@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.bun/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Large assets (dictionaries)
+assets/*.jsonl
+assets/*.json
+!assets/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp

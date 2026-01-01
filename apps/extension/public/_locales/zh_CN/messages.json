@@ -1,0 +1,82 @@
+{
+  "extensionName": {
+    "message": "LexiPath",
+    "description": "扩展名称"
+  },
+  "extensionDescription": {
+    "message": "沉浸式语言学习 - 用智能 i+1 增强改造网页和视频",
+    "description": "扩展描述"
+  },
+  "loading": {
+    "message": "加载中...",
+    "description": "加载状态"
+  },
+  "enabled": {
+    "message": "已启用",
+    "description": "启用标签"
+  },
+  "on": {
+    "message": "开",
+    "description": "开启状态"
+  },
+  "off": {
+    "message": "关",
+    "description": "关闭状态"
+  },
+  "targetLanguage": {
+    "message": "目标语言",
+    "description": "目标语言标签"
+  },
+  "proficiencyLevel": {
+    "message": "熟练度",
+    "description": "熟练度标签"
+  },
+  "openSettings": {
+    "message": "打开设置",
+    "description": "打开设置链接"
+  },
+  "settingsTitle": {
+    "message": "LexiPath 设置",
+    "description": "设置页面标题"
+  },
+  "providerSettings": {
+    "message": "AI 服务商",
+    "description": "服务商设置区域标题"
+  },
+  "providerSettingsDesc": {
+    "message": "配置您的 OpenAI 兼容 AI 服务商",
+    "description": "服务商设置描述"
+  },
+  "languageSettings": {
+    "message": "语言",
+    "description": "语言设置区域标题"
+  },
+  "siteRules": {
+    "message": "站点规则",
+    "description": "站点规则区域标题"
+  },
+  "welcomeTitle": {
+    "message": "欢迎使用 LexiPath",
+    "description": "入门欢迎标题"
+  },
+  "welcomeDesc": {
+    "message": "将您的浏览体验转化为沉浸式语言学习之旅",
+    "description": "入门欢迎描述"
+  },
+  "getStarted": {
+    "message": "开始使用",
+    "description": "开始使用按钮"
+  },
+  "chatTitle": {
+    "message": "对话",
+    "description": "侧边栏对话标题"
+  },
+  "chatEmpty": {
+    "message": "询问任何关于您正在阅读的单词或内容的问题",
+    "description": "空对话消息"
+  },
+  "chatPlaceholder": {
+    "message": "输入消息...",
+    "description": "对话输入占位符"
+  }
+}

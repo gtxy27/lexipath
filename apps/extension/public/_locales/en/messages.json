@@ -1,0 +1,82 @@
+{
+  "extensionName": {
+    "message": "LexiPath",
+    "description": "Extension name"
+  },
+  "extensionDescription": {
+    "message": "Immersive language learning - transform web pages and videos with intelligent i+1 enhancement",
+    "description": "Extension description"
+  },
+  "loading": {
+    "message": "Loading...",
+    "description": "Loading state"
+  },
+  "enabled": {
+    "message": "Enabled",
+    "description": "Enabled label"
+  },
+  "on": {
+    "message": "ON",
+    "description": "On state"
+  },
+  "off": {
+    "message": "OFF",
+    "description": "Off state"
+  },
+  "targetLanguage": {
+    "message": "Target Language",
+    "description": "Target language label"
+  },
+  "proficiencyLevel": {
+    "message": "Proficiency Level",
+    "description": "Proficiency level label"
+  },
+  "openSettings": {
+    "message": "Open Settings",
+    "description": "Open settings link"
+  },
+  "settingsTitle": {
+    "message": "LexiPath Settings",
+    "description": "Settings page title"
+  },
+  "providerSettings": {
+    "message": "AI Provider",
+    "description": "Provider settings section title"
+  },
+  "providerSettingsDesc": {
+    "message": "Configure your OpenAI-compatible AI provider",
+    "description": "Provider settings description"
+  },
+  "languageSettings": {
+    "message": "Language",
+    "description": "Language settings section title"
+  },
+  "siteRules": {
+    "message": "Site Rules",
+    "description": "Site rules section title"
+  },
+  "welcomeTitle": {
+    "message": "Welcome to LexiPath",
+    "description": "Onboarding welcome title"
+  },
+  "welcomeDesc": {
+    "message": "Transform your browsing experience into an immersive language learning journey",
+    "description": "Onboarding welcome description"
+  },
+  "getStarted": {
+    "message": "Get Started",
+    "description": "Get started button"
+  },
+  "chatTitle": {
+    "message": "Chat",
+    "description": "Sidebar chat title"
+  },
+  "chatEmpty": {
+    "message": "Ask anything about the words or content you're reading",
+    "description": "Empty chat message"
+  },
+  "chatPlaceholder": {
+    "message": "Type a message...",
+    "description": "Chat input placeholder"
+  }
+}

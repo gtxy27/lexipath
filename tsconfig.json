@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitAny": true,
+    "useUnknownInCatchVariables": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@lexipath/core": ["packages/core/src"],
+      "@lexipath/core/*": ["packages/core/src/*"],
+      "@lexipath/providers": ["packages/providers/src"],
+      "@lexipath/providers/*": ["packages/providers/src/*"],
+      "@lexipath/subtitles": ["packages/subtitles/src"],
+      "@lexipath/subtitles/*": ["packages/subtitles/src/*"],
+      "@lexipath/dictionary": ["packages/dictionary/src"],
+      "@lexipath/dictionary/*": ["packages/dictionary/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}
