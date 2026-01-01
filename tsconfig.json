@@ -18,18 +18,7 @@
     "isolatedModules": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@lexipath/core": ["packages/core/src"],
-      "@lexipath/core/*": ["packages/core/src/*"],
-      "@lexipath/providers": ["packages/providers/src"],
-      "@lexipath/providers/*": ["packages/providers/src/*"],
-      "@lexipath/subtitles": ["packages/subtitles/src"],
-      "@lexipath/subtitles/*": ["packages/subtitles/src/*"],
-      "@lexipath/dictionary": ["packages/dictionary/src"],
-      "@lexipath/dictionary/*": ["packages/dictionary/src/*"]
-    }
+    "sourceMap": true
   },
   "exclude": ["node_modules", "dist"]
 }
