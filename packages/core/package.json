@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./types": "./src/types/index.ts",
     "./qualify": "./src/qualify/index.ts",
+    "./familiarity": "./src/familiarity/index.ts",
     "./strategy": "./src/strategy/index.ts",
     "./validators": "./src/validators/index.ts",
     "./cache-key": "./src/cache-key/index.ts"

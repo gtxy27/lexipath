@@ -1,11 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { copyFileSync } from 'fs';
 
 const isFirefox = process.env.VITE_BROWSER === 'firefox';
+const browser = isFirefox ? 'firefox' : 'chrome';
+
+function copyManifestPlugin() {
+  return {
+    name: 'copy-manifest',
+    closeBundle() {
+      const outDir = isFirefox ? 'dist/firefox' : 'dist/chrome';
+      const src = resolve(__dirname, `public/manifest.${browser}.json`);
+      const dest = resolve(__dirname, `${outDir}/manifest.json`);
+      copyFileSync(src, dest);
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), copyManifestPlugin()],
   build: {
     outDir: isFirefox ? 'dist/firefox' : 'dist/chrome',
     emptyOutDir: true,

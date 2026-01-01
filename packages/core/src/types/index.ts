@@ -160,7 +160,8 @@ export type SubtitleEnhanceOutput = z.infer<typeof SubtitleEnhanceOutputSchema>;
 
 export const WordFamiliaritySchema = z.object({
   word: z.string(),
-  familiarity: z.number().min(0).max(1),
+  // 0–100 score used by strategy (see docs/WORD_FAMILIARITY_RESEARCH.md)
+  familiarity: z.number().min(0).max(100),
   lastSeen: z.number(),
   encounters: z.number(),
 });
@@ -193,3 +194,26 @@ export const StrategyOutputSchema = z.object({
   masterWords: MasterWordsSchema,
 });
 export type StrategyOutput = z.infer<typeof StrategyOutputSchema>;
+
+// =============================================================================
+// Chat
+// =============================================================================
+
+export const ChatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  timestamp: z.number(),
+});
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+export const ChatPayloadSchema = z.object({
+  message: z.string().min(1),
+  conversationId: z.string().optional(),
+});
+export type ChatPayload = z.infer<typeof ChatPayloadSchema>;
+
+export const ChatResponseSchema = z.object({
+  reply: z.string(),
+  conversationId: z.string(),
+});
+export type ChatResponse = z.infer<typeof ChatResponseSchema>;

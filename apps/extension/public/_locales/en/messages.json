@@ -78,5 +78,433 @@
   "chatPlaceholder": {
     "message": "Type a message...",
     "description": "Chat input placeholder"
+  },
+  "chatSend": {
+    "message": "Send",
+    "description": "Send button"
+  },
+  "chatClear": {
+    "message": "Clear",
+    "description": "Clear chat button"
+  },
+  "chatClearConfirm": {
+    "message": "Are you sure you want to clear all messages?",
+    "description": "Clear chat confirmation message"
+  },
+  "optionsLoadError": {
+    "message": "Failed to load settings: $1",
+    "description": "Options page load error"
+  },
+  "optionsSaveButton": {
+    "message": "Save",
+    "description": "Options page save button"
+  },
+  "optionsSaving": {
+    "message": "Saving…",
+    "description": "Options page saving state"
+  },
+  "optionsSaveSuccess": {
+    "message": "Saved.",
+    "description": "Options page save success"
+  },
+  "optionsSaveError": {
+    "message": "Failed to save: $1",
+    "description": "Options page save error"
+  },
+  "optionsValidationError": {
+    "message": "Please fix the highlighted fields.",
+    "description": "Options page validation error"
+  },
+  "optionsPermissionRequestFailed": {
+    "message": "Could not request host permission.",
+    "description": "Host permission request failed"
+  },
+  "optionsPermissionDenied": {
+    "message": "Permission denied. Please allow access to this host and try again.",
+    "description": "Host permission denied"
+  },
+  "optionsProviderBaseUrlLabel": {
+    "message": "Base URL",
+    "description": "Provider baseUrl label"
+  },
+  "optionsProviderBaseUrlDesc": {
+    "message": "OpenAI-compatible endpoint, usually ending with /v1",
+    "description": "Provider baseUrl description"
+  },
+  "optionsProviderBaseUrlPlaceholder": {
+    "message": "https://api.openai.com/v1",
+    "description": "Provider baseUrl placeholder"
+  },
+  "optionsProviderModelLabel": {
+    "message": "Model",
+    "description": "Provider model label"
+  },
+  "optionsProviderModelPlaceholder": {
+    "message": "gpt-4o-mini",
+    "description": "Provider model placeholder"
+  },
+  "optionsProviderApiKeyLabel": {
+    "message": "API Key",
+    "description": "Provider apiKey label"
+  },
+  "optionsProviderApiKeyDesc": {
+    "message": "Optional. Stored in extension local storage.",
+    "description": "Provider apiKey description"
+  },
+  "optionsProviderApiKeyPlaceholder": {
+    "message": "sk-...",
+    "description": "Provider apiKey placeholder"
+  },
+  "optionsProviderCustomHeadersLabel": {
+    "message": "Custom Headers (JSON)",
+    "description": "Provider custom headers label"
+  },
+  "optionsProviderCustomHeadersDesc": {
+    "message": "Optional JSON object of string headers, merged into every request.",
+    "description": "Provider custom headers description"
+  },
+  "optionsProviderCustomHeadersPlaceholder": {
+    "message": "{\n  \"X-Example\": \"value\"\n}",
+    "description": "Provider custom headers placeholder"
+  },
+  "optionsProviderTestButton": {
+    "message": "Test Connection",
+    "description": "Provider test connection button"
+  },
+  "optionsProviderTesting": {
+    "message": "Testing…",
+    "description": "Provider test connection loading state"
+  },
+  "optionsProviderTestHint": {
+    "message": "Requests permission for the provider host and sends a tiny chat request.",
+    "description": "Provider test connection hint"
+  },
+  "optionsProviderTestSuccess": {
+    "message": "Connection OK.",
+    "description": "Provider test connection success"
+  },
+  "optionsProviderTestFailed": {
+    "message": "Connection failed: $1",
+    "description": "Provider test connection failure"
+  },
+  "optionsProviderTestFailedUnknown": {
+    "message": "Unknown error",
+    "description": "Provider test connection unknown error"
+  },
+  "optionsProviderBaseUrlRequired": {
+    "message": "Base URL is required.",
+    "description": "Provider baseUrl required error"
+  },
+  "optionsProviderBaseUrlInvalid": {
+    "message": "Please enter a valid URL.",
+    "description": "Provider baseUrl invalid error"
+  },
+  "optionsProviderModelRequired": {
+    "message": "Model is required.",
+    "description": "Provider model required error"
+  },
+  "optionsProviderCustomHeadersInvalidJson": {
+    "message": "Invalid JSON.",
+    "description": "Provider custom headers JSON parse error"
+  },
+  "optionsProviderCustomHeadersInvalidFormat": {
+    "message": "Expected a JSON object with string values.",
+    "description": "Provider custom headers format error"
+  },
+  "optionsNativeLanguageLabel": {
+    "message": "Native Language",
+    "description": "Native language label"
+  },
+  "optionsTargetLanguageLabel": {
+    "message": "Target Language",
+    "description": "Target language label"
+  },
+  "optionsProficiencyLevelLabel": {
+    "message": "Proficiency",
+    "description": "Proficiency level label"
+  },
+  "languageNative_zh_CN": {
+    "message": "Chinese (Simplified)",
+    "description": "Native language zh-CN option"
+  },
+  "languageNative_zh_TW": {
+    "message": "Chinese (Traditional)",
+    "description": "Native language zh-TW option"
+  },
+  "languageNative_en": {
+    "message": "English",
+    "description": "Native language en option"
+  },
+  "languageTarget_en": {
+    "message": "English",
+    "description": "Target language en option"
+  },
+  "languageTarget_ja": {
+    "message": "Japanese",
+    "description": "Target language ja option"
+  },
+  "languageTarget_ko": {
+    "message": "Korean",
+    "description": "Target language ko option"
+  },
+  "languageTarget_fr": {
+    "message": "French",
+    "description": "Target language fr option"
+  },
+  "languageTarget_de": {
+    "message": "German",
+    "description": "Target language de option"
+  },
+  "languageTarget_zh": {
+    "message": "Chinese",
+    "description": "Target language zh option"
+  },
+  "proficiency_A1": {
+    "message": "A1",
+    "description": "CEFR A1"
+  },
+  "proficiency_A2": {
+    "message": "A2",
+    "description": "CEFR A2"
+  },
+  "proficiency_B1": {
+    "message": "B1",
+    "description": "CEFR B1"
+  },
+  "proficiency_B2": {
+    "message": "B2",
+    "description": "CEFR B2"
+  },
+  "proficiency_C1": {
+    "message": "C1",
+    "description": "CEFR C1"
+  },
+  "proficiency_C2": {
+    "message": "C2",
+    "description": "CEFR C2"
+  },
+  "optionsSiteModeLabel": {
+    "message": "Mode",
+    "description": "Site rules mode label"
+  },
+  "optionsSiteModeAll": {
+    "message": "All sites",
+    "description": "Site rules all mode"
+  },
+  "optionsSiteModeWhitelist": {
+    "message": "Whitelist only",
+    "description": "Site rules whitelist mode"
+  },
+  "optionsSiteModeDesc": {
+    "message": "All sites enhances everywhere; Whitelist only runs on allowed sites.",
+    "description": "Site rules mode description"
+  },
+  "optionsExcludedSitesLabel": {
+    "message": "Excluded Sites",
+    "description": "Excluded sites label"
+  },
+  "optionsExcludedSitesDesc": {
+    "message": "Ignored when Mode is “All sites”.",
+    "description": "Excluded sites description"
+  },
+  "optionsAllowedSitesLabel": {
+    "message": "Allowed Sites",
+    "description": "Allowed sites label"
+  },
+  "optionsAllowedSitesDesc": {
+    "message": "Used when Mode is “Whitelist only”.",
+    "description": "Allowed sites description"
+  },
+  "optionsSiteEntryPlaceholder": {
+    "message": "example.com or https://example.com/*",
+    "description": "Site entry placeholder"
+  },
+  "optionsListAdd": {
+    "message": "Add",
+    "description": "List add button"
+  },
+  "optionsListRemove": {
+    "message": "Remove",
+    "description": "List remove button"
+  },
+  "optionsListRemoveAria": {
+    "message": "Remove $1",
+    "description": "List remove aria label"
+  },
+  "optionsListEmpty": {
+    "message": "No entries yet.",
+    "description": "List empty state"
+  },
+  "wordCard_close": {
+    "message": "Close",
+    "description": "Close word card button"
+  },
+  "wordCard_pronounce": {
+    "message": "Pronounce",
+    "description": "Pronounce word button"
+  },
+  "wordCard_favorite": {
+    "message": "Favorite",
+    "description": "Add to favorites button"
+  },
+  "wordCard_markLearned": {
+    "message": "Learned",
+    "description": "Mark as learned button"
+  },
+  "onboardingStepProgress": {
+    "message": "Step $1 of 3",
+    "description": "Step progress indicator"
+  },
+  "onboardingStep1Title": {
+    "message": "Choose Your Learning Level",
+    "description": "Step 1 title"
+  },
+  "onboardingStep1Desc": {
+    "message": "Select the proficiency level that matches your target language skills",
+    "description": "Step 1 description"
+  },
+  "onboardingStep2Title": {
+    "message": "Customize Your Learning Scenarios",
+    "description": "Step 2 title"
+  },
+  "onboardingStep2Desc": {
+    "message": "Choose the scenarios you use most frequently",
+    "description": "Step 2 description"
+  },
+  "onboardingStep3Title": {
+    "message": "All Set!",
+    "description": "Step 3 title"
+  },
+  "onboardingStep3Desc": {
+    "message": "Review your settings and begin your learning journey",
+    "description": "Step 3 description"
+  },
+  "onboardingNext": {
+    "message": "Next",
+    "description": "Next button"
+  },
+  "onboardingPrevious": {
+    "message": "Previous",
+    "description": "Previous button"
+  },
+  "onboardingFinish": {
+    "message": "Get Started",
+    "description": "Finish button"
+  },
+  "onboardingTargetLanguageLabel": {
+    "message": "Target Language",
+    "description": "Target language label"
+  },
+  "onboardingProficiencyLabel": {
+    "message": "Proficiency Level",
+    "description": "Proficiency level label"
+  },
+  "onboardingSceneWeb": {
+    "message": "Web Reading",
+    "description": "Web scenario"
+  },
+  "onboardingSceneVideo": {
+    "message": "Video Watching",
+    "description": "Video scenario"
+  },
+  "onboardingSceneNative": {
+    "message": "Native Content",
+    "description": "Native content scenario"
+  },
+  "onboardingSceneTarget": {
+    "message": "Target Language Content",
+    "description": "Target language content scenario"
+  },
+  "onboardingSceneWebNativeTitle": {
+    "message": "Native Web Pages",
+    "description": "Native web scenario title"
+  },
+  "onboardingSceneWebNativeDesc": {
+    "message": "Inject target language expressions into native web pages for immersive learning",
+    "description": "Native web scenario description"
+  },
+  "onboardingSceneWebTargetTitle": {
+    "message": "Target Language Web Pages",
+    "description": "Target language web scenario title"
+  },
+  "onboardingSceneWebTargetDesc": {
+    "message": "Highlight difficult words in target language pages with on-demand native assistance",
+    "description": "Target language web scenario description"
+  },
+  "onboardingSceneVideoNativeTitle": {
+    "message": "Native Videos",
+    "description": "Native video scenario title"
+  },
+  "onboardingSceneVideoNativeDesc": {
+    "message": "Inject target language expressions into native subtitles for learning while watching",
+    "description": "Native video scenario description"
+  },
+  "onboardingSceneVideoTargetTitle": {
+    "message": "Target Language Videos",
+    "description": "Target language video scenario title"
+  },
+  "onboardingSceneVideoTargetDesc": {
+    "message": "Enhance target language subtitles with monolingual display by default, toggle to bilingual with one click",
+    "description": "Target language video scenario description"
+  },
+  "onboardingSummaryTitle": {
+    "message": "Confirm Your Settings",
+    "description": "Summary title"
+  },
+  "onboardingSummaryTargetLanguage": {
+    "message": "Target Language",
+    "description": "Summary: target language"
+  },
+  "onboardingSummaryProficiency": {
+    "message": "Proficiency Level",
+    "description": "Summary: proficiency"
+  },
+  "onboardingSummaryNote": {
+    "message": "You can adjust these settings anytime in the options page.",
+    "description": "Summary note"
+  },
+  "proficiency_N5": {
+    "message": "N5",
+    "description": "JLPT N5"
+  },
+  "proficiency_N4": {
+    "message": "N4",
+    "description": "JLPT N4"
+  },
+  "proficiency_N3": {
+    "message": "N3",
+    "description": "JLPT N3"
+  },
+  "proficiency_N2": {
+    "message": "N2",
+    "description": "JLPT N2"
+  },
+  "proficiency_N1": {
+    "message": "N1",
+    "description": "JLPT N1"
+  },
+  "proficiency_TOPIK1": {
+    "message": "TOPIK 1",
+    "description": "TOPIK 1"
+  },
+  "proficiency_TOPIK2": {
+    "message": "TOPIK 2",
+    "description": "TOPIK 2"
+  },
+  "proficiency_TOPIK3": {
+    "message": "TOPIK 3",
+    "description": "TOPIK 3"
+  },
+  "proficiency_TOPIK4": {
+    "message": "TOPIK 4",
+    "description": "TOPIK 4"
+  },
+  "proficiency_TOPIK5": {
+    "message": "TOPIK 5",
+    "description": "TOPIK 5"
+  },
+  "proficiency_TOPIK6": {
+    "message": "TOPIK 6",
+    "description": "TOPIK 6"
   }
 }

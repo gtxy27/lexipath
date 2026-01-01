@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
-import type { Settings, Response } from '@lexipath/core';
+import type { Settings } from '@lexipath/core';
+import { sendMessage } from '../../shared/messages';
 
 export function Popup(): React.ReactElement {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -8,11 +9,11 @@ export function Popup(): React.ReactElement {
 
   useEffect(() => {
     async function loadSettings() {
-      const response: Response<Settings> = await browser.runtime.sendMessage({
-        type: 'GET_SETTINGS',
-      });
+      const response = await sendMessage('GET_SETTINGS', undefined);
       if (response.ok) {
         setSettings(response.value);
+      } else {
+        console.error('[LexiPath] Failed to get settings:', response.error);
       }
       setLoading(false);
     }
@@ -21,12 +22,13 @@ export function Popup(): React.ReactElement {
 
   async function toggleEnabled() {
     if (!settings) return;
-    const newSettings = { ...settings, enabled: !settings.enabled };
-    await browser.runtime.sendMessage({
-      type: 'SET_SETTINGS',
-      payload: newSettings,
-    });
-    setSettings(newSettings);
+    const nextEnabled = !settings.enabled;
+    const response = await sendMessage('SET_SETTINGS', { enabled: nextEnabled });
+    if (response.ok) {
+      setSettings({ ...settings, enabled: nextEnabled });
+    } else {
+      console.error('[LexiPath] Failed to update settings:', response.error);
+    }
   }
 
   if (loading) {

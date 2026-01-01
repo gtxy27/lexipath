@@ -7,6 +7,21 @@
 
 export type { Cue, CueSource } from '@lexipath/core';
 
-// Adapters (to be implemented)
-// export { YouTubeAdapter } from './youtube';
-// export { BilibiliAdapter } from './bilibili';
+// YouTube
+export {
+  YouTubeAdapter,
+  getVideoId,
+  fetchSubtitles as fetchYouTubeSubtitles,
+  getAvailableTracks as getYouTubeAvailableTracks,
+  type YouTubeSubtitleTrack,
+} from './youtube';
+
+// Bilibili
+export {
+  BilibiliAdapter,
+  parseVideoInfo,
+  getCid,
+  fetchSubtitles as fetchBilibiliSubtitles,
+  getAvailableTracks as getBilibiliAvailableTracks,
+  type BilibiliSubtitleTrack,
+} from './bilibili';

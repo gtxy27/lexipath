@@ -8,8 +8,8 @@
 // Types
 export * from './types';
 
-// Modules (to be implemented)
-// export * from './qualify';
+// Modules
+export * from './qualify';
 // export * from './strategy';
 // export * from './validators';
 // export * from './cache-key';

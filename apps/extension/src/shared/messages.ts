@@ -1,0 +1,217 @@
+import browser from 'webextension-polyfill';
+import { z } from 'zod';
+import {
+  ChatPayloadSchema,
+  ChatResponseSchema,
+  ErrorResponseSchema,
+  MessageSchema,
+  MessageTypeSchema,
+  SettingsSchema,
+  SubtitleEnhanceOutputSchema,
+  SuccessResponseSchema,
+  WebEnhanceOutputSchema,
+  type ErrorResponse,
+  type MessageType,
+  type Response,
+  type Settings,
+} from '@lexipath/core';
+
+export type StructuredError = { code: string; message: string };
+
+export class MessageError extends Error {
+  code: string;
+
+  constructor({ code, message }: StructuredError) {
+    super(message);
+    this.name = 'MessageError';
+    this.code = code;
+  }
+}
+
+export function errorResponse(code: string, message: string): ErrorResponse {
+  return { ok: false, error: { code, message } };
+}
+
+export function unknownToErrorResponse(error: unknown): ErrorResponse {
+  if (error instanceof MessageError) {
+    return errorResponse(error.code, error.message);
+  }
+  if (error instanceof z.ZodError) {
+    return errorResponse('VALIDATION_ERROR', error.message);
+  }
+  if (error instanceof Error) {
+    return errorResponse('INTERNAL_ERROR', error.message);
+  }
+  return errorResponse('INTERNAL_ERROR', 'Unknown error');
+}
+
+const SetSettingsPayloadSchema = SettingsSchema.partial()
+  .strict()
+  .transform((partial): Partial<Settings> => {
+    const cleaned: Partial<Settings> = {};
+    for (const [key, value] of Object.entries(partial)) {
+      if (value !== undefined) {
+        (cleaned as Record<string, unknown>)[key] = value;
+      }
+    }
+    return cleaned;
+  });
+
+const messageDefinitions = {
+  GET_SETTINGS: {
+    payloadSchema: z.undefined(),
+    valueSchema: SettingsSchema,
+  },
+  SET_SETTINGS: {
+    payloadSchema: SetSettingsPayloadSchema,
+    valueSchema: z.null(),
+  },
+  REQUEST_HOST_PERMISSION: {
+    payloadSchema: z
+      .object({
+        origin: z.string().min(1),
+      })
+      .strict(),
+    valueSchema: z.boolean(),
+  },
+  ENHANCE_WEB: {
+    payloadSchema: z.unknown(),
+    valueSchema: WebEnhanceOutputSchema,
+  },
+  ENHANCE_SUBTITLE: {
+    payloadSchema: z.unknown(),
+    valueSchema: SubtitleEnhanceOutputSchema,
+  },
+  EXPLAIN_WORD: {
+    payloadSchema: z.unknown(),
+    valueSchema: z.unknown(),
+  },
+  CHAT: {
+    payloadSchema: ChatPayloadSchema,
+    valueSchema: ChatResponseSchema,
+  },
+} satisfies Record<
+  MessageType,
+  { payloadSchema: z.ZodTypeAny; valueSchema: z.ZodTypeAny }
+>;
+
+export type MessagePayload<TType extends MessageType> = z.infer<
+  (typeof messageDefinitions)[TType]['payloadSchema']
+>;
+export type MessageValue<TType extends MessageType> = z.infer<
+  (typeof messageDefinitions)[TType]['valueSchema']
+>;
+
+function normalizeMessageInput(input: unknown): unknown {
+  if (!input || typeof input !== 'object') return input;
+  return { payload: undefined, ...(input as Record<string, unknown>) };
+}
+
+function responseSchemaFor<TType extends MessageType>(type: TType) {
+  return z.union([
+    SuccessResponseSchema(messageDefinitions[type].valueSchema),
+    ErrorResponseSchema,
+  ]);
+}
+
+function parseResponse<TType extends MessageType>(
+  type: TType,
+  response: unknown
+): Response<MessageValue<TType>> {
+  const parsed = responseSchemaFor(type).safeParse(response);
+  if (parsed.success) {
+    return parsed.data as Response<MessageValue<TType>>;
+  }
+  return errorResponse('INVALID_RESPONSE', parsed.error.message);
+}
+
+export function sendMessage<TType extends MessageType>(
+  type: TType,
+  payload: MessagePayload<TType>
+): Promise<Response<MessageValue<TType>>>;
+export function sendMessage<T>(
+  type: MessageType,
+  payload: unknown
+): Promise<Response<T>>;
+export async function sendMessage(
+  type: MessageType,
+  payload: unknown
+): Promise<Response<unknown>> {
+  const parsedType = MessageTypeSchema.safeParse(type);
+  if (!parsedType.success) {
+    return errorResponse('INVALID_MESSAGE_TYPE', parsedType.error.message);
+  }
+  const typeKey = parsedType.data;
+
+  const payloadResult = messageDefinitions[typeKey].payloadSchema.safeParse(payload);
+  if (!payloadResult.success) {
+    return errorResponse('INVALID_PAYLOAD', payloadResult.error.message);
+  }
+
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: typeKey,
+      payload: payloadResult.data,
+    });
+    return parseResponse(typeKey, response);
+  } catch (error) {
+    return unknownToErrorResponse(error);
+  }
+}
+
+export type MessageHandler<TType extends MessageType> = (
+  payload: MessagePayload<TType>,
+  sender: browser.Runtime.MessageSender
+) => Promise<MessageValue<TType>> | MessageValue<TType>;
+
+export function createMessageHandlerRegistry() {
+  type AnyHandler = (
+    payload: unknown,
+    sender: browser.Runtime.MessageSender
+  ) => Promise<unknown> | unknown;
+
+  const handlers = new Map<MessageType, AnyHandler>();
+
+  function register<TType extends MessageType>(type: TType, handler: MessageHandler<TType>) {
+    handlers.set(type, handler as unknown as AnyHandler);
+  }
+
+  async function handleIncomingMessage(
+    rawMessage: unknown,
+    sender: browser.Runtime.MessageSender
+  ): Promise<Response<unknown>> {
+    const messageResult = MessageSchema.safeParse(normalizeMessageInput(rawMessage));
+    if (!messageResult.success) {
+      return errorResponse('INVALID_MESSAGE', messageResult.error.message);
+    }
+
+    const { type, payload } = messageResult.data;
+    const handler = handlers.get(type);
+    if (!handler) {
+      return errorResponse('NO_HANDLER', `No handler registered for ${type}`);
+    }
+
+    const payloadResult = messageDefinitions[type].payloadSchema.safeParse(payload);
+    if (!payloadResult.success) {
+      return errorResponse('INVALID_PAYLOAD', payloadResult.error.message);
+    }
+
+    try {
+      const value = await handler(payloadResult.data, sender);
+      const valueResult = messageDefinitions[type].valueSchema.safeParse(value);
+      if (!valueResult.success) {
+        return errorResponse('INVALID_RESPONSE', valueResult.error.message);
+      }
+      return { ok: true, value: valueResult.data };
+    } catch (error) {
+      return unknownToErrorResponse(error);
+    }
+  }
+
+  return {
+    register,
+    handleIncomingMessage,
+  };
+}
+
+export type { Settings };

@@ -78,5 +78,417 @@
   "chatPlaceholder": {
     "message": "输入消息...",
     "description": "对话输入占位符"
+  },
+  "chatSend": {
+    "message": "发送",
+    "description": "发送按钮"
+  },
+  "chatClear": {
+    "message": "清空",
+    "description": "清空对话按钮"
+  },
+  "chatClearConfirm": {
+    "message": "确定要清空所有对话吗？",
+    "description": "清空对话确认消息"
+  },
+  "optionsLoadError": {
+    "message": "加载设置失败：$1",
+    "description": "设置页加载错误"
+  },
+  "optionsSaveButton": {
+    "message": "保存",
+    "description": "设置页保存按钮"
+  },
+  "optionsSaving": {
+    "message": "保存中…",
+    "description": "设置页保存中状态"
+  },
+  "optionsSaveSuccess": {
+    "message": "已保存。",
+    "description": "设置页保存成功"
+  },
+  "optionsSaveError": {
+    "message": "保存失败：$1",
+    "description": "设置页保存失败"
+  },
+  "optionsValidationError": {
+    "message": "请先修正标红的字段。",
+    "description": "设置页表单校验提示"
+  },
+  "optionsPermissionRequestFailed": {
+    "message": "无法请求该主机权限。",
+    "description": "请求主机权限失败"
+  },
+  "optionsPermissionDenied": {
+    "message": "已拒绝权限。请允许访问该主机后重试。",
+    "description": "主机权限被拒绝"
+  },
+  "optionsProviderBaseUrlLabel": {
+    "message": "Base URL",
+    "description": "服务商 baseUrl 标签"
+  },
+  "optionsProviderBaseUrlDesc": {
+    "message": "OpenAI 兼容接口地址，通常以 /v1 结尾",
+    "description": "服务商 baseUrl 描述"
+  },
+  "optionsProviderBaseUrlPlaceholder": {
+    "message": "https://api.openai.com/v1",
+    "description": "服务商 baseUrl 占位符"
+  },
+  "optionsProviderModelLabel": {
+    "message": "模型",
+    "description": "服务商 model 标签"
+  },
+  "optionsProviderModelPlaceholder": {
+    "message": "gpt-4o-mini",
+    "description": "服务商 model 占位符"
+  },
+  "optionsProviderApiKeyLabel": {
+    "message": "API Key",
+    "description": "服务商 apiKey 标签"
+  },
+  "optionsProviderApiKeyDesc": {
+    "message": "可选。保存到扩展本地存储。",
+    "description": "服务商 apiKey 描述"
+  },
+  "optionsProviderApiKeyPlaceholder": {
+    "message": "sk-...",
+    "description": "服务商 apiKey 占位符"
+  },
+  "optionsProviderCustomHeadersLabel": {
+    "message": "自定义 Header（JSON）",
+    "description": "服务商自定义 header 标签"
+  },
+  "optionsProviderCustomHeadersDesc": {
+    "message": "可选。JSON 对象（值必须为字符串），会合并到每次请求中。",
+    "description": "服务商自定义 header 描述"
+  },
+  "optionsProviderCustomHeadersPlaceholder": {
+    "message": "{\n  \"X-Example\": \"value\"\n}",
+    "description": "服务商自定义 header 占位符"
+  },
+  "optionsProviderTestButton": {
+    "message": "测试连接",
+    "description": "服务商测试连接按钮"
+  },
+  "optionsProviderTesting": {
+    "message": "测试中…",
+    "description": "服务商测试连接加载状态"
+  },
+  "optionsProviderTestHint": {
+    "message": "会请求该主机权限并发送一次极小的测试请求。",
+    "description": "服务商测试连接提示"
+  },
+  "optionsProviderTestSuccess": {
+    "message": "连接正常。",
+    "description": "服务商测试连接成功"
+  },
+  "optionsProviderTestFailed": {
+    "message": "连接失败：$1",
+    "description": "服务商测试连接失败"
+  },
+  "optionsProviderTestFailedUnknown": {
+    "message": "未知错误",
+    "description": "服务商测试连接未知错误"
+  },
+  "optionsProviderBaseUrlRequired": {
+    "message": "Base URL 为必填项。",
+    "description": "服务商 baseUrl 必填错误"
+  },
+  "optionsProviderBaseUrlInvalid": {
+    "message": "请输入有效的 URL。",
+    "description": "服务商 baseUrl URL 格式错误"
+  },
+  "optionsProviderModelRequired": {
+    "message": "模型为必填项。",
+    "description": "服务商 model 必填错误"
+  },
+  "optionsProviderCustomHeadersInvalidJson": {
+    "message": "JSON 格式无效。",
+    "description": "服务商自定义 header JSON 解析错误"
+  },
+  "optionsProviderCustomHeadersInvalidFormat": {
+    "message": "需要 JSON 对象，且值必须为字符串。",
+    "description": "服务商自定义 header 格式错误"
+  },
+  "optionsNativeLanguageLabel": {
+    "message": "母语",
+    "description": "母语标签"
+  },
+  "optionsTargetLanguageLabel": {
+    "message": "目标语言",
+    "description": "目标语言标签"
+  },
+  "optionsProficiencyLevelLabel": {
+    "message": "熟练度",
+    "description": "熟练度标签"
+  },
+  "languageNative_zh_CN": {
+    "message": "中文（简体）",
+    "description": "母语 zh-CN 选项"
+  },
+  "languageNative_zh_TW": {
+    "message": "中文（繁体）",
+    "description": "母语 zh-TW 选项"
+  },
+  "languageNative_en": {
+    "message": "英语",
+    "description": "母语 en 选项"
+  },
+  "languageTarget_en": {
+    "message": "英语",
+    "description": "目标语言 en 选项"
+  },
+  "languageTarget_ja": {
+    "message": "日语",
+    "description": "目标语言 ja 选项"
+  },
+  "languageTarget_ko": {
+    "message": "韩语",
+    "description": "目标语言 ko 选项"
+  },
+  "languageTarget_fr": {
+    "message": "法语",
+    "description": "目标语言 fr 选项"
+  },
+  "languageTarget_de": {
+    "message": "德语",
+    "description": "目标语言 de 选项"
+  },
+  "languageTarget_zh": {
+    "message": "中文",
+    "description": "目标语言 zh 选项"
+  },
+  "proficiency_A1": {
+    "message": "A1",
+    "description": "CEFR A1"
+  },
+  "proficiency_A2": {
+    "message": "A2",
+    "description": "CEFR A2"
+  },
+  "proficiency_B1": {
+    "message": "B1",
+    "description": "CEFR B1"
+  },
+  "proficiency_B2": {
+    "message": "B2",
+    "description": "CEFR B2"
+  },
+  "proficiency_C1": {
+    "message": "C1",
+    "description": "CEFR C1"
+  },
+  "proficiency_C2": {
+    "message": "C2",
+    "description": "CEFR C2"
+  },
+  "optionsSiteModeLabel": {
+    "message": "模式",
+    "description": "站点规则模式标签"
+  },
+  "optionsSiteModeAll": {
+    "message": "全部站点",
+    "description": "站点规则全部站点模式"
+  },
+  "optionsSiteModeWhitelist": {
+    "message": "仅白名单",
+    "description": "站点规则仅白名单模式"
+  },
+  "optionsSiteModeDesc": {
+    "message": "“全部站点”会在所有站点运行；“仅白名单”只在允许列表的站点运行。",
+    "description": "站点规则模式描述"
+  },
+  "optionsExcludedSitesLabel": {
+    "message": "排除站点",
+    "description": "排除站点标签"
+  },
+  "optionsExcludedSitesDesc": {
+    "message": "当模式为“全部站点”时生效。",
+    "description": "排除站点描述"
+  },
+  "optionsAllowedSitesLabel": {
+    "message": "允许站点",
+    "description": "允许站点标签"
+  },
+  "optionsAllowedSitesDesc": {
+    "message": "当模式为“仅白名单”时生效。",
+    "description": "允许站点描述"
+  },
+  "optionsSiteEntryPlaceholder": {
+    "message": "example.com 或 https://example.com/*",
+    "description": "站点输入占位符"
+  },
+  "optionsListAdd": {
+    "message": "添加",
+    "description": "列表添加按钮"
+  },
+  "optionsListRemove": {
+    "message": "移除",
+    "description": "列表移除按钮"
+  },
+  "optionsListRemoveAria": {
+    "message": "移除 $1",
+    "description": "列表移除按钮无障碍标签"
+  },
+  "optionsListEmpty": {
+    "message": "暂无条目。",
+    "description": "列表为空提示"
+  },
+  "onboardingStepProgress": {
+    "message": "步骤 $1 / 3",
+    "description": "步骤进度指示器"
+  },
+  "onboardingStep1Title": {
+    "message": "选择您的学习水平",
+    "description": "步骤 1 标题"
+  },
+  "onboardingStep1Desc": {
+    "message": "根据您的目标语言选择合适的水平",
+    "description": "步骤 1 描述"
+  },
+  "onboardingStep2Title": {
+    "message": "自定义您的学习场景",
+    "description": "步骤 2 标题"
+  },
+  "onboardingStep2Desc": {
+    "message": "选择您最常使用的场景和偏好设置",
+    "description": "步骤 2 描述"
+  },
+  "onboardingStep3Title": {
+    "message": "准备就绪！",
+    "description": "步骤 3 标题"
+  },
+  "onboardingStep3Desc": {
+    "message": "确认您的设置并开始学习之旅",
+    "description": "步骤 3 描述"
+  },
+  "onboardingNext": {
+    "message": "下一步",
+    "description": "下一步按钮"
+  },
+  "onboardingPrevious": {
+    "message": "上一步",
+    "description": "上一步按钮"
+  },
+  "onboardingFinish": {
+    "message": "开始使用",
+    "description": "完成按钮"
+  },
+  "onboardingTargetLanguageLabel": {
+    "message": "目标语言",
+    "description": "目标语言标签"
+  },
+  "onboardingProficiencyLabel": {
+    "message": "学习水平",
+    "description": "学习水平标签"
+  },
+  "onboardingSceneWeb": {
+    "message": "网页阅读",
+    "description": "网页场景"
+  },
+  "onboardingSceneVideo": {
+    "message": "视频观看",
+    "description": "视频场景"
+  },
+  "onboardingSceneNative": {
+    "message": "中文内容",
+    "description": "母语内容场景"
+  },
+  "onboardingSceneTarget": {
+    "message": "目标语内容",
+    "description": "目标语内容场景"
+  },
+  "onboardingSceneWebNativeTitle": {
+    "message": "中文网页",
+    "description": "中文网页场景标题"
+  },
+  "onboardingSceneWebNativeDesc": {
+    "message": "在中文网页中注入目标语表达，提供沉浸式学习体验",
+    "description": "中文网页场景描述"
+  },
+  "onboardingSceneWebTargetTitle": {
+    "message": "目标语网页",
+    "description": "目标语网页场景标题"
+  },
+  "onboardingSceneWebTargetDesc": {
+    "message": "在目标语网页中高亮难词，提供按需中文辅助",
+    "description": "目标语网页场景描述"
+  },
+  "onboardingSceneVideoNativeTitle": {
+    "message": "中文视频",
+    "description": "中文视频场景标题"
+  },
+  "onboardingSceneVideoNativeDesc": {
+    "message": "在中文字幕中注入目标语表达，边看边学",
+    "description": "中文视频场景描述"
+  },
+  "onboardingSceneVideoTargetTitle": {
+    "message": "目标语视频",
+    "description": "目标语视频场景标题"
+  },
+  "onboardingSceneVideoTargetDesc": {
+    "message": "增强目标语字幕，默认单语显示，可一键切换双语",
+    "description": "目标语视频场景描述"
+  },
+  "onboardingSummaryTitle": {
+    "message": "确认您的设置",
+    "description": "总结标题"
+  },
+  "onboardingSummaryTargetLanguage": {
+    "message": "目标语言",
+    "description": "总结：目标语言"
+  },
+  "onboardingSummaryProficiency": {
+    "message": "学习水平",
+    "description": "总结：学习水平"
+  },
+  "onboardingSummaryNote": {
+    "message": "您可以随时在设置中调整这些选项。",
+    "description": "总结提示"
+  },
+  "proficiency_N5": {
+    "message": "N5",
+    "description": "JLPT N5"
+  },
+  "proficiency_N4": {
+    "message": "N4",
+    "description": "JLPT N4"
+  },
+  "proficiency_N3": {
+    "message": "N3",
+    "description": "JLPT N3"
+  },
+  "proficiency_N2": {
+    "message": "N2",
+    "description": "JLPT N2"
+  },
+  "proficiency_N1": {
+    "message": "N1",
+    "description": "JLPT N1"
+  },
+  "proficiency_TOPIK1": {
+    "message": "TOPIK 1",
+    "description": "TOPIK 1"
+  },
+  "proficiency_TOPIK2": {
+    "message": "TOPIK 2",
+    "description": "TOPIK 2"
+  },
+  "proficiency_TOPIK3": {
+    "message": "TOPIK 3",
+    "description": "TOPIK 3"
+  },
+  "proficiency_TOPIK4": {
+    "message": "TOPIK 4",
+    "description": "TOPIK 4"
+  },
+  "proficiency_TOPIK5": {
+    "message": "TOPIK 5",
+    "description": "TOPIK 5"
+  },
+  "proficiency_TOPIK6": {
+    "message": "TOPIK 6",
+    "description": "TOPIK 6"
   }
 }
