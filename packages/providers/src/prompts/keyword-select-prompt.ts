@@ -12,25 +12,24 @@ export function buildKeywordSelectPrompt(options: KeywordSelectPromptOptions): s
   const scene = options.scene ?? 'subtitle';
   const text = options.text.trim();
 
-  return `You are LexiPath, a language learning assistant.
+  return `你是 LexiPath，一个语言学习助手。
 
-Task: Select key vocabulary items from the given ${scene} text for a learner.
+任务：从下面这段 ${scene} 文本中，挑选对学习者最有价值的“关键词/短语”。
 
-Learner:
-- Native language: ${options.targetLang}
-- Target language: ${options.sourceLang}
-- Level: ${options.userLevel}
+学习者信息：
+- 母语：${options.targetLang}
+- 目标语言：${options.sourceLang}
+- 水平：${options.userLevel}
 
-Rules:
-- Output ONLY a JSON array of strings. No markdown, no code fences, no extra text.
-- Each item must be a word OR a short phrase (collocation/phrasal verb/idiom) that appears in the text.
-- Prefer phrases when they carry meaning beyond the individual words.
-- Exclude people names and place names.
-- Exclude basic numbers/counting words (e.g., 3, three) unless they are essential to meaning.
-- Return at most 8 items.
-- Do NOT output indices/positions.
+规则（非常重要）：
+- 只输出一个 JSON 字符串数组（string array）。不要输出 Markdown、不要代码块、不要任何额外文字。
+- 数组中的每个元素必须是原文中出现的：一个单词 或 一个短语（固定搭配/短语动词/习语）；短语优先。
+- 排除人名、地名等专有名词。
+- 排除基础数字/计数词（例如 3、three），除非它对句子含义至关重要。
+- 最多返回 8 个元素。
+- 不要输出索引/位置等信息。
 
-Text:
+文本：
 ${text}
 `;
 }

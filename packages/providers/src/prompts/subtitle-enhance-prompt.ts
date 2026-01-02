@@ -33,44 +33,46 @@ export function buildSubtitleEnhancePrompt(options: SubtitleEnhancePromptOptions
   const targetLanguageName = getLanguageName(targetLang);
 
   if (mode === 'single') {
-    return `You are a subtitle enhancement assistant for language learners. Enhance the following ${sourceLanguageName} subtitle to match ${difficultyLevel} CEFR proficiency level.
+    return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平，同时保持口语自然、适合字幕显示。
 
-Rules:
-1. Adapt vocabulary and grammar to ${difficultyLevel} level
-2. Keep the core meaning intact
-3. Maintain subtitle-appropriate length (max 2 lines, ~40 characters per line)
-4. Use natural, conversational language
-5. Return only the enhanced ${sourceLanguageName} subtitle
+规则：
+1. 词汇与语法难度适配 ${difficultyLevel}
+2. 保持核心含义不变
+3. 保持字幕长度合理（最多 2 行，每行约 40 个字符以内）
+4. 使用自然、口语化表达
+5. 只返回增强后的 ${sourceLanguageName} 字幕内容
+6. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
 
-Subtitle to enhance:
+待处理字幕：
 """
 ${subtitle}
 """
 
-Respond in JSON format:
+请输出 JSON：
 {
-  "line1_final": "enhanced subtitle text here"
+  "line1_final": "增强后的字幕文本"
 }`;
   }
 
-  return `You are a subtitle enhancement assistant for language learners. Process the following ${sourceLanguageName} subtitle for bilingual display.
+  return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕处理为双语展示。
 
-Rules:
-1. line1_final: Enhanced ${sourceLanguageName} subtitle adapted to ${difficultyLevel} CEFR level
-2. line2_final: ${targetLanguageName} translation for reference
-3. Keep each line under ~40 characters for readability
-4. Preserve the core meaning in both lines
-5. Use natural, conversational language
+规则：
+1. line1_final：将 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平
+2. line2_final：提供 ${targetLanguageName} 翻译用于对照
+3. 每行尽量控制在约 40 个字符以内，便于阅读
+4. 两行都要保持核心含义一致
+5. 使用自然、口语化表达
+6. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
 
-Subtitle to process:
+待处理字幕：
 """
 ${subtitle}
 """
 
-Respond in JSON format:
+请输出 JSON：
 {
-  "line1_final": "enhanced ${sourceLanguageName} subtitle",
-  "line2_final": "${targetLanguageName} translation"
+  "line1_final": "增强后的 ${sourceLanguageName} 字幕",
+  "line2_final": "${targetLanguageName} 翻译"
 }`;
 }
 
@@ -79,14 +81,14 @@ Respond in JSON format:
  */
 function getLanguageName(lang: SupportedLanguage | NativeLanguage): string {
   const names: Record<string, string> = {
-    'en': 'English',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'fr': 'French',
-    'de': 'German',
-    'zh': 'Chinese',
-    'zh-CN': 'Simplified Chinese',
-    'zh-TW': 'Traditional Chinese',
+    'en': '英语',
+    'ja': '日语',
+    'ko': '韩语',
+    'fr': '法语',
+    'de': '德语',
+    'zh': '中文',
+    'zh-CN': '简体中文',
+    'zh-TW': '繁体中文',
   };
   return names[lang] || lang;
 }

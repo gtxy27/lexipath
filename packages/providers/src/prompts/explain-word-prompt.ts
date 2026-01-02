@@ -32,36 +32,36 @@ export function buildExplainWordPrompt(options: ExplainWordPromptOptions): strin
   const targetLanguageName = getLanguageName(targetLang);
 
   const contextSection = context
-    ? `\nContext where the word appears:\n"${context}"`
+    ? `\n出现语境：\n"${context}"`
     : '';
 
   const phoneticInstruction = getPhoneticInstruction(sourceLang, targetLang);
 
-  return `You are a vocabulary learning assistant. Explain the following ${sourceLanguageName} word/phrase for a ${userLevel}-level language learner.
+  return `你是词汇学习助手。请为一个 ${userLevel} 水平的语言学习者解释下面这个 ${sourceLanguageName} 的单词/短语。
 
-Word/Phrase: "${word}"${contextSection}
+单词/短语："${word}"${contextSection}
 
-Provide:
-1. translation: Translation to ${targetLanguageName}
-2. phonetic: ${phoneticInstruction}
-3. difficulty: CEFR level (A1, A2, B1, B2, C1, or C2)
-4. definition: Concise definition in ${targetLanguageName} (adapted to ${userLevel} level)
-5. example: Example sentence in ${sourceLanguageName} (only if no context provided)
-6. example_translation: Translation of example sentence to ${targetLanguageName} (only if example provided)
+请输出一个 JSON 对象，包含字段：
+1. translation：翻译成 ${targetLanguageName}
+2. phonetic：${phoneticInstruction}
+3. difficulty：CEFR 等级（A1/A2/B1/B2/C1/C2）
+4. definition：用 ${targetLanguageName} 给出简明释义（难度适配 ${userLevel}）
+5. example：${sourceLanguageName} 的例句（仅在未提供语境时给出）
+6. example_translation：例句的 ${targetLanguageName} 翻译（仅在给出 example 时给出）
 
-Guidelines:
-- Keep definitions simple and clear for ${userLevel}-level learners
-- Use common, everyday language in explanations
-- If the word has multiple meanings, choose the most relevant based on context${context ? '' : ' or the most common meaning'}
+要求：
+- 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字。
+- 释义尽量简洁、口语化，适合 ${userLevel} 学习者。
+- 如果有多个含义：优先选择与语境最相关的那个${context ? '' : '；若无语境则选择最常见含义'}。
 
-Respond in JSON format:
+JSON 格式示例（注意只输出 JSON）：
 {
-  "translation": "${targetLanguageName} translation",
-  "phonetic": "pronunciation notation",
+  "translation": "${targetLanguageName} 翻译",
+  "phonetic": "发音标注",
   "difficulty": "B1",
-  "definition": "clear definition in ${targetLanguageName}",
-  "example": "${sourceLanguageName} example sentence (optional)",
-  "example_translation": "${targetLanguageName} translation (optional)"
+  "definition": "${targetLanguageName} 简明释义",
+  "example": "${sourceLanguageName} 例句（可选）",
+  "example_translation": "${targetLanguageName} 例句翻译（可选）"
 }`;
 }
 
@@ -70,29 +70,29 @@ Respond in JSON format:
  */
 function getPhoneticInstruction(sourceLang: SupportedLanguage, targetLang: NativeLanguage): string {
   if (sourceLang === 'en') {
-    return 'IPA phonetic notation for the English word';
+    return '给出英文单词的 IPA 音标';
   }
   if (sourceLang === 'zh') {
-    return 'Pinyin with tone marks for the Chinese word';
+    return '给出中文词语的拼音（带声调）';
   }
   if (sourceLang === 'ja') {
-    return 'Romaji for the Japanese word';
+    return '给出日语词语的罗马音（Romaji）';
   }
   if (sourceLang === 'ko') {
-    return 'Romanization for the Korean word';
+    return '给出韩语词语的罗马化拼写（Romanization）';
   }
   if (sourceLang === 'fr') {
-    return 'IPA phonetic notation for the French word';
+    return '给出法语单词的 IPA 音标';
   }
   if (sourceLang === 'de') {
-    return 'IPA phonetic notation for the German word';
+    return '给出德语单词的 IPA 音标';
   }
 
   if (targetLang.startsWith('zh')) {
-    return 'Pinyin with tone marks for the translation';
+    return '若可行，给出翻译对应的拼音（带声调）';
   }
 
-  return 'Phonetic notation';
+  return '给出合适的发音标注';
 }
 
 /**
@@ -100,14 +100,14 @@ function getPhoneticInstruction(sourceLang: SupportedLanguage, targetLang: Nativ
  */
 function getLanguageName(lang: SupportedLanguage | NativeLanguage): string {
   const names: Record<string, string> = {
-    'en': 'English',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'fr': 'French',
-    'de': 'German',
-    'zh': 'Chinese',
-    'zh-CN': 'Simplified Chinese',
-    'zh-TW': 'Traditional Chinese',
+    'en': '英语',
+    'ja': '日语',
+    'ko': '韩语',
+    'fr': '法语',
+    'de': '德语',
+    'zh': '中文',
+    'zh-CN': '简体中文',
+    'zh-TW': '繁体中文',
   };
   return names[lang] || lang;
 }

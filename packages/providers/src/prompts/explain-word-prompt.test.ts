@@ -17,16 +17,16 @@ describe('buildExplainWordPrompt', () => {
     const prompt = buildExplainWordPrompt(options);
 
     expect(prompt).toContain('serendipity');
-    expect(prompt).toContain('English word/phrase');
-    expect(prompt).toContain('B2-level');
-    expect(prompt).toContain('Simplified Chinese');
-    expect(prompt).toContain('IPA phonetic notation');
+    expect(prompt).toContain('英语');
+    expect(prompt).toContain('B2');
+    expect(prompt).toContain('简体中文');
+    expect(prompt).toContain('IPA 音标');
     expect(prompt).toContain('"translation"');
     expect(prompt).toContain('"phonetic"');
     expect(prompt).toContain('"difficulty"');
     expect(prompt).toContain('"definition"');
     expect(prompt).toContain('"example"');
-    expect(prompt).not.toContain('Context where the word appears');
+    expect(prompt).not.toContain('出现语境');
   });
 
   it('should build prompt with context', () => {
@@ -41,9 +41,9 @@ describe('buildExplainWordPrompt', () => {
     const prompt = buildExplainWordPrompt(options);
 
     expect(prompt).toContain('bank');
-    expect(prompt).toContain('Context where the word appears');
+    expect(prompt).toContain('出现语境');
     expect(prompt).toContain('I walked along the river bank');
-    expect(prompt).toContain('most relevant based on context');
+    expect(prompt).toContain('与语境最相关');
   });
 
   it('should use correct phonetic instruction for English', () => {
@@ -56,7 +56,7 @@ describe('buildExplainWordPrompt', () => {
 
     const prompt = buildExplainWordPrompt(options);
 
-    expect(prompt).toContain('IPA phonetic notation for the English word');
+    expect(prompt).toContain('给出英文单词的 IPA 音标');
   });
 
   it('should use correct phonetic instruction for Chinese', () => {
@@ -69,7 +69,7 @@ describe('buildExplainWordPrompt', () => {
 
     const prompt = buildExplainWordPrompt(options);
 
-    expect(prompt).toContain('Pinyin with tone marks for the Chinese word');
+    expect(prompt).toContain('给出中文词语的拼音');
   });
 
   it('should use correct phonetic instruction for Japanese', () => {
@@ -82,7 +82,7 @@ describe('buildExplainWordPrompt', () => {
 
     const prompt = buildExplainWordPrompt(options);
 
-    expect(prompt).toContain('Romaji for the Japanese word');
+    expect(prompt).toContain('罗马音');
   });
 
   it('should use correct phonetic instruction for Korean', () => {
@@ -95,7 +95,7 @@ describe('buildExplainWordPrompt', () => {
 
     const prompt = buildExplainWordPrompt(options);
 
-    expect(prompt).toContain('Romanization for the Korean word');
+    expect(prompt).toContain('罗马化');
   });
 
   it('should use correct phonetic instruction for French', () => {
@@ -108,7 +108,7 @@ describe('buildExplainWordPrompt', () => {
 
     const prompt = buildExplainWordPrompt(options);
 
-    expect(prompt).toContain('IPA phonetic notation for the French word');
+    expect(prompt).toContain('法语单词的 IPA 音标');
   });
 
   it('should handle different user proficiency levels', () => {
@@ -121,8 +121,8 @@ describe('buildExplainWordPrompt', () => {
 
     const prompt = buildExplainWordPrompt(options);
 
-    expect(prompt).toContain('C1-level');
-    expect(prompt).toContain('adapted to C1 level');
+    expect(prompt).toContain('C1');
+    expect(prompt).toContain('难度适配 C1');
   });
 });
 

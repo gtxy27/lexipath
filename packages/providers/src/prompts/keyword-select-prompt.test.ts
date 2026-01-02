@@ -11,10 +11,10 @@ describe('buildKeywordSelectPrompt', () => {
       scene: 'subtitle',
     });
 
-    expect(prompt).toContain('Select key vocabulary items');
-    expect(prompt).toContain('Output ONLY a JSON array of strings');
-    expect(prompt).toContain('Do NOT output indices/positions');
-    expect(prompt).toContain('Exclude people names and place names');
+    expect(prompt).toContain('挑选对学习者最有价值');
+    expect(prompt).toContain('只输出一个 JSON 字符串数组');
+    expect(prompt).toContain('不要输出索引/位置');
+    expect(prompt).toContain('排除人名、地名');
     expect(prompt).toContain('This is a test subtitle');
   });
 });
@@ -51,4 +51,3 @@ describe('parseKeywordSelectResponse', () => {
     expect(result.keywords).toEqual([]);
   });
 });
-

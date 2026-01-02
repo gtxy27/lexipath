@@ -18,10 +18,11 @@ describe('buildWebEnhancePrompt', () => {
 
     const prompt = buildWebEnhancePrompt(options);
 
-    expect(prompt).toContain('B1 CEFR');
-    expect(prompt).toContain('English text');
-    expect(prompt).toContain('Simplified Chinese');
-    expect(prompt).toContain('up to 10 vocabulary words');
+    expect(prompt).toContain('CEFR');
+    expect(prompt).toContain('B1');
+    expect(prompt).toContain('英语');
+    expect(prompt).toContain('简体中文');
+    expect(prompt).toContain('最多 10');
     expect(prompt).toContain('This is a test sentence');
     expect(prompt).toContain('"content_result"');
     expect(prompt).toContain('"convert_word"');
@@ -39,8 +40,9 @@ describe('buildWebEnhancePrompt', () => {
 
     const prompt = buildWebEnhancePrompt(options);
 
-    expect(prompt).toContain('B2-C2 CEFR');
-    expect(prompt).toContain('up to 15 vocabulary words');
+    expect(prompt).toContain('CEFR');
+    expect(prompt).toContain('B2-C2');
+    expect(prompt).toContain('最多 15');
   });
 
   it('should use default maxWords when not provided', () => {
@@ -54,7 +56,7 @@ describe('buildWebEnhancePrompt', () => {
 
     const prompt = buildWebEnhancePrompt(options);
 
-    expect(prompt).toContain('up to 15 vocabulary words');
+    expect(prompt).toContain('最多 15');
   });
 
   it('should handle different language pairs', () => {
@@ -68,8 +70,8 @@ describe('buildWebEnhancePrompt', () => {
 
     const prompt = buildWebEnhancePrompt(options);
 
-    expect(prompt).toContain('French text');
-    expect(prompt).toContain('English');
+    expect(prompt).toContain('法语');
+    expect(prompt).toContain('英语');
   });
 });
 

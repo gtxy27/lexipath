@@ -17,12 +17,12 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
-    expect(prompt).toContain('B1 CEFR proficiency level');
-    expect(prompt).toContain('English subtitle');
+    expect(prompt).toContain('CEFR B1');
+    expect(prompt).toContain('英语 字幕');
     expect(prompt).toContain('This is a complex sentence');
     expect(prompt).toContain('"line1_final"');
     expect(prompt).not.toContain('"line2_final"');
-    expect(prompt).toContain('Return only the enhanced English subtitle');
+    expect(prompt).toContain('只返回增强后的 英语 字幕内容');
   });
 
   it('should build prompt for bilingual mode', () => {
@@ -36,11 +36,11 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
-    expect(prompt).toContain('A2 CEFR level');
-    expect(prompt).toContain('bilingual display');
+    expect(prompt).toContain('CEFR A2');
+    expect(prompt).toContain('双语展示');
     expect(prompt).toContain('"line1_final"');
     expect(prompt).toContain('"line2_final"');
-    expect(prompt).toContain('Simplified Chinese translation');
+    expect(prompt).toContain('简体中文 翻译');
   });
 
   it('should handle different difficulty levels', () => {
@@ -54,7 +54,7 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
-    expect(prompt).toContain('C2 CEFR');
+    expect(prompt).toContain('CEFR C2');
   });
 
   it('should handle different language pairs', () => {
@@ -68,8 +68,8 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
-    expect(prompt).toContain('French subtitle');
-    expect(prompt).toContain('English translation');
+    expect(prompt).toContain('法语 字幕');
+    expect(prompt).toContain('英语 翻译');
   });
 
   it('should include subtitle length constraints', () => {
@@ -83,7 +83,7 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
-    expect(prompt).toContain('40 characters');
+    expect(prompt).toContain('40 个字符');
   });
 });
 

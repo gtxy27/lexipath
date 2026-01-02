@@ -36,30 +36,31 @@ export function buildWebEnhancePrompt(options: WebEnhancePromptOptions): string 
   const sourceLanguageName = getLanguageName(sourceLang);
   const targetLanguageName = getLanguageName(targetLang);
 
-  return `You are a vocabulary learning assistant. Analyze the following ${sourceLanguageName} text and select up to ${maxWords} vocabulary words to translate for language learners.
+  return `你是词汇学习助手。请分析下面这段 ${sourceLanguageName} 文本，为语言学习者挑选最多 ${maxWords} 个值得学习的词汇并翻译。
 
-Rules:
-1. Select vocabulary strictly within the ${difficultyLabel} CEFR difficulty range
-2. Prioritize words with high educational value and frequency
-3. Avoid: proper nouns, numbers, URLs, code snippets, single letters, stop words
-4. For each selected word, provide:
-   - original: the word as it appears in the text (preserve case)
-   - converted: translation to ${targetLanguageName}
-   - difficulty: CEFR level (A1, A2, B1, B2, C1, or C2)
-5. Return the original text unchanged in content_result
-6. The convert_word array is optional and may be empty if no suitable words are found
+规则：
+1. 只选择 CEFR 难度范围在 ${difficultyLabel} 内的词汇
+2. 优先选择教育价值高、常见且有代表性的词
+3. 避免：专有名词、人名地名、纯数字、URL、代码片段、单个字母、明显的虚词/停用词
+4. 对每个入选词输出：
+   - original：原文中出现的形式（保留大小写）
+   - converted：翻译成 ${targetLanguageName}
+   - difficulty：CEFR 等级（A1/A2/B1/B2/C1/C2）
+5. content_result 必须返回原文，不做改写
+6. convert_word 可为空数组；若没有合适词汇也可以返回空
+7. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
 
-Text to analyze:
+待分析文本：
 """
 ${content}
 """
 
-Respond in JSON format:
+请输出 JSON：
 {
-  "content_result": "original text here",
+  "content_result": "原文",
   "convert_word": [
-    {"original": "example", "converted": "例子", "difficulty": "B1"},
-    {"original": "significant", "converted": "重要的", "difficulty": "B2"}
+    { "original": "example", "converted": "例子", "difficulty": "B1" },
+    { "original": "significant", "converted": "重要的", "difficulty": "B2" }
   ]
 }`;
 }
@@ -69,14 +70,14 @@ Respond in JSON format:
  */
 function getLanguageName(lang: SupportedLanguage | NativeLanguage): string {
   const names: Record<string, string> = {
-    'en': 'English',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'fr': 'French',
-    'de': 'German',
-    'zh': 'Chinese',
-    'zh-CN': 'Simplified Chinese',
-    'zh-TW': 'Traditional Chinese',
+    'en': '英语',
+    'ja': '日语',
+    'ko': '韩语',
+    'fr': '法语',
+    'de': '德语',
+    'zh': '中文',
+    'zh-CN': '简体中文',
+    'zh-TW': '繁体中文',
   };
   return names[lang] || lang;
 }
