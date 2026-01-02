@@ -83,6 +83,7 @@ export async function getCid(bvid: string): Promise<string> {
   const response = await fetch(url, {
     method: 'GET',
     headers: { Accept: 'application/json' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -158,6 +159,7 @@ export async function getAvailableTracks(
   const response = await fetch(url, {
     method: 'GET',
     headers: { Accept: 'application/json' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
