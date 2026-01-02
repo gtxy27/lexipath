@@ -25,3 +25,9 @@ export {
   parseExplainWordResponse,
   type ExplainWordPromptOptions,
 } from './explain-word-prompt';
+
+export {
+  buildKeywordSelectPrompt,
+  parseKeywordSelectResponse,
+  type KeywordSelectPromptOptions,
+} from './keyword-select-prompt';

@@ -1,13 +1,16 @@
 import browser from 'webextension-polyfill';
 import { z } from 'zod';
 import {
+  CEFRLevelSchema,
   ChatPayloadSchema,
   ChatResponseSchema,
   ErrorResponseSchema,
   MessageSchema,
   MessageTypeSchema,
+  NativeLanguageSchema,
   SettingsSchema,
   SubtitleEnhanceOutputSchema,
+  SupportedLanguageSchema,
   SuccessResponseSchema,
   WebEnhanceOutputSchema,
   type ErrorResponse,
@@ -73,6 +76,18 @@ const messageDefinitions = {
       })
       .strict(),
     valueSchema: z.boolean(),
+  },
+  SELECT_KEYWORDS: {
+    payloadSchema: z
+      .object({
+        text: z.string().min(1),
+        scene: z.enum(['subtitle', 'web']).optional(),
+        sourceLang: SupportedLanguageSchema.optional(),
+        targetLang: NativeLanguageSchema.optional(),
+        userLevel: CEFRLevelSchema.optional(),
+      })
+      .strict(),
+    valueSchema: z.array(z.string()),
   },
   ENHANCE_WEB: {
     payloadSchema: z.unknown(),

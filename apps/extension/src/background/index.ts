@@ -24,9 +24,11 @@ import { validateSubtitleEnhanceOutput, validateWebEnhanceOutput } from '@lexipa
 import { OpenAICompatibleProvider } from '@lexipath/providers';
 import {
   buildExplainWordPrompt,
+  buildKeywordSelectPrompt,
   buildSubtitleEnhancePrompt,
   buildWebEnhancePrompt,
   parseExplainWordResponse,
+  parseKeywordSelectResponse,
 } from '@lexipath/providers/prompts';
 import { DictionaryService } from '@lexipath/dictionary';
 
@@ -126,6 +128,7 @@ function getDefaultDifficultyRange(level: CEFRLevel): { difficultyMin: CEFRLevel
 
 const webEnhanceCache = createExpiringLruCache<WebEnhanceOutput>(CACHE_MAX_ENTRIES);
 const subtitleEnhanceCache = createExpiringLruCache<SubtitleEnhanceOutput>(CACHE_MAX_ENTRIES);
+const keywordSelectCache = createExpiringLruCache<string[]>(CACHE_MAX_ENTRIES);
 const explainWordCache = createExpiringLruCache<{
   word: string;
   phonetic?: string;
@@ -137,6 +140,7 @@ const explainWordCache = createExpiringLruCache<{
 }>(CACHE_MAX_ENTRIES);
 const webEnhanceInFlight = new Map<string, Promise<WebEnhanceOutput>>();
 const subtitleEnhanceInFlight = new Map<string, Promise<SubtitleEnhanceOutput>>();
+const keywordSelectInFlight = new Map<string, Promise<string[]>>();
 const explainWordInFlight = new Map<
   string,
   Promise<{
@@ -205,6 +209,60 @@ registry.register('REQUEST_HOST_PERMISSION', async (payload) => {
   } catch {
     return false;
   }
+});
+
+registry.register('SELECT_KEYWORDS', async (payload) => {
+  const text = getOptionalPayloadField(payload, 'text', z.string().min(1)) ?? '';
+  if (!text) return [];
+
+  const settings = await getSettings();
+  const sourceLang = getOptionalPayloadField(payload, 'sourceLang', SupportedLanguageSchema) ?? settings.targetLanguage;
+  const targetLang = getOptionalPayloadField(payload, 'targetLang', NativeLanguageSchema) ?? settings.nativeLanguage;
+  const userLevel = getOptionalPayloadField(payload, 'userLevel', CEFRLevelSchema) ?? settings.proficiencyLevel;
+  const scene = getOptionalPayloadField(payload, 'scene', z.union([z.literal('subtitle'), z.literal('web')]))
+    ?? 'subtitle';
+
+  const provider = getProvider(settings.provider);
+  if (!provider) return [];
+
+  const cacheKey = makeCacheKey('SELECT_KEYWORDS', {
+    v: 1,
+    provider: { baseUrl: settings.provider?.baseUrl, model: settings.provider?.model },
+    prompt: {
+      text,
+      sourceLang,
+      targetLang,
+      userLevel,
+      scene,
+    },
+  });
+
+  return getOrRunCachedTask(keywordSelectCache, keywordSelectInFlight, cacheKey, {
+    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
+    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
+    run: async () => {
+      try {
+        const prompt = buildKeywordSelectPrompt({
+          text,
+          sourceLang,
+          targetLang,
+          userLevel,
+          scene,
+        });
+
+        const response = await provider.chat([{ role: 'user', content: prompt }], {
+          temperature: 0.1,
+          maxTokens: 250,
+        });
+
+        const responseText = response.choices?.[0]?.message?.content ?? '';
+        const parsed = parseKeywordSelectResponse(responseText);
+        return { value: parsed.keywords, ok: parsed.ok };
+      } catch {
+        return { value: [], ok: false };
+      }
+    },
+  });
 });
 
 registry.register('ENHANCE_WEB', async (payload) => {

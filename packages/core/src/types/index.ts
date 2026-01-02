@@ -42,6 +42,7 @@ export const MessageTypeSchema = z.enum([
   'GET_SETTINGS',
   'SET_SETTINGS',
   'REQUEST_HOST_PERMISSION',
+  'SELECT_KEYWORDS',
   'ENHANCE_WEB',
   'ENHANCE_SUBTITLE',
   'EXPLAIN_WORD',
