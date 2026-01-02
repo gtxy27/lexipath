@@ -20,6 +20,7 @@ type FormState = {
   providerModel: string;
   providerApiKey: string;
   providerCustomHeadersText: string;
+  modelConcurrencyLimitsText: string;
   nativeLanguage: Settings['nativeLanguage'];
   targetLanguage: Settings['targetLanguage'];
   proficiencyLevel: Settings['proficiencyLevel'];
@@ -33,12 +34,15 @@ type FieldErrorKey =
   | 'optionsProviderBaseUrlInvalid'
   | 'optionsProviderModelRequired'
   | 'optionsProviderCustomHeadersInvalidJson'
-  | 'optionsProviderCustomHeadersInvalidFormat';
+  | 'optionsProviderCustomHeadersInvalidFormat'
+  | 'optionsConcurrencyInvalidJson'
+  | 'optionsConcurrencyInvalidFormat';
 
 type FieldErrors = Partial<{
   providerBaseUrl: FieldErrorKey;
   providerModel: FieldErrorKey;
   providerCustomHeadersText: FieldErrorKey;
+  modelConcurrencyLimitsText: FieldErrorKey;
 }>;
 
 type Notice =
@@ -75,6 +79,7 @@ function settingsToFormState(settings: Settings): FormState {
     providerCustomHeadersText: settings.provider?.customHeaders
       ? JSON.stringify(settings.provider.customHeaders, null, 2)
       : '',
+    modelConcurrencyLimitsText: JSON.stringify(settings.modelConcurrencyLimits ?? {}, null, 2),
     nativeLanguage: settings.nativeLanguage,
     targetLanguage: settings.targetLanguage,
     proficiencyLevel: settings.proficiencyLevel,
@@ -100,6 +105,26 @@ function parseCustomHeaders(
   const result = z.record(z.string()).safeParse(parsed);
   if (!result.success) {
     return { ok: false, errorKey: 'optionsProviderCustomHeadersInvalidFormat' };
+  }
+  return { ok: true, value: result.data };
+}
+
+function parseModelConcurrencyLimits(
+  rawText: string
+): { ok: true; value: Record<string, number> } | { ok: false; errorKey: FieldErrorKey } {
+  const text = rawText.trim();
+  if (!text) return { ok: true, value: {} };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, errorKey: 'optionsConcurrencyInvalidJson' };
+  }
+
+  const result = z.record(z.number().int().min(1).max(500)).safeParse(parsed);
+  if (!result.success) {
+    return { ok: false, errorKey: 'optionsConcurrencyInvalidFormat' };
   }
   return { ok: true, value: result.data };
 }
@@ -135,6 +160,11 @@ function buildSettingsPatch(form: FormState): {
     errors.providerCustomHeadersText = customHeadersResult.errorKey;
   }
 
+  const concurrencyResult = parseModelConcurrencyLimits(form.modelConcurrencyLimitsText);
+  if (!concurrencyResult.ok) {
+    errors.modelConcurrencyLimitsText = concurrencyResult.errorKey;
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -166,6 +196,7 @@ function buildSettingsPatch(form: FormState): {
 
   const patch: Partial<Settings> = {
     provider: providerParsed.data,
+    modelConcurrencyLimits: concurrencyResult.ok ? concurrencyResult.value : {},
     nativeLanguage: form.nativeLanguage,
     targetLanguage: form.targetLanguage,
     proficiencyLevel: form.proficiencyLevel,
@@ -573,6 +604,28 @@ export function Options(): React.ReactElement {
               </button>
               <p className="text-xs text-gray-500">{t('optionsProviderTestHint')}</p>
             </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-4">
+          {t('optionsAdvancedTitle')}
+        </h2>
+        <p className="text-gray-500 mb-6">{t('optionsConcurrencyDesc')}</p>
+
+        {form ? (
+          <div className="space-y-4">
+            <TextareaField
+              id="model-concurrency-limits"
+              labelKey="optionsConcurrencyLabel"
+              descriptionKey="optionsConcurrencyHint"
+              placeholderKey="optionsConcurrencyPlaceholder"
+              value={form.modelConcurrencyLimitsText}
+              onChange={(value) => setForm({ ...form, modelConcurrencyLimitsText: value })}
+              errorKey={fieldErrors.modelConcurrencyLimitsText}
+              rows={6}
+            />
           </div>
         ) : null}
       </section>

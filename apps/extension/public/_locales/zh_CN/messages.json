@@ -490,5 +490,33 @@
   "proficiency_TOPIK6": {
     "message": "TOPIK 6",
     "description": "TOPIK 6"
+  },
+  "optionsAdvancedTitle": {
+    "message": "高级设置",
+    "description": "Options page advanced section title"
+  },
+  "optionsConcurrencyDesc": {
+    "message": "限制每个模型并行运行的 AI 请求数量。Key 格式：baseUrl|model。",
+    "description": "Options page concurrency description"
+  },
+  "optionsConcurrencyLabel": {
+    "message": "按模型并发限制",
+    "description": "Concurrency limits label"
+  },
+  "optionsConcurrencyHint": {
+    "message": "示例：{\"https://api.example.com|gpt-4o-mini\": 20}。为空或缺失的 key 使用默认值（20）。",
+    "description": "Concurrency limits hint"
+  },
+  "optionsConcurrencyPlaceholder": {
+    "message": "{\n  \"https://api.openai.com/v1|gpt-4o-mini\": 20\n}",
+    "description": "Concurrency limits placeholder"
+  },
+  "optionsConcurrencyInvalidJson": {
+    "message": "JSON 格式不正确。",
+    "description": "Concurrency JSON parse error"
+  },
+  "optionsConcurrencyInvalidFormat": {
+    "message": "需要一个 JSON 对象，key 为字符串，value 为整数（1-500）。",
+    "description": "Concurrency JSON schema error"
   }
 }

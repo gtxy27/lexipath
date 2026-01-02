@@ -99,6 +99,10 @@ export const SettingsSchema = z.object({
   // Provider
   provider: ProviderConfigSchema.optional(),
 
+  // Concurrency (advanced)
+  // Keyed by `${baseUrl}|${model}` (per-model concurrency limit).
+  modelConcurrencyLimits: z.record(z.number().int().min(1).max(500)).default({}),
+
   // Behavior
   enabled: z.boolean().default(true),
   autoEnhance: z.boolean().default(true),

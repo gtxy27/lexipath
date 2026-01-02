@@ -506,5 +506,33 @@
   "proficiency_TOPIK6": {
     "message": "TOPIK 6",
     "description": "TOPIK 6"
+  },
+  "optionsAdvancedTitle": {
+    "message": "Advanced",
+    "description": "Options page advanced section title"
+  },
+  "optionsConcurrencyDesc": {
+    "message": "Limit how many AI requests run in parallel per model. Key format: baseUrl|model.",
+    "description": "Options page concurrency description"
+  },
+  "optionsConcurrencyLabel": {
+    "message": "Per-model concurrency limits",
+    "description": "Concurrency limits label"
+  },
+  "optionsConcurrencyHint": {
+    "message": "Example: {\"https://api.example.com|gpt-4o-mini\": 20}. Empty or missing keys use the default (20).",
+    "description": "Concurrency limits hint"
+  },
+  "optionsConcurrencyPlaceholder": {
+    "message": "{\n  \"https://api.openai.com/v1|gpt-4o-mini\": 20\n}",
+    "description": "Concurrency limits placeholder"
+  },
+  "optionsConcurrencyInvalidJson": {
+    "message": "Invalid JSON.",
+    "description": "Concurrency JSON parse error"
+  },
+  "optionsConcurrencyInvalidFormat": {
+    "message": "Expected a JSON object mapping strings to integers (1-500).",
+    "description": "Concurrency JSON schema error"
   }
 }

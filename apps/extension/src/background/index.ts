@@ -48,6 +48,65 @@ const registry = createMessageHandlerRegistry();
 const CACHE_MAX_ENTRIES = 200;
 const CACHE_SUCCESS_TTL_MS = 5 * 60 * 1000;
 const CACHE_FALLBACK_TTL_MS = 60 * 1000;
+const DEFAULT_MODEL_CONCURRENCY = 20;
+
+type ConcurrencyState = { inFlight: number; waiters: Array<() => void> };
+const modelConcurrency = new Map<string, ConcurrencyState>();
+
+function providerModelKey(config: ProviderConfig): string {
+  return `${config.baseUrl}|${config.model}`;
+}
+
+function getModelConcurrencyLimit(settings: { modelConcurrencyLimits?: Record<string, number> }, config: ProviderConfig): number {
+  const key = providerModelKey(config);
+  const raw = settings.modelConcurrencyLimits?.[key];
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 1) {
+    return Math.min(500, Math.floor(raw));
+  }
+  return DEFAULT_MODEL_CONCURRENCY;
+}
+
+async function acquireConcurrencySlot(key: string, limit: number): Promise<() => void> {
+  const normalizedLimit = Math.max(1, Math.floor(limit));
+  const state = modelConcurrency.get(key) ?? { inFlight: 0, waiters: [] };
+  modelConcurrency.set(key, state);
+
+  if (state.inFlight < normalizedLimit) {
+    state.inFlight += 1;
+    return () => releaseConcurrencySlot(key);
+  }
+
+  return new Promise((resolve) => {
+    state.waiters.push(() => {
+      state.inFlight += 1;
+      resolve(() => releaseConcurrencySlot(key));
+    });
+  });
+}
+
+function releaseConcurrencySlot(key: string): void {
+  const state = modelConcurrency.get(key);
+  if (!state) return;
+
+  state.inFlight = Math.max(0, state.inFlight - 1);
+  const next = state.waiters.shift();
+  if (next) next();
+}
+
+async function runWithModelConcurrency<T>(
+  settings: { modelConcurrencyLimits?: Record<string, number> },
+  config: ProviderConfig,
+  work: () => Promise<T>
+): Promise<T> {
+  const key = providerModelKey(config);
+  const limit = getModelConcurrencyLimit(settings, config);
+  const release = await acquireConcurrencySlot(key, limit);
+  try {
+    return await work();
+  } finally {
+    release();
+  }
+}
 
 let providerInstance: OpenAICompatibleProvider | null = null;
 let providerConfigKey: string | null = null;
@@ -242,6 +301,9 @@ registry.register('SELECT_KEYWORDS', async (payload) => {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
+        const providerConfig = settings.provider;
+        if (!providerConfig) return { value: [], ok: false };
+
         const prompt = buildKeywordSelectPrompt({
           text,
           sourceLang,
@@ -250,10 +312,12 @@ registry.register('SELECT_KEYWORDS', async (payload) => {
           scene,
         });
 
-        const response = await provider.chat([{ role: 'user', content: prompt }], {
-          temperature: 0.1,
-          maxTokens: 250,
-        });
+        const response = await runWithModelConcurrency(settings, providerConfig, () =>
+          provider.chat([{ role: 'user', content: prompt }], {
+            temperature: 0.1,
+            maxTokens: 250,
+          })
+        );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
         const parsed = parseKeywordSelectResponse(responseText);
@@ -304,6 +368,9 @@ registry.register('ENHANCE_WEB', async (payload) => {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
+        const providerConfig = settings.provider;
+        if (!providerConfig) return { value: validateWebEnhanceOutput(undefined).fallback, ok: false };
+
         const prompt = buildWebEnhancePrompt({
           content,
           sourceLang,
@@ -313,10 +380,12 @@ registry.register('ENHANCE_WEB', async (payload) => {
           ...(maxWords !== undefined && { maxWords }),
         });
 
-        const response = await provider.chat([{ role: 'user', content: prompt }], {
-          temperature: 0.2,
-          maxTokens: 2000,
-        });
+        const response = await runWithModelConcurrency(settings, providerConfig, () =>
+          provider.chat([{ role: 'user', content: prompt }], {
+            temperature: 0.2,
+            maxTokens: 2000,
+          })
+        );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
         const validated = validateWebEnhanceOutput(responseText);
@@ -368,6 +437,9 @@ registry.register('ENHANCE_SUBTITLE', async (payload) => {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
+        const providerConfig = settings.provider;
+        if (!providerConfig) return { value: validateSubtitleEnhanceOutput(undefined).fallback, ok: false };
+
         const prompt = buildSubtitleEnhancePrompt({
           subtitle,
           sourceLang,
@@ -376,10 +448,12 @@ registry.register('ENHANCE_SUBTITLE', async (payload) => {
           mode,
         });
 
-        const response = await provider.chat([{ role: 'user', content: prompt }], {
-          temperature: 0.2,
-          maxTokens: 400,
-        });
+        const response = await runWithModelConcurrency(settings, providerConfig, () =>
+          provider.chat([{ role: 'user', content: prompt }], {
+            temperature: 0.2,
+            maxTokens: 400,
+          })
+        );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
         const validated = validateSubtitleEnhanceOutput(responseText);
@@ -457,6 +531,13 @@ registry.register('EXPLAIN_WORD', async (payload) => {
     }
 
     try {
+      const providerConfig = settings.provider;
+      if (!providerConfig) {
+        const value = { word, definition: 'No definition available' };
+        explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
+        return value;
+      }
+
       const prompt = buildExplainWordPrompt({
         word,
         ...(context ? { context } : {}),
@@ -465,10 +546,12 @@ registry.register('EXPLAIN_WORD', async (payload) => {
         userLevel,
       });
 
-      const response = await provider.chat([{ role: 'user', content: prompt }], {
-        temperature: 0.2,
-        maxTokens: 350,
-      });
+      const response = await runWithModelConcurrency(settings, providerConfig, () =>
+        provider.chat([{ role: 'user', content: prompt }], {
+          temperature: 0.2,
+          maxTokens: 350,
+        })
+      );
 
       const responseText = response.choices?.[0]?.message?.content ?? '';
       const parsed = parseExplainWordResponse(responseText);
@@ -592,12 +675,22 @@ registry.register('CHAT', async (payload) => {
   };
 
   try {
-    const response = await provider.chat(
-      [systemMessage, ...truncatedHistory],
-      {
-        temperature: 0.7,
-        maxTokens: 1000,
-      }
+    const providerConfig = settings.provider;
+    if (!providerConfig) {
+      throw new MessageError({
+        code: 'PROVIDER_NOT_CONFIGURED',
+        message: 'Provider not configured',
+      });
+    }
+
+    const response = await runWithModelConcurrency(settings, providerConfig, () =>
+      provider.chat(
+        [systemMessage, ...truncatedHistory],
+        {
+          temperature: 0.7,
+          maxTokens: 1000,
+        }
+      )
     );
 
     const assistantReply = response.choices?.[0]?.message?.content ?? '';
