@@ -120,6 +120,8 @@ export class SubtitleController {
   private prefetchQueuedTerms = new Set<string>();
   private prefetchInFlight = 0;
   private maxPrefetchInFlight = 5;
+  private debugLastPrefetchSummaryAt = 0;
+  private debugLastPrefetchSaturationAt = 0;
 
   constructor(private settings: Settings) {}
 
@@ -688,7 +690,12 @@ export class SubtitleController {
     if (inFlight) return inFlight;
 
     const promise = (async () => {
+      const startedAt = performance.now();
       const response = await sendMessage('SELECT_KEYWORDS', { text: trimmed, scene: 'subtitle' });
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      if (elapsedMs >= 800) {
+        console.debug(`[SubtitleController] SELECT_KEYWORDS slow cueId=${cueId} ms=${elapsedMs}`);
+      }
       if (!response.ok) return [];
       return response.value;
     })()
@@ -729,6 +736,7 @@ export class SubtitleController {
     if (this.destroyed) return;
     if (token !== this.prefetchToken) return;
 
+    const prefetchStartedAt = performance.now();
     const nowMs = this.videoElement.currentTime * 1000;
     const windowEndMs = nowMs + this.keywordPrefetchLookaheadMs;
 
@@ -741,9 +749,22 @@ export class SubtitleController {
       cuesInWindow.push(cue);
     }
 
+    const summaryNow = Date.now();
+    if (summaryNow - this.debugLastPrefetchSummaryAt >= 1500) {
+      this.debugLastPrefetchSummaryAt = summaryNow;
+      console.debug(
+        `[SubtitleController] Prefetch window cues=${cuesInWindow.length} nowMs=${Math.round(nowMs)} lookaheadMs=${this.keywordPrefetchLookaheadMs}`
+      );
+    }
+
     const keywordLists = await Promise.all(cuesInWindow.map((cue) => this.ensureCueKeywords(cue.id, cue.text)));
     if (this.destroyed) return;
-    if (token !== this.prefetchToken) return;
+    if (token !== this.prefetchToken) {
+      console.debug(
+        `[SubtitleController] Prefetch aborted (token changed) cues=${cuesInWindow.length} waitedMs=${Math.round(performance.now() - prefetchStartedAt)}`
+      );
+      return;
+    }
 
     const termContexts = new Map<string, string>();
     for (let i = 0; i < cuesInWindow.length; i++) {
@@ -761,6 +782,11 @@ export class SubtitleController {
 
     for (const [term, context] of termContexts.entries()) {
       this.queueExplanationPrefetch(term, context, token);
+    }
+
+    const prefetchElapsedMs = Math.round(performance.now() - prefetchStartedAt);
+    if (prefetchElapsedMs >= 800) {
+      console.debug(`[SubtitleController] Prefetch keywords ready ms=${prefetchElapsedMs} terms=${termContexts.size}`);
     }
   }
 
@@ -782,6 +808,17 @@ export class SubtitleController {
   private pumpPrefetchQueue(token: number): void {
     if (this.destroyed) return;
     if (token !== this.prefetchToken) return;
+
+    if (
+      this.prefetchInFlight >= this.maxPrefetchInFlight &&
+      this.prefetchQueue.length > 0 &&
+      Date.now() - this.debugLastPrefetchSaturationAt >= 1500
+    ) {
+      this.debugLastPrefetchSaturationAt = Date.now();
+      console.debug(
+        `[SubtitleController] Prefetch queue saturated inFlight=${this.prefetchInFlight}/${this.maxPrefetchInFlight} queued=${this.prefetchQueue.length}`
+      );
+    }
 
     while (this.prefetchInFlight < this.maxPrefetchInFlight && this.prefetchQueue.length > 0) {
       const next = this.prefetchQueue.shift();
@@ -845,10 +882,17 @@ export class SubtitleController {
     if (inFlight) return inFlight;
 
     const promise = (async () => {
+      const startedAt = performance.now();
       const response = await sendMessage('EXPLAIN_WORD', {
         word: normalizedWord,
         ...(context && context.trim() ? { context: context.trim() } : {}),
       });
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      if (elapsedMs >= 800) {
+        console.debug(
+          `[SubtitleController] EXPLAIN_WORD slow word=${normalizedWord} ms=${elapsedMs} ok=${response.ok}`
+        );
+      }
 
       if (!response.ok) {
         return {
