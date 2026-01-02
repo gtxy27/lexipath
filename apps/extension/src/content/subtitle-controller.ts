@@ -111,7 +111,15 @@ export class SubtitleController {
   private wordExplainInFlight = new Map<string, Promise<WordCardData>>();
   private currentSubtitleContext = '';
   private cueKeywords = new Map<string, string[]>();
+  private cueKeywordSignatures = new Map<string, string>();
   private cueKeywordsInFlight = new Map<string, Promise<string[]>>();
+
+  private readonly keywordPrefetchLookaheadMs = 15_000;
+  private prefetchToken = 0;
+  private prefetchQueue: Array<{ term: string; context: string }> = [];
+  private prefetchQueuedTerms = new Set<string>();
+  private prefetchInFlight = 0;
+  private readonly maxPrefetchInFlight = 20;
 
   constructor(private settings: Settings) {}
 
@@ -291,6 +299,9 @@ export class SubtitleController {
   destroy(): void {
     this.destroyed = true;
     this.youtubeParamsWatchToken++;
+    this.prefetchToken++;
+    this.prefetchQueue = [];
+    this.prefetchQueuedTerms.clear();
     this.stopSync();
     this.overlay?.unmount();
     this.overlay = null;
@@ -299,6 +310,7 @@ export class SubtitleController {
     this.cues = [];
     this.enhancedCues.clear();
     this.cueKeywords.clear();
+    this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
     this.currentCueIndex = -1;
     document.removeEventListener('keydown', this.handleKeyDown);
@@ -401,6 +413,9 @@ export class SubtitleController {
     this.cues = cues;
     this.currentCueIndex = -1;
     this.enhancedCues.clear();
+    this.cueKeywords.clear();
+    this.cueKeywordSignatures.clear();
+    this.cueKeywordsInFlight.clear();
     this.enhancedCueCount = 0;
     this.enhanceQueueIndex = 0;
 
@@ -550,6 +565,7 @@ export class SubtitleController {
     if (cueIndex !== this.currentCueIndex) {
       this.currentCueIndex = cueIndex;
       this.updateSubtitleDisplay();
+      this.startPrefetchWindow();
     }
   }
 
@@ -604,9 +620,11 @@ export class SubtitleController {
       ];
     }
 
-    this.ensureCueKeywords(cue.id, lines[0]?.text ?? cue.text);
+    const primaryText = lines[0]?.text ?? cue.text;
+    void this.ensureCueKeywords(cue.id, primaryText);
 
-    const keywords = this.cueKeywords.get(cue.id);
+    const signature = this.computeTextSignature(primaryText);
+    const keywords = this.cueKeywordSignatures.get(cue.id) === signature ? this.cueKeywords.get(cue.id) : undefined;
     const interactiveWords =
       keywords && keywords.length > 0
         ? new Set(keywords.map((term) => this.normalizeTerm(term)))
@@ -622,11 +640,31 @@ export class SubtitleController {
       .toLowerCase();
   }
 
-  private ensureCueKeywords(cueId: string, text: string): void {
+  private computeTextSignature(text: string): string {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+
+    let hash = 5381;
+    for (let i = 0; i < normalized.length; i++) {
+      hash = ((hash << 5) + hash) + normalized.charCodeAt(i);
+      hash |= 0;
+    }
+
+    return `${normalized.length}:${hash >>> 0}`;
+  }
+
+  private ensureCueKeywords(cueId: string, text: string): Promise<string[]> {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    if (this.cueKeywords.has(cueId)) return;
-    if (this.cueKeywordsInFlight.has(cueId)) return;
+    if (!trimmed) return Promise.resolve([]);
+
+    const signature = this.computeTextSignature(trimmed);
+    if (this.cueKeywordSignatures.get(cueId) === signature && this.cueKeywords.has(cueId)) {
+      return Promise.resolve(this.cueKeywords.get(cueId) ?? []);
+    }
+
+    const inFlightKey = `${cueId}:${signature}`;
+    const inFlight = this.cueKeywordsInFlight.get(inFlightKey);
+    if (inFlight) return inFlight;
 
     const promise = (async () => {
       const response = await sendMessage('SELECT_KEYWORDS', { text: trimmed, scene: 'subtitle' });
@@ -635,6 +673,7 @@ export class SubtitleController {
     })()
       .then((keywords) => {
         this.cueKeywords.set(cueId, keywords);
+        this.cueKeywordSignatures.set(cueId, signature);
         const currentCue = this.cues[this.currentCueIndex];
         if (currentCue?.id === cueId) {
           this.updateSubtitleDisplay();
@@ -645,10 +684,105 @@ export class SubtitleController {
         return [];
       })
       .finally(() => {
-        this.cueKeywordsInFlight.delete(cueId);
+        this.cueKeywordsInFlight.delete(inFlightKey);
       });
 
-    this.cueKeywordsInFlight.set(cueId, promise);
+    this.cueKeywordsInFlight.set(inFlightKey, promise);
+    return promise;
+  }
+
+  private startPrefetchWindow(): void {
+    if (!this.videoElement) return;
+    if (this.cues.length === 0) return;
+    if (this.currentCueIndex < 0) return;
+
+    const token = ++this.prefetchToken;
+    this.prefetchQueue = [];
+    this.prefetchQueuedTerms.clear();
+
+    void this.prefetchAhead(token);
+  }
+
+  private async prefetchAhead(token: number): Promise<void> {
+    if (!this.videoElement) return;
+    if (this.destroyed) return;
+    if (token !== this.prefetchToken) return;
+
+    const nowMs = this.videoElement.currentTime * 1000;
+    const windowEndMs = nowMs + this.keywordPrefetchLookaheadMs;
+
+    const cuesInWindow: Cue[] = [];
+    for (let i = Math.max(0, this.currentCueIndex); i < this.cues.length; i++) {
+      const cue = this.cues[i];
+      if (!cue) continue;
+      if (cue.startMs >= windowEndMs) break;
+      if (cue.endMs <= nowMs) continue;
+      cuesInWindow.push(cue);
+    }
+
+    const keywordLists = await Promise.all(cuesInWindow.map((cue) => this.ensureCueKeywords(cue.id, cue.text)));
+    if (this.destroyed) return;
+    if (token !== this.prefetchToken) return;
+
+    const termContexts = new Map<string, string>();
+    for (let i = 0; i < cuesInWindow.length; i++) {
+      const cue = cuesInWindow[i];
+      const terms = keywordLists[i] ?? [];
+      for (const rawTerm of terms) {
+        const normalized = this.normalizeTerm(rawTerm);
+        if (!normalized) continue;
+        if (!termContexts.has(normalized)) {
+          termContexts.set(normalized, cue.text);
+        }
+      }
+    }
+
+    for (const [term, context] of termContexts.entries()) {
+      this.queueExplanationPrefetch(term, context, token);
+    }
+  }
+
+  private queueExplanationPrefetch(term: string, context: string, token: number): void {
+    if (this.destroyed) return;
+    if (token !== this.prefetchToken) return;
+
+    const normalized = this.normalizeTerm(term);
+    if (!normalized) return;
+    if (this.wordExplainCache.has(normalized)) return;
+    if (this.wordExplainInFlight.has(normalized)) return;
+    if (this.prefetchQueuedTerms.has(normalized)) return;
+
+    this.prefetchQueuedTerms.add(normalized);
+    this.prefetchQueue.push({ term: normalized, context });
+    this.pumpPrefetchQueue(token);
+  }
+
+  private pumpPrefetchQueue(token: number): void {
+    if (this.destroyed) return;
+    if (token !== this.prefetchToken) return;
+
+    while (this.prefetchInFlight < this.maxPrefetchInFlight && this.prefetchQueue.length > 0) {
+      const next = this.prefetchQueue.shift();
+      if (!next) break;
+
+      const term = next.term;
+      const context = next.context;
+      if (!term) continue;
+      if (this.wordExplainCache.has(term)) continue;
+      if (this.wordExplainInFlight.has(term)) continue;
+
+      this.prefetchInFlight++;
+      void this.getWordCardData(term, context)
+        .catch(() => {
+          // ignore
+        })
+        .finally(() => {
+          this.prefetchInFlight--;
+          if (!this.destroyed && token === this.prefetchToken) {
+            this.pumpPrefetchQueue(token);
+          }
+        });
+    }
   }
 
   private async handleSubtitleWordClick(word: string, anchorRect: DOMRect): Promise<void> {
@@ -676,12 +810,12 @@ export class SubtitleController {
 
     this.overlay.showWordCardLoading(normalized, anchorRect, options);
 
-    const card = await this.getWordCardData(normalized);
+    const card = await this.getWordCardData(normalized, this.currentSubtitleContext);
     this.wordExplainCache.set(normalized, card);
     this.overlay.showWordCard(card, anchorRect, options);
   }
 
-  private async getWordCardData(normalizedWord: string): Promise<WordCardData> {
+  private async getWordCardData(normalizedWord: string, context?: string): Promise<WordCardData> {
     const cached = this.wordExplainCache.get(normalizedWord);
     if (cached) return cached;
 
@@ -691,7 +825,7 @@ export class SubtitleController {
     const promise = (async () => {
       const response = await sendMessage('EXPLAIN_WORD', {
         word: normalizedWord,
-        ...(this.currentSubtitleContext.trim() ? { context: this.currentSubtitleContext } : {}),
+        ...(context && context.trim() ? { context: context.trim() } : {}),
       });
 
       if (!response.ok) {
@@ -707,7 +841,7 @@ export class SubtitleController {
           ? data.definition.trim()
           : 'No definition available';
 
-      return {
+      const card: WordCardData = {
         word: typeof data.word === 'string' && data.word.trim() ? data.word.trim() : normalizedWord,
         definition,
         ...(typeof data.phonetic === 'string' && data.phonetic.trim() ? { phonetic: data.phonetic.trim() } : {}),
@@ -718,6 +852,9 @@ export class SubtitleController {
           ? { exampleTranslation: data.example_translation.trim() }
           : {}),
       };
+
+      this.wordExplainCache.set(normalizedWord, card);
+      return card;
     })().finally(() => {
       this.wordExplainInFlight.delete(normalizedWord);
     });
