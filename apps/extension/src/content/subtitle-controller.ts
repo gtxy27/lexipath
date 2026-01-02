@@ -1,4 +1,4 @@
-1/**
+/**
  * Subtitle Controller
  *
  * Manages subtitle fetching, enhancement, and synchronization with video playback.
