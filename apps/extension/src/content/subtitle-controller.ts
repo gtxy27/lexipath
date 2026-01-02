@@ -119,9 +119,28 @@ export class SubtitleController {
   private prefetchQueue: Array<{ term: string; context: string }> = [];
   private prefetchQueuedTerms = new Set<string>();
   private prefetchInFlight = 0;
-  private readonly maxPrefetchInFlight = 20;
+  private maxPrefetchInFlight = 5;
 
   constructor(private settings: Settings) {}
+
+  private getProviderKey(): string {
+    const provider = this.settings.provider;
+    if (!provider) return '';
+    return `${provider.baseUrl}|${provider.model}`;
+  }
+
+  private getPrefetchConcurrencyLimit(): number {
+    const providerKey = this.getProviderKey();
+    const configured =
+      providerKey && this.settings.modelConcurrencyLimits
+        ? this.settings.modelConcurrencyLimits[providerKey]
+        : undefined;
+
+    const modelLimit = typeof configured === 'number' && Number.isFinite(configured) ? configured : 20;
+    // Reserve headroom for user hover/click; prefetch uses ~25% of model concurrency, capped.
+    const suggested = Math.floor(modelLimit / 4);
+    return Math.min(20, Math.max(2, suggested || 2));
+  }
 
   private setYouTubeNativeCaptionsHidden(hidden: boolean): void {
     if (this.videoInfo?.platform !== 'youtube') return;
@@ -273,6 +292,8 @@ export class SubtitleController {
       console.error('[SubtitleController] Failed to mount overlay');
       return false;
     }
+
+    this.maxPrefetchInFlight = this.getPrefetchConcurrencyLimit();
 
     // For YouTube, listen for background webRequest interception messages.
     this.attachRuntimeMessageListener();

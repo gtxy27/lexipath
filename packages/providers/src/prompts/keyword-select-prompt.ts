@@ -26,6 +26,8 @@ Rules:
 - Each item must be a word OR a short phrase (collocation/phrasal verb/idiom) that appears in the text.
 - Prefer phrases when they carry meaning beyond the individual words.
 - Exclude people names and place names.
+- Exclude basic numbers/counting words (e.g., 3, three) unless they are essential to meaning.
+- Return at most 8 items.
 - Do NOT output indices/positions.
 
 Text:
@@ -91,4 +93,3 @@ export function parseKeywordSelectResponse(response: string): { keywords: string
 
   return { keywords, ok: true };
 }
-

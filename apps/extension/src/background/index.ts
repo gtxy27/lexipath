@@ -42,6 +42,7 @@ import {
   stableStringify,
   dedupeInFlight,
 } from './pipeline';
+import { filterSelectedKeywords } from './keyword-filter';
 
 const registry = createMessageHandlerRegistry();
 
@@ -321,7 +322,8 @@ registry.register('SELECT_KEYWORDS', async (payload) => {
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
         const parsed = parseKeywordSelectResponse(responseText);
-        return { value: parsed.keywords, ok: parsed.ok };
+        const filtered = filterSelectedKeywords(parsed.keywords, { userLevel, scene, maxItems: 8 });
+        return { value: filtered, ok: parsed.ok };
       } catch {
         return { value: [], ok: false };
       }
