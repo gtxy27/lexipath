@@ -6,6 +6,7 @@ Immersive language learning browser extension - transform web pages and videos w
 
 - **Web Enhancement**: Transform web pages with target language input (i+1)
 - **Video Subtitles**: YouTube + Bilibili subtitle enhancement with single/bilingual modes
+- **Subtitle Keywords**: Highlight key words/phrases and prefetch explanations for the next ~15 seconds
 - **Word Learning**: Word cards, familiarity tracking, TTS pronunciation
 - **AI-Powered**: OpenAI-compatible providers, user-configurable
 - **Cross-Browser**: Chrome/Edge + Firefox support
@@ -66,6 +67,20 @@ bun run dev
 1. Go to `about:debugging#/runtime/this-firefox`
 2. Click "Load Temporary Add-on"
 3. Select `apps/extension/dist/firefox/manifest.json`
+
+## Configuration
+
+### Advanced: Per-model concurrency limits
+
+In the Options page, you can configure how many AI requests run in parallel per model (keyed by `baseUrl|model`).
+
+Example:
+
+```json
+{
+  "https://api.openai.com/v1|gpt-4o-mini": 20
+}
+```
 
 ## License
 
