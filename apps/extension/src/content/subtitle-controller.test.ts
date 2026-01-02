@@ -161,6 +161,7 @@ describe('SubtitleController', () => {
   let controller: SubtitleController;
   let videoElement: HTMLVideoElement;
   let videoContainer: HTMLDivElement;
+  let paused = false;
 
   beforeEach(() => {
     // Clear mocks
@@ -174,6 +175,12 @@ describe('SubtitleController', () => {
 
     videoElement = document.createElement('video');
     document.body.appendChild(videoElement);
+
+    paused = false;
+    Object.defineProperty(videoElement, 'paused', {
+      configurable: true,
+      get: () => paused,
+    });
 
     // Create controller
     const settings: Settings = {
@@ -230,6 +237,47 @@ describe('SubtitleController', () => {
       expect(SubtitleOverlay).toHaveBeenCalledWith('youtube', expect.any(Object));
       expect(vi.mocked(SubtitleOverlay.prototype.mount)).toHaveBeenCalled();
       expect(fetchYouTubeSubtitles).toHaveBeenCalledWith('dQw4w9WgXcQ', 'en', { additionalParams: 'potc=1' });
+    });
+
+    it('shows native translation in bilingual mode', async () => {
+      const mockCues: Cue[] = [
+        {
+          id: 'youtube:test:0-1000:0',
+          startMs: 0,
+          endMs: 1000,
+          text: 'Hello world',
+          lang: 'en',
+          source: 'youtube',
+        },
+      ];
+
+      vi.mocked(getVideoId).mockReturnValue('test123');
+      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
+      vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
+
+      vi.mocked(sendMessage).mockImplementation(async (type, payload) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        if (type === 'ENHANCE_SUBTITLE') {
+          const mode = (payload as any)?.mode;
+          if (mode === 'bilingual') {
+            return { ok: true, value: { line1_final: 'Hello world', line2_final: '你好，世界' } as SubtitleEnhanceOutput };
+          }
+          return { ok: true, value: { line1_final: 'Hello world' } as SubtitleEnhanceOutput };
+        }
+        return { ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput };
+      });
+
+      await controller.init('https://www.youtube.com/watch?v=test123');
+
+      const overlayOptions = vi.mocked(SubtitleOverlay).mock.calls[0]?.[1] as any;
+      overlayOptions?.onModeChange?.('bilingual');
+      await (controller as any).ensureCueBilingual(mockCues[0]);
+
+      const displayCalls = vi.mocked(SubtitleOverlay.prototype.display).mock.calls;
+      const bilingual = displayCalls
+        .map((call) => call[0] as any)
+        .find((item) => item?.mode === 'bilingual' && item?.lines?.[1]?.text === '你好，世界');
+      expect(bilingual).toBeTruthy();
     });
 
     it('refreshes captions when already enabled but params missing', async () => {
@@ -415,6 +463,52 @@ describe('SubtitleController', () => {
 
       // Should still initialize successfully even if enhancement fails
       expect(result).toBe(true);
+    });
+
+    it('does not schedule new enhancements while paused', async () => {
+      const mockCues: Cue[] = [
+        { id: 'cue1', startMs: 0, endMs: 1000, text: 'First subtitle', lang: 'en', source: 'youtube' },
+        { id: 'cue2', startMs: 1000, endMs: 2000, text: 'Second subtitle', lang: 'en', source: 'youtube' },
+        { id: 'cue3', startMs: 2000, endMs: 3000, text: 'Third subtitle', lang: 'en', source: 'youtube' },
+      ];
+
+      vi.mocked(getVideoId).mockReturnValue('test123');
+      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
+      vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
+
+      const deferred: Array<{ resolve: (value: any) => void; promise: Promise<any> }> = [];
+      function makeDeferred() {
+        let resolve!: (value: any) => void;
+        const promise = new Promise((r) => { resolve = r; });
+        return { resolve, promise };
+      }
+
+      vi.mocked(sendMessage).mockImplementation((type) => {
+        if (type === 'SELECT_KEYWORDS') return Promise.resolve({ ok: true, value: [] });
+        if (type === 'ENHANCE_SUBTITLE') {
+          const d = makeDeferred();
+          deferred.push(d);
+          return d.promise;
+        }
+        return Promise.resolve({ ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput });
+      });
+
+      paused = false;
+      await controller.init('https://www.youtube.com/watch?v=test123');
+
+      // Two requests should start immediately due to maxEnhanceInFlight=2.
+      const started = vi.mocked(sendMessage).mock.calls.filter(([type]) => type === 'ENHANCE_SUBTITLE');
+      expect(started).toHaveLength(2);
+
+      // Pause before any in-flight enhancement finishes; subsequent pump should not schedule more.
+      paused = true;
+      videoElement.dispatchEvent(new Event('pause'));
+
+      deferred[0]?.resolve({ ok: true, value: { line1_final: 'Enhanced 1' } as SubtitleEnhanceOutput });
+      await Promise.resolve();
+
+      const after = vi.mocked(sendMessage).mock.calls.filter(([type]) => type === 'ENHANCE_SUBTITLE');
+      expect(after).toHaveLength(2);
     });
   });
 

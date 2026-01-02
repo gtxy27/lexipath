@@ -99,6 +99,8 @@ export class SubtitleController {
   private enhancementStarted = false;
   private readonly maxEnhanceInFlight = 2;
   private enhancedCueCount = 0;
+  private bilingualCueInFlight = new Map<string, Promise<void>>();
+  private bilingualCueLastAttemptAt = new Map<string, number>();
 
   private statusMessage = '';
   private youtubeAdditionalParams = '';
@@ -125,6 +127,10 @@ export class SubtitleController {
   private debugLastPrefetchSaturationAt = 0;
 
   constructor(private settings: Settings) {}
+
+  private isVideoPaused(): boolean {
+    return Boolean(this.videoElement?.paused);
+  }
 
   private getProviderKey(): string {
     const provider = this.settings.provider;
@@ -295,6 +301,9 @@ export class SubtitleController {
       return false;
     }
 
+    this.videoElement.addEventListener('play', this.handleVideoPlay);
+    this.videoElement.addEventListener('pause', this.handleVideoPause);
+
     // Create overlay
     this.overlay = new SubtitleOverlay(this.videoInfo.platform, {
       onModeChange: (mode) => {
@@ -350,12 +359,15 @@ export class SubtitleController {
     this.overlay?.unmount();
     this.overlay = null;
     this.setYouTubeNativeCaptionsHidden(false);
+    this.videoElement?.removeEventListener('play', this.handleVideoPlay);
+    this.videoElement?.removeEventListener('pause', this.handleVideoPause);
     this.videoElement = null;
     this.cues = [];
     this.enhancedCues.clear();
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
+    this.bilingualCueInFlight.clear();
     this.currentCueIndex = -1;
     document.removeEventListener('keydown', this.handleKeyDown);
     document.removeEventListener('keyup', this.handleKeyUp);
@@ -464,6 +476,8 @@ export class SubtitleController {
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
+    this.bilingualCueInFlight.clear();
+    this.bilingualCueLastAttemptAt.clear();
     this.enhancedCueCount = 0;
     this.enhanceQueueIndex = 0;
 
@@ -510,6 +524,7 @@ export class SubtitleController {
   private pumpSubtitleEnhancement(): void {
     if (this.destroyed) return;
     if (this.cues.length === 0) return;
+    if (this.isVideoPaused()) return;
 
     while (this.enhanceInFlight < this.maxEnhanceInFlight && this.enhanceQueueIndex < this.cues.length) {
       const cue = this.cues[this.enhanceQueueIndex++];
@@ -655,14 +670,21 @@ export class SubtitleController {
         },
       ];
     } else {
-      // Bilingual: enhanced + original
+      // Bilingual: enhanced + native translation (on-demand)
+      const translation = typeof enhanced?.line2_final === 'string' ? enhanced.line2_final.trim() : '';
+      if (!translation) {
+        void this.ensureCueBilingual(cue);
+      }
+
+      const loadingTranslationText =
+        this.settings.nativeLanguage.startsWith('zh') ? '（翻译加载中…）' : '(Loading translation...)';
       lines = [
         {
           text: enhanced?.line1_final || cue.text,
           isEnhanced: true,
         },
         {
-          text: cue.text,
+          text: translation || loadingTranslationText,
           isEnhanced: false,
         },
       ];
@@ -678,6 +700,51 @@ export class SubtitleController {
         ? new Set(keywords.map((term) => this.normalizeTerm(term)))
         : this.computeInteractiveWords(lines.map((line) => line.text));
     this.overlay.display({ mode: effectiveMode, lines, interactiveWords });
+  }
+
+  private ensureCueBilingual(cue: Cue): Promise<void> {
+    const existing = this.enhancedCues.get(cue.id);
+    if (existing && typeof existing.line2_final === 'string' && existing.line2_final.trim()) {
+      return Promise.resolve();
+    }
+
+    const inFlight = this.bilingualCueInFlight.get(cue.id);
+    if (inFlight) return inFlight;
+
+    const now = Date.now();
+    const lastAttemptAt = this.bilingualCueLastAttemptAt.get(cue.id) ?? 0;
+    if (now - lastAttemptAt < 10_000) {
+      return Promise.resolve();
+    }
+    this.bilingualCueLastAttemptAt.set(cue.id, now);
+
+    const generation = this.cuesGeneration;
+    const promise = (async () => {
+      const response = await sendMessage('ENHANCE_SUBTITLE', {
+        subtitle: cue.text,
+        sourceLang: this.settings.targetLanguage,
+        mode: 'bilingual',
+      });
+
+      if (!response.ok) return;
+      if (this.destroyed || generation !== this.cuesGeneration) return;
+
+      const enhanced = response.value;
+      if (!enhanced || !enhanced.line1_final || !enhanced.line1_final.trim()) return;
+
+      const prev = this.enhancedCues.get(cue.id) ?? ({} as SubtitleEnhanceOutput);
+      this.enhancedCues.set(cue.id, { ...prev, ...enhanced });
+
+      const currentCue = this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : null;
+      if (currentCue?.id === cue.id) {
+        this.updateSubtitleDisplay();
+      }
+    })().finally(() => {
+      this.bilingualCueInFlight.delete(cue.id);
+    });
+
+    this.bilingualCueInFlight.set(cue.id, promise);
+    return promise;
   }
 
   private normalizeTerm(term: string): string {
@@ -748,6 +815,7 @@ export class SubtitleController {
     if (!this.videoElement) return;
     if (this.cues.length === 0) return;
     if (this.currentCueIndex < 0) return;
+    if (this.isVideoPaused()) return;
 
     const token = ++this.prefetchToken;
     this.prefetchQueue = [];
@@ -760,6 +828,7 @@ export class SubtitleController {
     if (!this.videoElement) return;
     if (this.destroyed) return;
     if (token !== this.prefetchToken) return;
+    if (this.isVideoPaused()) return;
 
     const prefetchStartedAt = performance.now();
     const nowMs = this.videoElement.currentTime * 1000;
@@ -833,6 +902,7 @@ export class SubtitleController {
   private pumpPrefetchQueue(token: number): void {
     if (this.destroyed) return;
     if (token !== this.prefetchToken) return;
+    if (this.isVideoPaused()) return;
 
     if (
       this.prefetchInFlight >= this.maxPrefetchInFlight &&
@@ -1045,5 +1115,20 @@ export class SubtitleController {
       this.tempBilingualKeyPressed = false;
       this.updateSubtitleDisplay();
     }
+  };
+
+  private handleVideoPause = (): void => {
+    // Stop scheduling new background work while paused; let in-flight requests finish.
+    this.prefetchToken++;
+    this.prefetchQueue = [];
+    this.prefetchQueuedTerms.clear();
+  };
+
+  private handleVideoPlay = (): void => {
+    if (this.destroyed) return;
+    // Resume background pipelines.
+    this.pumpSubtitleEnhancement();
+    this.startPrefetchWindow();
+    this.updateSubtitleDisplay();
   };
 }
