@@ -50,9 +50,11 @@ const CACHE_MAX_ENTRIES = 200;
 const CACHE_SUCCESS_TTL_MS = 5 * 60 * 1000;
 const CACHE_FALLBACK_TTL_MS = 60 * 1000;
 const DEFAULT_MODEL_CONCURRENCY = 20;
+const CONCURRENCY_SATURATION_LOG_THROTTLE_MS = 1500;
 
 type ConcurrencyState = { inFlight: number; waiters: Array<() => void> };
 const modelConcurrency = new Map<string, ConcurrencyState>();
+const lastSaturationLogAt = new Map<string, number>();
 
 function providerModelKey(config: ProviderConfig): string {
   return `${config.baseUrl}|${config.model}`;
@@ -77,8 +79,22 @@ async function acquireConcurrencySlot(key: string, limit: number): Promise<() =>
     return () => releaseConcurrencySlot(key);
   }
 
+  const now = Date.now();
+  const lastLoggedAt = lastSaturationLogAt.get(key) ?? 0;
+  if (now - lastLoggedAt >= CONCURRENCY_SATURATION_LOG_THROTTLE_MS) {
+    lastSaturationLogAt.set(key, now);
+    console.warn(
+      `[LexiPath] Provider concurrency saturated (${key}) inFlight=${state.inFlight}/${normalizedLimit} queued=${state.waiters.length + 1}`
+    );
+  }
+
   return new Promise((resolve) => {
+    const queuedAt = Date.now();
     state.waiters.push(() => {
+      const waitedMs = Date.now() - queuedAt;
+      if (waitedMs >= 250) {
+        console.debug(`[LexiPath] Provider concurrency wait (${key}) waitedMs=${waitedMs}`);
+      }
       state.inFlight += 1;
       resolve(() => releaseConcurrencySlot(key));
     });
