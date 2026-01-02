@@ -49,6 +49,8 @@ export class SubtitleOverlay {
   private container: HTMLDivElement | null = null;
   private shadow: ShadowRoot | null = null;
   private subtitleElement: HTMLDivElement | null = null;
+  private subtitleLinesElement: HTMLDivElement | null = null;
+  private subtitleModeButton: HTMLButtonElement | null = null;
   private wordCardElement: HTMLDivElement | null = null;
   private platform: 'youtube' | 'bilibili';
   private mode: SubtitleMode = 'enhanced';
@@ -125,6 +127,25 @@ export class SubtitleOverlay {
 
     const subtitleEl = document.createElement('div');
     subtitleEl.className = 'lexipath-subtitle';
+    const controlsEl = document.createElement('div');
+    controlsEl.className = 'lexipath-subtitle__controls';
+
+    const modeButton = document.createElement('button');
+    modeButton.type = 'button';
+    modeButton.className = 'lexipath-subtitle__mode-toggle';
+    modeButton.textContent = this.getModeLabel(this.mode);
+    modeButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.toggleMode();
+    });
+
+    controlsEl.appendChild(modeButton);
+    subtitleEl.appendChild(controlsEl);
+
+    const linesEl = document.createElement('div');
+    linesEl.className = 'lexipath-subtitle__lines';
+    subtitleEl.appendChild(linesEl);
+
     this.shadow.appendChild(subtitleEl);
 
     const wordCardEl = document.createElement('div');
@@ -134,6 +155,8 @@ export class SubtitleOverlay {
 
     // Get subtitle element
     this.subtitleElement = subtitleEl;
+    this.subtitleLinesElement = linesEl;
+    this.subtitleModeButton = modeButton;
     this.wordCardElement = wordCardEl;
 
     // Setup click handler for mode switching
@@ -169,6 +192,8 @@ export class SubtitleOverlay {
     this.container = null;
     this.shadow = null;
     this.subtitleElement = null;
+    this.subtitleLinesElement = null;
+    this.subtitleModeButton = null;
     this.wordCardElement = null;
   }
 
@@ -176,25 +201,26 @@ export class SubtitleOverlay {
    * Update subtitle display
    */
   display(options: SubtitleDisplayOptions): void {
-    if (!this.subtitleElement) {
+    if (!this.subtitleElement || !this.subtitleLinesElement) {
       console.warn('[SubtitleOverlay] Not mounted');
       return;
     }
 
     this.mode = options.mode;
     const { lines } = options;
+    this.updateModeLabel();
 
     if (lines.length === 0) {
       this.clear();
       return;
     }
 
-    this.subtitleElement.textContent = '';
+    this.subtitleLinesElement.textContent = '';
     for (const line of lines) {
       const div = document.createElement('div');
       div.className = line.isEnhanced ? 'line-enhanced' : 'line-original';
       this.renderLineWithWordSpans(div, line.text, options.interactiveWords);
-      this.subtitleElement.appendChild(div);
+      this.subtitleLinesElement.appendChild(div);
     }
     this.subtitleElement.classList.add('visible');
   }
@@ -203,8 +229,8 @@ export class SubtitleOverlay {
    * Clear subtitle display
    */
   clear(): void {
-    if (!this.subtitleElement) return;
-    this.subtitleElement.textContent = '';
+    if (!this.subtitleElement || !this.subtitleLinesElement) return;
+    this.subtitleLinesElement.textContent = '';
     this.subtitleElement.classList.remove('visible');
     this.hideWordCard();
   }
@@ -221,6 +247,7 @@ export class SubtitleOverlay {
    */
   setMode(mode: SubtitleMode): void {
     this.mode = mode;
+    this.updateModeLabel();
   }
 
   /**
@@ -236,10 +263,33 @@ export class SubtitleOverlay {
       return;
     }
 
+    this.toggleMode();
+  };
+
+  private toggleMode(): void {
     const nextMode: SubtitleMode = this.mode === 'enhanced' ? 'bilingual' : 'enhanced';
     this.mode = nextMode;
+    this.updateModeLabel();
     this.onModeChange?.(nextMode);
-  };
+  }
+
+  private updateModeLabel(): void {
+    if (!this.subtitleModeButton) return;
+    this.subtitleModeButton.textContent = this.getModeLabel(this.mode);
+  }
+
+  private getModeLabel(mode: SubtitleMode): string {
+    switch (mode) {
+      case 'enhanced':
+        return '单语';
+      case 'bilingual':
+        return '双语';
+      case 'bilingual-temp':
+        return '双语(按住)';
+      default:
+        return '单语';
+    }
+  }
 
   showWordCardLoading(word: string, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
     this.showWordCard(
@@ -652,6 +702,37 @@ export class SubtitleOverlay {
 
         .lexipath-subtitle.visible {
           display: flex;
+        }
+
+        .lexipath-subtitle__controls {
+          display: flex;
+          justify-content: flex-end;
+          width: 100%;
+          margin-bottom: 2px;
+        }
+
+        .lexipath-subtitle__mode-toggle {
+          pointer-events: auto;
+          cursor: pointer;
+          font-size: 12px;
+          line-height: 1;
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          background: rgba(15, 23, 42, 0.75);
+          color: rgba(248, 250, 252, 0.95);
+        }
+
+        .lexipath-subtitle__mode-toggle:hover {
+          background: rgba(15, 23, 42, 0.9);
+          border-color: rgba(148, 163, 184, 0.55);
+        }
+
+        .lexipath-subtitle__lines {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
         }
 
         .line-enhanced {

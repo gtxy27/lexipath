@@ -131,7 +131,8 @@ describe('SubtitleOverlay', () => {
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
-      expect(subtitleElement?.textContent).toBe('');
+      // Controls remain; line content should be cleared.
+      expect(subtitleElement?.querySelector('.lexipath-subtitle__lines')?.textContent).toBe('');
       expect(subtitleElement?.classList.contains('visible')).toBe(false);
     });
 
@@ -200,7 +201,8 @@ describe('SubtitleOverlay', () => {
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
-      expect(subtitleElement?.textContent).toBe('');
+      // Controls remain; line content should be cleared.
+      expect(subtitleElement?.querySelector('.lexipath-subtitle__lines')?.textContent).toBe('');
       expect(subtitleElement?.classList.contains('visible')).toBe(false);
     });
   });
@@ -245,6 +247,7 @@ describe('SubtitleOverlay', () => {
       const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle') as HTMLDivElement;
+      const modeButton = shadow?.querySelector('.lexipath-subtitle__mode-toggle') as HTMLButtonElement;
 
       // Display something to make it clickable
       overlay.display({ mode: 'enhanced', lines: [{ text: 'Test', isEnhanced: true }] });
@@ -253,11 +256,33 @@ describe('SubtitleOverlay', () => {
       subtitleElement.click();
       expect(onModeChange).toHaveBeenCalledWith('bilingual');
       expect(overlay.getMode()).toBe('bilingual');
+      expect(modeButton?.textContent).toContain('双语');
 
       // Click again to toggle back
       subtitleElement.click();
       expect(onModeChange).toHaveBeenCalledWith('enhanced');
       expect(overlay.getMode()).toBe('enhanced');
+      expect(modeButton?.textContent).toContain('单语');
+    });
+
+    it('toggles mode via the mode button even when words are clickable', () => {
+      const onModeChange = vi.fn();
+      const overlay = new SubtitleOverlay('youtube', { onModeChange });
+      overlay.mount();
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const modeButton = shadow?.querySelector('.lexipath-subtitle__mode-toggle') as HTMLButtonElement;
+
+      overlay.display({
+        mode: 'enhanced',
+        lines: [{ text: 'the hero', isEnhanced: true }],
+        interactiveWords: new Set(['the', 'hero']),
+      });
+
+      modeButton.click();
+      expect(onModeChange).toHaveBeenCalledWith('bilingual');
+      expect(overlay.getMode()).toBe('bilingual');
     });
   });
 
