@@ -727,6 +727,7 @@ export class SubtitleController {
     const termContexts = new Map<string, string>();
     for (let i = 0; i < cuesInWindow.length; i++) {
       const cue = cuesInWindow[i];
+      if (!cue) continue;
       const terms = keywordLists[i] ?? [];
       for (const rawTerm of terms) {
         const normalized = this.normalizeTerm(rawTerm);

@@ -369,7 +369,11 @@ registry.register('ENHANCE_WEB', async (payload) => {
     run: async () => {
       try {
         const providerConfig = settings.provider;
-        if (!providerConfig) return { value: validateWebEnhanceOutput(undefined).fallback, ok: false };
+        if (!providerConfig) {
+          const fallbackResult = validateWebEnhanceOutput(undefined);
+          const fallbackValue = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
+          return { value: fallbackValue, ok: false };
+        }
 
         const prompt = buildWebEnhancePrompt({
           content,
@@ -438,7 +442,11 @@ registry.register('ENHANCE_SUBTITLE', async (payload) => {
     run: async () => {
       try {
         const providerConfig = settings.provider;
-        if (!providerConfig) return { value: validateSubtitleEnhanceOutput(undefined).fallback, ok: false };
+        if (!providerConfig) {
+          const fallbackResult = validateSubtitleEnhanceOutput(undefined);
+          const fallbackValue = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
+          return { value: fallbackValue, ok: false };
+        }
 
         const prompt = buildSubtitleEnhancePrompt({
           subtitle,

@@ -180,6 +180,7 @@ describe('SubtitleController', () => {
       nativeLanguage: 'zh-CN',
       targetLanguage: 'en',
       proficiencyLevel: 'B1',
+      modelConcurrencyLimits: {},
       enabled: true,
       autoEnhance: true,
       siteMode: 'all',
