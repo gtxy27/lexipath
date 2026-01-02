@@ -103,6 +103,7 @@ export class SubtitleController {
   private statusMessage = '';
   private youtubeAdditionalParams = '';
   private youtubeParamsWatchToken = 0;
+  private lastYouTubeCaptionsKickAt = 0;
   private cuesGeneration = 0;
   private subtitlesFetchPromise: Promise<void> | null = null;
   private runtimeMessageListenerAttached = false;
@@ -175,12 +176,30 @@ export class SubtitleController {
     this.youtubeCaptionHideStyle = style;
   }
 
-  private ensureYouTubeCaptionsEnabled(): void {
+  private kickYouTubeCaptionsRequest(options?: { forceRefreshIfAlreadyEnabled?: boolean }): void {
     try {
+      const now = Date.now();
+      if (now - this.lastYouTubeCaptionsKickAt < 1500) return;
+
       const button = document.querySelector('.ytp-subtitles-button');
       if (!(button instanceof HTMLElement)) return;
       const pressed = button.getAttribute('aria-pressed') === 'true';
-      if (!pressed) button.click();
+      const forceRefreshIfAlreadyEnabled = options?.forceRefreshIfAlreadyEnabled ?? false;
+
+      if (!pressed) {
+        button.click();
+        this.lastYouTubeCaptionsKickAt = now;
+        return;
+      }
+
+      if (forceRefreshIfAlreadyEnabled) {
+        // If captions are already enabled, YouTube may have already issued the timedtext request
+        // before our background listener was ready. Toggling forces a new request so background
+        // can intercept required params (e.g. potc=...).
+        button.click();
+        button.click();
+        this.lastYouTubeCaptionsKickAt = now;
+      }
     } catch {
       // ignore
     }
@@ -188,7 +207,7 @@ export class SubtitleController {
 
   private async tryGetYouTubeAdditionalParams(
     videoId: string,
-    options?: { maxAttempts?: number; delayMs?: number }
+    options?: { maxAttempts?: number; delayMs?: number; forceRefreshIfAlreadyEnabled?: boolean }
   ): Promise<string> {
     if (this.youtubeAdditionalParams.trim()) return this.youtubeAdditionalParams;
 
@@ -211,7 +230,9 @@ export class SubtitleController {
 
       if (attempt === 0) {
         // Best-effort: try to trigger the player to request captions so background can intercept potc=...
-        this.ensureYouTubeCaptionsEnabled();
+        this.kickYouTubeCaptionsRequest({
+          forceRefreshIfAlreadyEnabled: options?.forceRefreshIfAlreadyEnabled ?? false,
+        });
       }
 
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -362,7 +383,11 @@ export class SubtitleController {
       if (this.videoInfo.platform === 'youtube') {
         // Fetch subtitles matching target language
         const videoId = this.videoInfo.videoId;
-        const additionalParams = await this.tryGetYouTubeAdditionalParams(videoId, { maxAttempts: 6, delayMs: 500 });
+        const additionalParams = await this.tryGetYouTubeAdditionalParams(videoId, {
+          maxAttempts: 6,
+          delayMs: 500,
+          forceRefreshIfAlreadyEnabled: true,
+        });
         if (!additionalParams) {
           console.warn('[SubtitleController] No intercepted timedtext params; YouTube subtitles may be unavailable');
         }

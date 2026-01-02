@@ -232,6 +232,41 @@ describe('SubtitleController', () => {
       expect(fetchYouTubeSubtitles).toHaveBeenCalledWith('dQw4w9WgXcQ', 'en', { additionalParams: 'potc=1' });
     });
 
+    it('refreshes captions when already enabled but params missing', async () => {
+      vi.useFakeTimers();
+
+      const subtitlesButton = document.createElement('button');
+      subtitlesButton.className = 'ytp-subtitles-button';
+      subtitlesButton.setAttribute('aria-pressed', 'true');
+
+      let captionsKicked = false;
+      subtitlesButton.click = vi.fn(() => {
+        captionsKicked = true;
+      });
+
+      document.body.appendChild(subtitlesButton);
+
+      const browser = await import('webextension-polyfill');
+      vi.mocked(browser.default.runtime.sendMessage).mockImplementation(async () => {
+        if (captionsKicked) return { success: true, data: 'potc=1' };
+        return { success: true, data: '' };
+      });
+
+      const paramsPromise = (controller as any).tryGetYouTubeAdditionalParams('test123', {
+        maxAttempts: 2,
+        delayMs: 10,
+        forceRefreshIfAlreadyEnabled: true,
+      }) as Promise<string>;
+
+      await vi.advanceTimersByTimeAsync(10);
+      const params = await paramsPromise;
+
+      expect(subtitlesButton.click).toHaveBeenCalledTimes(2);
+      expect(params).toBe('potc=1');
+
+      vi.useRealTimers();
+    });
+
     it('initializes successfully for Bilibili', async () => {
       const mockCues: Cue[] = [
         {
