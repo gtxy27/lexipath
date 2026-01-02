@@ -154,6 +154,36 @@ describe('SubtitleOverlay', () => {
       // And the raw text should still be present as text content
       expect(subtitleElement?.textContent).toContain('<script>');
     });
+
+    it('highlights provided phrases as a single span', () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      const lines: SubtitleLine[] = [{ text: 'We should take off right now.', isEnhanced: true }];
+      overlay.display({ mode: 'enhanced', lines, interactiveWords: new Set(['take off']) });
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
+
+      const highlighted = subtitleElement?.querySelectorAll('.lexipath-subtitle-word') ?? [];
+      expect(Array.from(highlighted).some((node) => node.textContent === 'take off')).toBe(true);
+    });
+
+    it('does not highlight substrings inside other words', () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      const lines: SubtitleLine[] = [{ text: 'the hero', isEnhanced: true }];
+      overlay.display({ mode: 'enhanced', lines, interactiveWords: new Set(['he']) });
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
+
+      expect(subtitleElement?.querySelector('.lexipath-subtitle-word')).toBeNull();
+      expect(subtitleElement?.textContent).toContain('the hero');
+    });
   });
 
   describe('clear', () => {

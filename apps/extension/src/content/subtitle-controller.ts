@@ -1,4 +1,4 @@
-/**
+1/**
  * Subtitle Controller
  *
  * Manages subtitle fetching, enhancement, and synchronization with video playback.
@@ -110,6 +110,8 @@ export class SubtitleController {
   private wordExplainCache = new Map<string, WordCardData>();
   private wordExplainInFlight = new Map<string, Promise<WordCardData>>();
   private currentSubtitleContext = '';
+  private cueKeywords = new Map<string, string[]>();
+  private cueKeywordsInFlight = new Map<string, Promise<string[]>>();
 
   constructor(private settings: Settings) {}
 
@@ -296,6 +298,8 @@ export class SubtitleController {
     this.videoElement = null;
     this.cues = [];
     this.enhancedCues.clear();
+    this.cueKeywords.clear();
+    this.cueKeywordsInFlight.clear();
     this.currentCueIndex = -1;
     document.removeEventListener('keydown', this.handleKeyDown);
     document.removeEventListener('keyup', this.handleKeyUp);
@@ -600,8 +604,51 @@ export class SubtitleController {
       ];
     }
 
-    const interactiveWords = this.computeInteractiveWords(lines.map((line) => line.text));
+    this.ensureCueKeywords(cue.id, lines[0]?.text ?? cue.text);
+
+    const keywords = this.cueKeywords.get(cue.id);
+    const interactiveWords =
+      keywords && keywords.length > 0
+        ? new Set(keywords.map((term) => this.normalizeTerm(term)))
+        : this.computeInteractiveWords(lines.map((line) => line.text));
     this.overlay.display({ mode: effectiveMode, lines, interactiveWords });
+  }
+
+  private normalizeTerm(term: string): string {
+    return term
+      .replace(/\u2019/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  private ensureCueKeywords(cueId: string, text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (this.cueKeywords.has(cueId)) return;
+    if (this.cueKeywordsInFlight.has(cueId)) return;
+
+    const promise = (async () => {
+      const response = await sendMessage('SELECT_KEYWORDS', { text: trimmed, scene: 'subtitle' });
+      if (!response.ok) return [];
+      return response.value;
+    })()
+      .then((keywords) => {
+        this.cueKeywords.set(cueId, keywords);
+        const currentCue = this.cues[this.currentCueIndex];
+        if (currentCue?.id === cueId) {
+          this.updateSubtitleDisplay();
+        }
+        return keywords;
+      })
+      .catch(() => {
+        return [];
+      })
+      .finally(() => {
+        this.cueKeywordsInFlight.delete(cueId);
+      });
+
+    this.cueKeywordsInFlight.set(cueId, promise);
   }
 
   private async handleSubtitleWordClick(word: string, anchorRect: DOMRect): Promise<void> {
@@ -620,7 +667,7 @@ export class SubtitleController {
     if (!this.overlay) return;
     if (!word.trim()) return;
 
-    const normalized = word.trim().toLowerCase();
+    const normalized = this.normalizeTerm(word);
     const cached = this.wordExplainCache.get(normalized);
     if (cached) {
       this.overlay.showWordCard(cached, anchorRect, options);

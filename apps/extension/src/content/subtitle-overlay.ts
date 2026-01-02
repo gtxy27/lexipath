@@ -455,6 +455,52 @@ export class SubtitleOverlay {
   }
 
   private renderLineWithWordSpans(container: HTMLElement, text: string, interactiveWords?: Set<string>): void {
+    if (!interactiveWords) {
+      this.renderAllWords(container, text);
+      return;
+    }
+
+    if (interactiveWords.size === 0) {
+      container.appendChild(document.createTextNode(text));
+      return;
+    }
+
+    const terms = Array.from(interactiveWords)
+      .map((term) => this.normalizeTerm(term))
+      .filter(Boolean);
+
+    if (terms.length === 0) {
+      container.appendChild(document.createTextNode(text));
+      return;
+    }
+
+    const matches = this.findNonOverlappingTermMatches(text, terms);
+    if (matches.length === 0) {
+      container.appendChild(document.createTextNode(text));
+      return;
+    }
+
+    let lastIndex = 0;
+    for (const match of matches) {
+      if (match.start > lastIndex) {
+        container.appendChild(document.createTextNode(text.slice(lastIndex, match.start)));
+      }
+
+      const span = document.createElement('span');
+      span.className = 'lexipath-subtitle-word';
+      span.textContent = text.slice(match.start, match.end);
+      span.dataset.lexipathWord = match.term;
+      container.appendChild(span);
+
+      lastIndex = match.end;
+    }
+
+    if (lastIndex < text.length) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  }
+
+  private renderAllWords(container: HTMLElement, text: string): void {
     const wordRegex = /[A-Za-z][A-Za-z'-]*/g;
     let lastIndex = 0;
 
@@ -471,15 +517,11 @@ export class SubtitleOverlay {
         container.appendChild(document.createTextNode(text.slice(lastIndex, startIndex)));
       }
 
-      if (!interactiveWords || interactiveWords.has(normalizedWord)) {
-        const span = document.createElement('span');
-        span.className = 'lexipath-subtitle-word';
-        span.textContent = rawWord;
-        span.dataset.lexipathWord = normalizedWord;
-        container.appendChild(span);
-      } else {
-        container.appendChild(document.createTextNode(rawWord));
-      }
+      const span = document.createElement('span');
+      span.className = 'lexipath-subtitle-word';
+      span.textContent = rawWord;
+      span.dataset.lexipathWord = normalizedWord;
+      container.appendChild(span);
 
       lastIndex = endIndex;
     }
@@ -487,6 +529,81 @@ export class SubtitleOverlay {
     if (lastIndex < text.length) {
       container.appendChild(document.createTextNode(text.slice(lastIndex)));
     }
+  }
+
+  private normalizeTerm(term: string): string {
+    const normalized = term
+      .replace(/\u2019/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    return normalized;
+  }
+
+  private isAsciiWordChar(char: string | undefined): boolean {
+    if (!char) return false;
+    const code = char.charCodeAt(0);
+    const isDigit = code >= 48 && code <= 57;
+    const isUpper = code >= 65 && code <= 90;
+    const isLower = code >= 97 && code <= 122;
+    return isDigit || isUpper || isLower;
+  }
+
+  private matchRespectsBoundary(
+    normalizedText: string,
+    start: number,
+    end: number,
+    term: string
+  ): boolean {
+    const first = term[0];
+    const last = term[term.length - 1];
+
+    if (this.isAsciiWordChar(first)) {
+      const left = normalizedText[start - 1];
+      if (this.isAsciiWordChar(left)) return false;
+    }
+
+    if (this.isAsciiWordChar(last)) {
+      const right = normalizedText[end];
+      if (this.isAsciiWordChar(right)) return false;
+    }
+
+    return true;
+  }
+
+  private findNonOverlappingTermMatches(
+    text: string,
+    normalizedTerms: string[]
+  ): Array<{ start: number; end: number; term: string }> {
+    const normalizedText = text.replace(/\u2019/g, "'").toLowerCase();
+    const selected: Array<{ start: number; end: number; term: string }> = [];
+
+    const terms = Array.from(new Set(normalizedTerms))
+      .sort((a, b) => b.length - a.length || a.localeCompare(b));
+
+    for (const term of terms) {
+      if (!term) continue;
+      const termLen = term.length;
+      if (termLen === 0) continue;
+
+      let fromIndex = 0;
+      for (;;) {
+        const start = normalizedText.indexOf(term, fromIndex);
+        if (start === -1) break;
+        const end = start + termLen;
+        fromIndex = Math.max(end, start + 1);
+
+        if (!this.matchRespectsBoundary(normalizedText, start, end, term)) continue;
+
+        const overlaps = selected.some((range) => start < range.end && end > range.start);
+        if (overlaps) continue;
+
+        selected.push({ start, end, term });
+      }
+    }
+
+    selected.sort((a, b) => a.start - b.start || b.end - a.end);
+    return selected;
   }
 
   /**

@@ -187,6 +187,16 @@ describe('SubtitleController', () => {
       allowedSites: [],
     };
     controller = new SubtitleController(settings);
+
+    vi.mocked(sendMessage).mockImplementation(async (type) => {
+      if (type === 'SELECT_KEYWORDS') {
+        return { ok: true, value: [] };
+      }
+      if (type === 'EXPLAIN_WORD') {
+        return { ok: true, value: { word: 'test', definition: 'definition' } };
+      }
+      return { ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput };
+    });
   });
 
   afterEach(() => {
@@ -208,9 +218,9 @@ describe('SubtitleController', () => {
 
       vi.mocked(getVideoId).mockReturnValue('dQw4w9WgXcQ');
       vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
-      vi.mocked(sendMessage).mockResolvedValue({
-        ok: true,
-        value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput,
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
       });
 
       const result = await controller.init('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
@@ -243,9 +253,9 @@ describe('SubtitleController', () => {
       });
       vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
       vi.mocked(fetchBilibiliSubtitles).mockResolvedValue(mockCues);
-      vi.mocked(sendMessage).mockResolvedValue({
-        ok: true,
-        value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput,
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
       });
 
       const result = await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
@@ -287,7 +297,10 @@ describe('SubtitleController', () => {
     it('cleans up resources', async () => {
       vi.mocked(getVideoId).mockReturnValue('dQw4w9WgXcQ');
       vi.mocked(fetchYouTubeSubtitles).mockResolvedValue([]);
-      vi.mocked(sendMessage).mockResolvedValue({ ok: true, value: {} as SubtitleEnhanceOutput });
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: {} as SubtitleEnhanceOutput };
+      });
 
       await controller.init('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
       controller.destroy();
@@ -320,15 +333,16 @@ describe('SubtitleController', () => {
       vi.mocked(getVideoId).mockReturnValue('test123');
       vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
-      vi.mocked(sendMessage).mockResolvedValue({
-        ok: true,
-        value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput,
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput };
       });
 
       await controller.init('https://www.youtube.com/watch?v=test123');
 
       // Should start enhancing cues (concurrency-limited, but 2 cues should both start)
-      expect(sendMessage).toHaveBeenCalledTimes(2);
+      const enhanceCalls = vi.mocked(sendMessage).mock.calls.filter(([type]) => type === 'ENHANCE_SUBTITLE');
+      expect(enhanceCalls).toHaveLength(2);
       expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
         subtitle: 'First subtitle',
         sourceLang: 'en',
@@ -383,9 +397,9 @@ describe('SubtitleController', () => {
       vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
       vi.mocked(fetchBilibiliSubtitles).mockResolvedValue([]);
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
-      vi.mocked(sendMessage).mockResolvedValue({
-        ok: true,
-        value: {} as SubtitleEnhanceOutput,
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: {} as SubtitleEnhanceOutput };
       });
 
       await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
@@ -407,9 +421,9 @@ describe('SubtitleController', () => {
       vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
       vi.mocked(fetchBilibiliSubtitles).mockResolvedValue([]);
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
-      vi.mocked(sendMessage).mockResolvedValue({
-        ok: true,
-        value: {} as SubtitleEnhanceOutput,
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: {} as SubtitleEnhanceOutput };
       });
 
       await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
