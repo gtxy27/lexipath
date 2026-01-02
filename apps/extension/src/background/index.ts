@@ -33,90 +33,19 @@ import { DictionaryService } from '@lexipath/dictionary';
 import { MessageError, createMessageHandlerRegistry } from '../shared/messages';
 import { recordLookup } from '../shared/familiarity';
 import { getSettings, setSettings } from '../shared/storage';
+import {
+  createExpiringLruCache,
+  getOrRunCachedTask,
+  makeCacheKey,
+  stableStringify,
+  dedupeInFlight,
+} from './pipeline';
 
 const registry = createMessageHandlerRegistry();
 
 const CACHE_MAX_ENTRIES = 200;
 const CACHE_SUCCESS_TTL_MS = 5 * 60 * 1000;
 const CACHE_FALLBACK_TTL_MS = 60 * 1000;
-
-type CacheEntry<T> = { value: T; expiresAt: number };
-
-function createExpiringLruCache<T>(maxEntries: number) {
-  const entries = new Map<string, CacheEntry<T>>();
-
-  function get(key: string): T | undefined {
-    const entry = entries.get(key);
-    if (!entry) return undefined;
-
-    if (Date.now() > entry.expiresAt) {
-      entries.delete(key);
-      return undefined;
-    }
-
-    entries.delete(key);
-    entries.set(key, entry);
-    return entry.value;
-  }
-
-  function set(key: string, value: T, ttlMs: number) {
-    entries.delete(key);
-    entries.set(key, { value, expiresAt: Date.now() + ttlMs });
-
-    while (entries.size > maxEntries) {
-      const oldestKey = entries.keys().next().value as string | undefined;
-      if (!oldestKey) break;
-      entries.delete(oldestKey);
-    }
-  }
-
-  return { get, set };
-}
-
-function stableStringify(value: unknown): string {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record)
-    .filter((key) => record[key] !== undefined)
-    .sort();
-
-  const parts = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`);
-  return `{${parts.join(',')}}`;
-}
-
-function fnv1a32Hex(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0');
-}
-
-function makeCacheKey(type: string, params: Record<string, unknown>): string {
-  const json = stableStringify(params);
-  return `${type}:${fnv1a32Hex(json)}`;
-}
-
-async function dedupeInFlight<T>(
-  inFlight: Map<string, Promise<T>>,
-  key: string,
-  work: () => Promise<T>
-): Promise<T> {
-  const existing = inFlight.get(key);
-  if (existing) return existing;
-
-  const promise = work().finally(() => {
-    inFlight.delete(key);
-  });
-
-  inFlight.set(key, promise);
-  return promise;
-}
 
 let providerInstance: OpenAICompatibleProvider | null = null;
 let providerConfigKey: string | null = null;
@@ -312,37 +241,35 @@ registry.register('ENHANCE_WEB', async (payload) => {
     },
   });
 
-  const cached = webEnhanceCache.get(cacheKey);
-  if (cached) return cached;
+  return getOrRunCachedTask(webEnhanceCache, webEnhanceInFlight, cacheKey, {
+    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
+    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
+    run: async () => {
+      try {
+        const prompt = buildWebEnhancePrompt({
+          content,
+          sourceLang,
+          targetLang,
+          difficultyMin,
+          difficultyMax,
+          ...(maxWords !== undefined && { maxWords }),
+        });
 
-  return dedupeInFlight(webEnhanceInFlight, cacheKey, async () => {
-    try {
-      const prompt = buildWebEnhancePrompt({
-        content,
-        sourceLang,
-        targetLang,
-        difficultyMin,
-        difficultyMax,
-        ...(maxWords !== undefined && { maxWords }),
-      });
+        const response = await provider.chat([{ role: 'user', content: prompt }], {
+          temperature: 0.2,
+          maxTokens: 2000,
+        });
 
-      const response = await provider.chat([{ role: 'user', content: prompt }], {
-        temperature: 0.2,
-        maxTokens: 2000,
-      });
-
-      const responseText = response.choices?.[0]?.message?.content ?? '';
-      const validated = validateWebEnhanceOutput(responseText);
-      const value = validated.ok ? validated.value : validated.fallback;
-
-      webEnhanceCache.set(cacheKey, value, validated.ok ? CACHE_SUCCESS_TTL_MS : CACHE_FALLBACK_TTL_MS);
-      return value;
-    } catch {
-      const fallbackResult = validateWebEnhanceOutput(undefined);
-      const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-      webEnhanceCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
-      return value;
-    }
+        const responseText = response.choices?.[0]?.message?.content ?? '';
+        const validated = validateWebEnhanceOutput(responseText);
+        const value = validated.ok ? validated.value : validated.fallback;
+        return { value, ok: validated.ok };
+      } catch {
+        const fallbackResult = validateWebEnhanceOutput(undefined);
+        const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
+        return { value, ok: false };
+      }
+    },
   });
 });
 
@@ -378,36 +305,34 @@ registry.register('ENHANCE_SUBTITLE', async (payload) => {
     },
   });
 
-  const cached = subtitleEnhanceCache.get(cacheKey);
-  if (cached) return cached;
+  return getOrRunCachedTask(subtitleEnhanceCache, subtitleEnhanceInFlight, cacheKey, {
+    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
+    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
+    run: async () => {
+      try {
+        const prompt = buildSubtitleEnhancePrompt({
+          subtitle,
+          sourceLang,
+          targetLang,
+          difficultyLevel,
+          mode,
+        });
 
-  return dedupeInFlight(subtitleEnhanceInFlight, cacheKey, async () => {
-    try {
-      const prompt = buildSubtitleEnhancePrompt({
-        subtitle,
-        sourceLang,
-        targetLang,
-        difficultyLevel,
-        mode,
-      });
+        const response = await provider.chat([{ role: 'user', content: prompt }], {
+          temperature: 0.2,
+          maxTokens: 400,
+        });
 
-      const response = await provider.chat([{ role: 'user', content: prompt }], {
-        temperature: 0.2,
-        maxTokens: 400,
-      });
-
-      const responseText = response.choices?.[0]?.message?.content ?? '';
-      const validated = validateSubtitleEnhanceOutput(responseText);
-      const value = validated.ok ? validated.value : validated.fallback;
-
-      subtitleEnhanceCache.set(cacheKey, value, validated.ok ? CACHE_SUCCESS_TTL_MS : CACHE_FALLBACK_TTL_MS);
-      return value;
-    } catch {
-      const fallbackResult = validateSubtitleEnhanceOutput(undefined);
-      const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-      subtitleEnhanceCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
-      return value;
-    }
+        const responseText = response.choices?.[0]?.message?.content ?? '';
+        const validated = validateSubtitleEnhanceOutput(responseText);
+        const value = validated.ok ? validated.value : validated.fallback;
+        return { value, ok: validated.ok };
+      } catch {
+        const fallbackResult = validateSubtitleEnhanceOutput(undefined);
+        const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
+        return { value, ok: false };
+      }
+    },
   });
 });
 
