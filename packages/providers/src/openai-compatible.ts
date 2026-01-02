@@ -6,11 +6,19 @@ export interface ChatMessage {
   content: string;
 }
 
+export type ThinkingMode = 'disabled' | 'auto' | 'enabled';
+
+export interface ChatCompletionThinking {
+  type: ThinkingMode;
+}
+
 export interface ChatCompletionRequest {
   model: string;
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  // Vendor extension (e.g. Volcano/Ark). Most OpenAI-compatible gateways ignore unknown fields.
+  thinking?: ChatCompletionThinking;
 }
 
 export interface ChatCompletionResponse {
@@ -29,6 +37,14 @@ interface InFlightRequest {
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
+const DEFAULT_THINKING_MODE: ThinkingMode = 'disabled';
+
+export interface ChatOptions {
+  temperature?: number;
+  maxTokens?: number;
+  timeout?: number;
+  thinking?: ThinkingMode;
+}
 
 /**
  * OpenAI-compatible provider adapter.
@@ -43,9 +59,14 @@ export class OpenAICompatibleProvider {
   private config: ProviderConfig;
   private abortController: AbortController | null = null;
   private inFlightRequests = new Map<string, InFlightRequest>();
+  private supportsThinkingControl: boolean | null = null;
 
   constructor(config: ProviderConfig) {
     this.config = config;
+  }
+
+  private resolveThinkingMode(options: ChatOptions): ThinkingMode {
+    return options.thinking ?? DEFAULT_THINKING_MODE;
   }
 
   /**
@@ -54,14 +75,57 @@ export class OpenAICompatibleProvider {
   private generateCacheKey(messages: ChatMessage[], options: {
     temperature?: number;
     maxTokens?: number;
+    thinking?: ThinkingMode;
   }): string {
+    const thinking = this.resolveThinkingMode(options);
     const key = {
       model: this.config.model,
       messages,
       temperature: options.temperature,
       maxTokens: options.maxTokens,
+      thinking,
     };
     return JSON.stringify(key);
+  }
+
+  private createProviderError(status: number, errorText: string): Error {
+    const error = new Error(`Provider error: ${status} - ${errorText}`);
+    (error as any).status = status;
+    (error as any).body = errorText;
+    return error;
+  }
+
+  private supportsThinkingByDefault(): boolean {
+    // Heuristic: official OpenAI endpoints are less likely to accept vendor fields.
+    // Gateways commonly ignore unknown fields, so we try enabling by default there.
+    try {
+      const url = new URL(this.config.baseUrl);
+      if (url.hostname === 'api.openai.com') return false;
+    } catch {
+      // ignore
+    }
+    return true;
+  }
+
+  private shouldIncludeThinking(thinking: ThinkingMode): boolean {
+    if (!this.supportsThinkingByDefault()) return false;
+    if (this.supportsThinkingControl === false) return false;
+    // Only include when the caller expresses an intent (we default to disabled).
+    return Boolean(thinking);
+  }
+
+  private isThinkingLikelyUnsupported(error: unknown): boolean {
+    const body = typeof (error as any)?.body === 'string' ? (error as any).body : '';
+    if (!body) return false;
+    const normalized = body.toLowerCase();
+    if (!normalized.includes('thinking')) return false;
+    return (
+      normalized.includes('unknown') ||
+      normalized.includes('unexpected') ||
+      normalized.includes('additional properties') ||
+      normalized.includes('not allowed') ||
+      normalized.includes('unrecognized')
+    );
   }
 
   /**
@@ -93,11 +157,12 @@ export class OpenAICompatibleProvider {
    */
   private async executeWithRetry(
     messages: ChatMessage[],
-    options: { temperature?: number; maxTokens?: number; timeout?: number },
+    options: ChatOptions,
     maxRetries: number = DEFAULT_MAX_RETRIES
   ): Promise<ChatCompletionResponse> {
     const url = `${this.config.baseUrl}/chat/completions`;
     const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
+    const thinkingMode = this.resolveThinkingMode(options);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -108,7 +173,7 @@ export class OpenAICompatibleProvider {
       headers['Authorization'] = `Bearer ${this.config.apiKey}`;
     }
 
-    const body: ChatCompletionRequest = {
+    const baseBody: Omit<ChatCompletionRequest, 'thinking'> = {
       model: this.config.model,
       messages,
       ...(options.temperature !== undefined && { temperature: options.temperature }),
@@ -119,25 +184,63 @@ export class OpenAICompatibleProvider {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        const includeThinking = this.shouldIncludeThinking(thinkingMode);
+        const buildBody = (include: boolean): ChatCompletionRequest => ({
+          ...baseBody,
+          ...(include ? { thinking: { type: thinkingMode } } : {}),
+        });
+
         const response = await this.fetchWithTimeout(
           url,
           {
             method: 'POST',
             headers,
-            body: JSON.stringify(body),
+            body: JSON.stringify(buildBody(includeThinking)),
           },
           timeoutMs
         );
 
         if (!response.ok) {
           const errorText = await response.text();
-          const error = new Error(`Provider error: ${response.status} - ${errorText}`);
-          (error as any).status = response.status;
-          throw error;
+          throw this.createProviderError(response.status, errorText);
+        }
+
+        if (includeThinking && this.supportsThinkingControl === null) {
+          this.supportsThinkingControl = true;
         }
 
         return await response.json();
       } catch (error) {
+        const status = typeof (error as any)?.status === 'number' ? (error as any).status : null;
+
+        // Compatibility fallback: if the gateway rejects vendor fields, retry once without them.
+        if (
+          attempt === 0 &&
+          status === 400 &&
+          this.supportsThinkingControl === null &&
+          this.shouldIncludeThinking(thinkingMode) &&
+          this.isThinkingLikelyUnsupported(error)
+        ) {
+          try {
+            const response = await this.fetchWithTimeout(
+              url,
+              {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(baseBody),
+              },
+              timeoutMs
+            );
+
+            if (response.ok) {
+              this.supportsThinkingControl = false;
+              return await response.json();
+            }
+          } catch {
+            // ignore and proceed with normal retry flow
+          }
+        }
+
         lastError = error;
         const classified = classifyError(error);
 
@@ -158,7 +261,7 @@ export class OpenAICompatibleProvider {
    */
   async chat(
     messages: ChatMessage[],
-    options: { temperature?: number; maxTokens?: number; timeout?: number } = {}
+    options: ChatOptions = {}
   ): Promise<ChatCompletionResponse> {
     const cacheKey = this.generateCacheKey(messages, options);
 
