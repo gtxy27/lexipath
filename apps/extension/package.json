@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "bun run build:chrome && bun run build:firefox",
-    "build:chrome": "vite build --mode chrome",
-    "build:firefox": "vite build --mode firefox",
+    "build:chrome": "VITE_BROWSER=chrome vite build --mode chrome && VITE_BROWSER=chrome vite build -c vite.config.content.ts --mode chrome",
+    "build:firefox": "VITE_BROWSER=firefox vite build --mode firefox && VITE_BROWSER=firefox vite build -c vite.config.content.ts --mode firefox",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

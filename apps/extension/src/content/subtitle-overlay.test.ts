@@ -91,8 +91,9 @@ describe('SubtitleOverlay', () => {
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
       expect(subtitleElement?.classList.contains('visible')).toBe(true);
-      expect(subtitleElement?.innerHTML).toContain('Enhanced subtitle text');
-      expect(subtitleElement?.innerHTML).toContain('line-enhanced');
+      expect(subtitleElement?.textContent).toContain('Enhanced subtitle text');
+      expect(subtitleElement?.querySelector('.line-enhanced')).toBeTruthy();
+      expect(subtitleElement?.querySelectorAll('.lexipath-subtitle-word').length).toBeGreaterThan(0);
     });
 
     it('displays bilingual subtitles with enhanced and original lines', () => {
@@ -110,10 +111,10 @@ describe('SubtitleOverlay', () => {
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
-      expect(subtitleElement?.innerHTML).toContain('Enhanced text');
-      expect(subtitleElement?.innerHTML).toContain('Original text');
-      expect(subtitleElement?.innerHTML).toContain('line-enhanced');
-      expect(subtitleElement?.innerHTML).toContain('line-original');
+      expect(subtitleElement?.textContent).toContain('Enhanced text');
+      expect(subtitleElement?.textContent).toContain('Original text');
+      expect(subtitleElement?.querySelector('.line-enhanced')).toBeTruthy();
+      expect(subtitleElement?.querySelector('.line-original')).toBeTruthy();
     });
 
     it('clears display when given empty lines', () => {
@@ -130,7 +131,7 @@ describe('SubtitleOverlay', () => {
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
-      expect(subtitleElement?.innerHTML).toBe('');
+      expect(subtitleElement?.textContent).toBe('');
       expect(subtitleElement?.classList.contains('visible')).toBe(false);
     });
 
@@ -148,9 +149,10 @@ describe('SubtitleOverlay', () => {
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
-      // Should escape the script tag
-      expect(subtitleElement?.innerHTML).not.toContain('<script>');
-      expect(subtitleElement?.innerHTML).toContain('&lt;script&gt;');
+      // Should not create a real <script> element
+      expect(subtitleElement?.querySelector('script')).toBeNull();
+      // And the raw text should still be present as text content
+      expect(subtitleElement?.textContent).toContain('<script>');
     });
   });
 
@@ -168,7 +170,7 @@ describe('SubtitleOverlay', () => {
       const shadow = container?.shadowRoot;
       const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
 
-      expect(subtitleElement?.innerHTML).toBe('');
+      expect(subtitleElement?.textContent).toBe('');
       expect(subtitleElement?.classList.contains('visible')).toBe(false);
     });
   });

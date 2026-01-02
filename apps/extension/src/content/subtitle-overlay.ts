@@ -17,6 +17,16 @@ export interface SubtitleDisplayOptions {
   lines: SubtitleLine[];
 }
 
+export interface WordCardData {
+  word: string;
+  definition: string;
+  phonetic?: string;
+  difficulty?: string;
+  translation?: string;
+  example?: string;
+  exampleTranslation?: string;
+}
+
 /**
  * Platform-specific video container selector
  */
@@ -38,17 +48,24 @@ export class SubtitleOverlay {
   private container: HTMLDivElement | null = null;
   private shadow: ShadowRoot | null = null;
   private subtitleElement: HTMLDivElement | null = null;
+  private wordCardElement: HTMLDivElement | null = null;
   private platform: 'youtube' | 'bilibili';
   private mode: SubtitleMode = 'enhanced';
   private onModeChange?: (mode: SubtitleMode) => void;
+  private onWordClick?: (word: string, anchorRect: DOMRect) => void;
+  private documentClickListenerAttached = false;
+  private wordCardVisible = false;
 
   constructor(
     platform: 'youtube' | 'bilibili',
-    options?: { onModeChange?: (mode: SubtitleMode) => void }
+    options?: { onModeChange?: (mode: SubtitleMode) => void; onWordClick?: (word: string, anchorRect: DOMRect) => void }
   ) {
     this.platform = platform;
     if (options?.onModeChange) {
       this.onModeChange = options.onModeChange;
+    }
+    if (options?.onWordClick) {
+      this.onWordClick = options.onWordClick;
     }
   }
 
@@ -84,16 +101,30 @@ export class SubtitleOverlay {
 
     // Create Shadow DOM
     this.shadow = this.container.attachShadow({ mode: 'open' });
-    this.shadow.innerHTML = this.getStyles() + this.getTemplate();
+    this.shadow.textContent = '';
+
+    const styleEl = document.createElement('style');
+    styleEl.textContent = this.getStyles();
+    this.shadow.appendChild(styleEl);
+
+    const subtitleEl = document.createElement('div');
+    subtitleEl.className = 'lexipath-subtitle';
+    this.shadow.appendChild(subtitleEl);
+
+    const wordCardEl = document.createElement('div');
+    wordCardEl.className = 'lexipath-wordcard';
+    wordCardEl.setAttribute('aria-hidden', 'true');
+    this.shadow.appendChild(wordCardEl);
 
     // Get subtitle element
-    this.subtitleElement = this.shadow.querySelector('.lexipath-subtitle') as HTMLDivElement;
+    this.subtitleElement = subtitleEl;
+    this.wordCardElement = wordCardEl;
 
     // Setup click handler for mode switching
     if (this.subtitleElement) {
       this.subtitleElement.style.pointerEvents = 'auto';
       this.subtitleElement.style.cursor = 'pointer';
-      this.subtitleElement.addEventListener('click', this.handleClick.bind(this));
+      this.subtitleElement.addEventListener('click', this.handleClick);
     }
 
     // Append to video container
@@ -110,9 +141,11 @@ export class SubtitleOverlay {
     if (this.container && this.container.parentElement) {
       this.container.parentElement.removeChild(this.container);
     }
+    this.detachDocumentClickListener();
     this.container = null;
     this.shadow = null;
     this.subtitleElement = null;
+    this.wordCardElement = null;
   }
 
   /**
@@ -132,15 +165,13 @@ export class SubtitleOverlay {
       return;
     }
 
-    // Build HTML content
-    const html = lines
-      .map((line, index) => {
-        const className = line.isEnhanced ? 'line-enhanced' : 'line-original';
-        return `<div class="${className}">${this.escapeHtml(line.text)}</div>`;
-      })
-      .join('');
-
-    this.subtitleElement.innerHTML = html;
+    this.subtitleElement.textContent = '';
+    for (const line of lines) {
+      const div = document.createElement('div');
+      div.className = line.isEnhanced ? 'line-enhanced' : 'line-original';
+      this.renderLineWithWordSpans(div, line.text);
+      this.subtitleElement.appendChild(div);
+    }
     this.subtitleElement.classList.add('visible');
   }
 
@@ -149,8 +180,9 @@ export class SubtitleOverlay {
    */
   clear(): void {
     if (!this.subtitleElement) return;
-    this.subtitleElement.innerHTML = '';
+    this.subtitleElement.textContent = '';
     this.subtitleElement.classList.remove('visible');
+    this.hideWordCard();
   }
 
   /**
@@ -170,10 +202,179 @@ export class SubtitleOverlay {
   /**
    * Handle click to toggle mode
    */
-  private handleClick(): void {
+  private handleClick = (event: MouseEvent): void => {
+    const target = event.target as HTMLElement | null;
+    const word = target?.dataset?.lexipathWord;
+    if (word && this.onWordClick) {
+      event.stopPropagation();
+      const rect = target.getBoundingClientRect();
+      this.onWordClick(word, rect);
+      return;
+    }
+
     const nextMode: SubtitleMode = this.mode === 'enhanced' ? 'bilingual' : 'enhanced';
     this.mode = nextMode;
     this.onModeChange?.(nextMode);
+  };
+
+  showWordCardLoading(word: string, anchorRect: DOMRect): void {
+    this.showWordCard(
+      {
+        word,
+        definition: 'Loading…',
+      },
+      anchorRect
+    );
+  }
+
+  showWordCard(data: WordCardData, anchorRect: DOMRect): void {
+    if (!this.wordCardElement) return;
+
+    this.wordCardElement.textContent = '';
+
+    const header = document.createElement('div');
+    header.className = 'lexipath-wordcard__header';
+
+    const title = document.createElement('div');
+    title.className = 'lexipath-wordcard__title';
+    title.textContent = data.word;
+    header.appendChild(title);
+
+    const metaParts: string[] = [];
+    if (data.phonetic) metaParts.push(data.phonetic);
+    if (data.difficulty) metaParts.push(data.difficulty);
+    if (data.translation) metaParts.push(data.translation);
+
+    if (metaParts.length > 0) {
+      const meta = document.createElement('div');
+      meta.className = 'lexipath-wordcard__meta';
+      meta.textContent = metaParts.join(' · ');
+      header.appendChild(meta);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'lexipath-wordcard__body';
+
+    const definition = document.createElement('div');
+    definition.className = 'lexipath-wordcard__definition';
+    definition.textContent = data.definition;
+    body.appendChild(definition);
+
+    if (data.example) {
+      const example = document.createElement('div');
+      example.className = 'lexipath-wordcard__example';
+      example.textContent = data.example;
+      body.appendChild(example);
+    }
+
+    if (data.exampleTranslation) {
+      const exampleTranslation = document.createElement('div');
+      exampleTranslation.className = 'lexipath-wordcard__example-translation';
+      exampleTranslation.textContent = data.exampleTranslation;
+      body.appendChild(exampleTranslation);
+    }
+
+    this.wordCardElement.appendChild(header);
+    this.wordCardElement.appendChild(body);
+
+    const { top, left } = this.computeWordCardPosition(anchorRect);
+    this.wordCardElement.style.top = `${top}px`;
+    this.wordCardElement.style.left = `${left}px`;
+
+    this.wordCardVisible = true;
+    this.wordCardElement.classList.add('visible');
+    this.wordCardElement.setAttribute('aria-hidden', 'false');
+    this.attachDocumentClickListener();
+  }
+
+  hideWordCard(): void {
+    if (!this.wordCardElement) return;
+    if (!this.wordCardVisible) return;
+    this.wordCardVisible = false;
+    this.wordCardElement.classList.remove('visible');
+    this.wordCardElement.setAttribute('aria-hidden', 'true');
+    this.detachDocumentClickListener();
+  }
+
+  private attachDocumentClickListener(): void {
+    if (this.documentClickListenerAttached) return;
+    this.documentClickListenerAttached = true;
+    document.addEventListener('mousedown', this.handleDocumentMouseDown);
+    document.addEventListener('keydown', this.handleDocumentKeyDown);
+  }
+
+  private detachDocumentClickListener(): void {
+    if (!this.documentClickListenerAttached) return;
+    this.documentClickListenerAttached = false;
+    document.removeEventListener('mousedown', this.handleDocumentMouseDown);
+    document.removeEventListener('keydown', this.handleDocumentKeyDown);
+  }
+
+  private handleDocumentMouseDown = (event: MouseEvent): void => {
+    if (!this.wordCardVisible) return;
+    if (!this.container) return;
+    const path = (event.composedPath?.() ?? []) as unknown[];
+    if (path.includes(this.container)) return;
+    this.hideWordCard();
+  };
+
+  private handleDocumentKeyDown = (event: KeyboardEvent): void => {
+    if (!this.wordCardVisible) return;
+    if (event.key === 'Escape') {
+      this.hideWordCard();
+    }
+  };
+
+  private computeWordCardPosition(anchorRect: DOMRect): { top: number; left: number } {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const MARGIN = 10;
+    const PREFERRED_OFFSET = 10;
+    const CARD_WIDTH = 320;
+    const CARD_HEIGHT = 160;
+
+    let top = anchorRect.top - CARD_HEIGHT - PREFERRED_OFFSET;
+    let left = anchorRect.left + anchorRect.width / 2 - CARD_WIDTH / 2;
+
+    if (left < MARGIN) left = MARGIN;
+    if (left + CARD_WIDTH > viewportWidth - MARGIN) left = viewportWidth - CARD_WIDTH - MARGIN;
+
+    if (top < MARGIN) {
+      top = anchorRect.bottom + PREFERRED_OFFSET;
+      if (top + CARD_HEIGHT > viewportHeight - MARGIN) top = viewportHeight - CARD_HEIGHT - MARGIN;
+    }
+
+    return { top, left };
+  }
+
+  private renderLineWithWordSpans(container: HTMLElement, text: string): void {
+    const wordRegex = /[A-Za-z][A-Za-z'-]*/g;
+    let lastIndex = 0;
+
+    for (;;) {
+      const match = wordRegex.exec(text);
+      if (!match) break;
+
+      const rawWord = match[0] ?? '';
+      const startIndex = match.index;
+      const endIndex = startIndex + rawWord.length;
+
+      if (startIndex > lastIndex) {
+        container.appendChild(document.createTextNode(text.slice(lastIndex, startIndex)));
+      }
+
+      const span = document.createElement('span');
+      span.className = 'lexipath-subtitle-word';
+      span.textContent = rawWord;
+      span.dataset.lexipathWord = rawWord.toLowerCase();
+      container.appendChild(span);
+
+      lastIndex = endIndex;
+    }
+
+    if (lastIndex < text.length) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
   }
 
   /**
@@ -202,7 +403,6 @@ export class SubtitleOverlay {
    */
   private getStyles(): string {
     return `
-      <style>
         .lexipath-subtitle {
           display: none;
           flex-direction: column;
@@ -240,25 +440,79 @@ export class SubtitleOverlay {
         .lexipath-subtitle:hover {
           opacity: 0.95;
         }
-      </style>
-    `;
-  }
 
-  /**
-   * Get Shadow DOM template
-   */
-  private getTemplate(): string {
-    return `
-      <div class="lexipath-subtitle"></div>
-    `;
-  }
+        .lexipath-subtitle-word {
+          border-bottom: 2px dotted rgba(59, 130, 246, 0.9);
+          cursor: pointer;
+          padding: 0 1px;
+        }
 
-  /**
-   * Escape HTML to prevent XSS
-   */
-  private escapeHtml(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+        .lexipath-subtitle-word:hover {
+          background: rgba(59, 130, 246, 0.22);
+          border-radius: 3px;
+        }
+
+        .lexipath-wordcard {
+          display: none;
+          position: fixed;
+          width: 320px;
+          max-width: calc(100vw - 20px);
+          z-index: 10001;
+          pointer-events: auto;
+          background: rgba(15, 23, 42, 0.95);
+          color: #ffffff;
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+          border-radius: 12px;
+          backdrop-filter: blur(8px);
+          padding: 12px;
+        }
+
+        .lexipath-wordcard.visible {
+          display: block;
+        }
+
+        .lexipath-wordcard__header {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin-bottom: 10px;
+        }
+
+        .lexipath-wordcard__title {
+          font-size: 18px;
+          font-weight: 700;
+          line-height: 1.2;
+        }
+
+        .lexipath-wordcard__meta {
+          font-size: 12px;
+          color: rgba(226, 232, 240, 0.9);
+        }
+
+        .lexipath-wordcard__body {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          font-size: 13px;
+          line-height: 1.45;
+          color: rgba(241, 245, 249, 0.95);
+        }
+
+        .lexipath-wordcard__definition {
+          font-size: 13px;
+        }
+
+        .lexipath-wordcard__example {
+          padding-top: 8px;
+          border-top: 1px solid rgba(148, 163, 184, 0.22);
+          font-style: italic;
+          color: rgba(226, 232, 240, 0.95);
+        }
+
+        .lexipath-wordcard__example-translation {
+          color: rgba(148, 163, 184, 0.95);
+        }
+    `;
   }
 }

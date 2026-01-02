@@ -556,13 +556,22 @@ export async function getAvailableTracks(videoId: string): Promise<YouTubeSubtit
   return [...deduped.values()];
 }
 
-export async function fetchSubtitles(videoId: string, lang: string): Promise<Cue[]> {
+export async function fetchSubtitles(
+  videoId: string,
+  lang: string,
+  options?: { additionalParams?: string }
+): Promise<Cue[]> {
   const tracks = await getCaptionTracks(videoId);
   const selected = pickCaptionTrack(tracks, lang);
-  if (!selected) return [];
+  if (!selected) {
+    // Fallback: some environments block/paritize captionTracks extraction from watch HTML.
+    // Try the direct timedtext endpoint which can work without track metadata.
+    return fetchTimedTextFallback(videoId, lang, options);
+  }
 
   const url = new URL(selected.baseUrl);
-  url.searchParams.set('fmt', 'json3');
+  applyAdditionalParams(url, options?.additionalParams);
+  if (!url.searchParams.has('fmt')) url.searchParams.set('fmt', 'json3');
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -585,12 +594,71 @@ export async function fetchSubtitles(videoId: string, lang: string): Promise<Cue
     try {
       json = JSON.parse(bodyText) as unknown;
     } catch {
-      return [];
+      return fetchTimedTextFallback(videoId, lang, options);
     }
     return youtubeTimedTextToCues(json, { videoId, lang: selected.languageCode });
   }
 
   return youtubeTimedTextToCues(bodyText, { videoId, lang: selected.languageCode });
+}
+
+function applyAdditionalParams(url: URL, additionalParams: string | undefined): void {
+  if (!additionalParams || !additionalParams.trim()) return;
+  const existingKeys = new Set(url.searchParams.keys());
+  const extra = new URLSearchParams(additionalParams);
+  for (const [key, value] of extra.entries()) {
+    if (existingKeys.has(key)) continue;
+    url.searchParams.set(key, value);
+  }
+}
+
+async function fetchTimedTextFallback(
+  videoId: string,
+  lang: string,
+  options?: { additionalParams?: string }
+): Promise<Cue[]> {
+  const base = new URL('https://www.youtube.com/api/timedtext');
+  base.searchParams.set('v', videoId);
+  base.searchParams.set('lang', lang);
+  applyAdditionalParams(base, options?.additionalParams);
+  if (!base.searchParams.has('fmt')) base.searchParams.set('fmt', 'json3');
+
+  const tryFetch = async (url: URL): Promise<Cue[]> => {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json,text/xml,*/*' },
+    });
+    if (!response.ok) return [];
+
+    const contentType = response.headers.get('content-type') ?? '';
+    const bodyText = await response.text();
+    const trimmed = bodyText.trim();
+    if (!trimmed) return [];
+
+    const isJson =
+      contentType.includes('application/json') ||
+      trimmed.startsWith('{') ||
+      trimmed.startsWith('[');
+
+    if (isJson) {
+      try {
+        return youtubeTimedTextToCues(JSON.parse(trimmed) as unknown, { videoId, lang });
+      } catch {
+        return [];
+      }
+    }
+
+    return youtubeTimedTextToCues(bodyText, { videoId, lang });
+  };
+
+  // 1) Regular captions (manual or auto)
+  const cues = await tryFetch(base);
+  if (cues.length > 0) return cues;
+
+  // 2) Auto-generated captions fallback (ASR)
+  const asr = new URL(base);
+  asr.searchParams.set('kind', 'asr');
+  return tryFetch(asr);
 }
 
 export class YouTubeAdapter {

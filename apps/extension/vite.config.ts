@@ -3,50 +3,56 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { copyFileSync } from 'fs';
 
-const isFirefox = process.env.VITE_BROWSER === 'firefox';
-const browser = isFirefox ? 'firefox' : 'chrome';
-
-function copyManifestPlugin() {
+function copyManifestPlugin(params: { isFirefox: boolean; browser: 'firefox' | 'chrome' }) {
   return {
     name: 'copy-manifest',
     closeBundle() {
-      const outDir = isFirefox ? 'dist/firefox' : 'dist/chrome';
-      const src = resolve(__dirname, `public/manifest.${browser}.json`);
+      const outDir = params.isFirefox ? 'dist/firefox' : 'dist/chrome';
+      const src = resolve(__dirname, `public/manifest.${params.browser}.json`);
       const dest = resolve(__dirname, `${outDir}/manifest.json`);
       copyFileSync(src, dest);
     },
   };
 }
 
-export default defineConfig({
-  plugins: [react(), copyManifestPlugin()],
-  build: {
-    outDir: isFirefox ? 'dist/firefox' : 'dist/chrome',
-    emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        background: resolve(__dirname, 'src/background/index.ts'),
-        content: resolve(__dirname, 'src/content/index.ts'),
-        popup: resolve(__dirname, 'src/ui/popup/index.html'),
-        options: resolve(__dirname, 'src/ui/options/index.html'),
-        onboarding: resolve(__dirname, 'src/ui/onboarding/index.html'),
-        sidebar: resolve(__dirname, 'src/ui/sidebar/index.html'),
+export default defineConfig(({ mode }) => {
+  // Vite only injects .env[.mode] after config loading starts. Avoid reading
+  // process.env.VITE_BROWSER at module top-level.
+  const isFirefox = mode === 'firefox' || process.env.VITE_BROWSER === 'firefox';
+  const browser: 'firefox' | 'chrome' = isFirefox ? 'firefox' : 'chrome';
+
+  return {
+    plugins: [react(), copyManifestPlugin({ isFirefox, browser })],
+    build: {
+      outDir: isFirefox ? 'dist/firefox' : 'dist/chrome',
+      emptyOutDir: true,
+      rollupOptions: {
+        input: {
+          background: resolve(__dirname, 'src/background/index.ts'),
+          content: resolve(__dirname, 'src/content/index.ts'),
+          popup: resolve(__dirname, 'src/ui/popup/index.html'),
+          options: resolve(__dirname, 'src/ui/options/index.html'),
+          onboarding: resolve(__dirname, 'src/ui/onboarding/index.html'),
+          sidebar: resolve(__dirname, 'src/ui/sidebar/index.html'),
+        },
+        output: {
+          // Keep default output for background/UI entries.
+          format: 'es',
+          entryFileNames: '[name].js',
+          chunkFileNames: 'chunks/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
+        },
       },
-      output: {
-        entryFileNames: '[name].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]',
+      minify: process.env.NODE_ENV === 'production',
+      sourcemap: process.env.NODE_ENV !== 'production',
+    },
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, 'src'),
       },
     },
-    minify: process.env.NODE_ENV === 'production',
-    sourcemap: process.env.NODE_ENV !== 'production',
-  },
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
+    define: {
+      'process.env.BROWSER': JSON.stringify(browser),
     },
-  },
-  define: {
-    'process.env.BROWSER': JSON.stringify(isFirefox ? 'firefox' : 'chrome'),
-  },
+  };
 });

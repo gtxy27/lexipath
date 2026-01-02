@@ -1,0 +1,42 @@
+import { defineConfig } from 'vite';
+import { resolve } from 'path';
+import { copyFileSync } from 'fs';
+
+// Content scripts must be classic scripts in many extension contexts.
+// Build a dedicated IIFE bundle to avoid top-level `import`.
+export default defineConfig(({ mode }) => {
+  const isFirefox = mode === 'firefox' || process.env.VITE_BROWSER === 'firefox';
+  const browser: 'firefox' | 'chrome' = isFirefox ? 'firefox' : 'chrome';
+  const outDir = isFirefox ? 'dist/firefox' : 'dist/chrome';
+
+  return {
+    build: {
+      outDir,
+      emptyOutDir: false,
+      sourcemap: process.env.NODE_ENV !== 'production',
+      minify: process.env.NODE_ENV === 'production',
+      rollupOptions: {
+        input: {
+          content: resolve(__dirname, 'src/content/index.ts'),
+        },
+        output: {
+          format: 'iife',
+          entryFileNames: 'content.js',
+          chunkFileNames: 'content-[hash].js',
+          assetFileNames: 'assets/[name]-[hash][extname]',
+          inlineDynamicImports: true,
+        },
+      },
+    },
+    plugins: [
+      {
+        name: 'copy-manifest-content',
+        closeBundle() {
+          const src = resolve(__dirname, `public/manifest.${browser}.json`);
+          const dest = resolve(__dirname, `${outDir}/manifest.json`);
+          copyFileSync(src, dest);
+        },
+      },
+    ],
+  };
+});

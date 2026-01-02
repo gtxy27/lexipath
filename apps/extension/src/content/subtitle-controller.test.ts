@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Cue, SubtitleEnhanceOutput } from '@lexipath/core';
+import type { Cue, Settings, SubtitleEnhanceOutput } from '@lexipath/core';
 import {
   SubtitleController,
   detectPlatform,
@@ -14,6 +14,18 @@ import {
 // Mock dependencies
 vi.mock('../shared/messages', () => ({
   sendMessage: vi.fn(),
+}));
+
+vi.mock('webextension-polyfill', () => ({
+  default: {
+    runtime: {
+      sendMessage: vi.fn(async () => ({ success: true, data: 'potc=1' })),
+      onMessage: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    },
+  },
 }));
 
 vi.mock('@lexipath/subtitles', () => ({
@@ -162,7 +174,17 @@ describe('SubtitleController', () => {
     document.body.appendChild(videoElement);
 
     // Create controller
-    controller = new SubtitleController();
+    const settings: Settings = {
+      nativeLanguage: 'zh-CN',
+      targetLanguage: 'en',
+      proficiencyLevel: 'B1',
+      enabled: true,
+      autoEnhance: true,
+      siteMode: 'all',
+      excludedSites: [],
+      allowedSites: [],
+    };
+    controller = new SubtitleController(settings);
   });
 
   afterEach(() => {
@@ -194,7 +216,7 @@ describe('SubtitleController', () => {
       expect(result).toBe(true);
       expect(SubtitleOverlay).toHaveBeenCalledWith('youtube', expect.any(Object));
       expect(vi.mocked(SubtitleOverlay.prototype.mount)).toHaveBeenCalled();
-      expect(fetchYouTubeSubtitles).toHaveBeenCalledWith('dQw4w9WgXcQ', 'en');
+      expect(fetchYouTubeSubtitles).toHaveBeenCalledWith('dQw4w9WgXcQ', 'en', { additionalParams: 'potc=1' });
     });
 
     it('initializes successfully for Bilibili', async () => {
@@ -303,15 +325,17 @@ describe('SubtitleController', () => {
 
       await controller.init('https://www.youtube.com/watch?v=test123');
 
-      // Should enhance all cues
+      // Should start enhancing cues (concurrency-limited, but 2 cues should both start)
       expect(sendMessage).toHaveBeenCalledTimes(2);
       expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
-        text: 'First subtitle',
-        lang: 'en',
+        subtitle: 'First subtitle',
+        sourceLang: 'en',
+        mode: 'single',
       });
       expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
-        text: 'Second subtitle',
-        lang: 'en',
+        subtitle: 'Second subtitle',
+        sourceLang: 'en',
+        mode: 'single',
       });
     });
 

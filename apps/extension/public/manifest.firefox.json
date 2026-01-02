@@ -26,14 +26,15 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "webRequest"
   ],
   "optional_permissions": [
     "https://*/*",
     "http://localhost/*"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*",
+    "https://*.youtube.com/*",
     "https://www.bilibili.com/*"
   ],
   "commands": {

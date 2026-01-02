@@ -9,20 +9,26 @@
  */
 
 import type { Settings, WebEnhanceOutput } from '@lexipath/core';
+import { detectPrimaryLanguage } from '@lexipath/core/qualify';
 import { sendMessage } from '../shared/messages';
-import { SubtitleController, detectPlatform } from './subtitle-controller';
+import { SubtitleController, detectPlatform, type Platform } from './subtitle-controller';
 
 let subtitleController: SubtitleController | null = null;
 let currentSettings: Settings | null = null;
-let processedElements = new WeakSet<Element>();
 let observer: MutationObserver | null = null;
 
 // Minimum text length to process
 const MIN_TEXT_LENGTH = 20;
 // Maximum text length per request
 const MAX_TEXT_LENGTH = 2000;
-// Debounce delay for processing
-const PROCESS_DELAY_MS = 300;
+
+const MAX_IN_FLIGHT = 3;
+
+type WordRenderMode = 'target-to-native' | 'native-to-target';
+
+let tooltipInjected = false;
+let tooltipEl: HTMLDivElement | null = null;
+let tooltipTarget: HTMLElement | null = null;
 
 /**
  * Get current settings from background.
@@ -39,15 +45,7 @@ async function getSettings(): Promise<Settings | null> {
 /**
  * Initialize subtitle controller for video platforms
  */
-async function initSubtitleController(): Promise<void> {
-  const url = window.location.href;
-  const platform = detectPlatform(url);
-
-  if (platform === 'unknown') {
-    console.log('[LexiPath] Not a supported video platform');
-    return;
-  }
-
+async function initSubtitleController(platform: Platform, url: string): Promise<void> {
   console.log(`[LexiPath] Detected video platform: ${platform}`);
 
   // Wait for video element to be available
@@ -59,7 +57,8 @@ async function initSubtitleController(): Promise<void> {
 
     if (videoElement instanceof HTMLVideoElement) {
       // Video element found, initialize controller
-      subtitleController = new SubtitleController();
+      if (!currentSettings) return;
+      subtitleController = new SubtitleController(currentSettings);
       const success = await subtitleController.init(url);
 
       if (success) {
@@ -83,9 +82,6 @@ async function initSubtitleController(): Promise<void> {
  * Check if an element should be processed for text enhancement
  */
 function shouldProcessElement(element: Element): boolean {
-  // Skip already processed elements
-  if (processedElements.has(element)) return false;
-
   // Skip non-text elements
   const tagName = element.tagName.toLowerCase();
   const skipTags = ['script', 'style', 'noscript', 'iframe', 'svg', 'canvas', 'video', 'audio', 'input', 'textarea', 'select', 'button', 'code', 'pre'];
@@ -109,10 +105,23 @@ function extractTextContent(element: Element): string {
   return text.slice(0, MAX_TEXT_LENGTH);
 }
 
+function computeTextSignature(text: string): string {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+
+  let hash = 5381;
+  for (let i = 0; i < normalized.length; i++) {
+    hash = ((hash << 5) + hash) + normalized.charCodeAt(i);
+    hash |= 0;
+  }
+
+  return `${normalized.length}:${hash >>> 0}`;
+}
+
 /**
  * Create enhanced text element with word highlighting
  */
-function createEnhancedElement(original: string, enhanced: WebEnhanceOutput): DocumentFragment {
+function createEnhancedElement(original: string, enhanced: WebEnhanceOutput, mode: WordRenderMode): DocumentFragment {
   const fragment = document.createDocumentFragment();
 
   // If no words to convert, return original text
@@ -152,10 +161,15 @@ function createEnhancedElement(original: string, enhanced: WebEnhanceOutput): Do
     span.dataset.original = word.original;
     span.dataset.converted = word.converted;
     span.dataset.difficulty = word.difficulty || '';
-    span.textContent = word.original;
+    span.dataset.renderMode = mode;
 
-    // Add tooltip on hover
-    span.title = `${word.converted}${word.difficulty ? ` (${word.difficulty})` : ''}`;
+    const displayText = mode === 'native-to-target' ? word.converted : word.original;
+    const tooltipText = mode === 'native-to-target' ? word.original : word.converted;
+    span.textContent = displayText;
+    span.dataset.tooltip = `${tooltipText}${word.difficulty ? ` (${word.difficulty})` : ''}`;
+
+    // Avoid default browser tooltip delay; we render our own tooltip immediately.
+    span.removeAttribute('title');
 
     fragment.appendChild(span);
 
@@ -179,11 +193,38 @@ async function processTextElement(element: Element): Promise<void> {
   const text = extractTextContent(element);
   if (text.length < MIN_TEXT_LENGTH) return;
 
-  // Mark as processed to avoid re-processing
-  processedElements.add(element);
+  const signature = computeTextSignature(text);
+  if (processedElementSignature.get(element) === signature) return;
 
   try {
-    const response = await sendMessage('ENHANCE_WEB', { content: text });
+    ensureStylesInjected();
+    element.classList.add('lexipath-processing');
+
+    const startMs = performance.now();
+
+    const detected = detectPrimaryLanguage({ text });
+    const nativeDetected = currentSettings?.nativeLanguage === 'en' ? 'en' : 'zh';
+
+    const enhancePayload: Record<string, unknown> = { content: text };
+    let renderMode: WordRenderMode = 'target-to-native';
+    if (currentSettings) {
+      // Default mode: target language text -> native language tooltip.
+      let sourceLang: string = currentSettings.targetLanguage;
+      let targetLang: string = currentSettings.nativeLanguage;
+
+      // If we're learning English and the paragraph is in native Chinese,
+      // flip direction so we can still learn from native-language pages.
+      if (currentSettings.targetLanguage === 'en' && detected.language === nativeDetected && nativeDetected === 'zh') {
+        sourceLang = 'zh';
+        targetLang = 'en';
+        renderMode = 'native-to-target';
+      }
+
+      enhancePayload.sourceLang = sourceLang;
+      enhancePayload.targetLang = targetLang;
+    }
+
+    const response = await sendMessage('ENHANCE_WEB', enhancePayload);
 
     if (!response.ok) {
       console.warn('[LexiPath] Enhancement failed:', response.error);
@@ -191,6 +232,7 @@ async function processTextElement(element: Element): Promise<void> {
     }
 
     const enhanced = response.value;
+    processedElementSignature.set(element, signature);
 
     // Only modify if there are words to convert
     if (enhanced.convert_word && enhanced.convert_word.length > 0) {
@@ -208,7 +250,7 @@ async function processTextElement(element: Element): Promise<void> {
       // Process each text node
       for (const textNode of textNodes) {
         const nodeText = textNode.textContent || '';
-        const enhancedFragment = createEnhancedElement(nodeText, enhanced);
+        const enhancedFragment = createEnhancedElement(nodeText, enhanced, renderMode);
 
         // Replace the text node with enhanced content
         const parent = textNode.parentNode;
@@ -217,71 +259,203 @@ async function processTextElement(element: Element): Promise<void> {
         }
       }
 
-      console.log(`[LexiPath] Enhanced ${enhanced.convert_word.length} words`);
+      const elapsedMs = Math.round(performance.now() - startMs);
+      console.log(`[LexiPath] Enhanced ${enhanced.convert_word.length} words (textNodes=${textNodes.length}, ms=${elapsedMs}, lang=${detected.language})`);
     }
   } catch (error) {
     console.error('[LexiPath] Processing error:', error);
+  } finally {
+    element.classList.remove('lexipath-processing');
   }
 }
 
-/**
- * Find and process text elements in the document
- */
-function findTextElements(): Element[] {
-  // Target paragraph-like elements
-  const selectors = [
-    'p',
-    'article p',
-    'main p',
-    '.content p',
-    '.article-content p',
-    'div[class*="content"] p',
-    'div[class*="article"] p',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'li',
-    'td',
-    'blockquote'
-  ];
+function ensureTooltipInjected(): void {
+  if (tooltipInjected) return;
+  tooltipInjected = true;
 
-  const elements: Element[] = [];
+  tooltipEl = document.createElement('div');
+  tooltipEl.id = 'lexipath-tooltip';
+  tooltipEl.style.display = 'none';
+  document.documentElement.appendChild(tooltipEl);
 
-  for (const selector of selectors) {
-    try {
-      const found = document.querySelectorAll(selector);
-      found.forEach(el => {
-        if (shouldProcessElement(el)) {
-          elements.push(el);
-        }
-      });
-    } catch {
-      // Invalid selector, skip
+  const hide = () => {
+    if (!tooltipEl) return;
+    tooltipTarget = null;
+    tooltipEl.style.display = 'none';
+  };
+
+  const position = (clientX: number, clientY: number) => {
+    if (!tooltipEl) return;
+
+    const padding = 12;
+    const offset = 14;
+
+    tooltipEl.style.left = '0px';
+    tooltipEl.style.top = '0px';
+
+    const rect = tooltipEl.getBoundingClientRect();
+    let x = clientX + offset;
+    let y = clientY + offset;
+
+    const maxX = window.innerWidth - rect.width - padding;
+    const maxY = window.innerHeight - rect.height - padding;
+    x = Math.max(padding, Math.min(x, maxX));
+    y = Math.max(padding, Math.min(y, maxY));
+
+    tooltipEl.style.left = `${Math.round(x)}px`;
+    tooltipEl.style.top = `${Math.round(y)}px`;
+  };
+
+  const showForWord = (wordEl: HTMLElement, clientX: number, clientY: number) => {
+    if (!tooltipEl) return;
+    const tooltipText = wordEl.dataset.tooltip?.trim();
+    if (!tooltipText) {
+      hide();
+      return;
     }
-  }
 
-  return elements;
+    tooltipTarget = wordEl;
+    tooltipEl.textContent = tooltipText;
+    tooltipEl.style.display = 'block';
+    position(clientX, clientY);
+  };
+
+  const getWordEl = (target: EventTarget | null): HTMLElement | null => {
+    if (!(target instanceof Element)) return null;
+    const found = target.closest('.lexipath-word');
+    return found instanceof HTMLElement ? found : null;
+  };
+
+  document.addEventListener('pointerover', (event) => {
+    const wordEl = getWordEl(event.target);
+    if (!wordEl) return;
+    showForWord(wordEl, event.clientX, event.clientY);
+  }, true);
+
+  document.addEventListener('pointermove', (event) => {
+    if (!tooltipEl || !tooltipTarget) return;
+    position(event.clientX, event.clientY);
+  }, true);
+
+  document.addEventListener('pointerout', (event) => {
+    if (!tooltipTarget) return;
+    const next = getWordEl(event.relatedTarget);
+    if (next && next === tooltipTarget) return;
+    hide();
+  }, true);
+
+  document.addEventListener('focusin', (event) => {
+    const wordEl = getWordEl(event.target);
+    if (!wordEl) return;
+    const rect = wordEl.getBoundingClientRect();
+    showForWord(wordEl, rect.left, rect.bottom);
+  }, true);
+
+  document.addEventListener('focusout', hide, true);
+  window.addEventListener('scroll', hide, true);
+  window.addEventListener('blur', hide);
+  window.addEventListener('resize', hide);
 }
+
+const processedElementSignature = new WeakMap<Element, string>();
+const queuedElements = new WeakSet<Element>();
+const inFlightElements = new WeakSet<Element>();
 
 let elementQueue: Element[] = [];
-let isProcessing = false;
+let queueHead = 0;
+let inFlightCount = 0;
+let pumpScheduled = false;
+
+let stylesInjected = false;
+
+function ensureStylesInjected(): void {
+  if (stylesInjected) return;
+  stylesInjected = true;
+
+  const style = document.createElement('style');
+  style.id = 'lexipath-styles';
+  style.textContent = `
+    .lexipath-word {
+      background: rgba(59, 130, 246, 0.18) !important;
+      border-bottom: 2px dotted #3b82f6 !important;
+      border-radius: 3px !important;
+      padding: 0 2px !important;
+    }
+
+    .lexipath-processing {
+      background: rgba(59, 130, 246, 0.08) !important;
+      transition: background 150ms ease-out;
+    }
+
+    #lexipath-tooltip {
+      position: fixed;
+      z-index: 2147483647;
+      max-width: min(420px, calc(100vw - 24px));
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.92);
+      color: #ffffff;
+      font-size: 13px;
+      line-height: 1.35;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      white-space: pre-wrap;
+      backdrop-filter: blur(6px);
+    }
+  `;
+  document.documentElement.appendChild(style);
+  ensureTooltipInjected();
+}
+
+function schedulePumpQueue(): void {
+  if (pumpScheduled) return;
+  pumpScheduled = true;
+
+  const run = () => {
+    pumpScheduled = false;
+    pumpQueue();
+  };
+
+  // Prefer idle time to reduce UI jank, but keep a timeout so it progresses.
+  const requestIdleCallback = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number })
+    .requestIdleCallback;
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(run, { timeout: 200 });
+  } else {
+    setTimeout(run, 0);
+  }
+}
 
 /**
- * Process elements in queue with rate limiting
+ * Pump queue with concurrency limit; avoids head-of-line blocking from Promise.all batches.
  */
-async function processElementQueue(): Promise<void> {
-  if (isProcessing || elementQueue.length === 0) return;
+function pumpQueue(): void {
+  while (inFlightCount < MAX_IN_FLIGHT && queueHead < elementQueue.length) {
+    const el = elementQueue[queueHead++];
+    if (!el) continue;
 
-  isProcessing = true;
+    queuedElements.delete(el);
+    if (!shouldProcessElement(el) || inFlightElements.has(el)) continue;
 
-  // Process up to 5 elements at a time
-  const batch = elementQueue.splice(0, 5);
+    inFlightElements.add(el);
+    inFlightCount++;
 
-  await Promise.all(batch.map(el => processTextElement(el)));
+    void processTextElement(el)
+      .catch(() => {
+        // processTextElement already logs; keep queue moving
+      })
+      .finally(() => {
+        inFlightElements.delete(el);
+        inFlightCount--;
 
-  isProcessing = false;
+        // Compact queue occasionally
+        if (queueHead > 1000 && queueHead > elementQueue.length / 2) {
+          elementQueue = elementQueue.slice(queueHead);
+          queueHead = 0;
+        }
 
-  // Continue processing if there are more elements
-  if (elementQueue.length > 0) {
-    setTimeout(processElementQueue, PROCESS_DELAY_MS);
+        schedulePumpQueue();
+      });
   }
 }
 
@@ -290,12 +464,38 @@ async function processElementQueue(): Promise<void> {
  */
 function queueElements(elements: Element[]): void {
   for (const el of elements) {
-    if (!processedElements.has(el) && !elementQueue.includes(el)) {
+    if (!shouldProcessElement(el)) continue;
+    if (queuedElements.has(el) || inFlightElements.has(el)) continue;
+
+    // If element is near viewport, prioritize it for better perceived speed.
+    const rect = (el as HTMLElement).getBoundingClientRect?.();
+    const isNearViewport = rect
+      ? rect.top < window.innerHeight * 1.5 && rect.bottom > -window.innerHeight * 0.5
+      : false;
+
+    if (isNearViewport) {
+      elementQueue.splice(queueHead, 0, el);
+    } else {
       elementQueue.push(el);
     }
+    queuedElements.add(el);
   }
-  processElementQueue();
+  schedulePumpQueue();
 }
+
+const TEXT_SELECTOR = [
+  'p',
+  'article p',
+  'main p',
+  '.content p',
+  '.article-content p',
+  'div[class*="content"] p',
+  'div[class*="article"] p',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'li',
+  'td',
+  'blockquote',
+].join(', ');
 
 /**
  * Set up MutationObserver to handle dynamic content
@@ -310,13 +510,18 @@ function setupMutationObserver(): void {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
           if (node instanceof Element) {
-            // Check the added element itself
-            if (shouldProcessElement(node)) {
-              newElements.push(node);
+            // Check the added element itself + descendants (scoped query, avoids rescanning entire document)
+            try {
+              if (node.matches(TEXT_SELECTOR) && shouldProcessElement(node)) {
+                newElements.push(node);
+              }
+              const descendants = node.querySelectorAll(TEXT_SELECTOR);
+              descendants.forEach((el) => {
+                if (shouldProcessElement(el)) newElements.push(el);
+              });
+            } catch {
+              // ignore invalid selector / non-matching roots
             }
-            // Check descendants
-            const descendants = findTextElements();
-            newElements.push(...descendants.filter(el => node.contains(el)));
           }
         });
       }
@@ -340,7 +545,12 @@ async function initPageProcessing(): Promise<void> {
   console.log('[LexiPath] Starting page processing...');
 
   // Initial processing of existing content
-  const elements = findTextElements();
+  const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(shouldProcessElement);
+  elements.sort((a, b) => {
+    const ra = (a as HTMLElement).getBoundingClientRect?.();
+    const rb = (b as HTMLElement).getBoundingClientRect?.();
+    return (ra?.top ?? 0) - (rb?.top ?? 0);
+  });
   console.log(`[LexiPath] Found ${elements.length} text elements to process`);
 
   queueElements(elements);
@@ -368,8 +578,13 @@ async function init(): Promise<void> {
 
   console.log('[LexiPath] Content script initialized');
 
-  // Initialize subtitle controller for video platforms
-  await initSubtitleController();
+  const url = window.location.href;
+  const platform = detectPlatform(url);
+  if (platform !== 'unknown') {
+    // Video sites: focus on subtitles only (avoid modifying page content).
+    await initSubtitleController(platform, url);
+    return;
+  }
 
   // Initialize page content processing
   await initPageProcessing();
