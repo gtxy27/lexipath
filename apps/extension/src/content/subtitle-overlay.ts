@@ -15,6 +15,7 @@ export interface SubtitleLine {
 export interface SubtitleDisplayOptions {
   mode: SubtitleMode;
   lines: SubtitleLine[];
+  interactiveWords?: Set<string>;
 }
 
 export interface WordCardData {
@@ -53,12 +54,24 @@ export class SubtitleOverlay {
   private mode: SubtitleMode = 'enhanced';
   private onModeChange?: (mode: SubtitleMode) => void;
   private onWordClick?: (word: string, anchorRect: DOMRect) => void;
+  private onWordHover?: (word: string, anchorRect: DOMRect) => void;
   private documentClickListenerAttached = false;
   private wordCardVisible = false;
+  private wordCardPinned = false;
+  private hoverWord: string | null = null;
+  private hoverRect: DOMRect | null = null;
+  private hoverOpenTimer: number | null = null;
+  private hoverCloseTimer: number | null = null;
+  private readonly hoverOpenDelayMs = 250;
+  private readonly hoverCloseDelayMs = 250;
 
   constructor(
     platform: 'youtube' | 'bilibili',
-    options?: { onModeChange?: (mode: SubtitleMode) => void; onWordClick?: (word: string, anchorRect: DOMRect) => void }
+    options?: {
+      onModeChange?: (mode: SubtitleMode) => void;
+      onWordClick?: (word: string, anchorRect: DOMRect) => void;
+      onWordHover?: (word: string, anchorRect: DOMRect) => void;
+    }
   ) {
     this.platform = platform;
     if (options?.onModeChange) {
@@ -66,6 +79,9 @@ export class SubtitleOverlay {
     }
     if (options?.onWordClick) {
       this.onWordClick = options.onWordClick;
+    }
+    if (options?.onWordHover) {
+      this.onWordHover = options.onWordHover;
     }
   }
 
@@ -125,6 +141,13 @@ export class SubtitleOverlay {
       this.subtitleElement.style.pointerEvents = 'auto';
       this.subtitleElement.style.cursor = 'pointer';
       this.subtitleElement.addEventListener('click', this.handleClick);
+      this.subtitleElement.addEventListener('mousemove', this.handleMouseMove);
+      this.subtitleElement.addEventListener('mouseleave', this.handleMouseLeave);
+    }
+
+    if (this.wordCardElement) {
+      this.wordCardElement.addEventListener('mouseenter', this.handleWordCardMouseEnter);
+      this.wordCardElement.addEventListener('mouseleave', this.handleWordCardMouseLeave);
     }
 
     // Append to video container
@@ -142,6 +165,7 @@ export class SubtitleOverlay {
       this.container.parentElement.removeChild(this.container);
     }
     this.detachDocumentClickListener();
+    this.clearHoverTimers();
     this.container = null;
     this.shadow = null;
     this.subtitleElement = null;
@@ -169,7 +193,7 @@ export class SubtitleOverlay {
     for (const line of lines) {
       const div = document.createElement('div');
       div.className = line.isEnhanced ? 'line-enhanced' : 'line-original';
-      this.renderLineWithWordSpans(div, line.text);
+      this.renderLineWithWordSpans(div, line.text, options.interactiveWords);
       this.subtitleElement.appendChild(div);
     }
     this.subtitleElement.classList.add('visible');
@@ -217,19 +241,21 @@ export class SubtitleOverlay {
     this.onModeChange?.(nextMode);
   };
 
-  showWordCardLoading(word: string, anchorRect: DOMRect): void {
+  showWordCardLoading(word: string, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
     this.showWordCard(
       {
         word,
         definition: 'Loading…',
       },
-      anchorRect
+      anchorRect,
+      options
     );
   }
 
-  showWordCard(data: WordCardData, anchorRect: DOMRect): void {
+  showWordCard(data: WordCardData, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
     if (!this.wordCardElement) return;
 
+    this.wordCardPinned = options?.pinned ?? this.wordCardPinned;
     this.wordCardElement.textContent = '';
 
     const header = document.createElement('div');
@@ -291,6 +317,7 @@ export class SubtitleOverlay {
     if (!this.wordCardElement) return;
     if (!this.wordCardVisible) return;
     this.wordCardVisible = false;
+    this.wordCardPinned = false;
     this.wordCardElement.classList.remove('visible');
     this.wordCardElement.setAttribute('aria-hidden', 'true');
     this.detachDocumentClickListener();
@@ -325,6 +352,86 @@ export class SubtitleOverlay {
     }
   };
 
+  private handleWordCardMouseEnter = (): void => {
+    this.clearHoverCloseTimer();
+  };
+
+  private handleWordCardMouseLeave = (): void => {
+    if (this.wordCardPinned) return;
+    this.scheduleHoverClose();
+  };
+
+  private handleMouseMove = (event: MouseEvent): void => {
+    if (this.wordCardPinned) return;
+
+    const target = event.target as HTMLElement | null;
+    const wordEl = target?.closest?.('[data-lexipath-word]') as HTMLElement | null;
+    const word = wordEl?.dataset?.lexipathWord ?? '';
+    if (!wordEl || !word) {
+      this.hoverWord = null;
+      this.hoverRect = null;
+      this.clearHoverOpenTimer();
+      this.scheduleHoverClose();
+      return;
+    }
+
+    const rect = wordEl.getBoundingClientRect();
+    if (this.hoverWord === word) {
+      this.hoverRect = rect;
+      return;
+    }
+
+    this.hoverWord = word;
+    this.hoverRect = rect;
+    this.clearHoverCloseTimer();
+    this.clearHoverOpenTimer();
+
+    const onWordHover = this.onWordHover;
+    if (!onWordHover) return;
+    this.hoverOpenTimer = window.setTimeout(() => {
+      if (this.wordCardPinned) return;
+      if (!this.hoverWord || !this.hoverRect) return;
+      onWordHover(this.hoverWord, this.hoverRect);
+    }, this.hoverOpenDelayMs);
+  };
+
+  private handleMouseLeave = (): void => {
+    if (this.wordCardPinned) return;
+    this.hoverWord = null;
+    this.hoverRect = null;
+    this.clearHoverOpenTimer();
+    this.scheduleHoverClose();
+  };
+
+  private scheduleHoverClose(): void {
+    if (this.wordCardPinned) return;
+    if (!this.wordCardVisible) return;
+    if (this.hoverCloseTimer !== null) return;
+    this.hoverCloseTimer = window.setTimeout(() => {
+      this.hoverCloseTimer = null;
+      if (this.wordCardPinned) return;
+      if (this.hoverWord) return;
+      this.hideWordCard();
+    }, this.hoverCloseDelayMs);
+  }
+
+  private clearHoverTimers(): void {
+    this.clearHoverOpenTimer();
+    this.clearHoverCloseTimer();
+  }
+
+  private clearHoverOpenTimer(): void {
+    if (this.hoverOpenTimer === null) return;
+    window.clearTimeout(this.hoverOpenTimer);
+    this.hoverOpenTimer = null;
+  }
+
+  private clearHoverCloseTimer(): void {
+    if (this.hoverCloseTimer === null) return;
+    window.clearTimeout(this.hoverCloseTimer);
+    this.hoverCloseTimer = null;
+  }
+
   private computeWordCardPosition(anchorRect: DOMRect): { top: number; left: number } {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -347,7 +454,7 @@ export class SubtitleOverlay {
     return { top, left };
   }
 
-  private renderLineWithWordSpans(container: HTMLElement, text: string): void {
+  private renderLineWithWordSpans(container: HTMLElement, text: string, interactiveWords?: Set<string>): void {
     const wordRegex = /[A-Za-z][A-Za-z'-]*/g;
     let lastIndex = 0;
 
@@ -356,6 +463,7 @@ export class SubtitleOverlay {
       if (!match) break;
 
       const rawWord = match[0] ?? '';
+      const normalizedWord = rawWord.toLowerCase();
       const startIndex = match.index;
       const endIndex = startIndex + rawWord.length;
 
@@ -363,11 +471,15 @@ export class SubtitleOverlay {
         container.appendChild(document.createTextNode(text.slice(lastIndex, startIndex)));
       }
 
-      const span = document.createElement('span');
-      span.className = 'lexipath-subtitle-word';
-      span.textContent = rawWord;
-      span.dataset.lexipathWord = rawWord.toLowerCase();
-      container.appendChild(span);
+      if (!interactiveWords || interactiveWords.has(normalizedWord)) {
+        const span = document.createElement('span');
+        span.className = 'lexipath-subtitle-word';
+        span.textContent = rawWord;
+        span.dataset.lexipathWord = normalizedWord;
+        container.appendChild(span);
+      } else {
+        container.appendChild(document.createTextNode(rawWord));
+      }
 
       lastIndex = endIndex;
     }

@@ -108,6 +108,7 @@ export class SubtitleController {
   private runtimeMessageListenerAttached = false;
   private youtubeCaptionHideStyle: HTMLStyleElement | null = null;
   private wordExplainCache = new Map<string, WordCardData>();
+  private wordExplainInFlight = new Map<string, Promise<WordCardData>>();
   private currentSubtitleContext = '';
 
   constructor(private settings: Settings) {}
@@ -250,6 +251,9 @@ export class SubtitleController {
       },
       onWordClick: (word, anchorRect) => {
         void this.handleSubtitleWordClick(word, anchorRect);
+      },
+      onWordHover: (word, anchorRect) => {
+        void this.handleSubtitleWordHover(word, anchorRect);
       },
     });
 
@@ -596,55 +600,151 @@ export class SubtitleController {
       ];
     }
 
-    this.overlay.display({ mode: effectiveMode, lines });
+    const interactiveWords = this.computeInteractiveWords(lines.map((line) => line.text));
+    this.overlay.display({ mode: effectiveMode, lines, interactiveWords });
   }
 
   private async handleSubtitleWordClick(word: string, anchorRect: DOMRect): Promise<void> {
+    await this.showWordExplanation(word, anchorRect, { pinned: true });
+  }
+
+  private async handleSubtitleWordHover(word: string, anchorRect: DOMRect): Promise<void> {
+    await this.showWordExplanation(word, anchorRect, { pinned: false });
+  }
+
+  private async showWordExplanation(
+    word: string,
+    anchorRect: DOMRect,
+    options: { pinned: boolean }
+  ): Promise<void> {
     if (!this.overlay) return;
     if (!word.trim()) return;
 
     const normalized = word.trim().toLowerCase();
     const cached = this.wordExplainCache.get(normalized);
     if (cached) {
-      this.overlay.showWordCard(cached, anchorRect);
+      this.overlay.showWordCard(cached, anchorRect, options);
       return;
     }
 
-    this.overlay.showWordCardLoading(normalized, anchorRect);
+    this.overlay.showWordCardLoading(normalized, anchorRect, options);
 
-    const response = await sendMessage('EXPLAIN_WORD', {
-      word: normalized,
-      ...(this.currentSubtitleContext.trim() ? { context: this.currentSubtitleContext } : {}),
+    const card = await this.getWordCardData(normalized);
+    this.wordExplainCache.set(normalized, card);
+    this.overlay.showWordCard(card, anchorRect, options);
+  }
+
+  private async getWordCardData(normalizedWord: string): Promise<WordCardData> {
+    const cached = this.wordExplainCache.get(normalizedWord);
+    if (cached) return cached;
+
+    const inFlight = this.wordExplainInFlight.get(normalizedWord);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      const response = await sendMessage('EXPLAIN_WORD', {
+        word: normalizedWord,
+        ...(this.currentSubtitleContext.trim() ? { context: this.currentSubtitleContext } : {}),
+      });
+
+      if (!response.ok) {
+        return {
+          word: normalizedWord,
+          definition: 'Failed to load definition',
+        };
+      }
+
+      const data = response.value as Record<string, unknown>;
+      const definition =
+        typeof data.definition === 'string' && data.definition.trim()
+          ? data.definition.trim()
+          : 'No definition available';
+
+      return {
+        word: typeof data.word === 'string' && data.word.trim() ? data.word.trim() : normalizedWord,
+        definition,
+        ...(typeof data.phonetic === 'string' && data.phonetic.trim() ? { phonetic: data.phonetic.trim() } : {}),
+        ...(typeof data.difficulty === 'string' && data.difficulty.trim() ? { difficulty: data.difficulty.trim() } : {}),
+        ...(typeof data.translation === 'string' && data.translation.trim() ? { translation: data.translation.trim() } : {}),
+        ...(typeof data.example === 'string' && data.example.trim() ? { example: data.example.trim() } : {}),
+        ...(typeof data.example_translation === 'string' && data.example_translation.trim()
+          ? { exampleTranslation: data.example_translation.trim() }
+          : {}),
+      };
+    })().finally(() => {
+      this.wordExplainInFlight.delete(normalizedWord);
     });
 
-    if (!response.ok) {
-      this.overlay.showWordCard(
-        {
-          word: normalized,
-          definition: 'Failed to load definition',
-        },
-        anchorRect
-      );
-      return;
+    this.wordExplainInFlight.set(normalizedWord, promise);
+    return promise;
+  }
+
+  private computeInteractiveWords(texts: string[]): Set<string> {
+    const stopwords = new Set([
+      'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'can', 'could', 'did', 'do', 'does',
+      'doing', 'for', 'from', 'had', 'has', 'have', 'having', 'he', 'her', 'here', 'him', 'his', 'how', 'i', 'if',
+      'in', 'into', 'is', 'it', 'its', 'just', 'me', 'my', 'no', 'not', 'of', 'on', 'or', 'our', 'out', 'over',
+      'she', 'so', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', 'this', 'to', 'too',
+      'under', 'up', 'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'who', 'why', 'will', 'with',
+      'would', 'you', 'your',
+    ]);
+
+    const minLength = (() => {
+      switch (this.settings.proficiencyLevel) {
+        case 'A1':
+        case 'A2':
+          return 3;
+        case 'B1':
+        case 'B2':
+          return 4;
+        case 'C1':
+        case 'C2':
+          return 5;
+        default:
+          return 4;
+      }
+    })();
+
+    const maxWords = (() => {
+      switch (this.settings.proficiencyLevel) {
+        case 'A1':
+          return 6;
+        case 'A2':
+          return 5;
+        case 'B1':
+          return 4;
+        case 'B2':
+          return 3;
+        case 'C1':
+        case 'C2':
+          return 2;
+        default:
+          return 3;
+      }
+    })();
+
+    const candidates = new Map<string, number>();
+    const wordRegex = /[A-Za-z][A-Za-z'-]*/g;
+
+    for (const text of texts) {
+      wordRegex.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = wordRegex.exec(text)) !== null) {
+        const raw = match[0] ?? '';
+        const normalized = raw.toLowerCase();
+        if (normalized.length < minLength) continue;
+        if (stopwords.has(normalized)) continue;
+        const score = raw.length;
+        candidates.set(normalized, Math.max(candidates.get(normalized) ?? 0, score));
+      }
     }
 
-    const data = response.value as Record<string, unknown>;
-    const definition = typeof data.definition === 'string' && data.definition.trim() ? data.definition.trim() : 'No definition available';
+    const selected = Array.from(candidates.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, maxWords)
+      .map(([word]) => word);
 
-    const card: WordCardData = {
-      word: (typeof data.word === 'string' && data.word.trim()) ? data.word.trim() : normalized,
-      definition,
-      ...(typeof data.phonetic === 'string' && data.phonetic.trim() ? { phonetic: data.phonetic.trim() } : {}),
-      ...(typeof data.difficulty === 'string' && data.difficulty.trim() ? { difficulty: data.difficulty.trim() } : {}),
-      ...(typeof data.translation === 'string' && data.translation.trim() ? { translation: data.translation.trim() } : {}),
-      ...(typeof data.example === 'string' && data.example.trim() ? { example: data.example.trim() } : {}),
-      ...(typeof data.example_translation === 'string' && data.example_translation.trim()
-        ? { exampleTranslation: data.example_translation.trim() }
-        : {}),
-    };
-
-    this.wordExplainCache.set(normalized, card);
-    this.overlay.showWordCard(card, anchorRect);
+    return new Set(selected);
   }
 
   /**

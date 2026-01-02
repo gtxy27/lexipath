@@ -43,6 +43,8 @@ vi.mock('./subtitle-overlay', () => {
   SubtitleOverlay.prototype.unmount = vi.fn();
   SubtitleOverlay.prototype.display = vi.fn();
   SubtitleOverlay.prototype.clear = vi.fn();
+  SubtitleOverlay.prototype.showWordCardLoading = vi.fn();
+  SubtitleOverlay.prototype.showWordCard = vi.fn();
   SubtitleOverlay.prototype.setMode = vi.fn();
   SubtitleOverlay.prototype.getMode = vi.fn(() => 'enhanced');
 
