@@ -10,7 +10,6 @@ import {
   type ProviderConfig,
   type Settings,
 } from '@lexipath/core';
-import { OpenAICompatibleProvider } from '@lexipath/providers';
 import { sendMessage } from '../../shared/messages';
 
 type SiteMode = 'all' | 'whitelist';
@@ -484,30 +483,28 @@ export function Options(): React.ReactElement {
 
     setTesting(true);
     try {
-      const permission = await sendMessage('REQUEST_HOST_PERMISSION', {
-        origin: result.provider.baseUrl,
-      });
+      const response = await sendMessage('TEST_PROVIDER_CONNECTION', { provider: result.provider });
 
-      if (!permission.ok) {
-        setNotice({ kind: 'error', messageKey: 'optionsPermissionRequestFailed' });
+      if (response.ok) {
+        setNotice({ kind: 'success', messageKey: 'optionsProviderTestSuccess' });
         return;
       }
-      if (!permission.value) {
+
+      if (response.error.code === 'PERMISSION_DENIED') {
         setNotice({ kind: 'error', messageKey: 'optionsPermissionDenied' });
         return;
       }
-
-      const provider = new OpenAICompatibleProvider(result.provider);
-      const check = await provider.testConnection();
-      if (check.ok) {
-        setNotice({ kind: 'success', messageKey: 'optionsProviderTestSuccess' });
-      } else {
-        setNotice({
-          kind: 'error',
-          messageKey: 'optionsProviderTestFailed',
-          substitutions: check.error ?? t('optionsProviderTestFailedUnknown'),
-        });
+      if (response.error.code === 'PERMISSION_REQUEST_FAILED') {
+        setNotice({ kind: 'error', messageKey: 'optionsPermissionRequestFailed' });
+        return;
       }
+
+      const providerErrorKey = `providerError_${response.error.code}`;
+      const providerErrorText = t(providerErrorKey);
+      const substitution =
+        providerErrorText !== providerErrorKey ? providerErrorText : response.error.message || t('optionsProviderTestFailedUnknown');
+
+      setNotice({ kind: 'error', messageKey: 'optionsProviderTestFailed', substitutions: substitution });
     } finally {
       setTesting(false);
     }

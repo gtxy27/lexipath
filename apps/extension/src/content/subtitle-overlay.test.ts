@@ -3,6 +3,24 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('webextension-polyfill', () => ({
+  default: {
+    i18n: {
+      getMessage: (key: string) => {
+        const messages: Record<string, string> = {
+          loading: 'Loading...',
+          wordCard_loading: 'Loading…',
+          subtitle_modeSingle: '单语',
+          subtitle_modeBilingual: '双语',
+          subtitle_modeBilingualHold: '双语(按住)',
+        };
+        return messages[key] ?? '';
+      },
+    },
+  },
+}));
+
 import { SubtitleOverlay, getVideoContainerSelector, type SubtitleLine } from './subtitle-overlay';
 
 describe('getVideoContainerSelector', () => {

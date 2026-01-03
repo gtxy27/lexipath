@@ -15,6 +15,102 @@
     "message": "（翻译加载中…）",
     "description": "字幕：加载翻译占位符"
   },
+  "subtitle_modeSingle": {
+    "message": "单语",
+    "description": "字幕：模式按钮（单语）"
+  },
+  "subtitle_modeBilingual": {
+    "message": "双语",
+    "description": "字幕：模式按钮（双语）"
+  },
+  "subtitle_modeBilingualHold": {
+    "message": "双语(按住)",
+    "description": "字幕：模式按钮（双语，按住）"
+  },
+  "wordCard_loading": {
+    "message": "加载中…",
+    "description": "单词卡：加载中占位符"
+  },
+  "wordCard_definitionUnavailable": {
+    "message": "暂无释义",
+    "description": "单词卡：无释义兜底"
+  },
+  "wordCard_definitionFailed": {
+    "message": "加载释义失败",
+    "description": "单词卡：加载失败"
+  },
+  "wordCard_definitionError": {
+    "message": "加载释义出错",
+    "description": "单词卡：发生未知错误"
+  },
+  "error_unknown": {
+    "message": "未知错误",
+    "description": "通用未知错误"
+  },
+  "error_providerNotConfigured": {
+    "message": "未配置服务商",
+    "description": "错误：未配置服务商"
+  },
+  "error_emptyResponse": {
+    "message": "服务商返回为空",
+    "description": "错误：服务商返回为空"
+  },
+  "error_invalidOrigin": {
+    "message": "无效的地址",
+    "description": "错误：无效的 origin"
+  },
+  "log_providerNotConfiguredSkipPageProcessing": {
+    "message": "未配置服务商，跳过页面处理",
+    "description": "日志：未配置服务商"
+  },
+  "providerError_NETWORK_ERROR": {
+    "message": "网络错误，请检查网络连接。",
+    "description": "Provider 错误：NETWORK_ERROR"
+  },
+  "providerError_AUTH_ERROR": {
+    "message": "鉴权失败，请检查 API Key。",
+    "description": "Provider 错误：AUTH_ERROR"
+  },
+  "providerError_TIMEOUT": {
+    "message": "请求超时，请重试。",
+    "description": "Provider 错误：TIMEOUT"
+  },
+  "providerError_RATE_LIMIT": {
+    "message": "请求过于频繁，请稍后再试。",
+    "description": "Provider 错误：RATE_LIMIT"
+  },
+  "providerError_INVALID_RESPONSE": {
+    "message": "服务商返回格式异常，请检查配置。",
+    "description": "Provider 错误：INVALID_RESPONSE"
+  },
+  "providerError_INVALID_REQUEST": {
+    "message": "请求参数无效，请检查配置。",
+    "description": "Provider 错误：INVALID_REQUEST"
+  },
+  "providerError_SERVER_ERROR": {
+    "message": "服务商服务器错误，请稍后再试。",
+    "description": "Provider 错误：SERVER_ERROR"
+  },
+  "providerError_SERVICE_UNAVAILABLE": {
+    "message": "服务暂不可用，请稍后再试。",
+    "description": "Provider 错误：SERVICE_UNAVAILABLE"
+  },
+  "providerError_QUOTA_EXCEEDED": {
+    "message": "额度不足，请检查账户。",
+    "description": "Provider 错误：QUOTA_EXCEEDED"
+  },
+  "providerError_MODEL_NOT_FOUND": {
+    "message": "模型不存在，请检查模型名。",
+    "description": "Provider 错误：MODEL_NOT_FOUND"
+  },
+  "providerError_CONTEXT_LENGTH_EXCEEDED": {
+    "message": "内容过长，超过模型上下文限制。",
+    "description": "Provider 错误：CONTEXT_LENGTH_EXCEEDED"
+  },
+  "providerError_UNKNOWN": {
+    "message": "未知的服务商错误",
+    "description": "Provider 错误：UNKNOWN"
+  },
   "subtitle_youtubeEnableCaptions": {
     "message": "LexiPath：请先在 YouTube 打开字幕（CC），我才能读取并增强字幕。",
     "description": "字幕：提示用户开启 YouTube 原生字幕"

@@ -8,14 +8,19 @@
  * - Subtitle rendering
  */
 
-import type { Settings, WebEnhanceOutput } from '@lexipath/core';
+import type { EnhanceWebPayload, Settings, WebEnhanceOutput } from '@lexipath/core';
 import { detectPrimaryLanguage, qualifySite } from '@lexipath/core/qualify';
 import { sendMessage } from '../shared/messages';
 import { SubtitleController, detectPlatform, type Platform } from './subtitle-controller';
+import { createEnhancedElement, type WordRenderMode } from './enhanced-text';
+import { getI18nMessage } from './i18n';
 
 let subtitleController: SubtitleController | null = null;
 let currentSettings: Settings | null = null;
 let observer: MutationObserver | null = null;
+let urlPollTimer: number | null = null;
+let navigationToken = 0;
+let lastKnownUrl = '';
 
 // Minimum text length to process
 const MIN_TEXT_LENGTH = 20;
@@ -23,8 +28,6 @@ const MIN_TEXT_LENGTH = 20;
 const MAX_TEXT_LENGTH = 2000;
 
 const MAX_IN_FLIGHT = 3;
-
-type WordRenderMode = 'target-to-native' | 'native-to-target';
 
 let tooltipInjected = false;
 let tooltipEl: HTMLDivElement | null = null;
@@ -45,14 +48,21 @@ async function getSettings(): Promise<Settings | null> {
 /**
  * Initialize subtitle controller for video platforms
  */
-async function initSubtitleController(platform: Platform, url: string): Promise<void> {
+async function initSubtitleController(platform: Platform, url: string, token: number): Promise<void> {
+  if (token !== navigationToken) return;
   console.log(`[LexiPath] Detected video platform: ${platform}`);
+
+  if (subtitleController) {
+    subtitleController.destroy();
+    subtitleController = null;
+  }
 
   // Wait for video element to be available
   const maxRetries = 20;
   let retries = 0;
 
   const checkVideoElement = async (): Promise<void> => {
+    if (token !== navigationToken) return;
     const videoElement = document.querySelector('video');
 
     if (videoElement instanceof HTMLVideoElement) {
@@ -119,75 +129,10 @@ function computeTextSignature(text: string): string {
 }
 
 /**
- * Create enhanced text element with word highlighting
- */
-function createEnhancedElement(original: string, enhanced: WebEnhanceOutput, mode: WordRenderMode): DocumentFragment {
-  const fragment = document.createDocumentFragment();
-
-  // If no words to convert, return original text
-  if (!enhanced.convert_word || enhanced.convert_word.length === 0) {
-    fragment.appendChild(document.createTextNode(original));
-    return fragment;
-  }
-
-  let currentText = original;
-
-  // Sort words by position in text (process from end to avoid index shifting)
-  const words = enhanced.convert_word
-    .map(word => ({
-      ...word,
-      index: currentText.toLowerCase().indexOf(word.original.toLowerCase())
-    }))
-    .filter(word => word.index !== -1)
-    .sort((a, b) => a.index - b.index);
-
-  if (words.length === 0) {
-    fragment.appendChild(document.createTextNode(original));
-    return fragment;
-  }
-
-  let lastIndex = 0;
-
-  for (const word of words) {
-    // Add text before the word
-    if (word.index > lastIndex) {
-      fragment.appendChild(document.createTextNode(currentText.slice(lastIndex, word.index)));
-    }
-
-    // Create highlighted word span
-    const span = document.createElement('span');
-    span.className = 'lexipath-word';
-    span.style.cssText = 'border-bottom: 2px dotted #3b82f6; cursor: pointer; position: relative;';
-    span.dataset.original = word.original;
-    span.dataset.converted = word.converted;
-    span.dataset.difficulty = word.difficulty || '';
-    span.dataset.renderMode = mode;
-
-    const displayText = mode === 'native-to-target' ? word.converted : word.original;
-    const tooltipText = mode === 'native-to-target' ? word.original : word.converted;
-    span.textContent = displayText;
-    span.dataset.tooltip = `${tooltipText}${word.difficulty ? ` (${word.difficulty})` : ''}`;
-
-    // Avoid default browser tooltip delay; we render our own tooltip immediately.
-    span.removeAttribute('title');
-
-    fragment.appendChild(span);
-
-    lastIndex = word.index + word.original.length;
-  }
-
-  // Add remaining text
-  if (lastIndex < currentText.length) {
-    fragment.appendChild(document.createTextNode(currentText.slice(lastIndex)));
-  }
-
-  return fragment;
-}
-
-/**
  * Process a text node and its parent element
  */
-async function processTextElement(element: Element): Promise<void> {
+async function processTextElement(element: Element, token: number): Promise<void> {
+  if (token !== pageProcessingToken) return;
   if (!shouldProcessElement(element)) return;
 
   const text = extractTextContent(element);
@@ -205,12 +150,12 @@ async function processTextElement(element: Element): Promise<void> {
     const detected = detectPrimaryLanguage({ text });
     const nativeDetected = currentSettings?.nativeLanguage === 'en' ? 'en' : 'zh';
 
-    const enhancePayload: Record<string, unknown> = { content: text };
+    const enhancePayload: EnhanceWebPayload = { content: text };
     let renderMode: WordRenderMode = 'target-to-native';
     if (currentSettings) {
       // Default mode: target language text -> native language tooltip.
-      let sourceLang: string = currentSettings.targetLanguage;
-      let targetLang: string = currentSettings.nativeLanguage;
+      let sourceLang: EnhanceWebPayload['sourceLang'] = currentSettings.targetLanguage;
+      let targetLang: EnhanceWebPayload['targetLang'] = currentSettings.nativeLanguage;
 
       // If we're learning English and the paragraph is in native Chinese,
       // flip direction so we can still learn from native-language pages.
@@ -230,6 +175,8 @@ async function processTextElement(element: Element): Promise<void> {
       console.warn('[LexiPath] Enhancement failed:', response.error);
       return;
     }
+
+    if (token !== pageProcessingToken) return;
 
     const enhanced = response.value;
     processedElementSignature.set(element, signature);
@@ -357,16 +304,19 @@ function ensureTooltipInjected(): void {
   window.addEventListener('resize', hide);
 }
 
-const processedElementSignature = new WeakMap<Element, string>();
-const queuedElements = new WeakSet<Element>();
-const inFlightElements = new WeakSet<Element>();
+let processedElementSignature = new WeakMap<Element, string>();
+let queuedElements = new WeakSet<Element>();
+let inFlightElements = new WeakSet<Element>();
 
 let elementQueue: Element[] = [];
+let priorityQueue: Element[] = [];
+let pageProcessingToken = 0;
 let queueHead = 0;
 let inFlightCount = 0;
 let pumpScheduled = false;
 
 let stylesInjected = false;
+let intersectionObserver: IntersectionObserver | null = null;
 
 function ensureStylesInjected(): void {
   if (stylesInjected) return;
@@ -407,6 +357,36 @@ function ensureStylesInjected(): void {
   ensureTooltipInjected();
 }
 
+let priorityQueuedElements = new WeakSet<Element>();
+
+function ensureIntersectionObserver(): void {
+  if (intersectionObserver) return;
+  if (typeof IntersectionObserver === 'undefined') return;
+
+  intersectionObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const el = entry.target;
+        if (!(el instanceof Element)) continue;
+        if (!queuedElements.has(el)) continue;
+        if (priorityQueuedElements.has(el)) continue;
+        priorityQueuedElements.add(el);
+        priorityQueue.push(el);
+      }
+
+      if (priorityQueue.length > 0) {
+        schedulePumpQueue();
+      }
+    },
+    {
+      root: null,
+      rootMargin: '400px 0px',
+      threshold: 0.01,
+    }
+  );
+}
+
 function schedulePumpQueue(): void {
   if (pumpScheduled) return;
   pumpScheduled = true;
@@ -430,21 +410,45 @@ function schedulePumpQueue(): void {
  * Pump queue with concurrency limit; avoids head-of-line blocking from Promise.all batches.
  */
 function pumpQueue(): void {
-  while (inFlightCount < MAX_IN_FLIGHT && queueHead < elementQueue.length) {
-    const el = elementQueue[queueHead++];
-    if (!el) continue;
+  const token = pageProcessingToken;
+
+  const dequeue = (): Element | null => {
+    while (priorityQueue.length > 0) {
+      const el = priorityQueue.shift();
+      if (!el) continue;
+      if (!queuedElements.has(el)) continue;
+      return el;
+    }
+
+    while (queueHead < elementQueue.length) {
+      const el = elementQueue[queueHead++];
+      if (!el) continue;
+      if (!queuedElements.has(el)) continue;
+      return el;
+    }
+
+    return null;
+  };
+
+  while (inFlightCount < MAX_IN_FLIGHT) {
+    const el = dequeue();
+    if (!el) break;
 
     queuedElements.delete(el);
+    priorityQueuedElements.delete(el);
+    intersectionObserver?.unobserve(el);
+
     if (!shouldProcessElement(el) || inFlightElements.has(el)) continue;
 
     inFlightElements.add(el);
     inFlightCount++;
 
-    void processTextElement(el)
+    void processTextElement(el, token)
       .catch(() => {
         // processTextElement already logs; keep queue moving
       })
       .finally(() => {
+        if (token !== pageProcessingToken) return;
         inFlightElements.delete(el);
         inFlightCount--;
 
@@ -463,6 +467,7 @@ function pumpQueue(): void {
  * Queue elements for processing
  */
 function queueElements(elements: Element[]): void {
+  ensureIntersectionObserver();
   for (const el of elements) {
     if (!shouldProcessElement(el)) continue;
     if (queuedElements.has(el) || inFlightElements.has(el)) continue;
@@ -479,6 +484,7 @@ function queueElements(elements: Element[]): void {
       elementQueue.push(el);
     }
     queuedElements.add(el);
+    intersectionObserver?.observe(el);
   }
   schedulePumpQueue();
 }
@@ -538,10 +544,34 @@ function setupMutationObserver(): void {
   });
 }
 
+function resetPageProcessingState(): void {
+  pageProcessingToken++;
+  pumpScheduled = false;
+  inFlightCount = 0;
+  elementQueue = [];
+  priorityQueue = [];
+  queueHead = 0;
+  processedElementSignature = new WeakMap<Element, string>();
+  queuedElements = new WeakSet<Element>();
+  inFlightElements = new WeakSet<Element>();
+  priorityQueuedElements = new WeakSet<Element>();
+
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+
+  if (intersectionObserver) {
+    intersectionObserver.disconnect();
+    intersectionObserver = null;
+  }
+}
+
 /**
  * Initialize page content processing
  */
 async function initPageProcessing(): Promise<void> {
+  resetPageProcessingState();
   console.log('[LexiPath] Starting page processing...');
 
   // Initial processing of existing content
@@ -562,15 +592,15 @@ async function initPageProcessing(): Promise<void> {
 /**
  * Initialize content script.
  */
-async function init(): Promise<void> {
+async function initForUrl(url: string, token: number): Promise<void> {
   currentSettings = await getSettings();
+  if (token !== navigationToken) return;
 
   if (!currentSettings?.enabled) {
     console.log('[LexiPath] Extension is disabled');
     return;
   }
 
-  const url = window.location.href;
   const siteDecision = qualifySite({
     url,
     settings: {
@@ -588,7 +618,7 @@ async function init(): Promise<void> {
 
   // Check if provider is configured
   if (!currentSettings.provider?.baseUrl || !currentSettings.provider?.model) {
-    console.log('[LexiPath] Provider not configured, skipping page processing');
+    console.log(`[LexiPath] ${getI18nMessage('log_providerNotConfiguredSkipPageProcessing')}`);
     return;
   }
 
@@ -597,7 +627,7 @@ async function init(): Promise<void> {
   const platform = detectPlatform(url);
   if (platform !== 'unknown') {
     // Video sites: focus on subtitles only (avoid modifying page content).
-    await initSubtitleController(platform, url);
+    await initSubtitleController(platform, url, token);
     return;
   }
 
@@ -605,14 +635,44 @@ async function init(): Promise<void> {
   await initPageProcessing();
 }
 
-/**
- * Cleanup on page unload
- */
-function cleanup(): void {
+function resetAllState(): void {
   if (subtitleController) {
     subtitleController.destroy();
     subtitleController = null;
   }
+  resetPageProcessingState();
+}
+
+function startUrlWatcher(): void {
+  if (urlPollTimer !== null) return;
+  urlPollTimer = window.setInterval(() => {
+    const url = window.location.href;
+    if (url === lastKnownUrl) return;
+
+    lastKnownUrl = url;
+    const token = ++navigationToken;
+    resetAllState();
+    void initForUrl(url, token);
+  }, 1000);
+}
+
+async function init(): Promise<void> {
+  lastKnownUrl = window.location.href;
+  const token = ++navigationToken;
+  resetAllState();
+  await initForUrl(lastKnownUrl, token);
+  startUrlWatcher();
+}
+
+/**
+ * Cleanup on page unload
+ */
+function cleanup(): void {
+  if (urlPollTimer !== null) {
+    window.clearInterval(urlPollTimer);
+    urlPollTimer = null;
+  }
+  resetAllState();
 }
 
 // Initialize when DOM is ready

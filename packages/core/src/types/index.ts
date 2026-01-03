@@ -42,6 +42,7 @@ export const MessageTypeSchema = z.enum([
   'GET_SETTINGS',
   'SET_SETTINGS',
   'REQUEST_HOST_PERMISSION',
+  'TEST_PROVIDER_CONNECTION',
   'SELECT_KEYWORDS',
   'ENHANCE_WEB',
   'ENHANCE_SUBTITLE',
@@ -85,6 +86,13 @@ export const ProviderConfigSchema = z.object({
   customHeaders: z.record(z.string()).optional(),
 });
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
+
+export const TestProviderConnectionPayloadSchema = z
+  .object({
+    provider: ProviderConfigSchema,
+  })
+  .strict();
+export type TestProviderConnectionPayload = z.infer<typeof TestProviderConnectionPayloadSchema>;
 
 // =============================================================================
 // Settings
@@ -149,6 +157,22 @@ export const WebEnhanceOutputSchema = z.object({
 export type WebEnhanceOutput = z.infer<typeof WebEnhanceOutputSchema>;
 
 // =============================================================================
+// Web Enhancement Payload
+// =============================================================================
+
+export const EnhanceWebPayloadSchema = z
+  .object({
+    content: z.string().min(1),
+    sourceLang: SupportedLanguageSchema.optional(),
+    targetLang: NativeLanguageSchema.optional(),
+    difficultyMin: CEFRLevelSchema.optional(),
+    difficultyMax: CEFRLevelSchema.optional(),
+    maxWords: z.number().int().min(1).max(50).optional(),
+  })
+  .strict();
+export type EnhanceWebPayload = z.infer<typeof EnhanceWebPayloadSchema>;
+
+// =============================================================================
 // Subtitle Enhancement Output
 // =============================================================================
 
@@ -158,6 +182,21 @@ export const SubtitleEnhanceOutputSchema = z.object({
   line3_final: z.string().optional(),
 });
 export type SubtitleEnhanceOutput = z.infer<typeof SubtitleEnhanceOutputSchema>;
+
+// =============================================================================
+// Subtitle Enhancement Payload
+// =============================================================================
+
+export const EnhanceSubtitlePayloadSchema = z
+  .object({
+    subtitle: z.string().min(1),
+    sourceLang: SupportedLanguageSchema.optional(),
+    targetLang: NativeLanguageSchema.optional(),
+    difficultyLevel: CEFRLevelSchema.optional(),
+    mode: z.enum(['single', 'bilingual']).optional(),
+  })
+  .strict();
+export type EnhanceSubtitlePayload = z.infer<typeof EnhanceSubtitlePayloadSchema>;
 
 // =============================================================================
 // Word & Familiarity
@@ -222,3 +261,28 @@ export const ChatResponseSchema = z.object({
   conversationId: z.string(),
 });
 export type ChatResponse = z.infer<typeof ChatResponseSchema>;
+
+// =============================================================================
+// Explain Word
+// =============================================================================
+
+export const ExplainWordPayloadSchema = z
+  .object({
+    word: z.string().min(1),
+    context: z.string().min(1).optional(),
+  })
+  .strict();
+export type ExplainWordPayload = z.infer<typeof ExplainWordPayloadSchema>;
+
+export const ExplainWordOutputSchema = z
+  .object({
+    word: z.string().min(1),
+    definition: z.string().min(1),
+    phonetic: z.string().min(1).optional(),
+    difficulty: z.string().min(1).optional(),
+    translation: z.string().min(1).optional(),
+    example: z.string().min(1).optional(),
+    example_translation: z.string().min(1).optional(),
+  })
+  .strict();
+export type ExplainWordOutput = z.infer<typeof ExplainWordOutputSchema>;

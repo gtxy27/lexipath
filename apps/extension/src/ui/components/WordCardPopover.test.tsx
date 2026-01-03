@@ -141,7 +141,7 @@ describe('WordCardPopover', () => {
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to load definition')).toBeInTheDocument();
+        expect(screen.getByText('wordCard_definitionFailed')).toBeInTheDocument();
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -162,7 +162,7 @@ describe('WordCardPopover', () => {
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
 
       await waitFor(() => {
-        expect(screen.getByText('No definition available')).toBeInTheDocument();
+        expect(screen.getByText('wordCard_definitionUnavailable')).toBeInTheDocument();
       });
     });
 
@@ -173,7 +173,7 @@ describe('WordCardPopover', () => {
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Error loading definition')).toBeInTheDocument();
+        expect(screen.getByText('wordCard_definitionError')).toBeInTheDocument();
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(

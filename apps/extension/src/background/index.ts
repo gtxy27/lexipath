@@ -15,7 +15,11 @@ import {
   CEFRLevelSchema,
   NativeLanguageSchema,
   SupportedLanguageSchema,
+  type EnhanceSubtitlePayload,
+  type EnhanceWebPayload,
   type CEFRLevel,
+  type ExplainWordOutput,
+  type ExplainWordPayload,
   type ProviderConfig,
   type SubtitleEnhanceOutput,
   type WebEnhanceOutput,
@@ -55,6 +59,16 @@ const CONCURRENCY_SATURATION_LOG_THROTTLE_MS = 1500;
 type ConcurrencyState = { inFlight: number; waiters: Array<() => void> };
 const modelConcurrency = new Map<string, ConcurrencyState>();
 const lastSaturationLogAt = new Map<string, number>();
+
+function t(key: string, substitutions?: string | string[], fallback = ''): string {
+  try {
+    const message = browser.i18n?.getMessage?.(key, substitutions as any);
+    if (typeof message === 'string' && message.trim()) return message;
+  } catch {
+    // ignore
+  }
+  return fallback || key;
+}
 
 function providerModelKey(config: ProviderConfig): string {
   return `${config.baseUrl}|${config.model}`;
@@ -149,46 +163,6 @@ function getProvider(config: ProviderConfig | undefined): OpenAICompatibleProvid
   return providerInstance;
 }
 
-function coerceWebContent(payload: unknown): string | null {
-  if (typeof payload === 'string') return payload;
-  if (!payload || typeof payload !== 'object') return null;
-
-  const record = payload as Record<string, unknown>;
-  const candidates = [record.content, record.text, record.input, record.source];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function coerceSubtitle(payload: unknown): string | null {
-  if (typeof payload === 'string') return payload;
-  if (!payload || typeof payload !== 'object') return null;
-
-  const record = payload as Record<string, unknown>;
-  const candidates = [record.subtitle, record.text, record.content, record.input];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-  return null;
-}
-
-function getOptionalPayloadField<T>(
-  payload: unknown,
-  key: string,
-  schema: z.ZodType<T>
-): T | undefined {
-  if (!payload || typeof payload !== 'object') return undefined;
-  const record = payload as Record<string, unknown>;
-  const value = record[key];
-  const parsed = schema.safeParse(value);
-  return parsed.success ? parsed.data : undefined;
-}
-
 const CEFR_LEVELS: readonly CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 function getDefaultDifficultyRange(level: CEFRLevel): { difficultyMin: CEFRLevel; difficultyMax: CEFRLevel } {
@@ -205,30 +179,11 @@ function getDefaultDifficultyRange(level: CEFRLevel): { difficultyMin: CEFRLevel
 const webEnhanceCache = createExpiringLruCache<WebEnhanceOutput>(CACHE_MAX_ENTRIES);
 const subtitleEnhanceCache = createExpiringLruCache<SubtitleEnhanceOutput>(CACHE_MAX_ENTRIES);
 const keywordSelectCache = createExpiringLruCache<string[]>(CACHE_MAX_ENTRIES);
-const explainWordCache = createExpiringLruCache<{
-  word: string;
-  phonetic?: string;
-  definition: string;
-  difficulty?: string;
-  translation?: string;
-  example?: string;
-  example_translation?: string;
-}>(CACHE_MAX_ENTRIES);
+const explainWordCache = createExpiringLruCache<ExplainWordOutput>(CACHE_MAX_ENTRIES);
 const webEnhanceInFlight = new Map<string, Promise<WebEnhanceOutput>>();
 const subtitleEnhanceInFlight = new Map<string, Promise<SubtitleEnhanceOutput>>();
 const keywordSelectInFlight = new Map<string, Promise<string[]>>();
-const explainWordInFlight = new Map<
-  string,
-  Promise<{
-    word: string;
-    phonetic?: string;
-    definition: string;
-    difficulty?: string;
-    translation?: string;
-    example?: string;
-    example_translation?: string;
-  }>
->();
+const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
 const dictionaryService = new DictionaryService();
 
 type CaptionRequestCacheEntry = { params: string; timestamp: number };
@@ -266,16 +221,34 @@ registry.register('SET_SETTINGS', async (payload) => {
 
 function normalizeOriginToHostPattern(origin: string): string {
   const trimmed = origin.trim();
-
-  if (trimmed === '<all_urls>') return '<all_urls>';
-  if (trimmed.includes('*')) return trimmed;
-
-  try {
-    const url = new URL(trimmed);
-    return `${url.origin}/*`;
-  } catch {
-    return trimmed;
+  if (!trimmed) {
+    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
   }
+
+  if (trimmed === '<all_urls>') {
+    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
+  }
+
+  if (trimmed.includes('*')) {
+    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
+  }
+
+  const isLocalhostHttp = url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+  if (url.protocol !== 'https:' && !isLocalhostHttp) {
+    throw new MessageError({
+      code: 'INVALID_ORIGIN',
+      message: t('error_invalidOrigin'),
+    });
+  }
+
+  return `${url.origin}/*`;
 }
 
 registry.register('REQUEST_HOST_PERMISSION', async (payload) => {
@@ -287,16 +260,36 @@ registry.register('REQUEST_HOST_PERMISSION', async (payload) => {
   }
 });
 
-registry.register('SELECT_KEYWORDS', async (payload) => {
-  const text = getOptionalPayloadField(payload, 'text', z.string().min(1)) ?? '';
-  if (!text) return [];
+registry.register('TEST_PROVIDER_CONNECTION', async (payload) => {
+  const originPattern = normalizeOriginToHostPattern(payload.provider.baseUrl);
+  let granted = false;
+  try {
+    granted = await browser.permissions.request({ origins: [originPattern] });
+  } catch (error) {
+    throw new MessageError({
+      code: 'PERMISSION_REQUEST_FAILED',
+      message: error instanceof Error ? error.message : 'Could not request host permission',
+    });
+  }
 
+  if (!granted) {
+    throw new MessageError({ code: 'PERMISSION_DENIED', message: 'Permission denied' });
+  }
+
+  const provider = new OpenAICompatibleProvider(payload.provider);
+  const check = await provider.testConnection();
+  if (check.ok) return true as const;
+
+  throw new MessageError({ code: check.error.code, message: check.error.message });
+});
+
+registry.register('SELECT_KEYWORDS', async (payload) => {
   const settings = await getSettings();
-  const sourceLang = getOptionalPayloadField(payload, 'sourceLang', SupportedLanguageSchema) ?? settings.targetLanguage;
-  const targetLang = getOptionalPayloadField(payload, 'targetLang', NativeLanguageSchema) ?? settings.nativeLanguage;
-  const userLevel = getOptionalPayloadField(payload, 'userLevel', CEFRLevelSchema) ?? settings.proficiencyLevel;
-  const scene = getOptionalPayloadField(payload, 'scene', z.union([z.literal('subtitle'), z.literal('web')]))
-    ?? 'subtitle';
+  const text = payload.text;
+  const sourceLang = payload.sourceLang ?? settings.targetLanguage;
+  const targetLang = payload.targetLang ?? settings.nativeLanguage;
+  const userLevel = payload.userLevel ?? settings.proficiencyLevel;
+  const scene = payload.scene ?? 'subtitle';
 
   const provider = getProvider(settings.provider);
   if (!provider) return [];
@@ -347,20 +340,15 @@ registry.register('SELECT_KEYWORDS', async (payload) => {
   });
 });
 
-registry.register('ENHANCE_WEB', async (payload) => {
-  const content = coerceWebContent(payload);
-  if (!content) {
-    const fallbackResult = validateWebEnhanceOutput(undefined);
-    return fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-  }
-
+registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const settings = await getSettings();
-  const sourceLang = getOptionalPayloadField(payload, 'sourceLang', SupportedLanguageSchema) ?? settings.targetLanguage;
-  const targetLang = getOptionalPayloadField(payload, 'targetLang', NativeLanguageSchema) ?? settings.nativeLanguage;
+  const content = payload.content;
+  const sourceLang = payload.sourceLang ?? settings.targetLanguage;
+  const targetLang = payload.targetLang ?? settings.nativeLanguage;
   const defaultRange = getDefaultDifficultyRange(settings.proficiencyLevel);
-  const difficultyMin = getOptionalPayloadField(payload, 'difficultyMin', CEFRLevelSchema) ?? defaultRange.difficultyMin;
-  const difficultyMax = getOptionalPayloadField(payload, 'difficultyMax', CEFRLevelSchema) ?? defaultRange.difficultyMax;
-  const maxWords = getOptionalPayloadField(payload, 'maxWords', z.number().int().min(1).max(50));
+  const difficultyMin = payload.difficultyMin ?? defaultRange.difficultyMin;
+  const difficultyMax = payload.difficultyMax ?? defaultRange.difficultyMax;
+  const maxWords = payload.maxWords;
 
   const provider = getProvider(settings.provider);
   if (!provider) {
@@ -422,19 +410,13 @@ registry.register('ENHANCE_WEB', async (payload) => {
   });
 });
 
-registry.register('ENHANCE_SUBTITLE', async (payload) => {
-  const subtitle = coerceSubtitle(payload);
-  if (!subtitle) {
-    const fallbackResult = validateSubtitleEnhanceOutput(undefined);
-    return fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-  }
-
+registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) => {
   const settings = await getSettings();
-  const sourceLang = getOptionalPayloadField(payload, 'sourceLang', SupportedLanguageSchema) ?? settings.targetLanguage;
-  const targetLang = getOptionalPayloadField(payload, 'targetLang', NativeLanguageSchema) ?? settings.nativeLanguage;
-  const difficultyLevel = getOptionalPayloadField(payload, 'difficultyLevel', CEFRLevelSchema) ?? settings.proficiencyLevel;
-  const mode = getOptionalPayloadField(payload, 'mode', z.union([z.literal('single'), z.literal('bilingual')]))
-    ?? 'bilingual';
+  const subtitle = payload.subtitle;
+  const sourceLang = payload.sourceLang ?? settings.targetLanguage;
+  const targetLang = payload.targetLang ?? settings.nativeLanguage;
+  const difficultyLevel = payload.difficultyLevel ?? settings.proficiencyLevel;
+  const mode = payload.mode ?? 'bilingual';
 
   const provider = getProvider(settings.provider);
   if (!provider) {
@@ -494,18 +476,11 @@ registry.register('ENHANCE_SUBTITLE', async (payload) => {
   });
 });
 
-registry.register('EXPLAIN_WORD', async (payload) => {
-  const word =
-    getOptionalPayloadField(payload, 'word', z.string().min(1)) ??
-    (typeof payload === 'string' && payload.trim() ? payload.trim() : undefined);
-
-  const context = getOptionalPayloadField(payload, 'context', z.string().min(1));
-
+registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
+  const word = payload.word.trim();
+  const context = payload.context?.trim();
   if (!word) {
-    throw new MessageError({
-      code: 'INVALID_PAYLOAD',
-      message: 'Expected payload { word: string }',
-    });
+    throw new MessageError({ code: 'INVALID_PAYLOAD', message: 'Expected payload { word: string }' });
   }
 
   await recordLookup(word);
@@ -535,13 +510,14 @@ registry.register('EXPLAIN_WORD', async (payload) => {
       const definition =
         entry.definitions?.[0]?.definition ??
         entry.definitions?.map((item) => item.definition).filter(Boolean).join('\n') ??
-        'No definition available';
+        t('wordCard_definitionUnavailable');
 
-      const value = {
-        word: entry.word ?? word,
-        ...(entry.phonetic ? { phonetic: entry.phonetic } : {}),
-        definition,
-        ...(entry.difficulty ? { difficulty: entry.difficulty } : {}),
+      const normalizedWord = typeof entry.word === 'string' && entry.word.trim() ? entry.word.trim() : word;
+      const value: ExplainWordOutput = {
+        word: normalizedWord,
+        definition: definition.trim() ? definition : t('wordCard_definitionUnavailable'),
+        ...(entry.phonetic && entry.phonetic.trim() ? { phonetic: entry.phonetic.trim() } : {}),
+        ...(entry.difficulty && entry.difficulty.trim() ? { difficulty: entry.difficulty.trim() } : {}),
       };
 
       explainWordCache.set(cacheKey, value, CACHE_SUCCESS_TTL_MS);
@@ -551,7 +527,7 @@ registry.register('EXPLAIN_WORD', async (payload) => {
     // Fallback to provider-based explanation.
     const provider = getProvider(settings.provider);
     if (!provider) {
-      const value = { word, definition: 'No definition available' };
+      const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
       explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
       return value;
     }
@@ -559,7 +535,7 @@ registry.register('EXPLAIN_WORD', async (payload) => {
     try {
       const providerConfig = settings.provider;
       if (!providerConfig) {
-        const value = { word, definition: 'No definition available' };
+        const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
         explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
         return value;
       }
@@ -582,14 +558,21 @@ registry.register('EXPLAIN_WORD', async (payload) => {
       const responseText = response.choices?.[0]?.message?.content ?? '';
       const parsed = parseExplainWordResponse(responseText);
 
-      const value = {
+      const definition =
+        typeof parsed.definition === 'string' && parsed.definition.trim()
+          ? parsed.definition.trim()
+          : t('wordCard_definitionUnavailable');
+
+      const value: ExplainWordOutput = {
         word,
-        translation: parsed.translation,
-        phonetic: parsed.phonetic,
-        difficulty: parsed.difficulty,
-        definition: parsed.definition,
-        ...(parsed.example ? { example: parsed.example } : {}),
-        ...(parsed.example_translation ? { example_translation: parsed.example_translation } : {}),
+        definition,
+        ...(parsed.translation && parsed.translation.trim() ? { translation: parsed.translation.trim() } : {}),
+        ...(parsed.phonetic && parsed.phonetic.trim() ? { phonetic: parsed.phonetic.trim() } : {}),
+        ...(parsed.difficulty && parsed.difficulty.trim() ? { difficulty: parsed.difficulty.trim() } : {}),
+        ...(parsed.example && parsed.example.trim() ? { example: parsed.example.trim() } : {}),
+        ...(parsed.example_translation && parsed.example_translation.trim()
+          ? { example_translation: parsed.example_translation.trim() }
+          : {}),
       };
 
       // Persist minimal info for offline reuse.
@@ -607,7 +590,7 @@ registry.register('EXPLAIN_WORD', async (payload) => {
       explainWordCache.set(cacheKey, value, CACHE_SUCCESS_TTL_MS);
       return value;
     } catch {
-      const value = { word, definition: 'Failed to load definition' };
+      const value: ExplainWordOutput = { word, definition: t('wordCard_definitionFailed') };
       explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
       return value;
     }
@@ -626,6 +609,33 @@ interface ChatSession {
 }
 
 const chatSessions = new Map<string, ChatSession>();
+const CHAT_SESSIONS_STORAGE_KEY = 'lexipath_chat_sessions_v1';
+
+const ChatSessionSchema = z
+  .object({
+    id: z.string().min(1),
+    messages: z.array(
+      z
+        .object({
+          role: z.enum(['user', 'assistant']),
+          content: z.string(),
+        })
+        .strict()
+    ),
+    createdAt: z.number(),
+    lastAccessedAt: z.number(),
+  })
+  .strict();
+
+const StoredChatSessionsSchema = z
+  .object({
+    sessions: z.array(ChatSessionSchema),
+  })
+  .strict();
+
+let chatSessionsLoaded = false;
+let chatSessionsLoadPromise: Promise<void> | null = null;
+let chatSessionsPersistTimer: ReturnType<typeof setTimeout> | null = null;
 
 const CHAT_SESSION_MAX_COUNT = 10;
 const CHAT_SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -663,7 +673,58 @@ function truncateHistory(
   return messages.slice(messages.length - CHAT_MAX_HISTORY_MESSAGES);
 }
 
+function snapshotChatSessionsForStorage(): ChatSession[] {
+  const sessions = Array.from(chatSessions.values())
+    .map((session) => ({
+      ...session,
+      messages: truncateHistory(session.messages),
+    }))
+    .sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
+
+  // Persist only what we'd keep in-memory, and ensure max-count.
+  return sessions.slice(Math.max(0, sessions.length - CHAT_SESSION_MAX_COUNT));
+}
+
+function schedulePersistChatSessions(): void {
+  if (chatSessionsPersistTimer !== null) return;
+  chatSessionsPersistTimer = setTimeout(() => {
+    chatSessionsPersistTimer = null;
+    const sessions = snapshotChatSessionsForStorage();
+    void browser.storage.local
+      .set({ [CHAT_SESSIONS_STORAGE_KEY]: { sessions } })
+      .catch(() => {
+        // ignore
+      });
+  }, 250);
+}
+
+async function ensureChatSessionsLoaded(): Promise<void> {
+  if (chatSessionsLoaded) return;
+  if (chatSessionsLoadPromise) return chatSessionsLoadPromise;
+
+  chatSessionsLoadPromise = (async () => {
+    try {
+      const raw = await browser.storage.local.get(CHAT_SESSIONS_STORAGE_KEY);
+      const parsed = StoredChatSessionsSchema.safeParse(raw[CHAT_SESSIONS_STORAGE_KEY]);
+      if (parsed.success) {
+        for (const session of parsed.data.sessions) {
+          chatSessions.set(session.id, session);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      cleanupExpiredSessions();
+      chatSessionsLoaded = true;
+      schedulePersistChatSessions();
+    }
+  })();
+
+  return chatSessionsLoadPromise;
+}
+
 registry.register('CHAT', async (payload) => {
+  await ensureChatSessionsLoaded();
   cleanupExpiredSessions();
 
   const settings = await getSettings();
@@ -671,7 +732,7 @@ registry.register('CHAT', async (payload) => {
   if (!provider) {
     throw new MessageError({
       code: 'PROVIDER_NOT_CONFIGURED',
-      message: 'Provider not configured',
+      message: t('error_providerNotConfigured'),
     });
   }
 
@@ -686,12 +747,15 @@ registry.register('CHAT', async (payload) => {
       lastAccessedAt: Date.now(),
     };
     chatSessions.set(sessionId, session);
+    schedulePersistChatSessions();
   }
 
   session.messages.push({
     role: 'user',
     content: payload.message,
   });
+  session.messages = truncateHistory(session.messages);
+  schedulePersistChatSessions();
 
   const truncatedHistory = truncateHistory(session.messages);
 
@@ -705,7 +769,7 @@ registry.register('CHAT', async (payload) => {
     if (!providerConfig) {
       throw new MessageError({
         code: 'PROVIDER_NOT_CONFIGURED',
-        message: 'Provider not configured',
+        message: t('error_providerNotConfigured'),
       });
     }
 
@@ -723,7 +787,7 @@ registry.register('CHAT', async (payload) => {
     if (!assistantReply) {
       throw new MessageError({
         code: 'EMPTY_RESPONSE',
-        message: 'Empty response from provider',
+        message: t('error_emptyResponse'),
       });
     }
 
@@ -731,8 +795,10 @@ registry.register('CHAT', async (payload) => {
       role: 'assistant',
       content: assistantReply,
     });
+    session.messages = truncateHistory(session.messages);
 
     session.lastAccessedAt = Date.now();
+    schedulePersistChatSessions();
 
     return {
       reply: assistantReply,
@@ -740,6 +806,7 @@ registry.register('CHAT', async (payload) => {
     };
   } catch (error) {
     session.messages.pop();
+    schedulePersistChatSessions();
     throw error;
   }
 });

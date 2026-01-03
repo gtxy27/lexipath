@@ -59,7 +59,9 @@ export function Sidebar(): React.ReactElement {
         setMessages((prev) => prev.slice(0, -1));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(
+        err instanceof Error ? err.message : browser.i18n.getMessage('error_unknown') || 'error_unknown'
+      );
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);

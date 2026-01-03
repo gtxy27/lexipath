@@ -14,6 +14,7 @@ export interface WordCardData {
 export interface WordCardProps {
   data: WordCardData;
   mode?: 'hover' | 'click';
+  ttsLang?: string;
   onFavoriteToggle?: (word: string, isFavorited: boolean) => void;
   onLearnedToggle?: (word: string, isLearned: boolean) => void;
   onClose?: () => void;
@@ -22,6 +23,7 @@ export interface WordCardProps {
 export function WordCard({
   data,
   mode = 'click',
+  ttsLang,
   onFavoriteToggle,
   onLearnedToggle,
   onClose,
@@ -39,13 +41,13 @@ export function WordCard({
 
     try {
       setIsPlayingAudio(true);
-      await speak(data.word, 'en-US'); // TODO: Use target language from settings
+      await speak(data.word, ttsLang ?? 'en-US');
     } catch (error) {
       console.error('[WordCard] TTS error:', error);
     } finally {
       setIsPlayingAudio(false);
     }
-  }, [data.word, isPlayingAudio]);
+  }, [data.word, isPlayingAudio, ttsLang]);
 
   const handleFavoriteToggle = useCallback(() => {
     const nextValue = !isFavorited;

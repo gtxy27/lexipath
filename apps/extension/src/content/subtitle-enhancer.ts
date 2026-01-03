@@ -1,4 +1,4 @@
-import type { Cue, Response, SubtitleEnhanceOutput } from '@lexipath/core';
+import type { Cue, EnhanceSubtitlePayload, Response, SubtitleEnhanceOutput, SupportedLanguage } from '@lexipath/core';
 
 const SLOW_LOG_THRESHOLD_MS = 800;
 const BILINGUAL_RETRY_MIN_INTERVAL_MS = 10_000;
@@ -22,16 +22,16 @@ export class SubtitleEnhancer {
   private bilingualCueInFlight = new Map<string, Promise<void>>();
   private bilingualCueLastAttemptAt = new Map<string, number>();
 
-  private readonly sendEnhanceSubtitle: (payload: unknown) => Promise<Response<SubtitleEnhanceOutput>>;
-  private readonly getSourceLang: (cue: Cue, subtitleLanguage: string) => string;
+  private readonly sendEnhanceSubtitle: (payload: EnhanceSubtitlePayload) => Promise<Response<SubtitleEnhanceOutput>>;
+  private readonly getSourceLang: (cue: Cue, subtitleLanguage: string) => SupportedLanguage;
   private readonly isPaused: () => boolean;
   private readonly onCueEnhanced: ((cueId: string) => void) | undefined;
 
   constructor(options: {
     maxInFlight?: number;
     isPaused: () => boolean;
-    sendEnhanceSubtitle: (payload: unknown) => Promise<Response<SubtitleEnhanceOutput>>;
-    getSourceLang: (cue: Cue, subtitleLanguage: string) => string;
+    sendEnhanceSubtitle: (payload: EnhanceSubtitlePayload) => Promise<Response<SubtitleEnhanceOutput>>;
+    getSourceLang: (cue: Cue, subtitleLanguage: string) => SupportedLanguage;
     onCueEnhanced?: (cueId: string) => void;
   }) {
     this.maxInFlight = options.maxInFlight ?? 2;

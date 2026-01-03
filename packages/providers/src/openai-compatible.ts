@@ -1,5 +1,5 @@
 import type { ProviderConfig } from '@lexipath/core';
-import { classifyError } from './errors';
+import { classifyError, type ProviderError } from './errors';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -32,6 +32,7 @@ export interface ChatCompletionResponse {
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
   timestamp: number;
+  controller: AbortController;
 }
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -57,7 +58,6 @@ export interface ChatOptions {
  */
 export class OpenAICompatibleProvider {
   private config: ProviderConfig;
-  private abortController: AbortController | null = null;
   private inFlightRequests = new Map<string, InFlightRequest>();
   private supportsThinkingControl: boolean | null = null;
 
@@ -134,10 +134,20 @@ export class OpenAICompatibleProvider {
   private async fetchWithTimeout(
     url: string,
     options: RequestInit,
-    timeoutMs: number
+    timeoutMs: number,
+    cancelSignal?: AbortSignal
   ): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const abortListener = () => controller.abort();
+
+    if (cancelSignal) {
+      if (cancelSignal.aborted) {
+        controller.abort();
+      } else {
+        cancelSignal.addEventListener('abort', abortListener, { once: true });
+      }
+    }
 
     try {
       const response = await fetch(url, {
@@ -149,6 +159,10 @@ export class OpenAICompatibleProvider {
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
+    } finally {
+      if (cancelSignal) {
+        cancelSignal.removeEventListener('abort', abortListener);
+      }
     }
   }
 
@@ -158,6 +172,7 @@ export class OpenAICompatibleProvider {
   private async executeWithRetry(
     messages: ChatMessage[],
     options: ChatOptions,
+    cancelSignal: AbortSignal,
     maxRetries: number = DEFAULT_MAX_RETRIES
   ): Promise<ChatCompletionResponse> {
     const url = `${this.config.baseUrl}/chat/completions`;
@@ -184,6 +199,10 @@ export class OpenAICompatibleProvider {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
+        if (cancelSignal.aborted) {
+          throw Object.assign(new Error('Request was cancelled'), { name: 'AbortError' });
+        }
+
         const includeThinking = this.shouldIncludeThinking(thinkingMode);
         const buildBody = (include: boolean): ChatCompletionRequest => ({
           ...baseBody,
@@ -197,7 +216,8 @@ export class OpenAICompatibleProvider {
             headers,
             body: JSON.stringify(buildBody(includeThinking)),
           },
-          timeoutMs
+          timeoutMs,
+          cancelSignal
         );
 
         if (!response.ok) {
@@ -229,7 +249,8 @@ export class OpenAICompatibleProvider {
                 headers,
                 body: JSON.stringify(baseBody),
               },
-              timeoutMs
+              timeoutMs,
+              cancelSignal
             );
 
             if (response.ok) {
@@ -244,7 +265,7 @@ export class OpenAICompatibleProvider {
         lastError = error;
         const classified = classifyError(error);
 
-        if (!classified.retryable || attempt === maxRetries - 1) {
+        if (cancelSignal.aborted || !classified.retryable || attempt === maxRetries - 1) {
           throw error;
         }
 
@@ -270,7 +291,8 @@ export class OpenAICompatibleProvider {
       return existing.promise;
     }
 
-    const promise = this.executeWithRetry(messages, options)
+    const controller = new AbortController();
+    const promise = this.executeWithRetry(messages, options, controller.signal)
       .finally(() => {
         this.inFlightRequests.delete(cacheKey);
       });
@@ -278,6 +300,7 @@ export class OpenAICompatibleProvider {
     this.inFlightRequests.set(cacheKey, {
       promise,
       timestamp: Date.now(),
+      controller,
     });
 
     return promise;
@@ -286,7 +309,7 @@ export class OpenAICompatibleProvider {
   /**
    * Test connection to the provider.
    */
-  async testConnection(): Promise<{ ok: boolean; error?: string }> {
+  async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {
     try {
       await this.chat([{ role: 'user', content: 'Hello' }], { maxTokens: 1, timeout: 10000 });
       return { ok: true };
@@ -294,7 +317,7 @@ export class OpenAICompatibleProvider {
       const classified = classifyError(error);
       return {
         ok: false,
-        error: classified.message,
+        error: classified,
       };
     }
   }
@@ -303,8 +326,9 @@ export class OpenAICompatibleProvider {
    * Cancel any in-flight request.
    */
   cancel(): void {
-    this.abortController?.abort();
-    this.abortController = null;
+    for (const request of this.inFlightRequests.values()) {
+      request.controller.abort();
+    }
     this.inFlightRequests.clear();
   }
 }

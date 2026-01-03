@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import browser from 'webextension-polyfill';
 import { WordCard, type WordCardData } from './WordCard';
 import { sendMessage } from '../../shared/messages';
 
@@ -16,6 +17,34 @@ interface Position {
   left: number;
 }
 
+function resolveTtsLang(options: { targetLanguage?: string; nativeLanguage?: string }): string {
+  switch (options.targetLanguage) {
+    case 'en':
+      return 'en-US';
+    case 'ja':
+      return 'ja-JP';
+    case 'ko':
+      return 'ko-KR';
+    case 'fr':
+      return 'fr-FR';
+    case 'de':
+      return 'de-DE';
+    case 'zh':
+      return options.nativeLanguage === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+    default:
+      return 'en-US';
+  }
+}
+
+function t(key: string, substitutions?: string | string[]): string {
+  try {
+    const message = browser.i18n.getMessage(key, substitutions as any);
+    return message || key;
+  } catch {
+    return key;
+  }
+}
+
 export function WordCardPopover({
   word,
   anchorRect,
@@ -26,10 +55,30 @@ export function WordCardPopover({
 }: WordCardPopoverProps): React.ReactElement {
   const [cardData, setCardData] = useState<WordCardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [ttsLang, setTtsLang] = useState<string>('en-US');
   const [position, setPosition] = useState<Position>({ top: 0, left: 0 });
   const [isVisible, setIsVisible] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSettings() {
+      try {
+        const response = await sendMessage('GET_SETTINGS', undefined);
+        if (!response.ok || cancelled) return;
+        setTtsLang(resolveTtsLang(response.value));
+      } catch {
+        // ignore
+      }
+    }
+
+    loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch word explanation
   useEffect(() => {
@@ -51,14 +100,14 @@ export function WordCardPopover({
           setCardData({
             word: data.word || word,
             ...(data.phonetic ? { phonetic: data.phonetic } : {}),
-            definition: data.definition || 'No definition available',
+            definition: data.definition || t('wordCard_definitionUnavailable'),
             ...(data.difficulty ? { difficulty: data.difficulty } : {}),
           });
         } else {
           console.error('[WordCardPopover] Failed to fetch word data:', response.error);
           setCardData({
             word,
-            definition: 'Failed to load definition',
+            definition: t('wordCard_definitionFailed'),
           });
         }
       } catch (error) {
@@ -66,7 +115,7 @@ export function WordCardPopover({
         console.error('[WordCardPopover] Error fetching word data:', error);
         setCardData({
           word,
-          definition: 'Error loading definition',
+          definition: t('wordCard_definitionError'),
         });
       } finally {
         if (!cancelled) {
@@ -190,6 +239,7 @@ export function WordCardPopover({
         <WordCard
           data={cardData}
           mode={mode}
+          ttsLang={ttsLang}
           {...(onFavoriteToggle ? { onFavoriteToggle } : {})}
           {...(onLearnedToggle ? { onLearnedToggle } : {})}
           onClose={onClose}

@@ -5,6 +5,8 @@
  * Supports both overlay (on video) and below-video positioning.
  */
 
+import { getI18nMessage } from './i18n';
+
 export type SubtitleMode = 'enhanced' | 'bilingual' | 'bilingual-temp';
 
 export interface SubtitleLine {
@@ -392,21 +394,22 @@ export class SubtitleOverlay {
   private getModeLabel(mode: SubtitleMode): string {
     switch (mode) {
       case 'enhanced':
-        return '单语';
+        return getI18nMessage('subtitle_modeSingle', undefined, mode);
       case 'bilingual':
-        return '双语';
+        return getI18nMessage('subtitle_modeBilingual', undefined, mode);
       case 'bilingual-temp':
-        return '双语(按住)';
+        return getI18nMessage('subtitle_modeBilingualHold', undefined, mode);
       default:
-        return '单语';
+        return getI18nMessage('subtitle_modeSingle', undefined, mode);
     }
   }
 
   showWordCardLoading(word: string, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
+    const loadingText = getI18nMessage('wordCard_loading', undefined, getI18nMessage('loading'));
     this.showWordCard(
       {
         word,
-        definition: 'Loading…',
+        definition: loadingText,
       },
       anchorRect,
       options

@@ -13,6 +13,7 @@ const DEFAULT_CONFIG: DictionaryConfig = {
 export class DictionaryService {
   private config: DictionaryConfig;
   private db: IDBDatabase | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor(config: Partial<DictionaryConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -22,12 +23,19 @@ export class DictionaryService {
    * Initialize the IndexedDB database.
    */
   async init(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.db) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.config.dbName, this.config.version);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        this.initPromise = null;
+        reject(request.error);
+      };
       request.onsuccess = () => {
         this.db = request.result;
+        this.initPromise = null;
         resolve();
       };
 
@@ -39,6 +47,8 @@ export class DictionaryService {
         }
       };
     });
+
+    return this.initPromise;
   }
 
   /**
@@ -104,5 +114,6 @@ export class DictionaryService {
   close(): void {
     this.db?.close();
     this.db = null;
+    this.initPromise = null;
   }
 }

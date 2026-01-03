@@ -101,16 +101,12 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
 
     if (cues.length === 0 && !additionalParams) {
       this.startYouTubeParamsWatch(videoId);
-      return {
-        cues,
-        lang: this.settings.targetLanguage,
-        statusMessage: getI18nMessage(
-          'subtitle_youtubeEnableCaptions',
-          undefined,
-          'LexiPath: Please enable YouTube captions (CC) so I can read and enhance subtitles'
-        ),
-      };
-    }
+        return {
+          cues,
+          lang: this.settings.targetLanguage,
+          statusMessage: getI18nMessage('subtitle_youtubeEnableCaptions'),
+        };
+      }
 
     return { cues, lang: cues[0]?.lang ?? this.settings.targetLanguage };
   }

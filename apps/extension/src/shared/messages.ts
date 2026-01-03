@@ -4,7 +4,11 @@ import {
   CEFRLevelSchema,
   ChatPayloadSchema,
   ChatResponseSchema,
+  EnhanceSubtitlePayloadSchema,
+  EnhanceWebPayloadSchema,
   ErrorResponseSchema,
+  ExplainWordOutputSchema,
+  ExplainWordPayloadSchema,
   MessageSchema,
   MessageTypeSchema,
   NativeLanguageSchema,
@@ -12,6 +16,7 @@ import {
   SubtitleEnhanceOutputSchema,
   SupportedLanguageSchema,
   SuccessResponseSchema,
+  TestProviderConnectionPayloadSchema,
   WebEnhanceOutputSchema,
   type ErrorResponse,
   type MessageType,
@@ -45,7 +50,15 @@ export function unknownToErrorResponse(error: unknown): ErrorResponse {
   if (error instanceof Error) {
     return errorResponse('INTERNAL_ERROR', error.message);
   }
-  return errorResponse('INTERNAL_ERROR', 'Unknown error');
+  const fallback = (() => {
+    try {
+      const msg = browser.i18n?.getMessage?.('error_unknown');
+      return typeof msg === 'string' && msg.trim() ? msg : 'error_unknown';
+    } catch {
+      return 'error_unknown';
+    }
+  })();
+  return errorResponse('INTERNAL_ERROR', fallback);
 }
 
 const SetSettingsPayloadSchema = SettingsSchema.partial()
@@ -77,6 +90,10 @@ const messageDefinitions = {
       .strict(),
     valueSchema: z.boolean(),
   },
+  TEST_PROVIDER_CONNECTION: {
+    payloadSchema: TestProviderConnectionPayloadSchema,
+    valueSchema: z.literal(true),
+  },
   SELECT_KEYWORDS: {
     payloadSchema: z
       .object({
@@ -90,16 +107,16 @@ const messageDefinitions = {
     valueSchema: z.array(z.string()),
   },
   ENHANCE_WEB: {
-    payloadSchema: z.unknown(),
+    payloadSchema: EnhanceWebPayloadSchema,
     valueSchema: WebEnhanceOutputSchema,
   },
   ENHANCE_SUBTITLE: {
-    payloadSchema: z.unknown(),
+    payloadSchema: EnhanceSubtitlePayloadSchema,
     valueSchema: SubtitleEnhanceOutputSchema,
   },
   EXPLAIN_WORD: {
-    payloadSchema: z.unknown(),
-    valueSchema: z.unknown(),
+    payloadSchema: ExplainWordPayloadSchema,
+    valueSchema: ExplainWordOutputSchema,
   },
   CHAT: {
     payloadSchema: ChatPayloadSchema,

@@ -14,8 +14,7 @@
     "build:firefox": "bun run --filter @lexipath/extension build:firefox",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write ."
+    "typecheck": "tsc -p apps/extension/tsconfig.json --noEmit && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/dictionary/tsconfig.json --noEmit && tsc -p packages/providers/tsconfig.json --noEmit && tsc -p packages/subtitles/tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

@@ -5,7 +5,7 @@
  * Supports YouTube and Bilibili platforms.
  */
 
-import type { Cue, Settings } from '@lexipath/core';
+import type { Cue, Settings, SupportedLanguage } from '@lexipath/core';
 import { sendMessage } from '../shared/messages';
 import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './subtitle-overlay';
 import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
@@ -236,10 +236,17 @@ export class SubtitleController {
   }
 
   private async fetchAndProcessSubtitlesOnce(): Promise<void> {
-    if (!this.provider) return;
+    const provider = this.provider;
+    if (!provider) return;
+
+    // Respect the platform subtitle toggle. For Bilibili, avoid network fetching
+    // when captions are off (or unknown), and wait for the user to enable them.
+    if (provider.platform === 'bilibili' && this.platformCaptionsEnabled !== true) {
+      return;
+    }
 
     try {
-      const result = await this.provider.fetchSubtitles();
+      const result = await provider.fetchSubtitles();
       this.statusMessage = result.statusMessage ?? '';
 
       this.setCues(result.cues, result.lang);
@@ -343,11 +350,7 @@ export class SubtitleController {
         void this.enhancer?.ensureBilingual(cue);
       }
 
-      const loadingTranslationText = getI18nMessage(
-        'subtitle_loadingTranslation',
-        undefined,
-        '(Loading translation...)'
-      );
+      const loadingTranslationText = getI18nMessage('subtitle_loadingTranslation');
       lines = [
         {
           text: enhanced?.line1_final || cue.text,
@@ -464,6 +467,13 @@ export class SubtitleController {
       return false;
     }
 
+    // Bilibili's newer player buttons often represent the OFF state simply by not
+    // having an "active" class/aria state. For Bilibili, fail-closed so the
+    // extension doesn't render/fetch subtitles when the user has subtitles off.
+    const isLikelyBilibiliButton =
+      button.classList.contains('bpx-player-ctrl-subtitle') || button.classList.contains('bilibili-player-video-btn-subtitle');
+    if (isLikelyBilibiliButton) return false;
+
     return null;
   }
 
@@ -480,12 +490,21 @@ export class SubtitleController {
       this.provider?.showNativeCaptions?.();
     } else if (this.cues.length > 0) {
       this.provider?.hideNativeCaptions?.();
+    } else {
+      // Subtitles were previously gated by the platform caption toggle (notably Bilibili).
+      // Once the user enables captions, fetch cues so the overlay can start working.
+      void this.fetchAndProcessSubtitles();
     }
 
     this.updateSubtitleDisplay();
   }
 
-  private normalizeSupportedLanguageCode(languageCode: string): string | null {
+  private async ensureCueBilingual(cue: Cue): Promise<void> {
+    await this.enhancer?.ensureBilingual(cue);
+    this.updateSubtitleDisplay();
+  }
+
+  private normalizeSupportedLanguageCode(languageCode: string): SupportedLanguage | null {
     const normalized = languageCode.trim().toLowerCase();
     if (!normalized) return null;
 
@@ -507,7 +526,7 @@ export class SubtitleController {
     return null;
   }
 
-  private getCueSourceLanguage(cue: Cue, subtitleLanguage: string): string {
+  private getCueSourceLanguage(cue: Cue, subtitleLanguage: string): SupportedLanguage {
     const candidates = [subtitleLanguage, cue.lang, this.settings.targetLanguage];
     for (const candidate of candidates) {
       if (!candidate) continue;
@@ -773,7 +792,7 @@ export class SubtitleController {
       if (!response.ok) {
         return {
           word: normalizedWord,
-          definition: 'Failed to load definition',
+          definition: getI18nMessage('wordCard_definitionFailed'),
         };
       }
 
@@ -781,7 +800,7 @@ export class SubtitleController {
       const definition =
         typeof data.definition === 'string' && data.definition.trim()
           ? data.definition.trim()
-          : 'No definition available';
+          : getI18nMessage('wordCard_definitionUnavailable');
 
       const card: WordCardData = {
         word: typeof data.word === 'string' && data.word.trim() ? data.word.trim() : normalizedWord,

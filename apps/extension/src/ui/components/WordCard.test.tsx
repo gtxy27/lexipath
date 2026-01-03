@@ -142,12 +142,12 @@ describe('WordCard', () => {
   describe('Pronunciation', () => {
     it('calls speak function when pronounce button is clicked', async () => {
       const user = userEvent.setup();
-      render(<WordCard data={mockData} />);
+      render(<WordCard data={mockData} ttsLang="ja-JP" />);
 
       const pronounceButton = screen.getByLabelText('wordCard_pronounce');
       await user.click(pronounceButton);
 
-      expect(speakMock).toHaveBeenCalledWith('example', 'en-US');
+      expect(speakMock).toHaveBeenCalledWith('example', 'ja-JP');
     });
 
     it('disables button while audio is playing', async () => {

@@ -15,6 +15,102 @@
     "message": "(Loading translation...)",
     "description": "Subtitle: loading native translation placeholder"
   },
+  "subtitle_modeSingle": {
+    "message": "Single",
+    "description": "Subtitle: mode label (single)"
+  },
+  "subtitle_modeBilingual": {
+    "message": "Bilingual",
+    "description": "Subtitle: mode label (bilingual)"
+  },
+  "subtitle_modeBilingualHold": {
+    "message": "Bilingual (hold)",
+    "description": "Subtitle: mode label (bilingual, hold)"
+  },
+  "wordCard_loading": {
+    "message": "Loading…",
+    "description": "Word card: loading placeholder"
+  },
+  "wordCard_definitionUnavailable": {
+    "message": "No definition available",
+    "description": "Word card: no definition fallback"
+  },
+  "wordCard_definitionFailed": {
+    "message": "Failed to load definition",
+    "description": "Word card: definition fetch failed"
+  },
+  "wordCard_definitionError": {
+    "message": "Error loading definition",
+    "description": "Word card: unexpected error"
+  },
+  "error_unknown": {
+    "message": "Unknown error",
+    "description": "Generic unknown error message"
+  },
+  "error_providerNotConfigured": {
+    "message": "Provider not configured",
+    "description": "Error: provider not configured"
+  },
+  "error_emptyResponse": {
+    "message": "Empty response from provider",
+    "description": "Error: empty response"
+  },
+  "error_invalidOrigin": {
+    "message": "Invalid origin",
+    "description": "Error: invalid origin for host permission request"
+  },
+  "log_providerNotConfiguredSkipPageProcessing": {
+    "message": "Provider not configured, skipping page processing",
+    "description": "Log: provider not configured"
+  },
+  "providerError_NETWORK_ERROR": {
+    "message": "Network error. Please check your connection.",
+    "description": "Provider error: NETWORK_ERROR"
+  },
+  "providerError_AUTH_ERROR": {
+    "message": "Authentication failed. Please check your API key.",
+    "description": "Provider error: AUTH_ERROR"
+  },
+  "providerError_TIMEOUT": {
+    "message": "Request timed out. Please try again.",
+    "description": "Provider error: TIMEOUT"
+  },
+  "providerError_RATE_LIMIT": {
+    "message": "Rate limit exceeded. Please wait and retry.",
+    "description": "Provider error: RATE_LIMIT"
+  },
+  "providerError_INVALID_RESPONSE": {
+    "message": "Invalid response from provider. Please check your configuration.",
+    "description": "Provider error: INVALID_RESPONSE"
+  },
+  "providerError_INVALID_REQUEST": {
+    "message": "Invalid request. Please check your settings.",
+    "description": "Provider error: INVALID_REQUEST"
+  },
+  "providerError_SERVER_ERROR": {
+    "message": "Provider server error. Please try again later.",
+    "description": "Provider error: SERVER_ERROR"
+  },
+  "providerError_SERVICE_UNAVAILABLE": {
+    "message": "Service unavailable. Please try again later.",
+    "description": "Provider error: SERVICE_UNAVAILABLE"
+  },
+  "providerError_QUOTA_EXCEEDED": {
+    "message": "Quota exceeded. Please check your account.",
+    "description": "Provider error: QUOTA_EXCEEDED"
+  },
+  "providerError_MODEL_NOT_FOUND": {
+    "message": "Model not found. Please check your model name.",
+    "description": "Provider error: MODEL_NOT_FOUND"
+  },
+  "providerError_CONTEXT_LENGTH_EXCEEDED": {
+    "message": "Input is too long for the model. Please reduce content size.",
+    "description": "Provider error: CONTEXT_LENGTH_EXCEEDED"
+  },
+  "providerError_UNKNOWN": {
+    "message": "Unknown provider error",
+    "description": "Provider error: UNKNOWN"
+  },
   "subtitle_youtubeEnableCaptions": {
     "message": "LexiPath: Please enable YouTube captions (CC) so I can read and enhance subtitles.",
     "description": "Subtitle: prompt user to enable YouTube captions"

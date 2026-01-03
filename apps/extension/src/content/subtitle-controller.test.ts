@@ -111,6 +111,16 @@ describe('SubtitleController', () => {
   let videoContainer: HTMLDivElement;
   let paused = false;
 
+  const addBilibiliCaptionsButton = (enabled: boolean) => {
+    const button = document.createElement('button');
+    button.className = 'bpx-player-ctrl-subtitle';
+    if (enabled) {
+      button.classList.add('bpx-player-ctrl-btn-active');
+    }
+    document.body.appendChild(button);
+    return button;
+  };
+
   beforeEach(() => {
     // Clear mocks
     vi.clearAllMocks();
@@ -270,6 +280,8 @@ describe('SubtitleController', () => {
     });
 
     it('initializes successfully for Bilibili', async () => {
+      addBilibiliCaptionsButton(true);
+
       const mockCues: Cue[] = [
         {
           id: 'bilibili:0-1000:0',
@@ -300,6 +312,45 @@ describe('SubtitleController', () => {
 
       expect(result).toBe(true);
       expect(SubtitleOverlay).toHaveBeenCalledWith('bilibili', expect.any(Object));
+      expect(getBilibiliAvailableTracks).toHaveBeenCalledWith('BV1Q5411W7x1', '123456');
+      expect(fetchBilibiliSubtitles).toHaveBeenCalledWith('https://subtitle.url');
+    });
+
+    it('does not fetch subtitles when Bilibili captions are off', async () => {
+      addBilibiliCaptionsButton(false);
+
+      vi.mocked(parseVideoInfo).mockReturnValue({
+        bvid: 'BV1Q5411W7x1',
+        cid: '123456',
+      });
+
+      const result = await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
+
+      expect(result).toBe(true);
+      expect(getBilibiliAvailableTracks).not.toHaveBeenCalled();
+      expect(fetchBilibiliSubtitles).not.toHaveBeenCalled();
+      expect(SubtitleOverlay.prototype.clear).toHaveBeenCalled();
+    });
+
+    it('fetches subtitles after Bilibili captions are enabled', async () => {
+      const button = addBilibiliCaptionsButton(false);
+
+      const mockTracks = [{ languageCode: 'en', name: 'English', url: 'https://subtitle.url' }];
+      vi.mocked(parseVideoInfo).mockReturnValue({
+        bvid: 'BV1Q5411W7x1',
+        cid: '123456',
+      });
+      vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
+      vi.mocked(fetchBilibiliSubtitles).mockResolvedValue([]);
+
+      const result = await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
+      expect(result).toBe(true);
+      expect(getBilibiliAvailableTracks).not.toHaveBeenCalled();
+
+      button.classList.add('bpx-player-ctrl-btn-active');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       expect(getBilibiliAvailableTracks).toHaveBeenCalledWith('BV1Q5411W7x1', '123456');
       expect(fetchBilibiliSubtitles).toHaveBeenCalledWith('https://subtitle.url');
     });
@@ -470,6 +521,8 @@ describe('SubtitleController', () => {
 
   describe('Bilibili subtitle track selection', () => {
     it('prefers English track when available', async () => {
+      addBilibiliCaptionsButton(true);
+
       const mockTracks = [
         { languageCode: 'zh-Hans', name: 'Chinese', url: 'https://chinese.url' },
         { languageCode: 'en', name: 'English', url: 'https://english.url' },
@@ -495,6 +548,8 @@ describe('SubtitleController', () => {
     });
 
     it('falls back to first track when English not available', async () => {
+      addBilibiliCaptionsButton(true);
+
       const mockTracks = [
         { languageCode: 'zh-Hans', name: 'Chinese', url: 'https://chinese.url' },
         { languageCode: 'ja', name: 'Japanese', url: 'https://japanese.url' },
