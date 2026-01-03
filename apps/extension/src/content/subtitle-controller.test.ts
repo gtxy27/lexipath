@@ -7,9 +7,10 @@ import type { Cue, Settings, SubtitleEnhanceOutput } from '@lexipath/core';
 import {
   SubtitleController,
   detectPlatform,
-  extractVideoInfo,
   type Platform,
 } from './subtitle-controller';
+import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
+import { YouTubeSubtitleProvider } from './subtitle-providers/youtube-subtitle-provider';
 
 // Mock dependencies
 vi.mock('../shared/messages', () => ({
@@ -83,77 +84,24 @@ describe('detectPlatform', () => {
   });
 });
 
-describe('extractVideoInfo', () => {
+describe('createSubtitleProvider', () => {
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('extracts YouTube video info', async () => {
-    vi.mocked(getVideoId).mockReturnValue('dQw4w9WgXcQ');
-
-    const result = await extractVideoInfo('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-
-    expect(result).toEqual({
-      platform: 'youtube',
-      videoId: 'dQw4w9WgXcQ',
-    });
-    expect(getVideoId).toHaveBeenCalledWith('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  it('creates a YouTube provider', () => {
+    const provider = createSubtitleProvider('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    expect(provider?.platform).toBe('youtube');
   });
 
-  it('returns null for invalid YouTube URL', async () => {
-    vi.mocked(getVideoId).mockReturnValue(null);
-
-    const result = await extractVideoInfo('https://www.youtube.com/invalid');
-
-    expect(result).toBeNull();
+  it('creates a Bilibili provider', () => {
+    const provider = createSubtitleProvider('https://www.bilibili.com/video/BV1Q5411W7x1');
+    expect(provider?.platform).toBe('bilibili');
   });
 
-  it('extracts Bilibili video info with cid in URL', async () => {
-    vi.mocked(parseVideoInfo).mockReturnValue({
-      bvid: 'BV1Q5411W7x1',
-      cid: '123456',
-    });
-
-    const result = await extractVideoInfo('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
-
-    expect(result).toEqual({
-      platform: 'bilibili',
-      videoId: 'BV1Q5411W7x1',
-      extraParams: { cid: '123456' },
-    });
-  });
-
-  it('fetches cid from API when not in URL', async () => {
-    vi.mocked(parseVideoInfo).mockReturnValue({
-      bvid: 'BV1Q5411W7x1',
-    });
-    vi.mocked(getCid).mockResolvedValue('987654');
-
-    const result = await extractVideoInfo('https://www.bilibili.com/video/BV1Q5411W7x1');
-
-    expect(result).toEqual({
-      platform: 'bilibili',
-      videoId: 'BV1Q5411W7x1',
-      extraParams: { cid: '987654' },
-    });
-    expect(getCid).toHaveBeenCalledWith('BV1Q5411W7x1');
-  });
-
-  it('returns null when cid fetch fails', async () => {
-    vi.mocked(parseVideoInfo).mockReturnValue({
-      bvid: 'BV1Q5411W7x1',
-    });
-    vi.mocked(getCid).mockRejectedValue(new Error('API error'));
-
-    const result = await extractVideoInfo('https://www.bilibili.com/video/BV1Q5411W7x1');
-
-    expect(result).toBeNull();
-  });
-
-  it('returns null for unknown platform', async () => {
-    const result = await extractVideoInfo('https://www.example.com');
-
-    expect(result).toBeNull();
+  it('returns null for non-video URLs', () => {
+    const provider = createSubtitleProvider('https://www.example.com');
+    expect(provider).toBeNull();
   });
 });
 
@@ -166,6 +114,7 @@ describe('SubtitleController', () => {
   beforeEach(() => {
     // Clear mocks
     vi.clearAllMocks();
+    vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
 
     // Setup DOM
     document.body.innerHTML = '';
@@ -300,7 +249,12 @@ describe('SubtitleController', () => {
         return { success: true, data: '' };
       });
 
-      const paramsPromise = (controller as any).tryGetYouTubeAdditionalParams('test123', {
+      const provider = new YouTubeSubtitleProvider();
+      const settings = (controller as any).settings as Settings;
+      vi.mocked(getVideoId).mockReturnValue('test123');
+      await provider.init('https://www.youtube.com/watch?v=test123', settings);
+
+      const paramsPromise = (provider as any).tryGetYouTubeAdditionalParams('test123', {
         maxAttempts: 2,
         delayMs: 10,
         forceRefreshIfAlreadyEnabled: true,

@@ -6,85 +6,25 @@
  */
 
 import type { Cue, Settings, SubtitleEnhanceOutput } from '@lexipath/core';
-import browser from 'webextension-polyfill';
-import {
-  getVideoId as getYouTubeVideoId,
-  fetchYouTubeSubtitles,
-  parseVideoInfo as parseBilibiliVideoInfo,
-  getCid,
-  fetchBilibiliSubtitles,
-  getBilibiliAvailableTracks,
-} from '@lexipath/subtitles';
 import { sendMessage } from '../shared/messages';
 import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './subtitle-overlay';
+import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
+import type { SubtitleProvider } from './subtitle-providers/subtitle-provider';
+import { getI18nMessage } from './i18n';
 
-export type Platform = 'youtube' | 'bilibili' | 'unknown';
+export { detectPlatform } from './subtitle-platform';
+export type { Platform } from './subtitle-platform';
 
-export interface VideoInfo {
-  platform: Platform;
-  videoId: string;
-  extraParams?: Record<string, string>;
-}
-
-/**
- * Detect current platform from URL
- */
-export function detectPlatform(url: string): Platform {
-  const urlLower = url.toLowerCase();
-  if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
-    return 'youtube';
-  }
-  if (urlLower.includes('bilibili.com')) {
-    return 'bilibili';
-  }
-  return 'unknown';
-}
-
-/**
- * Extract video information from URL
- */
-export async function extractVideoInfo(url: string): Promise<VideoInfo | null> {
-  const platform = detectPlatform(url);
-
-  switch (platform) {
-    case 'youtube': {
-      const videoId = getYouTubeVideoId(url);
-      if (!videoId) return null;
-      return { platform, videoId };
-    }
-
-    case 'bilibili': {
-      const info = parseBilibiliVideoInfo(url);
-      if (!info) return null;
-
-      let cid = info.cid;
-      if (!cid) {
-        try {
-          cid = await getCid(info.bvid);
-        } catch (error) {
-          console.error('[SubtitleController] Failed to get cid:', error);
-          return null;
-        }
-      }
-
-      return {
-        platform,
-        videoId: info.bvid,
-        extraParams: { cid },
-      };
-    }
-
-    default:
-      return null;
-  }
-}
+const SLOW_LOG_THRESHOLD_MS = 800;
+const DEBUG_LOG_THROTTLE_MS = 1500;
+const BILINGUAL_RETRY_MIN_INTERVAL_MS = 10_000;
 
 /**
  * Subtitle Controller
  */
 export class SubtitleController {
   private destroyed = false;
-  private videoInfo: VideoInfo | null = null;
+  private provider: SubtitleProvider | null = null;
   private overlay: SubtitleOverlay | null = null;
   private cues: Cue[] = [];
   private enhancedCues: Map<string, SubtitleEnhanceOutput> = new Map();
@@ -103,13 +43,8 @@ export class SubtitleController {
   private bilingualCueLastAttemptAt = new Map<string, number>();
 
   private statusMessage = '';
-  private youtubeAdditionalParams = '';
-  private youtubeParamsWatchToken = 0;
-  private lastYouTubeCaptionsKickAt = 0;
   private cuesGeneration = 0;
   private subtitlesFetchPromise: Promise<void> | null = null;
-  private runtimeMessageListenerAttached = false;
-  private youtubeCaptionHideStyle: HTMLStyleElement | null = null;
   private wordExplainCache = new Map<string, WordCardData>();
   private wordExplainInFlight = new Map<string, Promise<WordCardData>>();
   private currentSubtitleContext = '';
@@ -151,153 +86,36 @@ export class SubtitleController {
     return Math.min(20, Math.max(2, suggested || 2));
   }
 
-  private setYouTubeNativeCaptionsHidden(hidden: boolean): void {
-    if (this.videoInfo?.platform !== 'youtube') return;
-    const styleId = 'lexipath-hide-youtube-captions';
-
-    if (!hidden) {
-      if (this.youtubeCaptionHideStyle) {
-        this.youtubeCaptionHideStyle.remove();
-        this.youtubeCaptionHideStyle = null;
-      } else {
-        document.getElementById(styleId)?.remove();
-      }
-      return;
-    }
-
-    if (this.youtubeCaptionHideStyle && this.youtubeCaptionHideStyle.isConnected) return;
-
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
-      /* Hide YouTube's native captions when LexiPath overlay is available */
-      .ytp-caption-window-container,
-      .caption-window.ytp-caption-window-container,
-      #movie_player .ytp-caption-window-container {
-        display: none !important;
-        visibility: hidden !important;
-      }
-    `;
-    (document.documentElement || document.head || document.body).appendChild(style);
-    this.youtubeCaptionHideStyle = style;
-  }
-
-  private kickYouTubeCaptionsRequest(options?: { forceRefreshIfAlreadyEnabled?: boolean }): void {
-    try {
-      const now = Date.now();
-      if (now - this.lastYouTubeCaptionsKickAt < 1500) return;
-
-      const button = document.querySelector('.ytp-subtitles-button');
-      if (!(button instanceof HTMLElement)) return;
-      const pressed = button.getAttribute('aria-pressed') === 'true';
-      const forceRefreshIfAlreadyEnabled = options?.forceRefreshIfAlreadyEnabled ?? false;
-
-      if (!pressed) {
-        button.click();
-        this.lastYouTubeCaptionsKickAt = now;
-        return;
-      }
-
-      if (forceRefreshIfAlreadyEnabled) {
-        // If captions are already enabled, YouTube may have already issued the timedtext request
-        // before our background listener was ready. Toggling forces a new request so background
-        // can intercept required params (e.g. potc=...).
-        button.click();
-        button.click();
-        this.lastYouTubeCaptionsKickAt = now;
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  private async tryGetYouTubeAdditionalParams(
-    videoId: string,
-    options?: { maxAttempts?: number; delayMs?: number; forceRefreshIfAlreadyEnabled?: boolean }
-  ): Promise<string> {
-    if (this.youtubeAdditionalParams.trim()) return this.youtubeAdditionalParams;
-
-    const maxAttempts = options?.maxAttempts ?? 6;
-    const delayMs = options?.delayMs ?? 500;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const response = await browser.runtime.sendMessage({ type: 'GET_CAPTION_REQUEST_INFO', videoId });
-        if (response && typeof response === 'object') {
-          const record = response as Record<string, unknown>;
-          if (record.success === true && typeof record.data === 'string' && record.data.trim()) {
-            this.youtubeAdditionalParams = record.data;
-            return record.data;
-          }
-        }
-      } catch {
-        // ignore
-      }
-
-      if (attempt === 0) {
-        // Best-effort: try to trigger the player to request captions so background can intercept potc=...
-        this.kickYouTubeCaptionsRequest({
-          forceRefreshIfAlreadyEnabled: options?.forceRefreshIfAlreadyEnabled ?? false,
-        });
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-
-    return '';
-  }
-
-  private attachRuntimeMessageListener(): void {
-    if (this.runtimeMessageListenerAttached) return;
-    this.runtimeMessageListenerAttached = true;
-    browser.runtime.onMessage.addListener(this.handleRuntimeMessage);
-  }
-
-  private detachRuntimeMessageListener(): void {
-    if (!this.runtimeMessageListenerAttached) return;
-    this.runtimeMessageListenerAttached = false;
-    browser.runtime.onMessage.removeListener(this.handleRuntimeMessage);
-  }
-
-  private handleRuntimeMessage = (message: unknown): void => {
-    if (this.destroyed) return;
-    if (!message || typeof message !== 'object') return;
-    const record = message as Record<string, unknown>;
-    if (record.type !== 'CAPTION_REQUEST_INTERCEPTED') return;
-
-    const data = (record.data ?? null) as Record<string, unknown> | null;
-    const videoId = typeof data?.videoId === 'string' ? data.videoId : '';
-    const additionalParams = typeof data?.additionalParams === 'string' ? data.additionalParams : '';
-
-    if (!videoId || !additionalParams) return;
-    if (this.videoInfo?.platform !== 'youtube') return;
-    if (this.videoInfo.videoId !== videoId) return;
-
-    this.youtubeAdditionalParams = additionalParams;
-
-    // If subtitles were missing initially, re-fetch now that we have the required params.
-    if (this.cues.length === 0) {
-      void this.fetchAndProcessSubtitles();
-    }
-  };
-
   /**
    * Initialize controller
    */
   async init(url: string): Promise<boolean> {
-    // Detect platform and extract video info
-    this.videoInfo = await extractVideoInfo(url);
-    if (!this.videoInfo || this.videoInfo.platform === 'unknown') {
+    this.provider = createSubtitleProvider(url, {
+      onSubtitlesMayBeAvailable: () => {
+        if (!this.destroyed) void this.fetchAndProcessSubtitles();
+      },
+    });
+
+    if (!this.provider) {
       console.log('[SubtitleController] Unsupported platform or invalid URL');
       return false;
     }
 
-    console.log('[SubtitleController] Video info:', this.videoInfo);
+    try {
+      await this.provider.init(url, this.settings);
+    } catch (error) {
+      console.error('[SubtitleController] Provider init failed:', error);
+      this.provider.destroy();
+      this.provider = null;
+      return false;
+    }
 
     // Find video element
     this.videoElement = this.findVideoElement();
     if (!this.videoElement) {
       console.error('[SubtitleController] Video element not found');
+      this.provider.destroy();
+      this.provider = null;
       return false;
     }
 
@@ -305,7 +123,7 @@ export class SubtitleController {
     this.videoElement.addEventListener('pause', this.handleVideoPause);
 
     // Create overlay
-    this.overlay = new SubtitleOverlay(this.videoInfo.platform, {
+    this.overlay = new SubtitleOverlay(this.provider.platform, {
       onModeChange: (mode) => {
         this.mode = mode;
         this.updateSubtitleDisplay();
@@ -322,13 +140,16 @@ export class SubtitleController {
     const mounted = this.overlay.mount();
     if (!mounted) {
       console.error('[SubtitleController] Failed to mount overlay');
+      this.overlay = null;
+      this.videoElement.removeEventListener('play', this.handleVideoPlay);
+      this.videoElement.removeEventListener('pause', this.handleVideoPause);
+      this.videoElement = null;
+      this.provider.destroy();
+      this.provider = null;
       return false;
     }
 
     this.maxPrefetchInFlight = this.getPrefetchConcurrencyLimit();
-
-    // For YouTube, listen for background webRequest interception messages.
-    this.attachRuntimeMessageListener();
 
     // Fetch subtitles
     await this.fetchAndProcessSubtitles();
@@ -351,14 +172,14 @@ export class SubtitleController {
    */
   destroy(): void {
     this.destroyed = true;
-    this.youtubeParamsWatchToken++;
     this.prefetchToken++;
     this.prefetchQueue = [];
     this.prefetchQueuedTerms.clear();
     this.stopSync();
     this.overlay?.unmount();
     this.overlay = null;
-    this.setYouTubeNativeCaptionsHidden(false);
+    this.provider?.destroy();
+    this.provider = null;
     this.videoElement?.removeEventListener('play', this.handleVideoPlay);
     this.videoElement?.removeEventListener('pause', this.handleVideoPause);
     this.videoElement = null;
@@ -371,7 +192,6 @@ export class SubtitleController {
     this.currentCueIndex = -1;
     document.removeEventListener('keydown', this.handleKeyDown);
     document.removeEventListener('keyup', this.handleKeyUp);
-    this.detachRuntimeMessageListener();
   }
 
   /**
@@ -386,86 +206,17 @@ export class SubtitleController {
   }
 
   private async fetchAndProcessSubtitlesOnce(): Promise<void> {
-    if (!this.videoInfo) return;
+    if (!this.provider) return;
 
     try {
-      // Fetch subtitles based on platform
-      let cues: Cue[] = [];
+      const result = await this.provider.fetchSubtitles();
+      this.statusMessage = result.statusMessage ?? '';
 
-      if (this.videoInfo.platform === 'youtube') {
-        // Fetch subtitles matching target language
-        const videoId = this.videoInfo.videoId;
-        const additionalParams = await this.tryGetYouTubeAdditionalParams(videoId, {
-          maxAttempts: 6,
-          delayMs: 500,
-          forceRefreshIfAlreadyEnabled: true,
-        });
-        if (!additionalParams) {
-          console.warn('[SubtitleController] No intercepted timedtext params; YouTube subtitles may be unavailable');
-        }
-
-        cues = await fetchYouTubeSubtitles(videoId, this.settings.targetLanguage, { additionalParams });
-
-        if (cues.length === 0 && !additionalParams) {
-          this.statusMessage = 'LexiPath: 请先在 YouTube 打开字幕 (CC)，我才能读取并增强字幕';
-          this.renderStatusMessage();
-          this.startYouTubeParamsWatch(videoId);
-        } else {
-          this.statusMessage = '';
-        }
-      } else if (this.videoInfo.platform === 'bilibili') {
-        // Fetch subtitles for Bilibili
-        const cid = this.videoInfo.extraParams?.cid;
-        if (!cid) {
-          console.error('[SubtitleController] Missing cid for Bilibili');
-          return;
-        }
-
-        const tracks = await getBilibiliAvailableTracks(this.videoInfo.videoId, cid);
-        if (tracks.length === 0) {
-          console.log('[SubtitleController] No subtitle tracks found');
-          return;
-        }
-
-        // Use first available track (or prefer target language if available)
-        const desired = this.settings.targetLanguage.toLowerCase();
-        const preferred =
-          tracks.find((t) => t.languageCode.toLowerCase() === desired) ??
-          tracks.find((t) => t.languageCode.toLowerCase().startsWith(`${desired}-`)) ??
-          tracks.find((t) => t.languageCode.toLowerCase().includes(desired));
-        const track = preferred || tracks[0];
-
-        if (!track) return;
-        cues = await fetchBilibiliSubtitles(track.url);
-      }
-
-      this.setCues(cues);
-      console.log(`[SubtitleController] Fetched ${cues.length} subtitle cues`);
+      this.setCues(result.cues);
+      console.log(`[SubtitleController] Fetched ${result.cues.length} subtitle cues`);
     } catch (error) {
       console.error('[SubtitleController] Failed to fetch subtitles:', error);
     }
-  }
-
-  private startYouTubeParamsWatch(videoId: string): void {
-    const token = ++this.youtubeParamsWatchToken;
-    void (async () => {
-      const deadlineMs = Date.now() + 30_000;
-
-      while (!this.destroyed && token === this.youtubeParamsWatchToken && Date.now() < deadlineMs) {
-        if (this.youtubeAdditionalParams.trim()) break;
-        const params = await this.tryGetYouTubeAdditionalParams(videoId, { maxAttempts: 1, delayMs: 0 });
-        if (params.trim()) break;
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      if (this.destroyed || token !== this.youtubeParamsWatchToken) return;
-      if (!this.youtubeAdditionalParams.trim()) return;
-      if (this.videoInfo?.platform !== 'youtube' || this.videoInfo.videoId !== videoId) return;
-
-      if (this.cues.length === 0) {
-        void this.fetchAndProcessSubtitles();
-      }
-    })();
   }
 
   private setCues(cues: Cue[]): void {
@@ -483,10 +234,10 @@ export class SubtitleController {
 
     if (cues.length > 0) {
       this.statusMessage = '';
-      // We already fetched captions successfully; prefer LexiPath overlay and hide native captions.
-      this.setYouTubeNativeCaptionsHidden(this.videoInfo?.platform === 'youtube');
+      this.provider?.hideNativeCaptions?.();
       this.syncSubtitle();
     } else {
+      this.provider?.showNativeCaptions?.();
       this.renderStatusMessage();
     }
 
@@ -573,7 +324,7 @@ export class SubtitleController {
       }
     } finally {
       const elapsedMs = Math.round(performance.now() - startMs);
-      if (elapsedMs >= 800 || this.enhancedCueCount % 20 === 0) {
+      if (elapsedMs >= SLOW_LOG_THRESHOLD_MS || this.enhancedCueCount % 20 === 0) {
         console.log(`[SubtitleController] Enhanced ${this.enhancedCueCount}/${this.cues.length} cues (lastMs=${elapsedMs})`);
       }
     }
@@ -620,9 +371,7 @@ export class SubtitleController {
     const currentTimeMs = this.videoElement.currentTime * 1000;
 
     // Find current cue
-    const cueIndex = this.cues.findIndex(
-      (cue) => currentTimeMs >= cue.startMs && currentTimeMs < cue.endMs
-    );
+    const cueIndex = this.findCueIndexAtTimeMs(currentTimeMs);
 
     // Update if cue changed
     if (cueIndex !== this.currentCueIndex) {
@@ -676,8 +425,11 @@ export class SubtitleController {
         void this.ensureCueBilingual(cue);
       }
 
-      const loadingTranslationText =
-        this.settings.nativeLanguage.startsWith('zh') ? '（翻译加载中…）' : '(Loading translation...)';
+      const loadingTranslationText = getI18nMessage(
+        'subtitle_loadingTranslation',
+        undefined,
+        '(Loading translation...)'
+      );
       lines = [
         {
           text: enhanced?.line1_final || cue.text,
@@ -702,6 +454,82 @@ export class SubtitleController {
     this.overlay.display({ mode: effectiveMode, lines, interactiveWords });
   }
 
+  private findCueIndexAtTimeMs(timeMs: number): number {
+    const cueCount = this.cues.length;
+    if (cueCount === 0) return -1;
+
+    const currentIndex = this.currentCueIndex;
+    if (currentIndex >= 0 && currentIndex < cueCount) {
+      const currentCue = this.cues[currentIndex];
+      if (currentCue && timeMs >= currentCue.startMs && timeMs < currentCue.endMs) {
+        return currentIndex;
+      }
+
+      const nextCue = this.cues[currentIndex + 1];
+      if (nextCue && timeMs >= nextCue.startMs && timeMs < nextCue.endMs) {
+        return currentIndex + 1;
+      }
+
+      const prevCue = this.cues[currentIndex - 1];
+      if (prevCue && timeMs >= prevCue.startMs && timeMs < prevCue.endMs) {
+        return currentIndex - 1;
+      }
+    }
+
+    // Binary search: find the last cue with startMs <= timeMs, then validate its endMs.
+    let lo = 0;
+    let hi = cueCount - 1;
+    let candidate = -1;
+
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const cue = this.cues[mid];
+      if (!cue) break;
+
+      if (timeMs >= cue.startMs) {
+        candidate = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+
+    if (candidate < 0) return -1;
+    const found = this.cues[candidate];
+    return found && timeMs < found.endMs ? candidate : -1;
+  }
+
+  private findFirstCueIndexAfterTimeMs(timeMs: number): number {
+    const cueCount = this.cues.length;
+    if (cueCount === 0) return 0;
+
+    // Find first cue with startMs >= timeMs (lower bound), then rewind one step in case the
+    // previous cue still overlaps timeMs.
+    let lo = 0;
+    let hi = cueCount;
+
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const cue = this.cues[mid];
+      if (!cue) break;
+      if (cue.startMs < timeMs) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+
+    let index = Math.max(0, lo - 1);
+    while (index < cueCount) {
+      const cue = this.cues[index];
+      if (!cue) break;
+      if (cue.endMs > timeMs) break;
+      index++;
+    }
+
+    return index;
+  }
+
   private ensureCueBilingual(cue: Cue): Promise<void> {
     const existing = this.enhancedCues.get(cue.id);
     if (existing && typeof existing.line2_final === 'string' && existing.line2_final.trim()) {
@@ -713,7 +541,7 @@ export class SubtitleController {
 
     const now = Date.now();
     const lastAttemptAt = this.bilingualCueLastAttemptAt.get(cue.id) ?? 0;
-    if (now - lastAttemptAt < 10_000) {
+    if (now - lastAttemptAt < BILINGUAL_RETRY_MIN_INTERVAL_MS) {
       return Promise.resolve();
     }
     this.bilingualCueLastAttemptAt.set(cue.id, now);
@@ -785,7 +613,7 @@ export class SubtitleController {
       const startedAt = performance.now();
       const response = await sendMessage('SELECT_KEYWORDS', { text: trimmed, scene: 'subtitle' });
       const elapsedMs = Math.round(performance.now() - startedAt);
-      if (elapsedMs >= 800) {
+      if (elapsedMs >= SLOW_LOG_THRESHOLD_MS) {
         console.debug(`[SubtitleController] SELECT_KEYWORDS slow cueId=${cueId} ms=${elapsedMs}`);
       }
       if (!response.ok) return [];
@@ -835,7 +663,18 @@ export class SubtitleController {
     const windowEndMs = nowMs + this.keywordPrefetchLookaheadMs;
 
     const cuesInWindow: Cue[] = [];
-    for (let i = Math.max(0, this.currentCueIndex); i < this.cues.length; i++) {
+
+    let startIndex = Math.max(0, this.currentCueIndex);
+    if (this.currentCueIndex < 0 || this.currentCueIndex >= this.cues.length) {
+      startIndex = this.findFirstCueIndexAfterTimeMs(nowMs);
+    } else {
+      const cue = this.cues[this.currentCueIndex];
+      if (!cue || cue.endMs <= nowMs) {
+        startIndex = this.findFirstCueIndexAfterTimeMs(nowMs);
+      }
+    }
+
+    for (let i = startIndex; i < this.cues.length; i++) {
       const cue = this.cues[i];
       if (!cue) continue;
       if (cue.startMs >= windowEndMs) break;
@@ -844,7 +683,7 @@ export class SubtitleController {
     }
 
     const summaryNow = Date.now();
-    if (summaryNow - this.debugLastPrefetchSummaryAt >= 1500) {
+    if (summaryNow - this.debugLastPrefetchSummaryAt >= DEBUG_LOG_THROTTLE_MS) {
       this.debugLastPrefetchSummaryAt = summaryNow;
       console.debug(
         `[SubtitleController] Prefetch window cues=${cuesInWindow.length} nowMs=${Math.round(nowMs)} lookaheadMs=${this.keywordPrefetchLookaheadMs}`
@@ -879,7 +718,7 @@ export class SubtitleController {
     }
 
     const prefetchElapsedMs = Math.round(performance.now() - prefetchStartedAt);
-    if (prefetchElapsedMs >= 800) {
+    if (prefetchElapsedMs >= SLOW_LOG_THRESHOLD_MS) {
       console.debug(`[SubtitleController] Prefetch keywords ready ms=${prefetchElapsedMs} terms=${termContexts.size}`);
     }
   }
@@ -907,7 +746,7 @@ export class SubtitleController {
     if (
       this.prefetchInFlight >= this.maxPrefetchInFlight &&
       this.prefetchQueue.length > 0 &&
-      Date.now() - this.debugLastPrefetchSaturationAt >= 1500
+      Date.now() - this.debugLastPrefetchSaturationAt >= DEBUG_LOG_THROTTLE_MS
     ) {
       this.debugLastPrefetchSaturationAt = Date.now();
       console.debug(
@@ -983,7 +822,7 @@ export class SubtitleController {
         ...(context && context.trim() ? { context: context.trim() } : {}),
       });
       const elapsedMs = Math.round(performance.now() - startedAt);
-      if (elapsedMs >= 800) {
+      if (elapsedMs >= SLOW_LOG_THRESHOLD_MS) {
         console.debug(
           `[SubtitleController] EXPLAIN_WORD slow word=${normalizedWord} ms=${elapsedMs} ok=${response.ok}`
         );

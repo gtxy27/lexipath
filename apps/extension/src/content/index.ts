@@ -9,7 +9,7 @@
  */
 
 import type { Settings, WebEnhanceOutput } from '@lexipath/core';
-import { detectPrimaryLanguage } from '@lexipath/core/qualify';
+import { detectPrimaryLanguage, qualifySite } from '@lexipath/core/qualify';
 import { sendMessage } from '../shared/messages';
 import { SubtitleController, detectPlatform, type Platform } from './subtitle-controller';
 
@@ -570,6 +570,22 @@ async function init(): Promise<void> {
     return;
   }
 
+  const url = window.location.href;
+  const siteDecision = qualifySite({
+    url,
+    settings: {
+      siteMode: currentSettings.siteMode,
+      excludedSites: currentSettings.excludedSites,
+      allowedSites: currentSettings.allowedSites,
+    },
+  });
+  if (!siteDecision.qualified) {
+    console.log(
+      `[LexiPath] Site gate blocked processing reason=${siteDecision.reason}${siteDecision.matchedRule ? ` rule=${siteDecision.matchedRule}` : ''}`
+    );
+    return;
+  }
+
   // Check if provider is configured
   if (!currentSettings.provider?.baseUrl || !currentSettings.provider?.model) {
     console.log('[LexiPath] Provider not configured, skipping page processing');
@@ -578,7 +594,6 @@ async function init(): Promise<void> {
 
   console.log('[LexiPath] Content script initialized');
 
-  const url = window.location.href;
   const platform = detectPlatform(url);
   if (platform !== 'unknown') {
     // Video sites: focus on subtitles only (avoid modifying page content).

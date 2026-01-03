@@ -11,6 +11,14 @@
     "message": "Loading...",
     "description": "Loading state"
   },
+  "subtitle_loadingTranslation": {
+    "message": "(Loading translation...)",
+    "description": "Subtitle: loading native translation placeholder"
+  },
+  "subtitle_youtubeEnableCaptions": {
+    "message": "LexiPath: Please enable YouTube captions (CC) so I can read and enhance subtitles.",
+    "description": "Subtitle: prompt user to enable YouTube captions"
+  },
   "enabled": {
     "message": "Enabled",
     "description": "Enabled label"

@@ -11,6 +11,14 @@
     "message": "加载中...",
     "description": "加载状态"
   },
+  "subtitle_loadingTranslation": {
+    "message": "（翻译加载中…）",
+    "description": "字幕：加载翻译占位符"
+  },
+  "subtitle_youtubeEnableCaptions": {
+    "message": "LexiPath：请先在 YouTube 打开字幕（CC），我才能读取并增强字幕。",
+    "description": "字幕：提示用户开启 YouTube 原生字幕"
+  },
   "enabled": {
     "message": "已启用",
     "description": "启用标签"
