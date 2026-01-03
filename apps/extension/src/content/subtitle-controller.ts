@@ -11,6 +11,7 @@ import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardDat
 import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
 import type { SubtitleProvider } from './subtitle-providers/subtitle-provider';
 import { getI18nMessage } from './i18n';
+import { SubtitleVideoSync } from './subtitle-video-sync';
 
 export { detectPlatform } from './subtitle-platform';
 export type { Platform } from './subtitle-platform';
@@ -30,7 +31,7 @@ export class SubtitleController {
   private enhancedCues: Map<string, SubtitleEnhanceOutput> = new Map();
   private currentCueIndex: number = -1;
   private videoElement: HTMLVideoElement | null = null;
-  private rafId: number | null = null;
+  private videoSync: SubtitleVideoSync | null = null;
   private mode: SubtitleMode = 'enhanced';
   private tempBilingualKeyPressed: boolean = false;
 
@@ -129,6 +130,15 @@ export class SubtitleController {
     this.videoElement.addEventListener('play', this.handleVideoPlay);
     this.videoElement.addEventListener('pause', this.handleVideoPause);
 
+    this.videoSync = new SubtitleVideoSync({
+      onCueIndexChange: (index) => {
+        this.currentCueIndex = index;
+        this.updateSubtitleDisplay();
+        this.startPrefetchWindow();
+      },
+    });
+    this.videoSync.setVideoElement(this.videoElement);
+
     // Create overlay
     this.overlay = new SubtitleOverlay(this.provider.platform, {
       onModeChange: (mode) => {
@@ -164,7 +174,7 @@ export class SubtitleController {
     await this.fetchAndProcessSubtitles();
 
     // Start sync loop
-    this.startSync();
+    this.videoSync.start();
 
     // Setup keyboard listener for temporary bilingual mode
     this.setupKeyboardListener();
@@ -185,7 +195,8 @@ export class SubtitleController {
     this.prefetchQueue = [];
     this.prefetchQueuedTerms.clear();
     this.stopPlatformCaptionsWatch();
-    this.stopSync();
+    this.videoSync?.destroy();
+    this.videoSync = null;
     this.overlay?.unmount();
     this.overlay = null;
     this.provider?.destroy();
@@ -235,6 +246,7 @@ export class SubtitleController {
     this.cues = cues;
     this.subtitleLanguage = typeof lang === 'string' ? lang : cues[0]?.lang ?? '';
     this.currentCueIndex = -1;
+    this.videoSync?.setCues(cues);
     this.enhancedCues.clear();
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
@@ -249,7 +261,7 @@ export class SubtitleController {
       if (this.platformCaptionsEnabled !== false) {
         this.provider?.hideNativeCaptions?.();
       }
-      this.syncSubtitle();
+      this.videoSync?.syncOnce();
     } else {
       this.provider?.showNativeCaptions?.();
       this.renderStatusMessage();
@@ -350,49 +362,6 @@ export class SubtitleController {
   private findVideoElement(): HTMLVideoElement | null {
     const video = document.querySelector('video');
     return video instanceof HTMLVideoElement ? video : null;
-  }
-
-  /**
-   * Start synchronization loop
-   */
-  private startSync(): void {
-    if (this.rafId !== null) return;
-
-    const syncLoop = () => {
-      this.syncSubtitle();
-      this.rafId = requestAnimationFrame(syncLoop);
-    };
-
-    this.rafId = requestAnimationFrame(syncLoop);
-  }
-
-  /**
-   * Stop synchronization loop
-   */
-  private stopSync(): void {
-    if (this.rafId !== null) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
-  }
-
-  /**
-   * Synchronize subtitle with video time
-   */
-  private syncSubtitle(): void {
-    if (!this.videoElement || this.cues.length === 0) return;
-
-    const currentTimeMs = this.videoElement.currentTime * 1000;
-
-    // Find current cue
-    const cueIndex = this.findCueIndexAtTimeMs(currentTimeMs);
-
-    // Update if cue changed
-    if (cueIndex !== this.currentCueIndex) {
-      this.currentCueIndex = cueIndex;
-      this.updateSubtitleDisplay();
-      this.startPrefetchWindow();
-    }
   }
 
   /**
@@ -587,82 +556,6 @@ export class SubtitleController {
     this.updateSubtitleDisplay();
   }
 
-  private findCueIndexAtTimeMs(timeMs: number): number {
-    const cueCount = this.cues.length;
-    if (cueCount === 0) return -1;
-
-    const currentIndex = this.currentCueIndex;
-    if (currentIndex >= 0 && currentIndex < cueCount) {
-      const currentCue = this.cues[currentIndex];
-      if (currentCue && timeMs >= currentCue.startMs && timeMs < currentCue.endMs) {
-        return currentIndex;
-      }
-
-      const nextCue = this.cues[currentIndex + 1];
-      if (nextCue && timeMs >= nextCue.startMs && timeMs < nextCue.endMs) {
-        return currentIndex + 1;
-      }
-
-      const prevCue = this.cues[currentIndex - 1];
-      if (prevCue && timeMs >= prevCue.startMs && timeMs < prevCue.endMs) {
-        return currentIndex - 1;
-      }
-    }
-
-    // Binary search: find the last cue with startMs <= timeMs, then validate its endMs.
-    let lo = 0;
-    let hi = cueCount - 1;
-    let candidate = -1;
-
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      const cue = this.cues[mid];
-      if (!cue) break;
-
-      if (timeMs >= cue.startMs) {
-        candidate = mid;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
-      }
-    }
-
-    if (candidate < 0) return -1;
-    const found = this.cues[candidate];
-    return found && timeMs < found.endMs ? candidate : -1;
-  }
-
-  private findFirstCueIndexAfterTimeMs(timeMs: number): number {
-    const cueCount = this.cues.length;
-    if (cueCount === 0) return 0;
-
-    // Find first cue with startMs >= timeMs (lower bound), then rewind one step in case the
-    // previous cue still overlaps timeMs.
-    let lo = 0;
-    let hi = cueCount;
-
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      const cue = this.cues[mid];
-      if (!cue) break;
-      if (cue.startMs < timeMs) {
-        lo = mid + 1;
-      } else {
-        hi = mid;
-      }
-    }
-
-    let index = Math.max(0, lo - 1);
-    while (index < cueCount) {
-      const cue = this.cues[index];
-      if (!cue) break;
-      if (cue.endMs > timeMs) break;
-      index++;
-    }
-
-    return index;
-  }
-
   private ensureCueBilingual(cue: Cue): Promise<void> {
     const existing = this.enhancedCues.get(cue.id);
     if (existing && typeof existing.line2_final === 'string' && existing.line2_final.trim()) {
@@ -829,15 +722,15 @@ export class SubtitleController {
 
     const cuesInWindow: Cue[] = [];
 
-    let startIndex = Math.max(0, this.currentCueIndex);
-    if (this.currentCueIndex < 0 || this.currentCueIndex >= this.cues.length) {
-      startIndex = this.findFirstCueIndexAfterTimeMs(nowMs);
-    } else {
-      const cue = this.cues[this.currentCueIndex];
-      if (!cue || cue.endMs <= nowMs) {
-        startIndex = this.findFirstCueIndexAfterTimeMs(nowMs);
+      let startIndex = Math.max(0, this.currentCueIndex);
+      if (this.currentCueIndex < 0 || this.currentCueIndex >= this.cues.length) {
+        startIndex = this.videoSync?.findFirstCueIndexAfterTimeMs(nowMs) ?? startIndex;
+      } else {
+        const cue = this.cues[this.currentCueIndex];
+        if (!cue || cue.endMs <= nowMs) {
+          startIndex = this.videoSync?.findFirstCueIndexAfterTimeMs(nowMs) ?? startIndex;
+        }
       }
-    }
 
     for (let i = startIndex; i < this.cues.length; i++) {
       const cue = this.cues[i];
