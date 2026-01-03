@@ -61,6 +61,12 @@ export class SubtitleController {
   private debugLastPrefetchSummaryAt = 0;
   private debugLastPrefetchSaturationAt = 0;
 
+  private platformCaptionsEnabled: boolean | null = null;
+  private platformCaptionsWatchToken = 0;
+  private platformCaptionsObserver: MutationObserver | null = null;
+  private platformCaptionsPollTimer: number | null = null;
+  private platformCaptionsButton: HTMLElement | null = null;
+
   constructor(private settings: Settings) {}
 
   private isVideoPaused(): boolean {
@@ -149,6 +155,8 @@ export class SubtitleController {
       return false;
     }
 
+    this.startPlatformCaptionsWatch();
+
     this.maxPrefetchInFlight = this.getPrefetchConcurrencyLimit();
 
     // Fetch subtitles
@@ -175,6 +183,7 @@ export class SubtitleController {
     this.prefetchToken++;
     this.prefetchQueue = [];
     this.prefetchQueuedTerms.clear();
+    this.stopPlatformCaptionsWatch();
     this.stopSync();
     this.overlay?.unmount();
     this.overlay = null;
@@ -234,7 +243,9 @@ export class SubtitleController {
 
     if (cues.length > 0) {
       this.statusMessage = '';
-      this.provider?.hideNativeCaptions?.();
+      if (this.platformCaptionsEnabled !== false) {
+        this.provider?.hideNativeCaptions?.();
+      }
       this.syncSubtitle();
     } else {
       this.provider?.showNativeCaptions?.();
@@ -387,6 +398,12 @@ export class SubtitleController {
   private updateSubtitleDisplay(): void {
     if (!this.overlay) return;
 
+    if (this.platformCaptionsEnabled === false) {
+      this.provider?.showNativeCaptions?.();
+      this.overlay.clear();
+      return;
+    }
+
     if (this.cues.length === 0) {
       this.renderStatusMessage();
       return;
@@ -452,6 +469,119 @@ export class SubtitleController {
         ? new Set(keywords.map((term) => this.normalizeTerm(term)))
         : this.computeInteractiveWords(lines.map((line) => line.text));
     this.overlay.display({ mode: effectiveMode, lines, interactiveWords });
+  }
+
+  private startPlatformCaptionsWatch(): void {
+    this.stopPlatformCaptionsWatch();
+    const token = ++this.platformCaptionsWatchToken;
+
+    const poll = () => {
+      if (this.destroyed) return;
+      if (token !== this.platformCaptionsWatchToken) return;
+
+      const button = this.findPlatformCaptionsButton();
+      if (!button) {
+        this.platformCaptionsPollTimer = window.setTimeout(poll, 1000);
+        return;
+      }
+
+      this.platformCaptionsButton = button;
+      this.platformCaptionsPollTimer = null;
+
+      const update = () => {
+        this.refreshPlatformCaptionsEnabled();
+      };
+
+      update();
+      this.platformCaptionsObserver = new MutationObserver(update);
+      this.platformCaptionsObserver.observe(button, {
+        attributes: true,
+        attributeFilter: ['aria-pressed', 'aria-checked', 'class'],
+      });
+    };
+
+    poll();
+  }
+
+  private stopPlatformCaptionsWatch(): void {
+    this.platformCaptionsWatchToken++;
+    if (this.platformCaptionsPollTimer !== null) {
+      window.clearTimeout(this.platformCaptionsPollTimer);
+      this.platformCaptionsPollTimer = null;
+    }
+    if (this.platformCaptionsObserver) {
+      this.platformCaptionsObserver.disconnect();
+      this.platformCaptionsObserver = null;
+    }
+    this.platformCaptionsButton = null;
+    this.platformCaptionsEnabled = null;
+  }
+
+  private findPlatformCaptionsButton(): HTMLElement | null {
+    const provider = this.provider;
+    if (!provider) return null;
+
+    if (provider.platform === 'youtube') {
+      const button = document.querySelector('.ytp-subtitles-button');
+      return button instanceof HTMLElement ? button : null;
+    }
+
+    if (provider.platform === 'bilibili') {
+      const selectors = [
+        '.bpx-player-ctrl-subtitle',
+        '.bpx-player-ctrl-btn.bpx-player-ctrl-subtitle',
+        '.bilibili-player-video-btn-subtitle',
+      ];
+
+      for (const selector of selectors) {
+        const button = document.querySelector(selector);
+        if (button instanceof HTMLElement) return button;
+      }
+    }
+
+    return null;
+  }
+
+  private getCaptionsEnabledFromButton(button: HTMLElement): boolean | null {
+    const ariaPressed = button.getAttribute('aria-pressed');
+    if (ariaPressed === 'true') return true;
+    if (ariaPressed === 'false') return false;
+
+    const ariaChecked = button.getAttribute('aria-checked');
+    if (ariaChecked === 'true') return true;
+    if (ariaChecked === 'false') return false;
+
+    if (
+      button.classList.contains('bpx-player-ctrl-btn-active') ||
+      button.classList.contains('bilibili-player-video-btn-subtitle-on') ||
+      button.classList.contains('active')
+    ) {
+      return true;
+    }
+
+    if (button.classList.contains('bilibili-player-video-btn-subtitle-off')) {
+      return false;
+    }
+
+    return null;
+  }
+
+  private refreshPlatformCaptionsEnabled(): void {
+    const button = this.platformCaptionsButton;
+    if (!button) return;
+
+    const enabled = this.getCaptionsEnabledFromButton(button);
+    if (enabled === null) return;
+    if (this.platformCaptionsEnabled === enabled) return;
+
+    this.platformCaptionsEnabled = enabled;
+    if (!enabled) {
+      this.provider?.showNativeCaptions?.();
+    } else if (this.cues.length > 0) {
+      this.provider?.hideNativeCaptions?.();
+    }
+
+    this.updateSubtitleDisplay();
   }
 
   private findCueIndexAtTimeMs(timeMs: number): number {
