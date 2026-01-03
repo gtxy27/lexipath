@@ -33,6 +33,31 @@ let tooltipInjected = false;
 let tooltipEl: HTMLDivElement | null = null;
 let tooltipTarget: HTMLElement | null = null;
 
+function isKeywordProviderConfigured(settings: Settings): boolean {
+  switch (settings.keywordProvider) {
+    case 'openai':
+      return Boolean(settings.channels.openai);
+    case 'claude':
+      return Boolean(settings.channels.claude);
+    case 'gemini':
+      return Boolean(settings.channels.gemini);
+  }
+}
+
+function isTranslationProviderConfigured(settings: Settings): boolean {
+  switch (settings.translationProvider) {
+    case 'openai':
+      return Boolean(settings.channels.openai);
+    case 'claude':
+      return Boolean(settings.channels.claude);
+    case 'gemini':
+      return Boolean(settings.channels.gemini);
+    case 'google':
+    case 'bing':
+      return true;
+  }
+}
+
 /**
  * Get current settings from background.
  */
@@ -616,18 +641,21 @@ async function initForUrl(url: string, token: number): Promise<void> {
     return;
   }
 
-  // Check if provider is configured
-  if (!currentSettings.provider?.baseUrl || !currentSettings.provider?.model) {
-    console.log(`[LexiPath] ${getI18nMessage('log_providerNotConfiguredSkipPageProcessing')}`);
-    return;
-  }
-
   console.log('[LexiPath] Content script initialized');
 
   const platform = detectPlatform(url);
   if (platform !== 'unknown') {
+    if (!isTranslationProviderConfigured(currentSettings)) {
+      console.log(`[LexiPath] ${getI18nMessage('log_providerNotConfiguredSkipPageProcessing')}`);
+      return;
+    }
     // Video sites: focus on subtitles only (avoid modifying page content).
     await initSubtitleController(platform, url, token);
+    return;
+  }
+
+  if (!isKeywordProviderConfigured(currentSettings) || !isTranslationProviderConfigured(currentSettings)) {
+    console.log(`[LexiPath] ${getI18nMessage('log_providerNotConfiguredSkipPageProcessing')}`);
     return;
   }
 

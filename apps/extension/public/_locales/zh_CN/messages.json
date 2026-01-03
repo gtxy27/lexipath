@@ -148,7 +148,7 @@
     "description": "服务商设置区域标题"
   },
   "providerSettingsDesc": {
-    "message": "配置您的 OpenAI 兼容 AI 服务商",
+    "message": "配置 OpenAI-compatible / Claude / Gemini 渠道，并选择“选词/翻译”的路由。",
     "description": "服务商设置描述"
   },
   "languageSettings": {
@@ -600,15 +600,15 @@
     "description": "Options page advanced section title"
   },
   "optionsConcurrencyDesc": {
-    "message": "限制每个模型并行运行的 AI 请求数量。Key 格式：baseUrl|model。",
+    "message": "限制每个渠道并行运行的请求数量。留空使用默认值（20）。",
     "description": "Options page concurrency description"
   },
   "optionsConcurrencyLabel": {
-    "message": "按模型并发限制",
+    "message": "按渠道并发限制",
     "description": "Concurrency limits label"
   },
   "optionsConcurrencyHint": {
-    "message": "示例：{\"https://api.example.com|gpt-4o-mini\": 20}。为空或缺失的 key 使用默认值（20）。",
+    "message": "这些限制同时适用于 OpenAI/Claude/Gemini 以及内置翻译（Google/Bing）。",
     "description": "Concurrency limits hint"
   },
   "optionsConcurrencyPlaceholder": {
@@ -622,5 +622,161 @@
   "optionsConcurrencyInvalidFormat": {
     "message": "需要一个 JSON 对象，key 为字符串，value 为整数（1-500）。",
     "description": "Concurrency JSON schema error"
+  },
+  "optionsConcurrencyInvalidNumber": {
+    "message": "请输入 1-500 之间的整数（或留空）。",
+    "description": "Concurrency number validation error"
+  },
+  "optionsConcurrencyChannel_openai": {
+    "message": "OpenAI",
+    "description": "Concurrency: OpenAI channel label"
+  },
+  "optionsConcurrencyChannel_claude": {
+    "message": "Claude",
+    "description": "Concurrency: Claude channel label"
+  },
+  "optionsConcurrencyChannel_gemini": {
+    "message": "Gemini",
+    "description": "Concurrency: Gemini channel label"
+  },
+  "optionsConcurrencyChannel_google": {
+    "message": "Google 翻译",
+    "description": "Concurrency: Google Translate label"
+  },
+  "optionsConcurrencyChannel_bing": {
+    "message": "Bing 翻译",
+    "description": "Concurrency: Bing Translate label"
+  },
+  "optionsProviderApiKeyRequired": {
+    "message": "API Key 为必填项。",
+    "description": "Provider API key required error"
+  },
+  "optionsKeywordProviderNotConfigured": {
+    "message": "所选的选词渠道尚未配置。",
+    "description": "Keyword provider not configured error"
+  },
+  "optionsTranslationProviderNotConfigured": {
+    "message": "所选的翻译渠道尚未配置。",
+    "description": "Translation provider not configured error"
+  },
+  "optionsChannelOpenAI": {
+    "message": "OpenAI-compatible",
+    "description": "OpenAI channel section title"
+  },
+  "optionsChannelOpenAIDesc": {
+    "message": "OpenAI 兼容聊天接口（例如 /v1/chat/completions）。每个渠道仅一个模型。",
+    "description": "OpenAI channel section description"
+  },
+  "optionsChannelClaude": {
+    "message": "Claude（Anthropic）",
+    "description": "Claude channel section title"
+  },
+  "optionsChannelClaudeDesc": {
+    "message": "Anthropic Messages API（/v1/messages）。每个渠道仅一个模型。",
+    "description": "Claude channel section description"
+  },
+  "optionsChannelGemini": {
+    "message": "Gemini（Google）",
+    "description": "Gemini channel section title"
+  },
+  "optionsChannelGeminiDesc": {
+    "message": "Gemini generateContent API。每个渠道仅一个模型。",
+    "description": "Gemini channel section description"
+  },
+  "optionsClaudeModelPlaceholder": {
+    "message": "claude-3-5-sonnet-20240620",
+    "description": "Claude model placeholder"
+  },
+  "optionsGeminiModelPlaceholder": {
+    "message": "gemini-1.5-flash",
+    "description": "Gemini model placeholder"
+  },
+  "optionsClaudeApiKeyDesc": {
+    "message": "必填。会保存到扩展本地存储。",
+    "description": "Claude api key description"
+  },
+  "optionsGeminiApiKeyDesc": {
+    "message": "必填。会保存到扩展本地存储。",
+    "description": "Gemini api key description"
+  },
+  "optionsClaudeBaseUrlDesc": {
+    "message": "可选覆盖。默认：https://api.anthropic.com/v1",
+    "description": "Claude base url description"
+  },
+  "optionsClaudeBaseUrlPlaceholder": {
+    "message": "https://api.anthropic.com/v1",
+    "description": "Claude base url placeholder"
+  },
+  "optionsGeminiBaseUrlDesc": {
+    "message": "可选覆盖。默认：https://generativelanguage.googleapis.com/v1beta",
+    "description": "Gemini base url description"
+  },
+  "optionsGeminiBaseUrlPlaceholder": {
+    "message": "https://generativelanguage.googleapis.com/v1beta",
+    "description": "Gemini base url placeholder"
+  },
+  "providerChannel_openai": {
+    "message": "OpenAI-compatible",
+    "description": "Provider channel option: openai"
+  },
+  "providerChannel_claude": {
+    "message": "Claude",
+    "description": "Provider channel option: claude"
+  },
+  "providerChannel_gemini": {
+    "message": "Gemini",
+    "description": "Provider channel option: gemini"
+  },
+  "translationProvider_openai": {
+    "message": "OpenAI-compatible",
+    "description": "Translation provider option: openai"
+  },
+  "translationProvider_claude": {
+    "message": "Claude",
+    "description": "Translation provider option: claude"
+  },
+  "translationProvider_gemini": {
+    "message": "Gemini",
+    "description": "Translation provider option: gemini"
+  },
+  "translationProvider_google": {
+    "message": "Google 翻译",
+    "description": "Translation provider option: google"
+  },
+  "translationProvider_bing": {
+    "message": "Bing 翻译",
+    "description": "Translation provider option: bing"
+  },
+  "optionsRoutingTitle": {
+    "message": "路由",
+    "description": "Routing section title"
+  },
+  "optionsRoutingDesc": {
+    "message": "选词与翻译可以使用不同渠道。",
+    "description": "Routing section description"
+  },
+  "optionsKeywordProviderLabel": {
+    "message": "选词渠道",
+    "description": "Keyword provider label"
+  },
+  "optionsKeywordProviderDesc": {
+    "message": "用于选词（仅支持 LLM）。",
+    "description": "Keyword provider description"
+  },
+  "optionsTranslationProviderLabel": {
+    "message": "翻译渠道",
+    "description": "Translation provider label"
+  },
+  "optionsTranslationProviderDesc": {
+    "message": "用于翻译选中的词/短语与双语字幕（LLM 或 Google/Bing）。",
+    "description": "Translation provider description"
+  },
+  "optionsTestGoogleTranslate": {
+    "message": "测试 Google 翻译",
+    "description": "Test Google Translate button"
+  },
+  "optionsTestBingTranslate": {
+    "message": "测试 Bing 翻译",
+    "description": "Test Bing Translate button"
   }
 }

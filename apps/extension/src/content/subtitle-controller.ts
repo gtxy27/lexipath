@@ -67,22 +67,17 @@ export class SubtitleController {
     return Boolean(this.videoElement?.paused);
   }
 
-  private getProviderKey(): string {
-    const provider = this.settings.provider;
-    if (!provider) return '';
-    return `${provider.baseUrl}|${provider.model}`;
-  }
-
   private getPrefetchConcurrencyLimit(): number {
-    const providerKey = this.getProviderKey();
-    const configured =
-      providerKey && this.settings.modelConcurrencyLimits
-        ? this.settings.modelConcurrencyLimits[providerKey]
-        : undefined;
+    const llmChannel = this.settings.translationProvider === 'openai' ||
+        this.settings.translationProvider === 'claude' ||
+        this.settings.translationProvider === 'gemini'
+      ? this.settings.translationProvider
+      : this.settings.keywordProvider;
 
-    const modelLimit = typeof configured === 'number' && Number.isFinite(configured) ? configured : 20;
+    const configured = this.settings.channelConcurrencyLimits?.[llmChannel];
+    const channelLimit = typeof configured === 'number' && Number.isFinite(configured) ? configured : 20;
     // Reserve headroom for user hover/click; prefetch uses ~25% of model concurrency, capped.
-    const suggested = Math.floor(modelLimit / 4);
+    const suggested = Math.floor(channelLimit / 4);
     return Math.min(20, Math.max(2, suggested || 2));
   }
 

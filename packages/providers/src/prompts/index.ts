@@ -31,3 +31,9 @@ export {
   parseKeywordSelectResponse,
   type KeywordSelectPromptOptions,
 } from './keyword-select-prompt';
+
+export {
+  buildTermTranslatePrompt,
+  parseTermTranslateResponse,
+  type TermTranslatePromptOptions,
+} from './term-translate-prompt';

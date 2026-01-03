@@ -38,5 +38,20 @@ describe('createEnhancedElement', () => {
     wrapper.appendChild(fragment);
     expect(wrapper.querySelector('span.lexipath-word')).toBeNull();
   });
-});
 
+  it('appends original text in parentheses for native-to-target mode', () => {
+    const fragment = createEnhancedElement(
+      '你好 世界',
+      {
+        content_result: '',
+        convert_word: [{ original: '你好', converted: 'hello' }],
+      },
+      'native-to-target'
+    );
+
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(fragment);
+    const span = wrapper.querySelector('span.lexipath-word');
+    expect(span?.textContent).toBe('hello (你好)');
+  });
+});

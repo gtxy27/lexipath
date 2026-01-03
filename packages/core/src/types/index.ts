@@ -87,11 +87,80 @@ export const ProviderConfigSchema = z.object({
 });
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 
-export const TestProviderConnectionPayloadSchema = z
+export const ClaudeProviderConfigSchema = z.object({
+  model: z.string().min(1),
+  apiKey: z.string().min(1),
+  // Optional override for proxies / self-hosted gateways.
+  baseUrl: z.string().url().optional(),
+  customHeaders: z.record(z.string()).optional(),
+});
+export type ClaudeProviderConfig = z.infer<typeof ClaudeProviderConfigSchema>;
+
+export const GeminiProviderConfigSchema = z.object({
+  model: z.string().min(1),
+  apiKey: z.string().min(1),
+  // Optional override for proxies / self-hosted gateways.
+  baseUrl: z.string().url().optional(),
+  customHeaders: z.record(z.string()).optional(),
+});
+export type GeminiProviderConfig = z.infer<typeof GeminiProviderConfigSchema>;
+
+export const LLMProviderChannelSchema = z.enum(['openai', 'claude', 'gemini']);
+export type LLMProviderChannel = z.infer<typeof LLMProviderChannelSchema>;
+
+export const TranslationProviderSchema = z.enum(['openai', 'claude', 'gemini', 'google', 'bing']);
+export type TranslationProvider = z.infer<typeof TranslationProviderSchema>;
+
+export const ProviderChannelsSchema = z
   .object({
-    provider: ProviderConfigSchema,
+    openai: ProviderConfigSchema.optional(),
+    claude: ClaudeProviderConfigSchema.optional(),
+    gemini: GeminiProviderConfigSchema.optional(),
   })
-  .strict();
+  .default({});
+export type ProviderChannels = z.infer<typeof ProviderChannelsSchema>;
+
+export const ChannelConcurrencyLimitsSchema = z
+  .object({
+    openai: z.number().int().min(1).max(500).optional(),
+    claude: z.number().int().min(1).max(500).optional(),
+    gemini: z.number().int().min(1).max(500).optional(),
+    google: z.number().int().min(1).max(500).optional(),
+    bing: z.number().int().min(1).max(500).optional(),
+  })
+  .default({});
+export type ChannelConcurrencyLimits = z.infer<typeof ChannelConcurrencyLimitsSchema>;
+
+export const TestProviderConnectionPayloadSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('openai'),
+      config: ProviderConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('claude'),
+      config: ClaudeProviderConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('gemini'),
+      config: GeminiProviderConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('google'),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('bing'),
+    })
+    .strict(),
+]);
 export type TestProviderConnectionPayload = z.infer<typeof TestProviderConnectionPayloadSchema>;
 
 // =============================================================================
@@ -104,12 +173,16 @@ export const SettingsSchema = z.object({
   targetLanguage: SupportedLanguageSchema.default('en'),
   proficiencyLevel: CEFRLevelSchema.default('B1'),
 
-  // Provider
-  provider: ProviderConfigSchema.optional(),
+  // Provider channels (one model per channel)
+  channels: ProviderChannelsSchema,
+
+  // Routing
+  keywordProvider: LLMProviderChannelSchema.default('openai'),
+  translationProvider: TranslationProviderSchema.default('openai'),
 
   // Concurrency (advanced)
-  // Keyed by `${baseUrl}|${model}` (per-model concurrency limit).
-  modelConcurrencyLimits: z.record(z.number().int().min(1).max(500)).default({}),
+  // Keyed by channel name (e.g. openai/claude/gemini/google/bing).
+  channelConcurrencyLimits: ChannelConcurrencyLimitsSchema,
 
   // Behavior
   enabled: z.boolean().default(true),

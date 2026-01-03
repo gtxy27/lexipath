@@ -148,7 +148,7 @@
     "description": "Provider settings section title"
   },
   "providerSettingsDesc": {
-    "message": "Configure your OpenAI-compatible AI provider",
+    "message": "Configure OpenAI-compatible / Claude / Gemini channels and choose routing for keyword selection + translation.",
     "description": "Provider settings description"
   },
   "languageSettings": {
@@ -616,15 +616,15 @@
     "description": "Options page advanced section title"
   },
   "optionsConcurrencyDesc": {
-    "message": "Limit how many AI requests run in parallel per model. Key format: baseUrl|model.",
+    "message": "Limit how many requests run in parallel per channel. Empty values use the default (20).",
     "description": "Options page concurrency description"
   },
   "optionsConcurrencyLabel": {
-    "message": "Per-model concurrency limits",
+    "message": "Per-channel concurrency limits",
     "description": "Concurrency limits label"
   },
   "optionsConcurrencyHint": {
-    "message": "Example: {\"https://api.example.com|gpt-4o-mini\": 20}. Empty or missing keys use the default (20).",
+    "message": "These limits apply to OpenAI/Claude/Gemini and also built-in translators (Google/Bing).",
     "description": "Concurrency limits hint"
   },
   "optionsConcurrencyPlaceholder": {
@@ -638,5 +638,161 @@
   "optionsConcurrencyInvalidFormat": {
     "message": "Expected a JSON object mapping strings to integers (1-500).",
     "description": "Concurrency JSON schema error"
+  },
+  "optionsConcurrencyInvalidNumber": {
+    "message": "Please enter an integer between 1 and 500 (or leave empty).",
+    "description": "Concurrency number validation error"
+  },
+  "optionsConcurrencyChannel_openai": {
+    "message": "OpenAI",
+    "description": "Concurrency: OpenAI channel label"
+  },
+  "optionsConcurrencyChannel_claude": {
+    "message": "Claude",
+    "description": "Concurrency: Claude channel label"
+  },
+  "optionsConcurrencyChannel_gemini": {
+    "message": "Gemini",
+    "description": "Concurrency: Gemini channel label"
+  },
+  "optionsConcurrencyChannel_google": {
+    "message": "Google Translate",
+    "description": "Concurrency: Google Translate label"
+  },
+  "optionsConcurrencyChannel_bing": {
+    "message": "Bing Translate",
+    "description": "Concurrency: Bing Translate label"
+  },
+  "optionsProviderApiKeyRequired": {
+    "message": "API Key is required.",
+    "description": "Provider API key required error"
+  },
+  "optionsKeywordProviderNotConfigured": {
+    "message": "Selected keyword channel is not configured.",
+    "description": "Keyword provider not configured error"
+  },
+  "optionsTranslationProviderNotConfigured": {
+    "message": "Selected translation channel is not configured.",
+    "description": "Translation provider not configured error"
+  },
+  "optionsChannelOpenAI": {
+    "message": "OpenAI-compatible",
+    "description": "OpenAI channel section title"
+  },
+  "optionsChannelOpenAIDesc": {
+    "message": "OpenAI-compatible chat endpoint (e.g. /v1/chat/completions). One model per channel.",
+    "description": "OpenAI channel section description"
+  },
+  "optionsChannelClaude": {
+    "message": "Claude (Anthropic)",
+    "description": "Claude channel section title"
+  },
+  "optionsChannelClaudeDesc": {
+    "message": "Anthropic Messages API (/v1/messages). One model per channel.",
+    "description": "Claude channel section description"
+  },
+  "optionsChannelGemini": {
+    "message": "Gemini (Google)",
+    "description": "Gemini channel section title"
+  },
+  "optionsChannelGeminiDesc": {
+    "message": "Gemini generateContent API. One model per channel.",
+    "description": "Gemini channel section description"
+  },
+  "optionsClaudeModelPlaceholder": {
+    "message": "claude-3-5-sonnet-20240620",
+    "description": "Claude model placeholder"
+  },
+  "optionsGeminiModelPlaceholder": {
+    "message": "gemini-1.5-flash",
+    "description": "Gemini model placeholder"
+  },
+  "optionsClaudeApiKeyDesc": {
+    "message": "Required. Stored in extension local storage.",
+    "description": "Claude api key description"
+  },
+  "optionsGeminiApiKeyDesc": {
+    "message": "Required. Stored in extension local storage.",
+    "description": "Gemini api key description"
+  },
+  "optionsClaudeBaseUrlDesc": {
+    "message": "Optional override. Default: https://api.anthropic.com/v1",
+    "description": "Claude base url description"
+  },
+  "optionsClaudeBaseUrlPlaceholder": {
+    "message": "https://api.anthropic.com/v1",
+    "description": "Claude base url placeholder"
+  },
+  "optionsGeminiBaseUrlDesc": {
+    "message": "Optional override. Default: https://generativelanguage.googleapis.com/v1beta",
+    "description": "Gemini base url description"
+  },
+  "optionsGeminiBaseUrlPlaceholder": {
+    "message": "https://generativelanguage.googleapis.com/v1beta",
+    "description": "Gemini base url placeholder"
+  },
+  "providerChannel_openai": {
+    "message": "OpenAI-compatible",
+    "description": "Provider channel option: openai"
+  },
+  "providerChannel_claude": {
+    "message": "Claude",
+    "description": "Provider channel option: claude"
+  },
+  "providerChannel_gemini": {
+    "message": "Gemini",
+    "description": "Provider channel option: gemini"
+  },
+  "translationProvider_openai": {
+    "message": "OpenAI-compatible",
+    "description": "Translation provider option: openai"
+  },
+  "translationProvider_claude": {
+    "message": "Claude",
+    "description": "Translation provider option: claude"
+  },
+  "translationProvider_gemini": {
+    "message": "Gemini",
+    "description": "Translation provider option: gemini"
+  },
+  "translationProvider_google": {
+    "message": "Google Translate",
+    "description": "Translation provider option: google"
+  },
+  "translationProvider_bing": {
+    "message": "Bing Translate",
+    "description": "Translation provider option: bing"
+  },
+  "optionsRoutingTitle": {
+    "message": "Routing",
+    "description": "Routing section title"
+  },
+  "optionsRoutingDesc": {
+    "message": "Keyword selection and translation can use different channels.",
+    "description": "Routing section description"
+  },
+  "optionsKeywordProviderLabel": {
+    "message": "Keyword channel",
+    "description": "Keyword provider label"
+  },
+  "optionsKeywordProviderDesc": {
+    "message": "Used for selecting keywords (LLM only).",
+    "description": "Keyword provider description"
+  },
+  "optionsTranslationProviderLabel": {
+    "message": "Translation channel",
+    "description": "Translation provider label"
+  },
+  "optionsTranslationProviderDesc": {
+    "message": "Used for translating selected words and bilingual subtitles (LLM or Google/Bing).",
+    "description": "Translation provider description"
+  },
+  "optionsTestGoogleTranslate": {
+    "message": "Test Google Translate",
+    "description": "Test Google Translate button"
+  },
+  "optionsTestBingTranslate": {
+    "message": "Test Bing Translate",
+    "description": "Test Bing Translate button"
   }
 }

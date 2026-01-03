@@ -13,26 +13,44 @@ import { z } from 'zod';
 
 import {
   CEFRLevelSchema,
+  ClaudeProviderConfigSchema,
+  GeminiProviderConfigSchema,
+  LLMProviderChannelSchema,
   NativeLanguageSchema,
+  ProviderConfigSchema,
   SupportedLanguageSchema,
+  TranslationProviderSchema,
   type EnhanceSubtitlePayload,
   type EnhanceWebPayload,
   type CEFRLevel,
+  type ClaudeProviderConfig,
+  type GeminiProviderConfig,
+  type LLMProviderChannel,
+  type ProviderConfig,
   type ExplainWordOutput,
   type ExplainWordPayload,
-  type ProviderConfig,
+  type TranslationProvider,
+  type Settings,
   type SubtitleEnhanceOutput,
   type WebEnhanceOutput,
 } from '@lexipath/core';
 import { validateSubtitleEnhanceOutput, validateWebEnhanceOutput } from '@lexipath/core/validators';
-import { OpenAICompatibleProvider } from '@lexipath/providers';
+import {
+  BingTranslateProvider,
+  ClaudeProvider,
+  GeminiProvider,
+  GoogleTranslateProvider,
+  OpenAICompatibleProvider,
+} from '@lexipath/providers';
 import {
   buildExplainWordPrompt,
   buildKeywordSelectPrompt,
   buildSubtitleEnhancePrompt,
+  buildTermTranslatePrompt,
   buildWebEnhancePrompt,
   parseExplainWordResponse,
   parseKeywordSelectResponse,
+  parseTermTranslateResponse,
 } from '@lexipath/providers/prompts';
 import { DictionaryService } from '@lexipath/dictionary';
 
@@ -70,13 +88,11 @@ function t(key: string, substitutions?: string | string[], fallback = ''): strin
   return fallback || key;
 }
 
-function providerModelKey(config: ProviderConfig): string {
-  return `${config.baseUrl}|${config.model}`;
-}
-
-function getModelConcurrencyLimit(settings: { modelConcurrencyLimits?: Record<string, number> }, config: ProviderConfig): number {
-  const key = providerModelKey(config);
-  const raw = settings.modelConcurrencyLimits?.[key];
+function getChannelConcurrencyLimit(
+  settings: { channelConcurrencyLimits?: Partial<Record<TranslationProvider, number | undefined>> },
+  channel: TranslationProvider
+): number {
+  const raw = settings.channelConcurrencyLimits?.[channel];
   if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 1) {
     return Math.min(500, Math.floor(raw));
   }
@@ -124,14 +140,13 @@ function releaseConcurrencySlot(key: string): void {
   if (next) next();
 }
 
-async function runWithModelConcurrency<T>(
-  settings: { modelConcurrencyLimits?: Record<string, number> },
-  config: ProviderConfig,
+async function runWithChannelConcurrency<T>(
+  settings: { channelConcurrencyLimits?: Partial<Record<TranslationProvider, number | undefined>> },
+  channel: TranslationProvider,
   work: () => Promise<T>
 ): Promise<T> {
-  const key = providerModelKey(config);
-  const limit = getModelConcurrencyLimit(settings, config);
-  const release = await acquireConcurrencySlot(key, limit);
+  const limit = getChannelConcurrencyLimit(settings, channel);
+  const release = await acquireConcurrencySlot(channel, limit);
   try {
     return await work();
   } finally {
@@ -139,28 +154,85 @@ async function runWithModelConcurrency<T>(
   }
 }
 
-let providerInstance: OpenAICompatibleProvider | null = null;
-let providerConfigKey: string | null = null;
+type ChatProvider = OpenAICompatibleProvider | ClaudeProvider | GeminiProvider;
 
-function providerKey(config: ProviderConfig): string {
-  return stableStringify({
-    baseUrl: config.baseUrl,
-    model: config.model,
-    apiKey: config.apiKey ?? '',
-    customHeaders: config.customHeaders ?? {},
-  });
+const chatProviders = new Map<string, ChatProvider>();
+
+function providerKey(type: LLMProviderChannel, config: ProviderConfig | ClaudeProviderConfig | GeminiProviderConfig): string {
+  return stableStringify({ type, config });
 }
 
-function getProvider(config: ProviderConfig | undefined): OpenAICompatibleProvider | null {
-  if (!config) return null;
+function getChatProvider(type: LLMProviderChannel, config: ProviderConfig | ClaudeProviderConfig | GeminiProviderConfig): ChatProvider {
+  const key = providerKey(type, config);
+  const existing = chatProviders.get(key);
+  if (existing) return existing;
 
-  const key = providerKey(config);
-  if (providerInstance && providerConfigKey === key) return providerInstance;
+  const created: ChatProvider = (() => {
+    switch (type) {
+      case 'openai':
+        return new OpenAICompatibleProvider(config as ProviderConfig);
+      case 'claude':
+        return new ClaudeProvider(config as ClaudeProviderConfig);
+      case 'gemini':
+        return new GeminiProvider(config as GeminiProviderConfig);
+    }
+  })();
 
-  providerInstance?.cancel();
-  providerInstance = new OpenAICompatibleProvider(config);
-  providerConfigKey = key;
-  return providerInstance;
+  chatProviders.set(key, created);
+  return created;
+}
+
+const googleTranslateProvider = new GoogleTranslateProvider();
+const bingTranslateProvider = new BingTranslateProvider();
+
+function isLLMProvider(type: TranslationProvider): type is LLMProviderChannel {
+  return type === 'openai' || type === 'claude' || type === 'gemini';
+}
+
+function getChatProviderConfig(
+  settings: Settings,
+  channel: LLMProviderChannel
+): ProviderConfig | ClaudeProviderConfig | GeminiProviderConfig | null {
+  switch (channel) {
+    case 'openai': {
+      const raw = settings.channels.openai;
+      if (!raw) return null;
+      const parsed = ProviderConfigSchema.safeParse(raw);
+      if (!parsed.success) return null;
+      return parsed.data;
+    }
+    case 'claude': {
+      const raw = settings.channels.claude;
+      if (!raw) return null;
+      const parsed = ClaudeProviderConfigSchema.safeParse(raw);
+      if (!parsed.success) return null;
+      return parsed.data;
+    }
+    case 'gemini': {
+      const raw = settings.channels.gemini;
+      if (!raw) return null;
+      const parsed = GeminiProviderConfigSchema.safeParse(raw);
+      if (!parsed.success) return null;
+      return parsed.data;
+    }
+  }
+}
+
+function providerIdentity(type: TranslationProvider, settings: Settings): Record<string, unknown> {
+  if (type === 'openai') {
+    return {
+      type,
+      baseUrl: settings.channels.openai?.baseUrl ?? '',
+      model: settings.channels.openai?.model ?? '',
+    };
+  }
+  if (type === 'claude') {
+    return { type, model: settings.channels.claude?.model ?? '' };
+  }
+  if (type === 'gemini') {
+    return { type, model: settings.channels.gemini?.model ?? '' };
+  }
+  return { type };
 }
 
 const CEFR_LEVELS: readonly CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
@@ -185,6 +257,126 @@ const subtitleEnhanceInFlight = new Map<string, Promise<SubtitleEnhanceOutput>>(
 const keywordSelectInFlight = new Map<string, Promise<string[]>>();
 const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
 const dictionaryService = new DictionaryService();
+
+async function getKeywordsForText(options: {
+  settings: Settings;
+  text: string;
+  sourceLang: EnhanceWebPayload['sourceLang'];
+  targetLang: EnhanceWebPayload['targetLang'];
+  userLevel: CEFRLevel;
+  scene: 'subtitle' | 'web';
+  maxItems?: number;
+}): Promise<string[]> {
+  const { settings, text, sourceLang, targetLang, userLevel, scene, maxItems } = options;
+
+  const channel = settings.keywordProvider;
+  const providerConfig = getChatProviderConfig(settings, channel);
+  if (!providerConfig) return [];
+
+  const provider = getChatProvider(channel, providerConfig);
+
+  const cacheKey = makeCacheKey('SELECT_KEYWORDS', {
+    v: 2,
+    provider: providerIdentity(channel, settings),
+    prompt: {
+      text,
+      sourceLang,
+      targetLang,
+      userLevel,
+      scene,
+    },
+  });
+
+  return getOrRunCachedTask(keywordSelectCache, keywordSelectInFlight, cacheKey, {
+    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
+    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
+    run: async () => {
+      try {
+        const prompt = buildKeywordSelectPrompt({
+          text,
+          sourceLang: sourceLang ?? settings.targetLanguage,
+          targetLang: targetLang ?? settings.nativeLanguage,
+          userLevel,
+          scene,
+        });
+
+        const response = await runWithChannelConcurrency(settings, channel, () =>
+          provider.chat([{ role: 'user', content: prompt }], {
+            temperature: 0.1,
+            maxTokens: 250,
+          })
+        );
+
+        const responseText = response.choices?.[0]?.message?.content ?? '';
+        const parsed = parseKeywordSelectResponse(responseText);
+        const filterOptions: { userLevel: CEFRLevel; scene: 'subtitle' | 'web'; maxItems?: number } = {
+          userLevel,
+          scene,
+        };
+        if (typeof maxItems === 'number') {
+          filterOptions.maxItems = maxItems;
+        }
+        const filtered = filterSelectedKeywords(parsed.keywords, filterOptions);
+        return { value: filtered, ok: parsed.ok };
+      } catch {
+        return { value: [], ok: false };
+      }
+    },
+  });
+}
+
+async function translateTerms(options: {
+  settings: Settings;
+  terms: string[];
+  sourceLang: string;
+  targetLang: string;
+}): Promise<string[]> {
+  const { settings } = options;
+  const translationProvider = settings.translationProvider;
+  const terms = options.terms.map((term) => term.trim()).filter(Boolean);
+  if (terms.length === 0) return [];
+
+  if (translationProvider === 'google') {
+    return runWithChannelConcurrency(settings, 'google', async () =>
+      googleTranslateProvider.translateList(terms, { from: options.sourceLang, to: options.targetLang })
+    );
+  }
+  if (translationProvider === 'bing') {
+    return runWithChannelConcurrency(settings, 'bing', async () =>
+      bingTranslateProvider.translateList(terms, { from: options.sourceLang, to: options.targetLang })
+    );
+  }
+
+  if (!isLLMProvider(translationProvider)) {
+    return terms;
+  }
+
+  const providerConfig = getChatProviderConfig(settings, translationProvider);
+  if (!providerConfig) return terms;
+  const provider = getChatProvider(translationProvider, providerConfig);
+
+  const prompt = buildTermTranslatePrompt({
+    terms,
+    sourceLang: options.sourceLang,
+    targetLang: options.targetLang,
+  });
+
+  try {
+    const response = await runWithChannelConcurrency(settings, translationProvider, () =>
+      provider.chat([{ role: 'user', content: prompt }], {
+        temperature: 0,
+        maxTokens: 400,
+      })
+    );
+
+    const responseText = response.choices?.[0]?.message?.content ?? '';
+    const parsed = parseTermTranslateResponse(responseText);
+    const translations = parsed.translations;
+    return terms.map((term) => translations[term] ?? term);
+  } catch {
+    return terms;
+  }
+}
 
 type CaptionRequestCacheEntry = { params: string; timestamp: number };
 const YOUTUBE_CAPTION_PARAMS_TTL_MS = 10 * 60 * 1000;
@@ -261,7 +453,22 @@ registry.register('REQUEST_HOST_PERMISSION', async (payload) => {
 });
 
 registry.register('TEST_PROVIDER_CONNECTION', async (payload) => {
-  const originPattern = normalizeOriginToHostPattern(payload.provider.baseUrl);
+  const origin = (() => {
+    switch (payload.type) {
+      case 'openai':
+        return payload.config.baseUrl;
+      case 'claude':
+        return payload.config.baseUrl ?? 'https://api.anthropic.com/v1';
+      case 'gemini':
+        return payload.config.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta';
+      case 'google':
+        return 'https://translate.googleapis.com';
+      case 'bing':
+        return 'https://www.bing.com';
+    }
+  })();
+
+  const originPattern = normalizeOriginToHostPattern(origin);
   let granted = false;
   try {
     granted = await browser.permissions.request({ origins: [originPattern] });
@@ -276,8 +483,21 @@ registry.register('TEST_PROVIDER_CONNECTION', async (payload) => {
     throw new MessageError({ code: 'PERMISSION_DENIED', message: 'Permission denied' });
   }
 
-  const provider = new OpenAICompatibleProvider(payload.provider);
-  const check = await provider.testConnection();
+  const check = await (async () => {
+    switch (payload.type) {
+      case 'openai':
+        return new OpenAICompatibleProvider(payload.config).testConnection();
+      case 'claude':
+        return new ClaudeProvider(payload.config).testConnection();
+      case 'gemini':
+        return new GeminiProvider(payload.config).testConnection();
+      case 'google':
+        return googleTranslateProvider.testConnection();
+      case 'bing':
+        return bingTranslateProvider.testConnection();
+    }
+  })();
+
   if (check.ok) return true as const;
 
   throw new MessageError({ code: check.error.code, message: check.error.message });
@@ -291,52 +511,13 @@ registry.register('SELECT_KEYWORDS', async (payload) => {
   const userLevel = payload.userLevel ?? settings.proficiencyLevel;
   const scene = payload.scene ?? 'subtitle';
 
-  const provider = getProvider(settings.provider);
-  if (!provider) return [];
-
-  const cacheKey = makeCacheKey('SELECT_KEYWORDS', {
-    v: 1,
-    provider: { baseUrl: settings.provider?.baseUrl, model: settings.provider?.model },
-    prompt: {
-      text,
-      sourceLang,
-      targetLang,
-      userLevel,
-      scene,
-    },
-  });
-
-  return getOrRunCachedTask(keywordSelectCache, keywordSelectInFlight, cacheKey, {
-    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
-    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
-    run: async () => {
-      try {
-        const providerConfig = settings.provider;
-        if (!providerConfig) return { value: [], ok: false };
-
-        const prompt = buildKeywordSelectPrompt({
-          text,
-          sourceLang,
-          targetLang,
-          userLevel,
-          scene,
-        });
-
-        const response = await runWithModelConcurrency(settings, providerConfig, () =>
-          provider.chat([{ role: 'user', content: prompt }], {
-            temperature: 0.1,
-            maxTokens: 250,
-          })
-        );
-
-        const responseText = response.choices?.[0]?.message?.content ?? '';
-        const parsed = parseKeywordSelectResponse(responseText);
-        const filtered = filterSelectedKeywords(parsed.keywords, { userLevel, scene, maxItems: 8 });
-        return { value: filtered, ok: parsed.ok };
-      } catch {
-        return { value: [], ok: false };
-      }
-    },
+  return getKeywordsForText({
+    settings,
+    text,
+    sourceLang,
+    targetLang,
+    userLevel,
+    scene,
   });
 });
 
@@ -345,27 +526,21 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const content = payload.content;
   const sourceLang = payload.sourceLang ?? settings.targetLanguage;
   const targetLang = payload.targetLang ?? settings.nativeLanguage;
-  const defaultRange = getDefaultDifficultyRange(settings.proficiencyLevel);
-  const difficultyMin = payload.difficultyMin ?? defaultRange.difficultyMin;
-  const difficultyMax = payload.difficultyMax ?? defaultRange.difficultyMax;
-  const maxWords = payload.maxWords;
-
-  const provider = getProvider(settings.provider);
-  if (!provider) {
-    const fallbackResult = validateWebEnhanceOutput(undefined);
-    return fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-  }
+  const maxWords = payload.maxWords ?? 15;
+  const userLevel = settings.proficiencyLevel;
 
   const cacheKey = makeCacheKey('ENHANCE_WEB', {
-    v: 1,
-    provider: { baseUrl: settings.provider?.baseUrl, model: settings.provider?.model },
-    prompt: {
+    v: 2,
+    providers: {
+      keyword: providerIdentity(settings.keywordProvider, settings),
+      translation: providerIdentity(settings.translationProvider, settings),
+    },
+    params: {
       content,
       sourceLang,
       targetLang,
-      difficultyMin,
-      difficultyMax,
-      maxWords: maxWords ?? 15,
+      userLevel,
+      maxWords,
     },
   });
 
@@ -374,37 +549,35 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        const providerConfig = settings.provider;
-        if (!providerConfig) {
-          const fallbackResult = validateWebEnhanceOutput(undefined);
-          const fallbackValue = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-          return { value: fallbackValue, ok: false };
-        }
-
-        const prompt = buildWebEnhancePrompt({
-          content,
+        const keywords = await getKeywordsForText({
+          settings,
+          text: content,
           sourceLang,
           targetLang,
-          difficultyMin,
-          difficultyMax,
-          ...(maxWords !== undefined && { maxWords }),
+          userLevel,
+          scene: 'web',
+          maxItems: maxWords,
         });
 
-        const response = await runWithModelConcurrency(settings, providerConfig, () =>
-          provider.chat([{ role: 'user', content: prompt }], {
-            temperature: 0.2,
-            maxTokens: 2000,
-          })
-        );
+        if (!keywords.length) {
+          return { value: { content_result: content, convert_word: [] }, ok: false };
+        }
 
-        const responseText = response.choices?.[0]?.message?.content ?? '';
-        const validated = validateWebEnhanceOutput(responseText);
-        const value = validated.ok ? validated.value : validated.fallback;
-        return { value, ok: validated.ok };
+        const translations = await translateTerms({
+          settings,
+          terms: keywords,
+          sourceLang: String(sourceLang ?? settings.targetLanguage),
+          targetLang: String(targetLang ?? settings.nativeLanguage),
+        });
+
+        const convert_word = keywords.map((original, idx) => ({
+          original,
+          converted: translations[idx] ?? original,
+        }));
+
+        return { value: { content_result: content, convert_word }, ok: true };
       } catch {
-        const fallbackResult = validateWebEnhanceOutput(undefined);
-        const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-        return { value, ok: false };
+        return { value: { content_result: content, convert_word: [] }, ok: false };
       }
     },
   });
@@ -418,16 +591,19 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
   const difficultyLevel = payload.difficultyLevel ?? settings.proficiencyLevel;
   const mode = payload.mode ?? 'bilingual';
 
-  const provider = getProvider(settings.provider);
-  if (!provider) {
-    const fallbackResult = validateSubtitleEnhanceOutput(undefined);
-    return fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-  }
+  const translationProvider = settings.translationProvider;
+  const enhanceChannel: LLMProviderChannel | null = isLLMProvider(translationProvider)
+    ? translationProvider
+    : settings.keywordProvider;
+  const enhanceConfig = enhanceChannel ? getChatProviderConfig(settings, enhanceChannel) : null;
 
   const cacheKey = makeCacheKey('ENHANCE_SUBTITLE', {
-    v: 1,
-    provider: { baseUrl: settings.provider?.baseUrl, model: settings.provider?.model },
-    prompt: {
+    v: 2,
+    providers: {
+      enhance: enhanceChannel ? providerIdentity(enhanceChannel, settings) : { type: 'none' },
+      translation: providerIdentity(translationProvider, settings),
+    },
+    params: {
       subtitle,
       sourceLang,
       targetLang,
@@ -441,11 +617,71 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        const providerConfig = settings.provider;
-        if (!providerConfig) {
-          const fallbackResult = validateSubtitleEnhanceOutput(undefined);
-          const fallbackValue = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
-          return { value: fallbackValue, ok: false };
+        if (!enhanceChannel || !enhanceConfig) {
+          if (mode === 'bilingual') {
+            const translated = await (async () => {
+              if (translationProvider === 'google') {
+                return runWithChannelConcurrency(settings, 'google', () =>
+                  googleTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(targetLang) })
+                );
+              }
+              if (translationProvider === 'bing') {
+                return runWithChannelConcurrency(settings, 'bing', () =>
+                  bingTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(targetLang) })
+                );
+              }
+              return '';
+            })();
+
+            return {
+              value: { line1_final: subtitle, ...(translated ? { line2_final: translated } : {}) },
+              ok: Boolean(translated),
+            };
+          }
+
+          return { value: { line1_final: subtitle }, ok: false };
+        }
+
+        const provider = getChatProvider(enhanceChannel, enhanceConfig);
+
+        if (mode === 'bilingual' && !isLLMProvider(translationProvider)) {
+          const prompt = buildSubtitleEnhancePrompt({
+            subtitle,
+            sourceLang,
+            targetLang,
+            difficultyLevel,
+            mode: 'single',
+          });
+
+          const response = await runWithChannelConcurrency(settings, enhanceChannel, () =>
+            provider.chat([{ role: 'user', content: prompt }], {
+              temperature: 0.2,
+              maxTokens: 300,
+            })
+          );
+
+          const responseText = response.choices?.[0]?.message?.content ?? '';
+          const validated = validateSubtitleEnhanceOutput(responseText);
+          const enhancedLine = validated.ok ? validated.value.line1_final : subtitle;
+
+          const translated = await (async () => {
+            if (translationProvider === 'google') {
+              return runWithChannelConcurrency(settings, 'google', () =>
+                googleTranslateProvider.translate(enhancedLine, { from: String(sourceLang), to: String(targetLang) })
+              );
+            }
+            if (translationProvider === 'bing') {
+              return runWithChannelConcurrency(settings, 'bing', () =>
+                bingTranslateProvider.translate(enhancedLine, { from: String(sourceLang), to: String(targetLang) })
+              );
+            }
+            return '';
+          })();
+
+          return {
+            value: { line1_final: enhancedLine, ...(translated ? { line2_final: translated } : {}) },
+            ok: Boolean(translated),
+          };
         }
 
         const prompt = buildSubtitleEnhancePrompt({
@@ -456,7 +692,7 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           mode,
         });
 
-        const response = await runWithModelConcurrency(settings, providerConfig, () =>
+        const response = await runWithChannelConcurrency(settings, enhanceChannel, () =>
           provider.chat([{ role: 'user', content: prompt }], {
             temperature: 0.2,
             maxTokens: 400,
@@ -489,10 +725,14 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
   const sourceLang = settings.targetLanguage;
   const targetLang = settings.nativeLanguage;
   const userLevel = settings.proficiencyLevel;
+  const llmChannel: LLMProviderChannel = isLLMProvider(settings.translationProvider)
+    ? settings.translationProvider
+    : settings.keywordProvider;
+  const llmConfig = getChatProviderConfig(settings, llmChannel);
 
   const cacheKey = makeCacheKey('EXPLAIN_WORD', {
-    v: 2,
-    provider: { baseUrl: settings.provider?.baseUrl, model: settings.provider?.model },
+    v: 3,
+    provider: providerIdentity(llmChannel, settings),
     word,
     sourceLang,
     targetLang,
@@ -525,20 +765,14 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     }
 
     // Fallback to provider-based explanation.
-    const provider = getProvider(settings.provider);
-    if (!provider) {
+    if (!llmConfig) {
       const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
       explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
       return value;
     }
 
     try {
-      const providerConfig = settings.provider;
-      if (!providerConfig) {
-        const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
-        explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
-        return value;
-      }
+      const provider = getChatProvider(llmChannel, llmConfig);
 
       const prompt = buildExplainWordPrompt({
         word,
@@ -548,7 +782,7 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
         userLevel,
       });
 
-      const response = await runWithModelConcurrency(settings, providerConfig, () =>
+      const response = await runWithChannelConcurrency(settings, llmChannel, () =>
         provider.chat([{ role: 'user', content: prompt }], {
           temperature: 0.2,
           maxTokens: 350,
@@ -728,13 +962,18 @@ registry.register('CHAT', async (payload) => {
   cleanupExpiredSessions();
 
   const settings = await getSettings();
-  const provider = getProvider(settings.provider);
-  if (!provider) {
+  const llmChannel: LLMProviderChannel = isLLMProvider(settings.translationProvider)
+    ? settings.translationProvider
+    : settings.keywordProvider;
+  const llmConfig = getChatProviderConfig(settings, llmChannel);
+  if (!llmConfig) {
     throw new MessageError({
       code: 'PROVIDER_NOT_CONFIGURED',
       message: t('error_providerNotConfigured'),
     });
   }
+
+  const provider = getChatProvider(llmChannel, llmConfig);
 
   const sessionId = payload.conversationId ?? generateSessionId();
   let session = chatSessions.get(sessionId);
@@ -765,15 +1004,7 @@ registry.register('CHAT', async (payload) => {
   };
 
   try {
-    const providerConfig = settings.provider;
-    if (!providerConfig) {
-      throw new MessageError({
-        code: 'PROVIDER_NOT_CONFIGURED',
-        message: t('error_providerNotConfigured'),
-      });
-    }
-
-    const response = await runWithModelConcurrency(settings, providerConfig, () =>
+    const response = await runWithChannelConcurrency(settings, llmChannel, () =>
       provider.chat(
         [systemMessage, ...truncatedHistory],
         {

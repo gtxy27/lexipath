@@ -76,7 +76,10 @@ export function createEnhancedElement(
     span.dataset.difficulty = bestWord.difficulty || '';
     span.dataset.renderMode = mode;
 
-    const displayText = mode === 'native-to-target' ? bestWord.converted : matchedOriginal;
+    const displayText =
+      mode === 'native-to-target'
+        ? `${bestWord.converted} (${matchedOriginal})`
+        : matchedOriginal;
     const tooltipText = mode === 'native-to-target' ? matchedOriginal : bestWord.converted;
     span.textContent = displayText;
     span.dataset.tooltip = `${tooltipText}${bestWord.difficulty ? ` (${bestWord.difficulty})` : ''}`;
