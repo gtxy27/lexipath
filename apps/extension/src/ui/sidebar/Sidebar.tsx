@@ -95,14 +95,14 @@ export function Sidebar(): React.ReactElement {
   }, [messages.length]);
 
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-br from-background via-background to-muted/10">
-      <header className="flex items-center justify-between border-b border-border/50 px-4 py-3.5 shadow-lg bg-gradient-to-r from-card/80 via-card/60 to-card/80 backdrop-blur-md supports-[backdrop-filter]:bg-card/60">
+    <div className="flex h-screen flex-col bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      <header className="flex items-center justify-between border-b border-purple-200/50 px-4 py-3.5 shadow-lg bg-gradient-to-r from-white/90 via-purple-50/80 to-white/90 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-           <Avatar className="h-9 w-9 ring-2 ring-primary/20 shadow-md">
+           <Avatar className="h-9 w-9 ring-2 ring-purple-200 shadow-md">
               <AvatarImage src="../../icons/icon.svg" />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground font-bold">LP</AvatarFallback>
+              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">LP</AvatarFallback>
            </Avatar>
-           <h1 className="font-bold text-base bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+           <h1 className="font-bold text-base bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
              {browser.i18n.getMessage('chatTitle')}
            </h1>
         </div>
@@ -112,7 +112,7 @@ export function Sidebar(): React.ReactElement {
             size="icon"
             onClick={handleClear}
             title={browser.i18n.getMessage('chatClear')}
-            className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-lg"
+            className="h-9 w-9 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-lg"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -121,9 +121,9 @@ export function Sidebar(): React.ReactElement {
 
       <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
-          <div className="flex h-[calc(100vh-140px)] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
-            <div className="p-4 rounded-full bg-gradient-to-br from-primary/10 to-primary/5">
-              <Bot className="h-16 w-16 opacity-30 text-primary" />
+          <div className="flex h-[calc(100vh-140px)] flex-col items-center justify-center gap-3 text-center text-gray-500">
+            <div className="p-4 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100">
+              <Bot className="h-16 w-16 text-indigo-500" />
             </div>
             <p className="text-sm font-medium">
               {browser.i18n.getMessage('chatEmpty')}
@@ -141,11 +141,11 @@ export function Sidebar(): React.ReactElement {
               >
                  <Avatar className={cn(
                    "h-8 w-8 mt-1 border-2 shadow-md transition-all duration-200",
-                   msg.role === 'user' ? "border-primary/30" : "border-muted/30"
+                   msg.role === 'user' ? "border-purple-200" : "border-gray-200"
                  )}>
                     <AvatarFallback className={msg.role === 'user'
-                      ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
-                      : "bg-gradient-to-br from-muted to-muted/80"
+                      ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white"
+                      : "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600"
                     }>
                        {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                     </AvatarFallback>
@@ -155,8 +155,8 @@ export function Sidebar(): React.ReactElement {
                   className={cn(
                     "rounded-2xl px-4 py-3 text-sm shadow-lg transition-all duration-200 hover:shadow-xl",
                     msg.role === 'user'
-                      ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground"
-                      : "bg-gradient-to-br from-card to-card/90 text-foreground border border-border/50 backdrop-blur-sm"
+                      ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white"
+                      : "bg-white text-gray-800 border border-purple-100"
                   )}
                 >
                   <div className="whitespace-pre-wrap break-words leading-relaxed">
@@ -164,8 +164,8 @@ export function Sidebar(): React.ReactElement {
                   </div>
                   <div
                     className={cn(
-                      "text-[10px] mt-1.5 opacity-60",
-                      msg.role === 'user' ? "text-primary-foreground" : "text-muted-foreground"
+                      "text-[10px] mt-1.5",
+                      msg.role === 'user' ? "text-white/70" : "text-gray-400"
                     )}
                   >
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -175,15 +175,15 @@ export function Sidebar(): React.ReactElement {
             ))}
             {isLoading && (
                <div className="flex gap-3 mr-auto max-w-[85%] animate-in slide-in-from-bottom-2 duration-300">
-                  <Avatar className="h-8 w-8 mt-1 border-2 border-muted/30 shadow-md">
-                     <AvatarFallback className="bg-gradient-to-br from-muted to-muted/80">
+                  <Avatar className="h-8 w-8 mt-1 border-2 border-gray-200 shadow-md">
+                     <AvatarFallback className="bg-gradient-to-br from-gray-100 to-gray-200 text-gray-600">
                         <Bot className="h-4 w-4" />
                      </AvatarFallback>
                   </Avatar>
-                  <div className="rounded-2xl px-4 py-3.5 bg-gradient-to-br from-card to-card/90 shadow-lg border border-border/50 backdrop-blur-sm flex items-center gap-1.5">
-                     <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]"></span>
-                     <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]"></span>
-                     <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"></span>
+                  <div className="rounded-2xl px-4 py-3.5 bg-white shadow-lg border border-purple-100 flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce [animation-delay:-0.3s]"></span>
+                     <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce [animation-delay:-0.15s]"></span>
+                     <span className="w-2 h-2 rounded-full bg-pink-400 animate-bounce"></span>
                   </div>
                </div>
             )}
@@ -193,13 +193,13 @@ export function Sidebar(): React.ReactElement {
       </ScrollArea>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-destructive/10 to-destructive/5 text-destructive text-xs border-t border-destructive/20 backdrop-blur-sm">
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-50 to-rose-50 text-red-600 text-xs border-t border-red-200">
           <AlertCircle className="h-4 w-4 animate-pulse" />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="p-4 border-t border-border/50 bg-gradient-to-br from-card/80 to-card/60 backdrop-blur-md shadow-2xl">
+      <div className="p-4 border-t border-purple-200/50 bg-gradient-to-r from-white/90 via-purple-50/80 to-white/90 backdrop-blur-md shadow-2xl">
         <div className="flex gap-2.5">
           <Input
             ref={inputRef}
@@ -208,15 +208,15 @@ export function Sidebar(): React.ReactElement {
             onKeyDown={handleKeyDown}
             placeholder={browser.i18n.getMessage('chatPlaceholder')}
             disabled={isLoading}
-            className="flex-1 border-border/50 bg-background/50 backdrop-blur-sm shadow-sm focus-visible:ring-primary/50 transition-all duration-200"
+            className="flex-1 border-purple-200 bg-white/80 backdrop-blur-sm shadow-sm focus-visible:ring-purple-400 transition-all duration-200"
           />
           <Button
             onClick={handleSend}
             disabled={!inputValue.trim() || isLoading}
             size="icon"
             className={cn(
-               "shrink-0 shadow-md transition-all duration-200 hover:shadow-lg",
-               !inputValue.trim() && !isLoading && "opacity-50"
+               "shrink-0 shadow-lg transition-all duration-200 hover:shadow-xl bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700",
+               (!inputValue.trim() && !isLoading) && "opacity-50"
             )}
           >
              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

@@ -770,8 +770,11 @@ export function Options(): React.ReactNode {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/10">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
+          <p className="text-sm text-gray-600">Loading settings...</p>
+        </div>
       </div>
     );
   }
@@ -779,22 +782,42 @@ export function Options(): React.ReactNode {
   if (!form) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 py-8">
-      <div className="container mx-auto py-8 max-w-4xl">
-        <Card className="min-h-[600px] border border-border/50 shadow-2xl">
-          <CardHeader className="border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
-            <CardTitle className="text-3xl font-bold">{t('settingsTitle')}</CardTitle>
-            <CardDescription>
-              Configure your LexiPath experience.
-            </CardDescription>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-8">
+      <div className="container mx-auto max-w-5xl px-4">
+        <Card className="border border-purple-200/50 shadow-2xl overflow-hidden bg-white/80 backdrop-blur-sm">
+          <CardHeader className="border-b border-purple-200/50 bg-gradient-to-r from-white/90 via-purple-50/80 to-white/90 pb-6 pt-8">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg">
+                <svg className="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <CardTitle className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  {t('settingsTitle')}
+                </CardTitle>
+                <CardDescription className="mt-1 text-sm text-gray-600">
+                  Configure your LexiPath experience.
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6 pb-8">
             <Tabs defaultValue="general" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1">
-                <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('languageSettings')}</TabsTrigger>
-                <TabsTrigger value="providers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('providerSettings')}</TabsTrigger>
-                <TabsTrigger value="routing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('optionsRoutingTitle')}</TabsTrigger>
-                <TabsTrigger value="rules" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('siteRules')}</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4 bg-purple-50/50 p-1 rounded-lg shadow-sm border border-purple-200/50">
+                <TabsTrigger value="general" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200">
+                  {t('languageSettings')}
+                </TabsTrigger>
+                <TabsTrigger value="providers" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200">
+                  {t('providerSettings')}
+                </TabsTrigger>
+                <TabsTrigger value="routing" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200">
+                  {t('optionsRoutingTitle')}
+                </TabsTrigger>
+                <TabsTrigger value="rules" className="data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200">
+                  {t('siteRules')}
+                </TabsTrigger>
               </TabsList>
 
             {/* --- GENERAL TAB --- */}
@@ -1131,8 +1154,12 @@ export function Options(): React.ReactNode {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="flex justify-end border-t border-border/50 pt-6 bg-gradient-to-r from-muted/10 to-transparent">
-           <Button onClick={save} disabled={saving} className="shadow-md hover:shadow-lg transition-shadow px-8">
+        <CardFooter className="flex justify-end border-t border-purple-200/50 pt-6 bg-gradient-to-r from-gray-50 to-purple-50/30">
+           <Button
+             onClick={save}
+             disabled={saving}
+             className="shadow-lg hover:shadow-xl transition-all duration-200 bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-8"
+           >
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {saving ? t('optionsSaving') : t('optionsSaveButton')}
            </Button>
