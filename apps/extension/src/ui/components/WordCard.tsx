@@ -82,44 +82,45 @@ export function WordCard({
     return "outline";
   };
   
-  // Custom difficulty colors to match original design intent better than standard variants
   const getDifficultyClass = (difficulty?: string) => {
       if (!difficulty) return "bg-muted text-muted-foreground hover:bg-muted/80";
       const lower = difficulty.toLowerCase();
       if (lower.includes('easy') || lower === 'a1' || lower === 'a2') {
-        return "bg-green-100 text-green-700 hover:bg-green-200 border-transparent";
+        return "bg-gradient-to-br from-green-400 to-emerald-500 text-white border-0 shadow-sm";
       }
       if (lower.includes('medium') || lower === 'b1' || lower === 'b2') {
-        return "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-transparent";
+        return "bg-gradient-to-br from-yellow-400 to-orange-500 text-white border-0 shadow-sm";
       }
       if (lower.includes('hard') || lower === 'c1' || lower === 'c2') {
-        return "bg-red-100 text-red-700 hover:bg-red-200 border-transparent";
+        return "bg-gradient-to-br from-red-400 to-rose-600 text-white border-0 shadow-sm";
       }
       return "bg-muted text-muted-foreground hover:bg-muted/80";
   }
 
   return (
-    <Card className="w-full min-w-[280px] max-w-[400px] shadow-lg border-0">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 pt-4 px-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold leading-none">{data.word}</h3>
+    <Card className="w-full min-w-[280px] max-w-[400px] shadow-2xl border-0 overflow-hidden bg-gradient-to-br from-card via-card to-card/90 backdrop-blur-sm">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent pointer-events-none"></div>
+
+      <CardHeader className="relative flex flex-row items-start justify-between space-y-0 pb-3 pt-5 px-5 border-b border-border/50 bg-gradient-to-br from-muted/30 to-transparent">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2.5">
+            <h3 className="text-2xl font-bold leading-none bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text">{data.word}</h3>
             {data.difficulty && (
-              <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5", getDifficultyClass(data.difficulty))}>
+              <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 h-5 font-semibold", getDifficultyClass(data.difficulty))}>
                 {data.difficulty}
               </Badge>
             )}
           </div>
           {data.phonetic && (
-            <p className="text-sm text-muted-foreground font-mono">{data.phonetic}</p>
+            <p className="text-sm text-muted-foreground/80 font-mono italic">{data.phonetic}</p>
           )}
         </div>
-        
+
         {mode === 'click' && onClose && (
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 -mr-2 -mt-2 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 -mr-2 -mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-lg"
             onClick={() => {
               stop();
               onClose();
@@ -131,39 +132,41 @@ export function WordCard({
         )}
       </CardHeader>
 
-      <CardContent className="pb-3 px-4">
-        <p className="text-sm leading-relaxed text-foreground">
+      <CardContent className="relative pb-4 pt-4 px-5 bg-gradient-to-b from-transparent to-muted/10">
+        <p className="text-sm leading-relaxed text-foreground/90">
           {data.definition}
         </p>
       </CardContent>
-      
-      <Separator />
 
-      <CardFooter className="flex items-center justify-between p-2 px-4 bg-muted/20">
+      <Separator className="bg-border/50" />
+
+      <CardFooter className="relative flex items-center justify-between p-3 px-5 bg-gradient-to-br from-muted/20 to-muted/10 backdrop-blur-sm">
         <Button
           variant="ghost"
           size="sm"
           onClick={handleSpeak}
           disabled={isPlayingAudio}
-          className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+          className="h-9 gap-2 px-3 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200 rounded-lg group"
           aria-label={browser.i18n.getMessage('wordCard_pronounce')}
         >
-          <Volume2 className={cn("h-4 w-4", isPlayingAudio && "animate-pulse text-primary")} />
+          <Volume2 className={cn("h-4 w-4 transition-all duration-200", isPlayingAudio ? "animate-pulse text-primary scale-110" : "group-hover:scale-110")} />
           <span className="text-xs font-medium">{browser.i18n.getMessage('wordCard_pronounce')}</span>
         </Button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleFavoriteToggle}
             className={cn(
-              "h-8 w-8 p-0",
-              isFavorited ? "text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50" : "text-muted-foreground hover:text-foreground"
+              "h-9 w-9 p-0 rounded-lg transition-all duration-200",
+              isFavorited
+                ? "text-yellow-500 hover:text-yellow-600 bg-yellow-500/10 hover:bg-yellow-500/20 shadow-sm"
+                : "text-muted-foreground hover:text-yellow-500 hover:bg-yellow-500/10"
             )}
             aria-label={browser.i18n.getMessage('wordCard_favorite')}
           >
-            <Star className={cn("h-4 w-4", isFavorited && "fill-current")} />
+            <Star className={cn("h-4 w-4 transition-all duration-200", isFavorited && "fill-current animate-in zoom-in-50")} />
           </Button>
 
           <Button
@@ -171,14 +174,14 @@ export function WordCard({
             size="sm"
             onClick={handleLearnedToggle}
             className={cn(
-              "h-8 gap-1.5 px-2",
-               isLearned 
-                ? "text-green-600 hover:text-green-700 hover:bg-green-50" 
-                : "text-muted-foreground hover:text-foreground"
+              "h-9 gap-1.5 px-3 rounded-lg transition-all duration-200",
+               isLearned
+                ? "text-green-600 hover:text-green-700 bg-green-500/10 hover:bg-green-500/20 shadow-sm"
+                : "text-muted-foreground hover:text-green-600 hover:bg-green-500/10"
             )}
             aria-label={browser.i18n.getMessage('wordCard_markLearned')}
           >
-             <Check className="h-4 w-4" />
+             <Check className={cn("h-4 w-4 transition-all duration-200", isLearned && "animate-in zoom-in-50")} />
              <span className="text-xs font-medium">{browser.i18n.getMessage('wordCard_markLearned')}</span>
           </Button>
         </div>

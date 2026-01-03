@@ -95,14 +95,14 @@ export function Sidebar(): React.ReactElement {
   }, [messages.length]);
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <header className="flex items-center justify-between border-b px-4 py-3 shadow-sm bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="flex items-center gap-2">
-           <Avatar className="h-8 w-8">
+    <div className="flex h-screen flex-col bg-gradient-to-br from-background via-background to-muted/10">
+      <header className="flex items-center justify-between border-b border-border/50 px-4 py-3.5 shadow-lg bg-gradient-to-r from-card/80 via-card/60 to-card/80 backdrop-blur-md supports-[backdrop-filter]:bg-card/60">
+        <div className="flex items-center gap-2.5">
+           <Avatar className="h-9 w-9 ring-2 ring-primary/20 shadow-md">
               <AvatarImage src="../../icons/icon.svg" />
-              <AvatarFallback>LP</AvatarFallback>
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground font-bold">LP</AvatarFallback>
            </Avatar>
-           <h1 className="font-semibold text-sm">
+           <h1 className="font-bold text-base bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
              {browser.i18n.getMessage('chatTitle')}
            </h1>
         </div>
@@ -112,7 +112,7 @@ export function Sidebar(): React.ReactElement {
             size="icon"
             onClick={handleClear}
             title={browser.i18n.getMessage('chatClear')}
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200 rounded-lg"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -121,9 +121,11 @@ export function Sidebar(): React.ReactElement {
 
       <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
-          <div className="flex h-[calc(100vh-140px)] flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <Bot className="h-12 w-12 opacity-20" />
-            <p className="text-sm">
+          <div className="flex h-[calc(100vh-140px)] flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+            <div className="p-4 rounded-full bg-gradient-to-br from-primary/10 to-primary/5">
+              <Bot className="h-16 w-16 opacity-30 text-primary" />
+            </div>
+            <p className="text-sm font-medium">
               {browser.i18n.getMessage('chatEmpty')}
             </p>
           </div>
@@ -133,22 +135,28 @@ export function Sidebar(): React.ReactElement {
               <div
                 key={`${msg.timestamp}-${index}`}
                 className={cn(
-                  "flex gap-3 max-w-[85%]",
+                  "flex gap-3 max-w-[85%] animate-in slide-in-from-bottom-2 duration-300",
                   msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
                 )}
               >
-                 <Avatar className="h-8 w-8 mt-1 border">
-                    <AvatarFallback className={msg.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted"}>
+                 <Avatar className={cn(
+                   "h-8 w-8 mt-1 border-2 shadow-md transition-all duration-200",
+                   msg.role === 'user' ? "border-primary/30" : "border-muted/30"
+                 )}>
+                    <AvatarFallback className={msg.role === 'user'
+                      ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
+                      : "bg-gradient-to-br from-muted to-muted/80"
+                    }>
                        {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                     </AvatarFallback>
                  </Avatar>
-                 
+
                 <div
                   className={cn(
-                    "rounded-lg px-4 py-2.5 text-sm shadow-sm",
+                    "rounded-2xl px-4 py-3 text-sm shadow-lg transition-all duration-200 hover:shadow-xl",
                     msg.role === 'user'
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground"
+                      ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground"
+                      : "bg-gradient-to-br from-card to-card/90 text-foreground border border-border/50 backdrop-blur-sm"
                   )}
                 >
                   <div className="whitespace-pre-wrap break-words leading-relaxed">
@@ -156,7 +164,7 @@ export function Sidebar(): React.ReactElement {
                   </div>
                   <div
                     className={cn(
-                      "text-[10px] mt-1 opacity-70",
+                      "text-[10px] mt-1.5 opacity-60",
                       msg.role === 'user' ? "text-primary-foreground" : "text-muted-foreground"
                     )}
                   >
@@ -166,16 +174,16 @@ export function Sidebar(): React.ReactElement {
               </div>
             ))}
             {isLoading && (
-               <div className="flex gap-3 mr-auto max-w-[85%]">
-                  <Avatar className="h-8 w-8 mt-1 border">
-                     <AvatarFallback className="bg-muted">
+               <div className="flex gap-3 mr-auto max-w-[85%] animate-in slide-in-from-bottom-2 duration-300">
+                  <Avatar className="h-8 w-8 mt-1 border-2 border-muted/30 shadow-md">
+                     <AvatarFallback className="bg-gradient-to-br from-muted to-muted/80">
                         <Bot className="h-4 w-4" />
                      </AvatarFallback>
                   </Avatar>
-                  <div className="rounded-lg px-4 py-3 bg-muted shadow-sm flex items-center gap-1">
-                     <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.3s]"></span>
-                     <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.15s]"></span>
-                     <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"></span>
+                  <div className="rounded-2xl px-4 py-3.5 bg-gradient-to-br from-card to-card/90 shadow-lg border border-border/50 backdrop-blur-sm flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]"></span>
+                     <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]"></span>
+                     <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"></span>
                   </div>
                </div>
             )}
@@ -185,14 +193,14 @@ export function Sidebar(): React.ReactElement {
       </ScrollArea>
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-destructive/10 text-destructive text-xs border-t border-destructive/20">
-          <AlertCircle className="h-4 w-4" />
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-destructive/10 to-destructive/5 text-destructive text-xs border-t border-destructive/20 backdrop-blur-sm">
+          <AlertCircle className="h-4 w-4 animate-pulse" />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="p-4 border-t bg-background">
-        <div className="flex gap-2">
+      <div className="p-4 border-t border-border/50 bg-gradient-to-br from-card/80 to-card/60 backdrop-blur-md shadow-2xl">
+        <div className="flex gap-2.5">
           <Input
             ref={inputRef}
             value={inputValue}
@@ -200,14 +208,14 @@ export function Sidebar(): React.ReactElement {
             onKeyDown={handleKeyDown}
             placeholder={browser.i18n.getMessage('chatPlaceholder')}
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 border-border/50 bg-background/50 backdrop-blur-sm shadow-sm focus-visible:ring-primary/50 transition-all duration-200"
           />
           <Button
             onClick={handleSend}
             disabled={!inputValue.trim() || isLoading}
             size="icon"
             className={cn(
-               "shrink-0",
+               "shrink-0 shadow-md transition-all duration-200 hover:shadow-lg",
                !inputValue.trim() && !isLoading && "opacity-50"
             )}
           >

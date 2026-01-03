@@ -770,8 +770,8 @@ export function Options(): React.ReactNode {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted/10">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
@@ -779,22 +779,23 @@ export function Options(): React.ReactNode {
   if (!form) return null;
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <Card className="min-h-[600px] border-none shadow-none">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold">{t('settingsTitle')}</CardTitle>
-          <CardDescription>
-            Configure your LexiPath experience.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="general">{t('languageSettings')}</TabsTrigger>
-              <TabsTrigger value="providers">{t('providerSettings')}</TabsTrigger>
-              <TabsTrigger value="routing">{t('optionsRoutingTitle')}</TabsTrigger>
-              <TabsTrigger value="rules">{t('siteRules')}</TabsTrigger>
-            </TabsList>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10 py-8">
+      <div className="container mx-auto py-8 max-w-4xl">
+        <Card className="min-h-[600px] border border-border/50 shadow-2xl">
+          <CardHeader className="border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
+            <CardTitle className="text-3xl font-bold">{t('settingsTitle')}</CardTitle>
+            <CardDescription>
+              Configure your LexiPath experience.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="general" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1">
+                <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('languageSettings')}</TabsTrigger>
+                <TabsTrigger value="providers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('providerSettings')}</TabsTrigger>
+                <TabsTrigger value="routing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('optionsRoutingTitle')}</TabsTrigger>
+                <TabsTrigger value="rules" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('siteRules')}</TabsTrigger>
+              </TabsList>
 
             {/* --- GENERAL TAB --- */}
             <TabsContent value="general" className="space-y-6 pt-4">
@@ -1130,14 +1131,15 @@ export function Options(): React.ReactNode {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="flex justify-end border-t pt-6">
-           <Button onClick={save} disabled={saving}>
+        <CardFooter className="flex justify-end border-t border-border/50 pt-6 bg-gradient-to-r from-muted/10 to-transparent">
+           <Button onClick={save} disabled={saving} className="shadow-md hover:shadow-lg transition-shadow px-8">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {saving ? t('optionsSaving') : t('optionsSaveButton')}
            </Button>
         </CardFooter>
       </Card>
       <Toaster />
+    </div>
     </div>
   );
 }
