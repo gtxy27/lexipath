@@ -4,6 +4,7 @@ import type { SupportedPlatform } from '../subtitle-platform';
 export type SubtitleFetchResult = {
   cues: Cue[];
   statusMessage?: string;
+  lang?: string;
 };
 
 export interface SubtitleProvider {
@@ -16,4 +17,3 @@ export interface SubtitleProvider {
   showNativeCaptions?(): void;
   destroy(): void;
 }
-

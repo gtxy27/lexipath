@@ -103,6 +103,7 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
       this.startYouTubeParamsWatch(videoId);
       return {
         cues,
+        lang: this.settings.targetLanguage,
         statusMessage: getI18nMessage(
           'subtitle_youtubeEnableCaptions',
           undefined,
@@ -111,7 +112,7 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
       };
     }
 
-    return { cues };
+    return { cues, lang: cues[0]?.lang ?? this.settings.targetLanguage };
   }
 
   private kickYouTubeCaptionsRequest(options?: { forceRefreshIfAlreadyEnabled?: boolean }): void {

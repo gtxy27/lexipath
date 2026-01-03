@@ -45,6 +45,7 @@ export class SubtitleController {
   private statusMessage = '';
   private cuesGeneration = 0;
   private subtitlesFetchPromise: Promise<void> | null = null;
+  private subtitleLanguage = '';
   private wordExplainCache = new Map<string, WordCardData>();
   private wordExplainInFlight = new Map<string, Promise<WordCardData>>();
   private currentSubtitleContext = '';
@@ -193,6 +194,7 @@ export class SubtitleController {
     this.videoElement?.removeEventListener('pause', this.handleVideoPause);
     this.videoElement = null;
     this.cues = [];
+    this.subtitleLanguage = '';
     this.enhancedCues.clear();
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
@@ -221,16 +223,17 @@ export class SubtitleController {
       const result = await this.provider.fetchSubtitles();
       this.statusMessage = result.statusMessage ?? '';
 
-      this.setCues(result.cues);
+      this.setCues(result.cues, result.lang);
       console.log(`[SubtitleController] Fetched ${result.cues.length} subtitle cues`);
     } catch (error) {
       console.error('[SubtitleController] Failed to fetch subtitles:', error);
     }
   }
 
-  private setCues(cues: Cue[]): void {
+  private setCues(cues: Cue[], lang?: string): void {
     this.cuesGeneration++;
     this.cues = cues;
+    this.subtitleLanguage = typeof lang === 'string' ? lang : cues[0]?.lang ?? '';
     this.currentCueIndex = -1;
     this.enhancedCues.clear();
     this.cueKeywords.clear();
@@ -312,7 +315,7 @@ export class SubtitleController {
     try {
       const response = await sendMessage('ENHANCE_SUBTITLE', {
         subtitle: cue.text,
-        sourceLang: this.settings.targetLanguage,
+        sourceLang: this.getCueSourceLanguage(cue),
         mode: 'single',
       });
 
@@ -680,7 +683,7 @@ export class SubtitleController {
     const promise = (async () => {
       const response = await sendMessage('ENHANCE_SUBTITLE', {
         subtitle: cue.text,
-        sourceLang: this.settings.targetLanguage,
+        sourceLang: this.getCueSourceLanguage(cue),
         mode: 'bilingual',
       });
 
@@ -703,6 +706,38 @@ export class SubtitleController {
 
     this.bilingualCueInFlight.set(cue.id, promise);
     return promise;
+  }
+
+  private normalizeSupportedLanguageCode(languageCode: string): string | null {
+    const normalized = languageCode.trim().toLowerCase();
+    if (!normalized) return null;
+
+    const parts = normalized.split(/[-_]/).filter(Boolean);
+    for (const part of parts) {
+      switch (part) {
+        case 'en':
+        case 'ja':
+        case 'ko':
+        case 'fr':
+        case 'de':
+        case 'zh':
+          return part;
+        default:
+          break;
+      }
+    }
+
+    return null;
+  }
+
+  private getCueSourceLanguage(cue: Cue): string {
+    const candidates = [this.subtitleLanguage, cue.lang, this.settings.targetLanguage];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const normalized = this.normalizeSupportedLanguageCode(candidate);
+      if (normalized) return normalized;
+    }
+    return this.settings.targetLanguage;
   }
 
   private normalizeTerm(term: string): string {

@@ -44,6 +44,6 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
 
     if (!track) return { cues: [] };
     const cues = await fetchBilibiliSubtitles(track.url);
-    return { cues };
+    return { cues, lang: track.languageCode };
   }
 }
