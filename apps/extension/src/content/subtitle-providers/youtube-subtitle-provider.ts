@@ -23,7 +23,7 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
   private runtimeMessageListenerAttached = false;
   private youtubeCaptionHideStyle: HTMLStyleElement | null = null;
 
-  private readonly onSubtitlesMayBeAvailable?: () => void;
+  private readonly onSubtitlesMayBeAvailable: (() => void) | undefined;
 
   constructor(options: { onSubtitlesMayBeAvailable?: () => void } = {}) {
     this.onSubtitlesMayBeAvailable = options.onSubtitlesMayBeAvailable;

@@ -9,11 +9,12 @@ export function createSubtitleProvider(
 ): SubtitleProvider | null {
   const platform = detectPlatform(url);
   if (platform === 'youtube') {
-    return new YouTubeSubtitleProvider({ onSubtitlesMayBeAvailable: options.onSubtitlesMayBeAvailable });
+    return new YouTubeSubtitleProvider({
+      ...(options.onSubtitlesMayBeAvailable ? { onSubtitlesMayBeAvailable: options.onSubtitlesMayBeAvailable } : {}),
+    });
   }
   if (platform === 'bilibili') {
     return new BilibiliSubtitleProvider();
   }
   return null;
 }
-

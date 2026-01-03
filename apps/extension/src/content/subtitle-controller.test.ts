@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Cue, Settings, SubtitleEnhanceOutput } from '@lexipath/core';
+import type { Cue, Response, Settings, SubtitleEnhanceOutput } from '@lexipath/core';
 import {
   SubtitleController,
   detectPlatform,
@@ -430,14 +430,16 @@ describe('SubtitleController', () => {
       vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
 
-      const deferred: Array<{ resolve: (value: any) => void; promise: Promise<any> }> = [];
+      const deferred: Array<{ resolve: (value: Response<unknown>) => void; promise: Promise<Response<unknown>> }> = [];
       function makeDeferred() {
-        let resolve!: (value: any) => void;
-        const promise = new Promise((r) => { resolve = r; });
+        let resolve!: (value: Response<unknown>) => void;
+        const promise: Promise<Response<unknown>> = new Promise((r) => {
+          resolve = r;
+        });
         return { resolve, promise };
       }
 
-      vi.mocked(sendMessage).mockImplementation((type) => {
+      vi.mocked(sendMessage).mockImplementation((type, _payload) => {
         if (type === 'SELECT_KEYWORDS') return Promise.resolve({ ok: true, value: [] });
         if (type === 'ENHANCE_SUBTITLE') {
           const d = makeDeferred();
