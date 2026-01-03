@@ -769,15 +769,24 @@ export class SubtitleOverlay {
           align-items: center;
           gap: 4px;
           max-width: 90%;
-          padding: 8px 16px;
-          background: rgba(0, 0, 0, 0.8);
-          border-radius: 4px;
+          padding: 0;
+          background: transparent;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
           font-size: var(--lexipath-subtitle-font-size, 20px);
           line-height: 1.4;
           color: #ffffff;
           text-align: center;
-          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+          text-shadow:
+            0 0 2px rgba(0, 0, 0, 0.95),
+            0 0 8px rgba(0, 0, 0, 0.6),
+            1px 0 0 rgba(0, 0, 0, 0.9),
+            -1px 0 0 rgba(0, 0, 0, 0.9),
+            0 1px 0 rgba(0, 0, 0, 0.9),
+            0 -1px 0 rgba(0, 0, 0, 0.9),
+            1px 1px 0 rgba(0, 0, 0, 0.85),
+            -1px 1px 0 rgba(0, 0, 0, 0.85),
+            1px -1px 0 rgba(0, 0, 0, 0.85),
+            -1px -1px 0 rgba(0, 0, 0, 0.85);
           transition: opacity 0.2s ease;
         }
 
