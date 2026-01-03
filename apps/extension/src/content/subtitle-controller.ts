@@ -5,20 +5,20 @@
  * Supports YouTube and Bilibili platforms.
  */
 
-import type { Cue, Settings, SubtitleEnhanceOutput } from '@lexipath/core';
+import type { Cue, Settings } from '@lexipath/core';
 import { sendMessage } from '../shared/messages';
 import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './subtitle-overlay';
 import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
 import type { SubtitleProvider } from './subtitle-providers/subtitle-provider';
 import { getI18nMessage } from './i18n';
 import { SubtitleVideoSync } from './subtitle-video-sync';
+import { SubtitleEnhancer } from './subtitle-enhancer';
 
 export { detectPlatform } from './subtitle-platform';
 export type { Platform } from './subtitle-platform';
 
 const SLOW_LOG_THRESHOLD_MS = 800;
 const DEBUG_LOG_THROTTLE_MS = 1500;
-const BILINGUAL_RETRY_MIN_INTERVAL_MS = 10_000;
 
 /**
  * Subtitle Controller
@@ -28,20 +28,12 @@ export class SubtitleController {
   private provider: SubtitleProvider | null = null;
   private overlay: SubtitleOverlay | null = null;
   private cues: Cue[] = [];
-  private enhancedCues: Map<string, SubtitleEnhanceOutput> = new Map();
   private currentCueIndex: number = -1;
   private videoElement: HTMLVideoElement | null = null;
   private videoSync: SubtitleVideoSync | null = null;
+  private enhancer: SubtitleEnhancer | null = null;
   private mode: SubtitleMode = 'enhanced';
   private tempBilingualKeyPressed: boolean = false;
-
-  private enhanceQueueIndex = 0;
-  private enhanceInFlight = 0;
-  private enhancementStarted = false;
-  private readonly maxEnhanceInFlight = 2;
-  private enhancedCueCount = 0;
-  private bilingualCueInFlight = new Map<string, Promise<void>>();
-  private bilingualCueLastAttemptAt = new Map<string, number>();
 
   private statusMessage = '';
   private cuesGeneration = 0;
@@ -139,6 +131,18 @@ export class SubtitleController {
     });
     this.videoSync.setVideoElement(this.videoElement);
 
+    this.enhancer = new SubtitleEnhancer({
+      isPaused: () => this.isVideoPaused(),
+      sendEnhanceSubtitle: (payload) => sendMessage('ENHANCE_SUBTITLE', payload),
+      getSourceLang: (cue, subtitleLanguage) => this.getCueSourceLanguage(cue, subtitleLanguage),
+      onCueEnhanced: (cueId) => {
+        const currentCue = this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : null;
+        if (currentCue?.id === cueId) {
+          this.updateSubtitleDisplay();
+        }
+      },
+    });
+
     // Create overlay
     this.overlay = new SubtitleOverlay(this.provider.platform, {
       onModeChange: (mode) => {
@@ -158,6 +162,10 @@ export class SubtitleController {
     if (!mounted) {
       console.error('[SubtitleController] Failed to mount overlay');
       this.overlay = null;
+      this.enhancer?.destroy();
+      this.enhancer = null;
+      this.videoSync?.destroy();
+      this.videoSync = null;
       this.videoElement.removeEventListener('play', this.handleVideoPlay);
       this.videoElement.removeEventListener('pause', this.handleVideoPause);
       this.videoElement = null;
@@ -180,7 +188,7 @@ export class SubtitleController {
     this.setupKeyboardListener();
 
     // Enhance subtitles in background (do not block initial rendering)
-    this.startSubtitleEnhancement();
+    this.enhancer.start();
 
     console.log('[SubtitleController] Initialized successfully');
     return true;
@@ -197,6 +205,8 @@ export class SubtitleController {
     this.stopPlatformCaptionsWatch();
     this.videoSync?.destroy();
     this.videoSync = null;
+    this.enhancer?.destroy();
+    this.enhancer = null;
     this.overlay?.unmount();
     this.overlay = null;
     this.provider?.destroy();
@@ -206,11 +216,9 @@ export class SubtitleController {
     this.videoElement = null;
     this.cues = [];
     this.subtitleLanguage = '';
-    this.enhancedCues.clear();
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
-    this.bilingualCueInFlight.clear();
     this.currentCueIndex = -1;
     document.removeEventListener('keydown', this.handleKeyDown);
     document.removeEventListener('keyup', this.handleKeyUp);
@@ -247,14 +255,10 @@ export class SubtitleController {
     this.subtitleLanguage = typeof lang === 'string' ? lang : cues[0]?.lang ?? '';
     this.currentCueIndex = -1;
     this.videoSync?.setCues(cues);
-    this.enhancedCues.clear();
+    this.enhancer?.setCues(cues, { token: this.cuesGeneration, subtitleLanguage: this.subtitleLanguage });
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
-    this.bilingualCueInFlight.clear();
-    this.bilingualCueLastAttemptAt.clear();
-    this.enhancedCueCount = 0;
-    this.enhanceQueueIndex = 0;
 
     if (cues.length > 0) {
       this.statusMessage = '';
@@ -262,16 +266,10 @@ export class SubtitleController {
         this.provider?.hideNativeCaptions?.();
       }
       this.videoSync?.syncOnce();
+      this.enhancer?.start();
     } else {
       this.provider?.showNativeCaptions?.();
       this.renderStatusMessage();
-    }
-
-    // Kick (or resume) enhancement now that cues are available.
-    if (!this.enhancementStarted) {
-      this.startSubtitleEnhancement();
-    } else {
-      this.pumpSubtitleEnhancement();
     }
   }
 
@@ -285,75 +283,6 @@ export class SubtitleController {
       mode: this.mode,
       lines: [{ text: this.statusMessage, isEnhanced: false }],
     });
-  }
-
-  /**
-   * Enhance subtitles incrementally with concurrency limit.
-   */
-  private startSubtitleEnhancement(): void {
-    if (this.enhancementStarted) return;
-    this.enhancementStarted = true;
-    this.enhanceQueueIndex = 0;
-    this.enhanceInFlight = 0;
-    this.pumpSubtitleEnhancement();
-  }
-
-  private pumpSubtitleEnhancement(): void {
-    if (this.destroyed) return;
-    if (this.cues.length === 0) return;
-    if (this.isVideoPaused()) return;
-
-    while (this.enhanceInFlight < this.maxEnhanceInFlight && this.enhanceQueueIndex < this.cues.length) {
-      const cue = this.cues[this.enhanceQueueIndex++];
-      if (!cue) continue;
-      if (this.enhancedCues.has(cue.id)) continue;
-      if (!cue.text || cue.text.trim().length < 2) continue;
-
-      this.enhanceInFlight++;
-      const generation = this.cuesGeneration;
-      void this.enhanceCue(cue, generation)
-        .catch(() => {
-          // enhanceCue already logs; keep pipeline moving
-        })
-        .finally(() => {
-          this.enhanceInFlight--;
-          this.pumpSubtitleEnhancement();
-        });
-    }
-  }
-
-  private async enhanceCue(cue: Cue, generation: number): Promise<void> {
-    const startMs = performance.now();
-    try {
-      const response = await sendMessage('ENHANCE_SUBTITLE', {
-        subtitle: cue.text,
-        sourceLang: this.getCueSourceLanguage(cue),
-        mode: 'single',
-      });
-
-      if (!response.ok) {
-        console.warn(`[SubtitleController] Failed to enhance cue ${cue.id}:`, response.error);
-        return;
-      }
-
-      if (this.destroyed || generation !== this.cuesGeneration) return;
-
-      const enhanced = response.value;
-      if (!enhanced.line1_final || !enhanced.line1_final.trim()) return;
-
-      this.enhancedCues.set(cue.id, enhanced);
-      this.enhancedCueCount++;
-
-      const currentCue = this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : null;
-      if (currentCue?.id === cue.id) {
-        this.updateSubtitleDisplay();
-      }
-    } finally {
-      const elapsedMs = Math.round(performance.now() - startMs);
-      if (elapsedMs >= SLOW_LOG_THRESHOLD_MS || this.enhancedCueCount % 20 === 0) {
-        console.log(`[SubtitleController] Enhanced ${this.enhancedCueCount}/${this.cues.length} cues (lastMs=${elapsedMs})`);
-      }
-    }
   }
 
   /**
@@ -394,7 +323,7 @@ export class SubtitleController {
     }
 
     this.currentSubtitleContext = cue.text;
-    const enhanced = this.enhancedCues.get(cue.id);
+    const enhanced = this.enhancer?.getEnhanced(cue.id);
     const effectiveMode = this.tempBilingualKeyPressed ? 'bilingual-temp' : this.mode;
 
     let lines: SubtitleLine[] = [];
@@ -411,7 +340,7 @@ export class SubtitleController {
       // Bilingual: enhanced + native translation (on-demand)
       const translation = typeof enhanced?.line2_final === 'string' ? enhanced.line2_final.trim() : '';
       if (!translation) {
-        void this.ensureCueBilingual(cue);
+        void this.enhancer?.ensureBilingual(cue);
       }
 
       const loadingTranslationText = getI18nMessage(
@@ -556,51 +485,6 @@ export class SubtitleController {
     this.updateSubtitleDisplay();
   }
 
-  private ensureCueBilingual(cue: Cue): Promise<void> {
-    const existing = this.enhancedCues.get(cue.id);
-    if (existing && typeof existing.line2_final === 'string' && existing.line2_final.trim()) {
-      return Promise.resolve();
-    }
-
-    const inFlight = this.bilingualCueInFlight.get(cue.id);
-    if (inFlight) return inFlight;
-
-    const now = Date.now();
-    const lastAttemptAt = this.bilingualCueLastAttemptAt.get(cue.id) ?? 0;
-    if (now - lastAttemptAt < BILINGUAL_RETRY_MIN_INTERVAL_MS) {
-      return Promise.resolve();
-    }
-    this.bilingualCueLastAttemptAt.set(cue.id, now);
-
-    const generation = this.cuesGeneration;
-    const promise = (async () => {
-      const response = await sendMessage('ENHANCE_SUBTITLE', {
-        subtitle: cue.text,
-        sourceLang: this.getCueSourceLanguage(cue),
-        mode: 'bilingual',
-      });
-
-      if (!response.ok) return;
-      if (this.destroyed || generation !== this.cuesGeneration) return;
-
-      const enhanced = response.value;
-      if (!enhanced || !enhanced.line1_final || !enhanced.line1_final.trim()) return;
-
-      const prev = this.enhancedCues.get(cue.id) ?? ({} as SubtitleEnhanceOutput);
-      this.enhancedCues.set(cue.id, { ...prev, ...enhanced });
-
-      const currentCue = this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : null;
-      if (currentCue?.id === cue.id) {
-        this.updateSubtitleDisplay();
-      }
-    })().finally(() => {
-      this.bilingualCueInFlight.delete(cue.id);
-    });
-
-    this.bilingualCueInFlight.set(cue.id, promise);
-    return promise;
-  }
-
   private normalizeSupportedLanguageCode(languageCode: string): string | null {
     const normalized = languageCode.trim().toLowerCase();
     if (!normalized) return null;
@@ -623,8 +507,8 @@ export class SubtitleController {
     return null;
   }
 
-  private getCueSourceLanguage(cue: Cue): string {
-    const candidates = [this.subtitleLanguage, cue.lang, this.settings.targetLanguage];
+  private getCueSourceLanguage(cue: Cue, subtitleLanguage: string): string {
+    const candidates = [subtitleLanguage, cue.lang, this.settings.targetLanguage];
     for (const candidate of candidates) {
       if (!candidate) continue;
       const normalized = this.normalizeSupportedLanguageCode(candidate);
@@ -1024,7 +908,7 @@ export class SubtitleController {
   private handleVideoPlay = (): void => {
     if (this.destroyed) return;
     // Resume background pipelines.
-    this.pumpSubtitleEnhancement();
+    this.enhancer?.pump();
     this.startPrefetchWindow();
     this.updateSubtitleDisplay();
   };
