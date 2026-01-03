@@ -53,6 +53,8 @@ export class SubtitleOverlay {
   private subtitleModeButton: HTMLButtonElement | null = null;
   private wordCardElement: HTMLDivElement | null = null;
   private videoContainer: HTMLElement | null = null;
+  private videoContainerInlinePosition: string | null = null;
+  private forcedVideoContainerPosition = false;
   private platform: 'youtube' | 'bilibili';
   private mode: SubtitleMode = 'enhanced';
   private onModeChange?: (mode: SubtitleMode) => void;
@@ -107,6 +109,7 @@ export class SubtitleOverlay {
       return false;
     }
     this.videoContainer = videoContainer;
+    this.ensureVideoContainerPositioned();
 
     // Create container
     this.container = document.createElement('div');
@@ -203,7 +206,34 @@ export class SubtitleOverlay {
     this.subtitleLinesElement = null;
     this.subtitleModeButton = null;
     this.wordCardElement = null;
+    this.restoreVideoContainerPositioning();
     this.videoContainer = null;
+  }
+
+  private ensureVideoContainerPositioned(): void {
+    const container = this.videoContainer;
+    if (!container) return;
+
+    try {
+      const computed = window.getComputedStyle(container);
+      if (computed.position !== 'static') return;
+    } catch {
+      return;
+    }
+
+    this.videoContainerInlinePosition = container.style.position;
+    container.style.position = 'relative';
+    this.forcedVideoContainerPosition = true;
+  }
+
+  private restoreVideoContainerPositioning(): void {
+    const container = this.videoContainer;
+    if (!container) return;
+    if (!this.forcedVideoContainerPosition) return;
+
+    container.style.position = this.videoContainerInlinePosition ?? '';
+    this.videoContainerInlinePosition = null;
+    this.forcedVideoContainerPosition = false;
   }
 
   private setupAutoFontSizing(): void {
@@ -749,13 +779,24 @@ export class SubtitleOverlay {
       const selectors = selector.split(', ');
       for (const sel of selectors) {
         const elem = document.querySelector(sel.trim());
-        if (elem instanceof HTMLElement) return elem;
+        if (!(elem instanceof HTMLElement)) continue;
+        return this.refineBilibiliVideoContainer(elem);
       }
       return null;
     }
 
     const elem = document.querySelector(selector);
     return elem instanceof HTMLElement ? elem : null;
+  }
+
+  private refineBilibiliVideoContainer(container: HTMLElement): HTMLElement {
+    const video = container.querySelector('video');
+    if (!(video instanceof HTMLVideoElement)) return container;
+
+    const preferred = video.closest('.bpx-player-video-area, .bpx-player-video-wrap, .bilibili-player-video-wrap');
+    if (preferred instanceof HTMLElement) return preferred;
+
+    return video.parentElement instanceof HTMLElement ? video.parentElement : container;
   }
 
   /**
