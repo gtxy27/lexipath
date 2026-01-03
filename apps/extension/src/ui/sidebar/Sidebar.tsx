@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import browser from 'webextension-polyfill';
 import { sendMessage } from '../../shared/messages';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { ScrollArea } from '../components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { Send, Trash2, Bot, User, Loader2, AlertCircle } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -89,99 +95,126 @@ export function Sidebar(): React.ReactElement {
   }, [messages.length]);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <header className="p-4 border-b bg-white shadow-sm flex items-center justify-between">
-        <h1 className="font-semibold text-lg">
-          {browser.i18n.getMessage('chatTitle')}
-        </h1>
+    <div className="flex h-screen flex-col bg-background">
+      <header className="flex items-center justify-between border-b px-4 py-3 shadow-sm bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+        <div className="flex items-center gap-2">
+           <Avatar className="h-8 w-8">
+              <AvatarImage src="../../icons/icon.svg" />
+              <AvatarFallback>LP</AvatarFallback>
+           </Avatar>
+           <h1 className="font-semibold text-sm">
+             {browser.i18n.getMessage('chatTitle')}
+           </h1>
+        </div>
         {messages.length > 0 && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleClear}
-            className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 rounded hover:bg-gray-100"
             title={browser.i18n.getMessage('chatClear')}
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
           >
-            {browser.i18n.getMessage('chatClear')}
-          </button>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         )}
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+      <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-400 text-center">
+          <div className="flex h-[calc(100vh-140px)] flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+            <Bot className="h-12 w-12 opacity-20" />
+            <p className="text-sm">
               {browser.i18n.getMessage('chatEmpty')}
             </p>
           </div>
         ) : (
-          <>
+          <div className="flex flex-col gap-4 pb-4">
             {messages.map((msg, index) => (
               <div
                 key={`${msg.timestamp}-${index}`}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={cn(
+                  "flex gap-3 max-w-[85%]",
+                  msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
+                )}
               >
+                 <Avatar className="h-8 w-8 mt-1 border">
+                    <AvatarFallback className={msg.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted"}>
+                       {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                    </AvatarFallback>
+                 </Avatar>
+                 
                 <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                  className={cn(
+                    "rounded-lg px-4 py-2.5 text-sm shadow-sm",
                     msg.role === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white border border-gray-200 text-gray-800'
-                  }`}
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground"
+                  )}
                 >
-                  <div className="whitespace-pre-wrap break-words">
+                  <div className="whitespace-pre-wrap break-words leading-relaxed">
                     {msg.content}
                   </div>
                   <div
-                    className={`text-xs mt-1 ${
-                      msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'
-                    }`}
+                    className={cn(
+                      "text-[10px] mt-1 opacity-70",
+                      msg.role === 'user' ? "text-primary-foreground" : "text-muted-foreground"
+                    )}
                   >
-                    {new Date(msg.timestamp).toLocaleTimeString()}
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
               </div>
             ))}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] rounded-lg px-4 py-2 bg-white border border-gray-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+               <div className="flex gap-3 mr-auto max-w-[85%]">
+                  <Avatar className="h-8 w-8 mt-1 border">
+                     <AvatarFallback className="bg-muted">
+                        <Bot className="h-4 w-4" />
+                     </AvatarFallback>
+                  </Avatar>
+                  <div className="rounded-lg px-4 py-3 bg-muted shadow-sm flex items-center gap-1">
+                     <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.3s]"></span>
+                     <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:-0.15s]"></span>
+                     <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"></span>
                   </div>
-                </div>
-              </div>
+               </div>
             )}
             <div ref={messagesEndRef} />
-          </>
+          </div>
         )}
-      </main>
+      </ScrollArea>
 
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-t border-red-200">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="flex items-center gap-2 px-4 py-2 bg-destructive/10 text-destructive text-xs border-t border-destructive/20">
+          <AlertCircle className="h-4 w-4" />
+          <p>{error}</p>
         </div>
       )}
 
-      <footer className="p-4 border-t bg-white">
+      <div className="p-4 border-t bg-background">
         <div className="flex gap-2">
-          <input
+          <Input
             ref={inputRef}
-            type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={browser.i18n.getMessage('chatPlaceholder')}
             disabled={isLoading}
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="flex-1"
           />
-          <button
+          <Button
             onClick={handleSend}
             disabled={!inputValue.trim() || isLoading}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            size="icon"
+            className={cn(
+               "shrink-0",
+               !inputValue.trim() && !isLoading && "opacity-50"
+            )}
           >
-            {browser.i18n.getMessage('chatSend')}
-          </button>
+             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }

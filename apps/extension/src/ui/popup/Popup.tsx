@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import browser from 'webextension-polyfill';
 import type { Settings } from '@lexipath/core';
 import { sendMessage } from '../../shared/messages';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Switch } from '../components/ui/switch';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Separator } from '../components/ui/separator';
+import { Loader2, Settings2, Power, Languages, GraduationCap } from 'lucide-react';
 
 export function Popup(): React.ReactElement {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -33,51 +39,79 @@ export function Popup(): React.ReactElement {
 
   if (loading) {
     return (
-      <div className="w-80 p-4">
-        <p className="text-gray-500">{browser.i18n.getMessage('loading')}</p>
+      <div className="flex h-64 w-80 items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="w-80 p-4">
-      <h1 className="text-lg font-bold mb-4">LexiPath</h1>
+    <Card className="w-80 border-0 rounded-none shadow-none">
+      <CardHeader className="pb-3 pt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="../../icons/icon.svg" className="h-6 w-6" alt="LexiPath" />
+            <CardTitle className="text-lg font-bold">LexiPath</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={!!settings?.enabled}
+              onCheckedChange={toggleEnabled}
+              id="extension-toggle"
+            />
+          </div>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-4 py-2">
+        <div className="rounded-lg border bg-card p-3 shadow-sm">
+           <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Power className="h-4 w-4" />
+                {browser.i18n.getMessage('status')}
+              </span>
+              <Badge variant={settings?.enabled ? "default" : "secondary"}>
+                {settings?.enabled
+                  ? browser.i18n.getMessage('on')
+                  : browser.i18n.getMessage('off')}
+              </Badge>
+           </div>
+        </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <span>{browser.i18n.getMessage('enabled')}</span>
-        <button
-          onClick={toggleEnabled}
-          className={`px-3 py-1 rounded ${
-            settings?.enabled
-              ? 'bg-primary-500 text-white'
-              : 'bg-gray-200 text-gray-700'
-          }`}
-        >
-          {settings?.enabled
-            ? browser.i18n.getMessage('on')
-            : browser.i18n.getMessage('off')}
-        </button>
-      </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border bg-card p-3 shadow-sm">
+            <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+              <Languages className="h-3 w-3" />
+              {browser.i18n.getMessage('targetLanguage')}
+            </div>
+            <div className="text-sm font-semibold uppercase">
+              {settings?.targetLanguage || '-'}
+            </div>
+          </div>
+          
+          <div className="rounded-lg border bg-card p-3 shadow-sm">
+            <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+              <GraduationCap className="h-3 w-3" />
+              {browser.i18n.getMessage('proficiencyLevel')}
+            </div>
+            <div className="text-sm font-semibold">
+              {settings?.proficiencyLevel || '-'}
+            </div>
+          </div>
+        </div>
+      </CardContent>
 
-      <div className="text-sm text-gray-500">
-        <p>
-          {browser.i18n.getMessage('targetLanguage')}:{' '}
-          {settings?.targetLanguage?.toUpperCase()}
-        </p>
-        <p>
-          {browser.i18n.getMessage('proficiencyLevel')}:{' '}
-          {settings?.proficiencyLevel}
-        </p>
-      </div>
-
-      <div className="mt-4 pt-4 border-t">
-        <button
+      <CardFooter className="flex flex-col gap-2 pb-4 pt-2">
+        <Separator className="mb-2" />
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-2"
           onClick={() => browser.runtime.openOptionsPage()}
-          className="text-primary-500 hover:underline text-sm"
         >
+          <Settings2 className="h-4 w-4" />
           {browser.i18n.getMessage('openSettings')}
-        </button>
-      </div>
-    </div>
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

@@ -11,6 +11,13 @@ import {
   type SupportedLanguage,
 } from '@lexipath/core';
 import { sendMessage } from '../../shared/messages';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Progress } from '../components/ui/progress';
+import { Switch } from '../components/ui/switch';
+import { Label } from '../components/ui/label';
+import { Check, ChevronRight, ChevronLeft, Loader2, Globe, Video } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 type ProficiencyLevel = CEFRLevel | JLPTLevel | TOPIKLevel;
 
@@ -77,110 +84,6 @@ function toCEFRLevel(proficiency: ProficiencyLevel, language: SupportedLanguage)
     return mapping[proficiency as TOPIKLevel];
   }
   return proficiency as CEFRLevel;
-}
-
-function ProgressIndicator({ currentStep }: { currentStep: number }): React.ReactElement {
-  return (
-    <div className="mb-8">
-      <div className="flex items-center justify-center gap-2 mb-2">
-        {[1, 2, 3].map((step) => (
-          <div
-            key={step}
-            className={`h-2 rounded-full transition-all ${
-              step === currentStep
-                ? 'w-8 bg-primary-500'
-                : step < currentStep
-                ? 'w-2 bg-primary-300'
-                : 'w-2 bg-gray-200'
-            }`}
-          />
-        ))}
-      </div>
-      <p className="text-sm text-gray-500 text-center">
-        {t('onboardingStepProgress', String(currentStep))}
-      </p>
-    </div>
-  );
-}
-
-function OptionCard({
-  title,
-  description,
-  selected,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  selected: boolean;
-  onClick: () => void;
-}): React.ReactElement {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-        selected
-          ? 'border-primary-500 bg-primary-50'
-          : 'border-gray-200 bg-white hover:border-gray-300'
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-            selected ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
-          }`}
-        >
-          {selected && <div className="w-2 h-2 bg-white rounded-full" />}
-        </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-          <p className="text-sm text-gray-600">{description}</p>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function SceneCard({
-  title,
-  description,
-  enabled,
-  onToggle,
-}: {
-  title: string;
-  description: string;
-  enabled: boolean;
-  onToggle: () => void;
-}): React.ReactElement {
-  return (
-    <div
-      className={`p-4 rounded-lg border-2 transition-all ${
-        enabled
-          ? 'border-primary-500 bg-primary-50'
-          : 'border-gray-200 bg-white'
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={onToggle}
-          className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-            enabled ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
-          }`}
-        >
-          {enabled && (
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-        </button>
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-          <p className="text-sm text-gray-600">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function Onboarding(): React.ReactElement {
@@ -271,68 +174,73 @@ export function Onboarding(): React.ReactElement {
     }
   }
 
+  const progress = (currentStep / 3) * 100;
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50">
-      <div className="max-w-2xl w-full">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+      <Card className="w-full max-w-2xl border-none shadow-xl">
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-3xl font-bold">
             {browser.i18n.getMessage('welcomeTitle')}
-          </h1>
-          <p className="text-gray-600">
+          </CardTitle>
+          <CardDescription className="text-lg">
             {browser.i18n.getMessage('welcomeDesc')}
-          </p>
+          </CardDescription>
+        </CardHeader>
+        
+        <div className="px-6 py-2">
+           <Progress value={progress} className="h-2" />
+           <p className="text-xs text-center text-muted-foreground mt-2">
+             {t('onboardingStepProgress', String(currentStep))}
+           </p>
         </div>
 
-        {/* Progress Indicator */}
-        <ProgressIndicator currentStep={currentStep} />
-
-        {/* Step Content */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+        <CardContent className="p-6 min-h-[400px]">
           {currentStep === 1 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-2">
-                {t('onboardingStep1Title')}
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {t('onboardingStep1Desc')}
-              </p>
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-semibold mb-2">{t('onboardingStep1Title')}</h2>
+                <p className="text-muted-foreground">{t('onboardingStep1Desc')}</p>
+              </div>
 
               <div className="space-y-6">
-                {/* Target Language Selection */}
-                <div>
-                  <label className="block text-sm font-medium mb-3">
-                    {t('onboardingTargetLanguageLabel')}
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="space-y-3">
+                  <Label className="text-base">{t('onboardingTargetLanguageLabel')}</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {targetLanguageOptions.map((option) => (
-                      <OptionCard
+                      <Button
                         key={option.value}
-                        title={t(option.labelKey)}
-                        description=""
-                        selected={formData.targetLanguage === option.value}
+                        variant={formData.targetLanguage === option.value ? "default" : "outline"}
+                        className={cn(
+                          "h-auto py-3 justify-start px-4",
+                          formData.targetLanguage === option.value && "ring-2 ring-primary ring-offset-2"
+                        )}
                         onClick={() => handleTargetLanguageChange(option.value)}
-                      />
+                      >
+                         <div className="flex items-center gap-2 w-full">
+                            <span className="flex-1 text-left">{t(option.labelKey)}</span>
+                            {formData.targetLanguage === option.value && <Check className="h-4 w-4" />}
+                         </div>
+                      </Button>
                     ))}
                   </div>
                 </div>
 
-                {/* Proficiency Level Selection */}
-                <div>
-                  <label className="block text-sm font-medium mb-3">
-                    {t('onboardingProficiencyLabel')}
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="space-y-3">
+                  <Label className="text-base">{t('onboardingProficiencyLabel')}</Label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                     {proficiencyOptions.map((option) => (
-                      <OptionCard
+                      <Button
                         key={option.value}
-                        title={t(option.labelKey)}
-                        description=""
-                        selected={formData.proficiencyLevel === option.value}
-                        onClick={() =>
-                          setFormData({ ...formData, proficiencyLevel: option.value })
-                        }
-                      />
+                        variant={formData.proficiencyLevel === option.value ? "default" : "outline"}
+                        className={cn(
+                           "h-auto py-2 px-2",
+                           formData.proficiencyLevel === option.value && "ring-2 ring-primary ring-offset-2"
+                        )}
+                        onClick={() => setFormData({ ...formData, proficiencyLevel: option.value })}
+                      >
+                        {t(option.labelKey).replace('Proficiency ', '')}
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -341,149 +249,120 @@ export function Onboarding(): React.ReactElement {
           )}
 
           {currentStep === 2 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-2">
-                {t('onboardingStep2Title')}
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {t('onboardingStep2Desc')}
-              </p>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center mb-6">
+                 <h2 className="text-xl font-semibold mb-2">{t('onboardingStep2Title')}</h2>
+                 <p className="text-muted-foreground">{t('onboardingStep2Desc')}</p>
+              </div>
 
-              <div className="space-y-4">
-                <SceneCard
-                  title={t('onboardingSceneWebNativeTitle')}
-                  description={t('onboardingSceneWebNativeDesc')}
-                  enabled={formData.scenesEnabled.webNative}
-                  onToggle={() =>
-                    setFormData({
-                      ...formData,
-                      scenesEnabled: {
-                        ...formData.scenesEnabled,
-                        webNative: !formData.scenesEnabled.webNative,
-                      },
-                    })
-                  }
-                />
-                <SceneCard
-                  title={t('onboardingSceneWebTargetTitle')}
-                  description={t('onboardingSceneWebTargetDesc')}
-                  enabled={formData.scenesEnabled.webTarget}
-                  onToggle={() =>
-                    setFormData({
-                      ...formData,
-                      scenesEnabled: {
-                        ...formData.scenesEnabled,
-                        webTarget: !formData.scenesEnabled.webTarget,
-                      },
-                    })
-                  }
-                />
-                <SceneCard
-                  title={t('onboardingSceneVideoNativeTitle')}
-                  description={t('onboardingSceneVideoNativeDesc')}
-                  enabled={formData.scenesEnabled.videoNative}
-                  onToggle={() =>
-                    setFormData({
-                      ...formData,
-                      scenesEnabled: {
-                        ...formData.scenesEnabled,
-                        videoNative: !formData.scenesEnabled.videoNative,
-                      },
-                    })
-                  }
-                />
-                <SceneCard
-                  title={t('onboardingSceneVideoTargetTitle')}
-                  description={t('onboardingSceneVideoTargetDesc')}
-                  enabled={formData.scenesEnabled.videoTarget}
-                  onToggle={() =>
-                    setFormData({
-                      ...formData,
-                      scenesEnabled: {
-                        ...formData.scenesEnabled,
-                        videoTarget: !formData.scenesEnabled.videoTarget,
-                      },
-                    })
-                  }
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                   { 
+                      key: 'webNative', 
+                      icon: Globe, 
+                      title: t('onboardingSceneWebNativeTitle'), 
+                      desc: t('onboardingSceneWebNativeDesc') 
+                   },
+                   { 
+                      key: 'webTarget', 
+                      icon: Globe, 
+                      title: t('onboardingSceneWebTargetTitle'), 
+                      desc: t('onboardingSceneWebTargetDesc') 
+                   },
+                   { 
+                      key: 'videoNative', 
+                      icon: Video, 
+                      title: t('onboardingSceneVideoNativeTitle'), 
+                      desc: t('onboardingSceneVideoNativeDesc') 
+                   },
+                   { 
+                      key: 'videoTarget', 
+                      icon: Video, 
+                      title: t('onboardingSceneVideoTargetTitle'), 
+                      desc: t('onboardingSceneVideoTargetDesc') 
+                   }
+                ].map((scene) => (
+                   <Card key={scene.key} className="border shadow-sm">
+                      <CardContent className="p-4 flex items-center justify-between gap-4">
+                         <div className="flex items-start gap-3">
+                            <div className="p-2 rounded-full bg-primary/10 text-primary">
+                               <scene.icon className="h-5 w-5" />
+                            </div>
+                            <div className="space-y-1">
+                               <h3 className="font-medium leading-none">{scene.title}</h3>
+                               <p className="text-sm text-muted-foreground">{scene.desc}</p>
+                            </div>
+                         </div>
+                         <Switch 
+                            checked={formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]}
+                            onCheckedChange={(checked) => 
+                               setFormData({
+                                  ...formData,
+                                  scenesEnabled: {
+                                     ...formData.scenesEnabled,
+                                     [scene.key]: checked
+                                  }
+                               })
+                            }
+                         />
+                      </CardContent>
+                   </Card>
+                ))}
               </div>
             </div>
           )}
 
           {currentStep === 3 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-2">
-                {t('onboardingStep3Title')}
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {t('onboardingStep3Desc')}
-              </p>
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="text-center mb-6">
+                 <h2 className="text-xl font-semibold mb-2">{t('onboardingStep3Title')}</h2>
+                 <p className="text-muted-foreground">{t('onboardingStep3Desc')}</p>
+               </div>
 
-              <div className="bg-gray-50 rounded-lg p-6 space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    {t('onboardingSummaryTargetLanguage')}
-                  </h3>
-                  <p className="text-lg font-semibold">
-                    {t(`languageTarget_${formData.targetLanguage}`)}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">
-                    {t('onboardingSummaryProficiency')}
-                  </h3>
-                  <p className="text-lg font-semibold">
-                    {t(`proficiency_${formData.proficiencyLevel}`)}
-                  </p>
-                </div>
-              </div>
+               <Card className="bg-muted/50 border-dashed">
+                  <CardContent className="p-6 grid grid-cols-2 gap-8 text-center">
+                     <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">{t('onboardingSummaryTargetLanguage')}</p>
+                        <p className="text-2xl font-bold text-primary">{t(`languageTarget_${formData.targetLanguage}`)}</p>
+                     </div>
+                     <div className="space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">{t('onboardingSummaryProficiency')}</p>
+                        <p className="text-2xl font-bold text-primary">{t(`proficiency_${formData.proficiencyLevel}`)}</p>
+                     </div>
+                  </CardContent>
+               </Card>
 
-              <p className="text-sm text-gray-500 mt-6 text-center">
-                {t('onboardingSummaryNote')}
-              </p>
+               <p className="text-sm text-center text-muted-foreground max-w-sm mx-auto">
+                  {t('onboardingSummaryNote')}
+               </p>
             </div>
           )}
-        </div>
+        </CardContent>
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
+        <CardFooter className="flex justify-between p-6 pt-0">
+          <Button
+            variant="ghost"
             onClick={handlePrevious}
             disabled={currentStep === 1}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              currentStep === 1
-                ? 'text-gray-400 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
+            className="gap-2"
           >
+            <ChevronLeft className="h-4 w-4" />
             {t('onboardingPrevious')}
-          </button>
+          </Button>
 
           {currentStep < 3 ? (
-            <button
-              type="button"
-              onClick={handleNext}
-              className="px-6 py-3 rounded-lg font-semibold bg-primary-500 text-white hover:bg-primary-600 transition-all"
-            >
+            <Button onClick={handleNext} className="gap-2">
               {t('onboardingNext')}
-            </button>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           ) : (
-            <button
-              type="button"
-              onClick={handleFinish}
-              disabled={saving}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                saving
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-primary-500 text-white hover:bg-primary-600'
-              }`}
-            >
+            <Button onClick={handleFinish} disabled={saving} className="gap-2">
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {saving ? t('optionsSaving') : t('onboardingFinish')}
-            </button>
+            </Button>
           )}
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
