@@ -16,6 +16,7 @@ describe('parseVideoInfo', () => {
   it('parses bvid from a standard video URL', () => {
     expect(parseVideoInfo('https://www.bilibili.com/video/BV1Q5411W7x1/?p=1')).toEqual({
       bvid: 'BV1Q5411W7x1',
+      pageNumber: 1,
     });
   });
 
@@ -51,6 +52,25 @@ describe('getCid', () => {
     await expect(getCid('BV1Q5411W7x1')).resolves.toBe('987654');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('x/web-interface/view?bvid=BV1Q5411W7x1');
+  });
+
+  it('fetches cid from view API pageNumber when available', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        return new Response(
+          JSON.stringify({
+            code: 0,
+            data: {
+              pages: [{ cid: 111 }, { cid: 222 }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      })
+    );
+
+    await expect(getCid('BV1Q5411W7x1', 2)).resolves.toBe('222');
   });
 
   it('falls back to data.cid when pages are missing', async () => {

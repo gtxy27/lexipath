@@ -12,12 +12,15 @@ export interface BilibiliSubtitleTrack {
   url: string;
 }
 
-export function parseVideoInfo(url: string): { bvid: string; cid?: string } | null {
+export function parseVideoInfo(
+  url: string
+): { bvid: string; cid?: string; pageNumber?: number } | null {
   const raw = url.trim();
   if (!raw) return null;
 
   let bvid: string | null = null;
   let cid: string | undefined;
+  let pageNumber: number | undefined;
 
   try {
     const parsedUrl = new URL(raw);
@@ -32,6 +35,14 @@ export function parseVideoInfo(url: string): { bvid: string; cid?: string } | nu
     const cidParam = parsedUrl.searchParams.get('cid');
     if (cidParam && /^\d+$/.test(cidParam)) {
       cid = cidParam;
+    }
+
+    const pageParam = parsedUrl.searchParams.get('p');
+    if (pageParam && /^\d+$/.test(pageParam)) {
+      const parsedPage = Number.parseInt(pageParam, 10);
+      if (Number.isFinite(parsedPage) && parsedPage >= 1) {
+        pageNumber = parsedPage;
+      }
     }
 
     if (!bvid) {
@@ -55,7 +66,7 @@ export function parseVideoInfo(url: string): { bvid: string; cid?: string } | nu
   }
 
   if (!bvid) return null;
-  return cid ? { bvid, cid } : { bvid };
+  return { bvid, ...(cid ? { cid } : {}), ...(pageNumber ? { pageNumber } : {}) };
 }
 
 const BilibiliViewApiResponseSchema = z.object({
@@ -78,7 +89,7 @@ const BilibiliViewApiResponseSchema = z.object({
 /**
  * Get the cid for a given bvid using Bilibili's view API.
  */
-export async function getCid(bvid: string): Promise<string> {
+export async function getCid(bvid: string, pageNumber?: number): Promise<string> {
   const url = `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`;
   const response = await fetch(url, {
     method: 'GET',
@@ -97,7 +108,9 @@ export async function getCid(bvid: string): Promise<string> {
     throw new Error(`Bilibili view API error: code ${parsed.code}${parsed.message ? ` - ${parsed.message}` : ''}`);
   }
 
-  const cidCandidate = parsed.data?.pages?.[0]?.cid ?? parsed.data?.cid;
+  const pages = parsed.data?.pages ?? [];
+  const pageIndex = typeof pageNumber === 'number' && Number.isFinite(pageNumber) && pageNumber >= 1 ? pageNumber - 1 : -1;
+  const cidCandidate = pages[pageIndex]?.cid ?? pages[0]?.cid ?? parsed.data?.cid;
   if (cidCandidate === undefined || cidCandidate === null || cidCandidate === '') {
     throw new Error(`Bilibili view API did not return cid for bvid: ${bvid}`);
   }

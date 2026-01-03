@@ -17,7 +17,7 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
 
     this.settings = settings;
     this.bvid = info.bvid;
-    this.cid = info.cid ?? (await getCid(info.bvid));
+    this.cid = info.cid ?? (await getCid(info.bvid, info.pageNumber));
   }
 
   destroy(): void {
@@ -47,4 +47,3 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
     return { cues };
   }
 }
-
