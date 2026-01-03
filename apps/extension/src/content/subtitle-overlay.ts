@@ -52,6 +52,7 @@ export class SubtitleOverlay {
   private subtitleLinesElement: HTMLDivElement | null = null;
   private subtitleModeButton: HTMLButtonElement | null = null;
   private wordCardElement: HTMLDivElement | null = null;
+  private videoContainer: HTMLElement | null = null;
   private platform: 'youtube' | 'bilibili';
   private mode: SubtitleMode = 'enhanced';
   private onModeChange?: (mode: SubtitleMode) => void;
@@ -66,6 +67,10 @@ export class SubtitleOverlay {
   private hoverCloseTimer: number | null = null;
   private readonly hoverOpenDelayMs = 250;
   private readonly hoverCloseDelayMs = 250;
+  private fontSizeObserver: ResizeObserver | null = null;
+  private fontSizeUpdateTimer: number | null = null;
+  private lastMainFontSizePx: number | null = null;
+  private lastOriginalFontSizePx: number | null = null;
 
   constructor(
     platform: 'youtube' | 'bilibili',
@@ -101,6 +106,7 @@ export class SubtitleOverlay {
       console.error('[SubtitleOverlay] Video container not found');
       return false;
     }
+    this.videoContainer = videoContainer;
 
     // Create container
     this.container = document.createElement('div');
@@ -175,6 +181,7 @@ export class SubtitleOverlay {
 
     // Append to video container
     videoContainer.appendChild(this.container);
+    this.setupAutoFontSizing();
 
     console.log('[SubtitleOverlay] Mounted successfully');
     return true;
@@ -184,6 +191,7 @@ export class SubtitleOverlay {
    * Unmount and cleanup
    */
   unmount(): void {
+    this.teardownAutoFontSizing();
     if (this.container && this.container.parentElement) {
       this.container.parentElement.removeChild(this.container);
     }
@@ -195,6 +203,79 @@ export class SubtitleOverlay {
     this.subtitleLinesElement = null;
     this.subtitleModeButton = null;
     this.wordCardElement = null;
+    this.videoContainer = null;
+  }
+
+  private setupAutoFontSizing(): void {
+    if (!this.container || !this.videoContainer) return;
+    this.updateSubtitleFontSize();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    this.fontSizeObserver = new ResizeObserver(() => {
+      this.scheduleSubtitleFontSizeUpdate();
+    });
+
+    this.fontSizeObserver.observe(this.videoContainer);
+    const video = this.videoContainer.querySelector('video');
+    if (video instanceof HTMLElement) {
+      this.fontSizeObserver.observe(video);
+    }
+  }
+
+  private teardownAutoFontSizing(): void {
+    if (this.fontSizeUpdateTimer !== null) {
+      window.clearTimeout(this.fontSizeUpdateTimer);
+      this.fontSizeUpdateTimer = null;
+    }
+    if (this.fontSizeObserver) {
+      this.fontSizeObserver.disconnect();
+      this.fontSizeObserver = null;
+    }
+    this.lastMainFontSizePx = null;
+    this.lastOriginalFontSizePx = null;
+  }
+
+  private scheduleSubtitleFontSizeUpdate(): void {
+    if (this.fontSizeUpdateTimer !== null) return;
+    this.fontSizeUpdateTimer = window.setTimeout(() => {
+      this.fontSizeUpdateTimer = null;
+      this.updateSubtitleFontSize();
+    }, 100);
+  }
+
+  private updateSubtitleFontSize(): void {
+    if (!this.container || !this.videoContainer) return;
+
+    const heightPx = this.getVideoHeightPx();
+    if (!Number.isFinite(heightPx) || heightPx <= 0) return;
+
+    const mainSizePx = Math.max(14, Math.min(60, Math.round(heightPx * 0.04)));
+    const originalSizePx = Math.max(10, Math.round(mainSizePx * 0.8));
+
+    if (this.lastMainFontSizePx !== mainSizePx) {
+      this.container.style.setProperty('--lexipath-subtitle-font-size', `${mainSizePx}px`);
+      this.lastMainFontSizePx = mainSizePx;
+    }
+
+    if (this.lastOriginalFontSizePx !== originalSizePx) {
+      this.container.style.setProperty('--lexipath-subtitle-original-font-size', `${originalSizePx}px`);
+      this.lastOriginalFontSizePx = originalSizePx;
+    }
+  }
+
+  private getVideoHeightPx(): number {
+    const container = this.videoContainer;
+    if (!container) return 0;
+
+    const video = container.querySelector('video');
+    if (video instanceof HTMLVideoElement) {
+      const rect = video.getBoundingClientRect();
+      if (rect.height > 0) return rect.height;
+      if (video.clientHeight > 0) return video.clientHeight;
+    }
+
+    const rect = container.getBoundingClientRect();
+    return rect.height;
   }
 
   /**
@@ -692,7 +773,7 @@ export class SubtitleOverlay {
           background: rgba(0, 0, 0, 0.8);
           border-radius: 4px;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          font-size: 20px;
+          font-size: var(--lexipath-subtitle-font-size, 20px);
           line-height: 1.4;
           color: #ffffff;
           text-align: center;
@@ -741,7 +822,7 @@ export class SubtitleOverlay {
         }
 
         .line-original {
-          font-size: 16px;
+          font-size: var(--lexipath-subtitle-original-font-size, 16px);
           font-weight: 400;
           color: #cccccc;
           opacity: 0.9;
