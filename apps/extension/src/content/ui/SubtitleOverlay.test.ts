@@ -21,7 +21,7 @@ vi.mock('webextension-polyfill', () => ({
   },
 }));
 
-import { SubtitleOverlay, getVideoContainerSelector, type SubtitleLine } from './subtitle-overlay';
+import { SubtitleOverlay, getVideoContainerSelector, type SubtitleLine } from './SubtitleOverlay';
 
 describe('getVideoContainerSelector', () => {
   it('returns correct selector for YouTube', () => {

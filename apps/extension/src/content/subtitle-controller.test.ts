@@ -38,7 +38,7 @@ vi.mock('@lexipath/subtitles', () => ({
   getBilibiliAvailableTracks: vi.fn(),
 }));
 
-vi.mock('./subtitle-overlay', () => {
+vi.mock('./ui/SubtitleOverlay', () => {
   const SubtitleOverlay = vi.fn();
   SubtitleOverlay.prototype.mount = vi.fn(() => true);
   SubtitleOverlay.prototype.unmount = vi.fn();
@@ -64,7 +64,7 @@ import {
   fetchBilibiliSubtitles,
   getBilibiliAvailableTracks,
 } from '@lexipath/subtitles';
-import { SubtitleOverlay } from './subtitle-overlay';
+import { SubtitleOverlay } from './ui/SubtitleOverlay';
 
 describe('detectPlatform', () => {
   it('detects YouTube from various URLs', () => {

@@ -7,7 +7,7 @@
 
 import type { Cue, Settings, SupportedLanguage } from '@lexipath/core';
 import { sendMessage } from '../shared/messages';
-import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './subtitle-overlay';
+import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './ui/SubtitleOverlay';
 import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
 import type { SubtitleProvider } from './subtitle-providers/subtitle-provider';
 import { getI18nMessage } from './i18n';

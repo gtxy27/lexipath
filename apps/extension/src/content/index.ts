@@ -14,6 +14,7 @@ import { sendMessage } from '../shared/messages';
 import { SubtitleController, detectPlatform, type Platform } from './subtitle-controller';
 import { createEnhancedElement, type WordRenderMode } from './enhanced-text';
 import { getI18nMessage } from './i18n';
+import { SubtitleOverlay, type WordCardData } from './ui/SubtitleOverlay';
 
 let subtitleController: SubtitleController | null = null;
 let currentSettings: Settings | null = null;
@@ -21,6 +22,64 @@ let observer: MutationObserver | null = null;
 let urlPollTimer: number | null = null;
 let navigationToken = 0;
 let lastKnownUrl = '';
+
+let webOverlay: SubtitleOverlay | null = null;
+let hoverTimer: number | null = null;
+const HOVER_UPGRADE_DELAY_MS = 800;
+const wordExplainCache = new Map<string, WordCardData>();
+const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
+
+function getWebOverlay(): SubtitleOverlay {
+  if (!webOverlay) {
+    webOverlay = new SubtitleOverlay('youtube', { // platform doesn't matter for web card
+      onWordClick: (word, rect) => showFullWordCard(word, rect, true),
+    });
+    webOverlay.mount();
+  }
+  return webOverlay;
+}
+
+async function getWordCardData(word: string): Promise<WordCardData> {
+  const normalized = word.toLowerCase().trim();
+  const cached = wordExplainCache.get(normalized);
+  if (cached) return cached;
+
+  const inFlight = wordExplainInFlight.get(normalized);
+  if (inFlight) return inFlight;
+
+  const promise = (async () => {
+    const response = await sendMessage('EXPLAIN_WORD', { word: normalized });
+    if (!response.ok) {
+      return { word: normalized, definition: getI18nMessage('wordCard_definitionFailed') };
+    }
+    const data = response.value as any;
+    const card: WordCardData = {
+      word: data.word || normalized,
+      definition: data.definition || getI18nMessage('wordCard_definitionUnavailable'),
+      phonetic: data.phonetic,
+      difficulty: data.difficulty,
+      translation: data.translation,
+      example: data.example,
+      exampleTranslation: data.example_translation,
+    };
+    wordExplainCache.set(normalized, card);
+    return card;
+  })().finally(() => wordExplainInFlight.delete(normalized));
+
+  wordExplainInFlight.set(normalized, promise);
+  return promise;
+}
+
+async function showFullWordCard(word: string, rect: DOMRect, pinned = false) {
+  const overlay = getWebOverlay();
+  overlay.showWordCardLoading(word, rect, { pinned });
+  const data = await getWordCardData(word);
+  overlay.showWordCard(data, rect, { pinned });
+}
+
+function isFullCardVisible(): boolean {
+  return Boolean(webOverlay && (webOverlay as any).wordCardVisible);
+}
 
 // Minimum text length to process
 const MIN_TEXT_LENGTH = 20;
@@ -285,13 +344,17 @@ function ensureTooltipInjected(): void {
   tooltipEl.style.display = 'none';
   document.documentElement.appendChild(tooltipEl);
 
-  const hide = () => {
+  const hideTooltip = () => {
     if (!tooltipEl) return;
     tooltipTarget = null;
     tooltipEl.style.display = 'none';
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
   };
 
-  const position = (clientX: number, clientY: number) => {
+  const positionTooltip = (clientX: number, clientY: number) => {
     if (!tooltipEl) return;
 
     const padding = 12;
@@ -313,18 +376,29 @@ function ensureTooltipInjected(): void {
     tooltipEl.style.top = `${Math.round(y)}px`;
   };
 
-  const showForWord = (wordEl: HTMLElement, clientX: number, clientY: number) => {
-    if (!tooltipEl) return;
+  const showTooltipForWord = (wordEl: HTMLElement, clientX: number, clientY: number) => {
+    if (!tooltipEl || isFullCardVisible()) return;
     const tooltipText = wordEl.dataset.tooltip?.trim();
     if (!tooltipText) {
-      hide();
+      hideTooltip();
       return;
     }
 
     tooltipTarget = wordEl;
     tooltipEl.textContent = tooltipText;
     tooltipEl.style.display = 'block';
-    position(clientX, clientY);
+    positionTooltip(clientX, clientY);
+
+    // Start timer to upgrade to full card
+    if (hoverTimer) clearTimeout(hoverTimer);
+    hoverTimer = window.setTimeout(() => {
+      if (tooltipTarget === wordEl) {
+        hideTooltip();
+        const rect = wordEl.getBoundingClientRect();
+        const word = wordEl.dataset.original || wordEl.textContent || '';
+        showFullWordCard(word, rect, false);
+      }
+    }, HOVER_UPGRADE_DELAY_MS);
   };
 
   const getWordEl = (target: EventTarget | null): HTMLElement | null => {
@@ -336,32 +410,50 @@ function ensureTooltipInjected(): void {
   document.addEventListener('pointerover', (event) => {
     const wordEl = getWordEl(event.target);
     if (!wordEl) return;
-    showForWord(wordEl, event.clientX, event.clientY);
+    showTooltipForWord(wordEl, event.clientX, event.clientY);
   }, true);
 
   document.addEventListener('pointermove', (event) => {
     if (!tooltipEl || !tooltipTarget) return;
-    position(event.clientX, event.clientY);
+    positionTooltip(event.clientX, event.clientY);
   }, true);
 
   document.addEventListener('pointerout', (event) => {
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
     if (!tooltipTarget) return;
     const next = getWordEl(event.relatedTarget);
     if (next && next === tooltipTarget) return;
-    hide();
+    hideTooltip();
+  }, true);
+
+  // Support click to show full card immediately
+  document.addEventListener('click', (event) => {
+    const wordEl = getWordEl(event.target);
+    if (!wordEl) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    hideTooltip();
+    const rect = wordEl.getBoundingClientRect();
+    const word = wordEl.dataset.original || wordEl.textContent || '';
+    showFullWordCard(word, rect, true); // Pinned on click
   }, true);
 
   document.addEventListener('focusin', (event) => {
     const wordEl = getWordEl(event.target);
     if (!wordEl) return;
     const rect = wordEl.getBoundingClientRect();
-    showForWord(wordEl, rect.left, rect.bottom);
+    showTooltipForWord(wordEl, rect.left, rect.bottom);
   }, true);
 
-  document.addEventListener('focusout', hide, true);
-  window.addEventListener('scroll', hide, true);
-  window.addEventListener('blur', hide);
-  window.addEventListener('resize', hide);
+  document.addEventListener('focusout', hideTooltip, true);
+  window.addEventListener('scroll', hideTooltip, true);
+  window.addEventListener('blur', hideTooltip);
+  window.addEventListener('resize', hideTooltip);
 }
 
 let processedElementSignature = new WeakMap<Element, string>();

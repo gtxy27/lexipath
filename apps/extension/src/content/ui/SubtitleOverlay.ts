@@ -5,7 +5,8 @@
  * Supports both overlay (on video) and below-video positioning.
  */
 
-import { getI18nMessage } from './i18n';
+import { getI18nMessage } from '../i18n';
+import { sendMessage } from '../../shared/messages';
 
 export type SubtitleMode = 'enhanced' | 'bilingual' | 'bilingual-temp';
 
@@ -63,7 +64,7 @@ export class SubtitleOverlay {
   private onWordClick?: (word: string, anchorRect: DOMRect) => void;
   private onWordHover?: (word: string, anchorRect: DOMRect) => void;
   private documentClickListenerAttached = false;
-  private wordCardVisible = false;
+  public wordCardVisible = false;
   private wordCardPinned = false;
   private hoverWord: string | null = null;
   private hoverRect: DOMRect | null = null;
@@ -467,6 +468,24 @@ export class SubtitleOverlay {
     this.wordCardElement.appendChild(header);
     this.wordCardElement.appendChild(body);
 
+    const footer = document.createElement('div');
+    footer.className = 'lexipath-wordcard__footer';
+
+    const chatButton = document.createElement('button');
+    chatButton.className = 'lexipath-wordcard__chat-button';
+    chatButton.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6 6-6"/></svg>
+      <span>${getI18nMessage('wordCard_askAI') || 'Ask AI'}</span>
+    `;
+    chatButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const prompt = `Please explain the usage of the word "${data.word}" in this context${data.example ? `: "${data.example}"` : ''}.`;
+      sendMessage('OPEN_SIDEBAR', { initialMessage: prompt, isAutoSend: true });
+      this.hideWordCard();
+    });
+    footer.appendChild(chatButton);
+    this.wordCardElement.appendChild(footer);
+
     const { top, left } = this.computeWordCardPosition(anchorRect);
     this.wordCardElement.style.top = `${top}px`;
     this.wordCardElement.style.left = `${left}px`;
@@ -775,21 +794,23 @@ export class SubtitleOverlay {
    */
   private findVideoContainer(): HTMLElement | null {
     const selector = getVideoContainerSelector(this.platform);
-    if (!selector) return null;
-
-    // Try multiple selectors for bilibili
-    if (this.platform === 'bilibili') {
-      const selectors = selector.split(', ');
-      for (const sel of selectors) {
-        const elem = document.querySelector(sel.trim());
-        if (!(elem instanceof HTMLElement)) continue;
-        return this.refineBilibiliVideoContainer(elem);
+    if (selector) {
+      // Try multiple selectors for bilibili
+      if (this.platform === 'bilibili') {
+        const selectors = selector.split(', ');
+        for (const sel of selectors) {
+          const elem = document.querySelector(sel.trim());
+          if (!(elem instanceof HTMLElement)) continue;
+          return this.refineBilibiliVideoContainer(elem);
+        }
+      } else {
+        const elem = document.querySelector(selector);
+        if (elem instanceof HTMLElement) return elem;
       }
-      return null;
     }
 
-    const elem = document.querySelector(selector);
-    return elem instanceof HTMLElement ? elem : null;
+    // Fallback for general web pages where no video player is targetted
+    return document.body;
   }
 
   private refineBilibiliVideoContainer(container: HTMLElement): HTMLElement {
@@ -956,6 +977,41 @@ export class SubtitleOverlay {
 
         .lexipath-wordcard__example-translation {
           color: rgba(148, 163, 184, 0.95);
+        }
+
+        .lexipath-wordcard__footer {
+          margin-top: 14px;
+          padding-top: 10px;
+          border-top: 1px solid rgba(148, 163, 184, 0.15);
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .lexipath-wordcard__chat-button {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          background: rgba(99, 102, 241, 0.1);
+          color: #818cf8;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .lexipath-wordcard__chat-button:hover {
+          background: rgba(99, 102, 241, 0.2);
+          border-color: rgba(99, 102, 241, 0.5);
+          transform: translateY(-1px);
+        }
+
+        .lexipath-wordcard__chat-button svg {
+          stroke: currentColor;
         }
     `;
   }
