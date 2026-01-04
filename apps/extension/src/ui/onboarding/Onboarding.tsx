@@ -20,7 +20,6 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Progress } from "../components/ui/progress";
 import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
 import {
@@ -30,8 +29,11 @@ import {
   Loader2,
   Globe,
   Video,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 type ProficiencyLevel = CEFRLevel | JLPTLevel | TOPIKLevel;
 
@@ -137,10 +139,8 @@ export function Onboarding(): React.ReactElement {
     const oldLanguage = formData.targetLanguage;
     const currentLevel = formData.proficiencyLevel;
 
-    // Determine if we need to reset proficiency level
     let newProficiencyLevel = currentLevel;
 
-    // Check if switching between different proficiency systems
     const oldIsJapanese = oldLanguage === "ja";
     const newIsJapanese = newLanguage === "ja";
     const oldIsKorean = oldLanguage === "ko";
@@ -152,7 +152,6 @@ export function Onboarding(): React.ReactElement {
       (oldIsKorean && !newIsKorean) ||
       (!oldIsKorean && newIsKorean)
     ) {
-      // Switching between different proficiency systems, reset to default
       newProficiencyLevel = getDefaultProficiency(newLanguage);
     }
 
@@ -187,7 +186,6 @@ export function Onboarding(): React.ReactElement {
         proficiencyLevel: cefrLevel,
       });
 
-      // Close onboarding page and open options or popup
       window.close();
     } catch (error) {
       console.error("[LexiPath] Failed to save onboarding settings:", error);
@@ -199,243 +197,308 @@ export function Onboarding(): React.ReactElement {
   const progress = (currentStep / 3) * 100;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <Card className="w-full max-w-2xl shadow-lg">
-        <CardHeader className="text-center pb-2 border-b">
-          <CardTitle className="text-3xl font-bold text-gray-900">
-            {browser.i18n.getMessage("welcomeTitle")}
-          </CardTitle>
-          <CardDescription className="text-lg text-gray-500">
-            {browser.i18n.getMessage("welcomeDesc")}
-          </CardDescription>
-        </CardHeader>
+    <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-[#0d0e14] text-gray-900 dark:text-white relative overflow-hidden transition-colors duration-500">
+      {/* Immersive background */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/5 dark:bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/5 dark:bg-purple-600/20 rounded-full blur-[120px] animate-pulse" />
+      </div>
 
-        <div className="px-6 py-4 border-b">
-          <Progress value={progress} className="h-2" />
-          <p className="text-xs text-center text-gray-500 mt-2">
-            {t("onboardingStepProgress", String(currentStep))}
-          </p>
-        </div>
-
-        <CardContent className="p-6 min-h-[400px]">
-          {currentStep === 1 && (
-            <div className="space-y-8">
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  {t("onboardingStep1Title")}
-                </h2>
-                <p className="text-gray-500">{t("onboardingStep1Desc")}</p>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-2xl relative z-10"
+      >
+        <Card className="glass-card border-gray-100 dark:border-white/5 bg-white/80 dark:bg-white/5 backdrop-blur-2xl overflow-hidden rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] dark:shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)]">
+          <CardHeader className="text-center pb-8 pt-10 px-8 relative overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-indigo-500/5 dark:bg-indigo-500/10 blur-3xl rounded-full" />
+            
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-premium p-[1px] shadow-2xl shadow-indigo-500/10 dark:shadow-indigo-500/20"
+            >
+              <div className="flex h-full w-full items-center justify-center rounded-[15px] bg-white dark:bg-[#0d0e14]">
+                <img src="../../icons/icon.svg" className="h-9 w-9" alt="LexiPath" />
               </div>
+            </motion.div>
+            
+            <CardTitle className="text-4xl font-black tracking-tighter text-gray-900 dark:text-white mb-2">
+              {browser.i18n.getMessage("welcomeTitle") || "LexiPath"}
+            </CardTitle>
+            <CardDescription className="text-lg text-gray-500 dark:text-gray-400 font-bold max-w-md mx-auto leading-relaxed uppercase tracking-wider text-[11px]">
+              {browser.i18n.getMessage("welcomeDesc") || "Experience the next generation of language learning."}
+            </CardDescription>
+          </CardHeader>
 
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <Label className="text-base">
-                    {t("onboardingTargetLanguageLabel")}
-                  </Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {targetLanguageOptions.map((option) => (
-                      <Button
-                        key={option.value}
-                        variant={
-                          formData.targetLanguage === option.value
-                            ? "default"
-                            : "outline"
-                        }
-                        className={cn(
-                          "h-auto py-3 justify-start px-4",
-                          formData.targetLanguage === option.value &&
-                            "bg-indigo-600 hover:bg-indigo-700",
-                        )}
-                        onClick={() => handleTargetLanguageChange(option.value)}
-                      >
-                        <div className="flex items-center gap-2 w-full">
-                          <span className="flex-1 text-left">
-                            {t(option.labelKey)}
-                          </span>
-                          {formData.targetLanguage === option.value && (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-base">
-                    {t("onboardingProficiencyLabel")}
-                  </Label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                    {proficiencyOptions.map((option) => (
-                      <Button
-                        key={option.value}
-                        variant={
-                          formData.proficiencyLevel === option.value
-                            ? "default"
-                            : "outline"
-                        }
-                        className={cn(
-                          "h-auto py-2 px-2",
-                          formData.proficiencyLevel === option.value &&
-                            "bg-indigo-600 hover:bg-indigo-700",
-                        )}
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            proficiencyLevel: option.value,
-                          })
-                        }
-                      >
-                        {t(option.labelKey).replace("Proficiency ", "")}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+          <div className="px-10 py-0">
+            <div 
+              role="progressbar" 
+              aria-label="Setup Progress"
+              aria-valuenow={Math.round(progress).toString()} 
+              aria-valuemin="0" 
+              aria-valuemax="100"
+              className="relative h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden"
+            >
+              <motion.div 
+                className="absolute top-0 left-0 h-full bg-gradient-premium rounded-full"
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5, ease: "circOut" }}
+              />
             </div>
-          )}
+            <div className="flex justify-between mt-3 px-1">
+               <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">{t("onboardingStepProgress", String(currentStep))}</span>
+               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{Math.round(progress)}% Complete</span>
+            </div>
+          </div>
 
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  {t("onboardingStep2Title")}
-                </h2>
-                <p className="text-gray-500">{t("onboardingStep2Desc")}</p>
-              </div>
+          <CardContent className="p-10 min-h-[460px] flex flex-col">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.1 }}
+                className="flex-1"
+              >
+                {currentStep === 1 && (
+                  <div className="space-y-10">
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                        {t("onboardingStep1Title")}
+                      </h2>
+                      <p className="text-gray-400 dark:text-gray-500 font-bold text-[11px] uppercase tracking-wider leading-relaxed">
+                        {t("onboardingStep1Desc")}
+                      </p>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    key: "webNative",
-                    icon: Globe,
-                    title: t("onboardingSceneWebNativeTitle"),
-                    desc: t("onboardingSceneWebNativeDesc"),
-                  },
-                  {
-                    key: "webTarget",
-                    icon: Globe,
-                    title: t("onboardingSceneWebTargetTitle"),
-                    desc: t("onboardingSceneWebTargetDesc"),
-                  },
-                  {
-                    key: "videoNative",
-                    icon: Video,
-                    title: t("onboardingSceneVideoNativeTitle"),
-                    desc: t("onboardingSceneVideoNativeDesc"),
-                  },
-                  {
-                    key: "videoTarget",
-                    icon: Video,
-                    title: t("onboardingSceneVideoTargetTitle"),
-                    desc: t("onboardingSceneVideoTargetDesc"),
-                  },
-                ].map((scene) => (
-                  <Card key={scene.key} className="border shadow-sm">
-                    <CardContent className="p-4 flex items-center justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-full bg-indigo-100 text-indigo-600">
-                          <scene.icon className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <h3 className="font-medium leading-none">
-                            {scene.title}
-                          </h3>
-                          <p className="text-sm text-gray-500">{scene.desc}</p>
+                    <div className="space-y-8">
+                      <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                          {t("onboardingTargetLanguageLabel")}
+                        </Label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {targetLanguageOptions.map((option) => (
+                            <Button
+                              key={option.value}
+                              variant="outline"
+                              className={cn(
+                                "h-auto py-4 px-4 rounded-2xl border-gray-100 dark:border-white/5 transition-all duration-300 relative overflow-hidden group",
+                                formData.targetLanguage === option.value
+                                  ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/5 dark:shadow-indigo-500/10"
+                                  : "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                              )}
+                              onClick={() => handleTargetLanguageChange(option.value)}
+                            >
+                              <div className="flex items-center justify-between w-full relative z-10">
+                                <span className="font-bold tracking-wide">
+                                  {t(option.labelKey)}
+                                </span>
+                                {formData.targetLanguage === option.value && (
+                                  <motion.div layoutId="check" initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                                    <Check className="h-4 w-4 text-white" />
+                                  </motion.div>
+                                )}
+                              </div>
+                            </Button>
+                          ))}
                         </div>
                       </div>
-                      <Switch
-                        checked={
-                          formData.scenesEnabled[
-                            scene.key as keyof typeof formData.scenesEnabled
-                          ]
-                        }
-                        aria-label={scene.title}
-                        onCheckedChange={(checked) =>
-                          setFormData({
-                            ...formData,
-                            scenesEnabled: {
-                              ...formData.scenesEnabled,
-                              [scene.key]: checked,
-                            },
-                          })
-                        }
-                      />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {currentStep === 3 && (
-            <div className="space-y-8">
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold mb-2">
-                  {t("onboardingStep3Title")}
-                </h2>
-                <p className="text-gray-500">{t("onboardingStep3Desc")}</p>
-              </div>
-
-              <Card className="bg-gray-50 border border-dashed">
-                <CardContent className="p-6 grid grid-cols-2 gap-8 text-center">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-500">
-                      {t("onboardingSummaryTargetLanguage")}
-                    </p>
-                    <p className="text-2xl font-bold text-indigo-600">
-                      {t(`languageTarget_${formData.targetLanguage}`)}
-                    </p>
+                      <div className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                          {t("onboardingProficiencyLabel")}
+                        </Label>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                          {proficiencyOptions.map((option) => (
+                            <Button
+                              key={option.value}
+                              variant="outline"
+                              className={cn(
+                                "h-11 rounded-xl border-gray-100 dark:border-white/5 transition-all",
+                                formData.proficiencyLevel === option.value
+                                  ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/10"
+                                  : "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400"
+                              )}
+                              onClick={() =>
+                                setFormData({
+                                  ...formData,
+                                  proficiencyLevel: option.value,
+                                })
+                              }
+                            >
+                              <span className="font-black text-xs">
+                                {t(option.labelKey).replace("Proficiency ", "").replace("JLPT ", "").replace("Level ", "")}
+                              </span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-500">
-                      {t("onboardingSummaryProficiency")}
-                    </p>
-                    <p className="text-2xl font-bold text-indigo-600">
-                      {t(`proficiency_${formData.proficiencyLevel}`)}
-                    </p>
+                )}
+
+                {currentStep === 2 && (
+                  <div className="space-y-10">
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                        {t("onboardingStep2Title")}
+                      </h2>
+                      <p className="text-gray-400 dark:text-gray-500 font-bold text-[11px] uppercase tracking-wider leading-relaxed">
+                        {t("onboardingStep2Desc")}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        {
+                          key: "webNative",
+                          icon: Globe,
+                          title: t("onboardingSceneWebNativeTitle"),
+                          desc: t("onboardingSceneWebNativeDesc"),
+                        },
+                        {
+                          key: "webTarget",
+                          icon: Sparkles,
+                          title: t("onboardingSceneWebTargetTitle"),
+                          desc: t("onboardingSceneWebTargetDesc"),
+                        },
+                        {
+                          key: "videoNative",
+                          icon: Video,
+                          title: t("onboardingSceneVideoNativeTitle"),
+                          desc: t("onboardingSceneVideoNativeDesc"),
+                        },
+                        {
+                          key: "videoTarget",
+                          icon: Zap,
+                          title: t("onboardingSceneVideoTargetTitle"),
+                          desc: t("onboardingSceneVideoTargetDesc"),
+                        },
+                      ].map((scene) => (
+                        <div key={scene.key} className={cn(
+                          "relative group rounded-2xl border transition-all duration-300 p-5 cursor-pointer select-none",
+                          formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]
+                            ? "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500/30"
+                            : "bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10"
+                        )}
+                        onClick={() => setFormData({
+                          ...formData,
+                          scenesEnabled: {
+                            ...formData.scenesEnabled,
+                            [scene.key]: !formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled],
+                          },
+                        })}>
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-start gap-4">
+                              <div className={cn(
+                                "p-3 rounded-xl transition-colors",
+                                formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]
+                                  ? "bg-indigo-500 text-white"
+                                  : "bg-white dark:bg-[#0d0e14] text-gray-300 dark:text-gray-600"
+                              )}>
+                                <scene.icon className="h-6 w-6" />
+                              </div>
+                              <div className="space-y-1">
+                                <h3 className="font-bold text-gray-900 dark:text-white tracking-tight">
+                                  {scene.title}
+                                </h3>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider leading-tight">{scene.desc}</p>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]}
+                              className="data-[state=checked]:bg-indigo-600"
+                              aria-label={scene.title}
+                              onCheckedChange={() => {}} // Controlled by card click
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                )}
 
-              <p className="text-sm text-center text-gray-500 max-w-sm mx-auto">
-                {t("onboardingSummaryNote")}
-              </p>
-            </div>
-          )}
-        </CardContent>
+                {currentStep === 3 && (
+                  <div className="space-y-10">
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight text-center">
+                        {t("onboardingStep3Title")}
+                      </h2>
+                      <p className="text-gray-400 dark:text-gray-500 font-bold text-[11px] uppercase tracking-wider leading-relaxed text-center">
+                        {t("onboardingStep3Desc")}
+                      </p>
+                    </div>
 
-        <CardFooter className="flex justify-between p-6 pt-0 border-t">
-          <Button
-            variant="ghost"
-            onClick={handlePrevious}
-            disabled={currentStep === 1}
-            className="gap-2"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {t("onboardingPrevious")}
-          </Button>
+                    <div className="relative group">
+                       <div className="absolute -inset-1 rounded-[2rem] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur opacity-75 group-hover:opacity-100 transition duration-1000" />
+                       <Card className="relative bg-gray-50/50 dark:bg-[#0d0e14]/40 border-gray-100 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-inner">
+                          <CardContent className="p-10 grid grid-cols-2 gap-8 text-center relative">
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/70">
+                                {t("onboardingSummaryTargetLanguage")}
+                              </p>
+                              <p data-testid="summary-target-lang" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                {t(`languageTarget_${formData.targetLanguage}`)}
+                              </p>
+                            </div>
+                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-gray-200 dark:bg-white/5" />
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500 dark:text-purple-400/70">
+                                {t("onboardingSummaryProficiency")}
+                              </p>
+                              <p data-testid="summary-proficiency" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                {t(`proficiency_${formData.proficiencyLevel}`).replace("Proficiency ", "")}
+                              </p>
+                            </div>
+                          </CardContent>
+                       </Card>
+                    </div>
 
-          {currentStep < 3 ? (
+                    <div className="glass-card bg-gray-50 dark:bg-white/5 rounded-2xl p-6 border-gray-100 dark:border-indigo-500/10 text-center">
+                       <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
+                          {t("onboardingSummaryNote")}
+                       </p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </CardContent>
+
+          <CardFooter className="flex justify-between p-10 pt-0 relative z-10">
             <Button
-              onClick={handleNext}
-              className="gap-2 bg-indigo-600 hover:bg-indigo-700"
+              variant="ghost"
+              onClick={handlePrevious}
+              disabled={currentStep === 1}
+              className="gap-2 h-12 px-6 text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl transition-all font-bold"
             >
-              {t("onboardingNext")}
-              <ChevronRight className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" />
+              {t("onboardingPrevious")}
             </Button>
-          ) : (
-            <Button
-              onClick={handleFinish}
-              disabled={saving}
-              className="gap-2 bg-indigo-600 hover:bg-indigo-700"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? t("optionsSaving") : t("onboardingFinish")}
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
+
+            {currentStep < 3 ? (
+              <Button
+                onClick={handleNext}
+                className="gap-2 h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-600/10 dark:shadow-indigo-600/20 transition-all font-bold group"
+              >
+                {t("onboardingNext")}
+                <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleFinish}
+                disabled={saving}
+                className="gap-2 h-14 px-10 bg-gradient-premium text-white rounded-2xl shadow-2xl shadow-indigo-600/20 dark:shadow-indigo-600/30 transition-all font-black text-lg group"
+              >
+                {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6 group-hover:rotate-12 transition-transform" />}
+                {saving ? t("optionsSaving") : t("onboardingFinish") || "Start Learning"}
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+      </motion.div>
     </div>
   );
 }

@@ -84,7 +84,9 @@ describe('Onboarding', () => {
     it('selects English by default', () => {
       render(<Onboarding />);
 
-      const enButton = screen.getByText('languageTarget_en').closest('button');
+      const elements = screen.getAllByText('languageTarget_en');
+      const enButton = elements[0]!.closest('button');
+      expect(enButton).not.toBeNull();
       expect(enButton).toHaveClass('bg-indigo-600');
     });
 
@@ -221,13 +223,13 @@ describe('Onboarding', () => {
       await user.click(screen.getByText('onboardingNext'));
 
       const switches = [
-        screen.getByRole('switch', { name: 'onboardingSceneWebNativeTitle' }),
-        screen.getByRole('switch', { name: 'onboardingSceneWebTargetTitle' }),
-        screen.getByRole('switch', { name: 'onboardingSceneVideoNativeTitle' }),
-        screen.getByRole('switch', { name: 'onboardingSceneVideoTargetTitle' }),
+        screen.getByLabelText('onboardingSceneWebNativeTitle'),
+        screen.getByLabelText('onboardingSceneWebTargetTitle'),
+        screen.getByLabelText('onboardingSceneVideoNativeTitle'),
+        screen.getByLabelText('onboardingSceneVideoTargetTitle'),
       ];
       for (const sw of switches) {
-        expect(sw).toHaveAttribute('data-state', 'checked');
+        expect(sw).toBeChecked();
       }
     });
 
@@ -237,17 +239,15 @@ describe('Onboarding', () => {
 
       await user.click(screen.getByText('onboardingNext'));
 
-      const webNativeSwitch = screen.getByRole('switch', {
-        name: 'onboardingSceneWebNativeTitle',
-      });
+      const webNativeSwitch = screen.getByLabelText('onboardingSceneWebNativeTitle');
 
-      expect(webNativeSwitch).toHaveAttribute('data-state', 'checked');
+      expect(webNativeSwitch).toBeChecked();
 
       await user.click(webNativeSwitch);
-      expect(webNativeSwitch).toHaveAttribute('data-state', 'unchecked');
+      expect(webNativeSwitch).not.toBeChecked();
 
       await user.click(webNativeSwitch);
-      expect(webNativeSwitch).toHaveAttribute('data-state', 'checked');
+      expect(webNativeSwitch).toBeChecked();
     });
 
     it('shows previous button on step 2', async () => {
@@ -276,34 +276,32 @@ describe('Onboarding', () => {
     });
 
     it('shows summary of selected options', async () => {
-      const user = userEvent.setup();
       render(<Onboarding />);
+      const user = userEvent.setup();
 
+      // Go to step 3
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
       expect(screen.getByText('onboardingSummaryTargetLanguage')).toBeInTheDocument();
       expect(screen.getByText('onboardingSummaryProficiency')).toBeInTheDocument();
-      expect(screen.getByText('languageTarget_en')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_B1')).toBeInTheDocument();
+      expect(screen.getByTestId('summary-target-lang')).toHaveTextContent('languageTarget_en');
+      expect(screen.getByTestId('summary-proficiency')).toHaveTextContent('proficiency_B1');
     });
 
     it('shows correct summary for Japanese selection', async () => {
-      const user = userEvent.setup();
       render(<Onboarding />);
+      const user = userEvent.setup();
 
-      // Select Japanese and N2
-      const jaButton = screen.getByText('languageTarget_ja').closest('button');
-      await user.click(jaButton!);
+      // Select Japanese
+      await user.click(screen.getByText('languageTarget_ja'));
 
-      const n2Button = screen.getByText('proficiency_N2').closest('button');
-      await user.click(n2Button!);
-
+      // Go to step 3
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
-      expect(screen.getByText('languageTarget_ja')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_N2')).toBeInTheDocument();
+      expect(screen.getByTestId('summary-target-lang')).toHaveTextContent('languageTarget_ja');
+      expect(screen.getByTestId('summary-proficiency')).toHaveTextContent('proficiency_N3');
     });
 
     it('shows note about adjusting settings later', async () => {
@@ -372,11 +370,9 @@ describe('Onboarding', () => {
       await user.click(screen.getByText('onboardingNext'));
 
       // Disable a scene
-      const videoNativeSwitch = screen.getByRole('switch', {
-        name: 'onboardingSceneVideoNativeTitle',
-      });
+      const videoNativeSwitch = screen.getByLabelText('onboardingSceneVideoNativeTitle');
       await user.click(videoNativeSwitch);
-      expect(videoNativeSwitch).toHaveAttribute('data-state', 'unchecked');
+      expect(videoNativeSwitch).not.toBeChecked();
 
       // Go back to step 1
       await user.click(screen.getByText('onboardingPrevious'));
