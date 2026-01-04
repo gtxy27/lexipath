@@ -232,15 +232,13 @@ export function Onboarding(): React.ReactElement {
           </CardHeader>
 
           <div className="px-10 py-0">
-            <div 
-              role="progressbar" 
-              aria-label="Setup Progress"
-              aria-valuenow={Math.round(progress).toString()} 
-              aria-valuemin="0" 
-              aria-valuemax="100"
+            <div
+              role="progressbar"
+              aria-label={`Setup Progress: ${Math.round(progress)}% complete`}
+              aria-valuetext={`${Math.round(progress)} percent`}
               className="relative h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden"
             >
-              <motion.div 
+              <motion.div
                 className="absolute top-0 left-0 h-full bg-gradient-premium rounded-full"
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.5, ease: "circOut" }}
