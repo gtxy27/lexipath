@@ -17,17 +17,6 @@ export const MessageContent = React.memo(function MessageContent(props: {
   const content = props.content ?? "";
   const isStreaming = Boolean(props.isStreaming);
 
-  if (isStreaming) {
-    return (
-      <div className="whitespace-pre-wrap break-words font-medium">
-        {content}
-        <span className="ml-0.5 inline-block w-[0.5ch] animate-pulse select-none">
-          {"\u258C"}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div className="text-sm leading-relaxed">
       <Markdown
@@ -98,6 +87,14 @@ export const MessageContent = React.memo(function MessageContent(props: {
       >
         {content}
       </Markdown>
+      {isStreaming && (
+        <span
+          aria-hidden="true"
+          className="ml-0.5 inline-block w-[0.5ch] animate-pulse select-none align-baseline"
+        >
+          {"\u258C"}
+        </span>
+      )}
     </div>
   );
 });
