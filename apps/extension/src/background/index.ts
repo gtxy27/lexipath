@@ -62,6 +62,10 @@ import {
   dedupeInFlight,
 } from './pipeline';
 import { filterSelectedKeywords } from './keyword-filter';
+import {
+  InvalidOriginError,
+  normalizeOriginToHostPattern as normalizeOriginToHostPatternCore,
+} from './origin';
 
 const registry = createMessageHandlerRegistry();
 
@@ -477,35 +481,14 @@ registry.register('SET_SETTINGS', async (payload) => {
 });
 
 function normalizeOriginToHostPattern(origin: string): string {
-  const trimmed = origin.trim();
-  if (!trimmed) {
-    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
-  }
-
-  if (trimmed === '<all_urls>') {
-    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
-  }
-
-  if (trimmed.includes('*')) {
-    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
-  }
-
-  let url: URL;
   try {
-    url = new URL(trimmed);
-  } catch {
-    throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
+    return normalizeOriginToHostPatternCore(origin);
+  } catch (error) {
+    if (error instanceof InvalidOriginError) {
+      throw new MessageError({ code: 'INVALID_ORIGIN', message: t('error_invalidOrigin') });
+    }
+    throw error;
   }
-
-  const isLocalhostHttp = url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
-  if (url.protocol !== 'https:' && !isLocalhostHttp) {
-    throw new MessageError({
-      code: 'INVALID_ORIGIN',
-      message: t('error_invalidOrigin'),
-    });
-  }
-
-  return `${url.origin}/*`;
 }
 
 registry.register('REQUEST_HOST_PERMISSION', async (payload) => {
