@@ -376,51 +376,51 @@
     "description": "Sites section title"
   },
   "optionsBehavior_select_keywords": {
-    "message": "Select keywords",
+    "message": "Extract Keywords",
     "description": "Behavior label: select_keywords"
   },
   "optionsBehaviorDesc_select_keywords": {
-    "message": "LLM-only keyword selection.",
+    "message": "Extract key vocabulary from text for learning (LLM Channel only).",
     "description": "Behavior description: select_keywords"
   },
   "optionsBehavior_translate": {
-    "message": "Translate",
+    "message": "Universal Translation",
     "description": "Behavior label: translate"
   },
   "optionsBehaviorDesc_translate": {
-    "message": "Translate selected terms (Channel/Google/Bing).",
+    "message": "Translate sentences or paragraphs (LLM Channel/Google/Bing).",
     "description": "Behavior description: translate"
   },
   "optionsBehavior_translate_keywords": {
-    "message": "Translate keywords",
+    "message": "Batch Translation",
     "description": "Behavior label: translate_keywords"
   },
   "optionsBehaviorDesc_translate_keywords": {
-    "message": "Batch-translate subtitle/web keywords (Channel/Google/Bing).",
+    "message": "Subtitle-specific: Translate multiple keywords at once (LLM Channel/Google/Bing).",
     "description": "Behavior description: translate_keywords"
   },
   "optionsBehavior_dictionary": {
-    "message": "Dictionary fallback",
+    "message": "Word Lookup",
     "description": "Behavior label: dictionary"
   },
   "optionsBehaviorDesc_dictionary": {
-    "message": "Offline-first; fallback via routing when missed.",
+    "message": "Look up word definitions and pronunciation (offline-first, fallback via routing when missed).",
     "description": "Behavior description: dictionary"
   },
   "optionsBehavior_adapt_subtitle": {
-    "message": "Adaptive subtitle translation",
+    "message": "Subtitle Adaptation",
     "description": "Behavior label: adapt_subtitle"
   },
   "optionsBehaviorDesc_adapt_subtitle": {
-    "message": "Translate native subtitles into your learning language and adapt difficulty (LLM-only).",
+    "message": "Convert native language subtitles to learning language adapted to your level (LLM Channel only).",
     "description": "Behavior description: adapt_subtitle"
   },
   "optionsBehavior_chat": {
-    "message": "Chat",
+    "message": "Deep Learning",
     "description": "Behavior label: chat"
   },
   "optionsBehaviorDesc_chat": {
-    "message": "LLM-only sidebar chat.",
+    "message": "Deep discussion of learning content with AI (LLM Channel only).",
     "description": "Behavior description: chat"
   },
   "optionsChannelNameRequired": {

@@ -314,6 +314,10 @@ function behaviorLabel(key: BehaviorKey): string {
   return t(`optionsBehavior_${key}`);
 }
 
+function behaviorDesc(key: BehaviorKey): string {
+  return t(`optionsBehaviorDesc_${key}`);
+}
+
 function isIconUrlAllowed(raw: string): boolean {
   const value = raw.trim();
   if (!value) return true;
@@ -1202,7 +1206,7 @@ export function Options(): React.ReactElement {
                         </div>
                         <div>
                           <h4 className="font-bold text-gray-900 dark:text-white text-base">{behaviorLabel(key)}</h4>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mt-1">{t("optionsRoutingDesc").split(".")[0]}</p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{behaviorDesc(key)}</p>
                         </div>
                       </div>
 
