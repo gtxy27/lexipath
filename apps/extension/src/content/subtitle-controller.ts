@@ -236,8 +236,8 @@ export class SubtitleController {
     if (!provider) return;
 
     // Respect the platform subtitle toggle. For Bilibili, avoid network fetching
-    // when captions are off (or unknown), and wait for the user to enable them.
-    if (provider.platform === 'bilibili' && this.platformCaptionsEnabled !== true) {
+    // when captions are explicitly disabled by the user.
+    if (provider.platform === 'bilibili' && this.platformCaptionsEnabled === false) {
       return;
     }
 
@@ -463,12 +463,26 @@ export class SubtitleController {
       return false;
     }
 
-    // Bilibili's newer player buttons often represent the OFF state simply by not
-    // having an "active" class/aria state. For Bilibili, fail-closed so the
-    // extension doesn't render/fetch subtitles when the user has subtitles off.
+    // For Bilibili, check if there's an active subtitle selection in the menu
     const isLikelyBilibiliButton =
       button.classList.contains('bpx-player-ctrl-subtitle') || button.classList.contains('bilibili-player-video-btn-subtitle');
-    if (isLikelyBilibiliButton) return false;
+    if (isLikelyBilibiliButton) {
+      // Check if the "close" switch is NOT active (meaning subtitles are on)
+      const closeSwitch = button.querySelector('.bpx-player-ctrl-subtitle-close-switch');
+      if (closeSwitch && !closeSwitch.classList.contains('bpx-state-active')) {
+        return true;
+      }
+
+      // Also check if bilibili subtitle is actually visible on page
+      const subtitleWrap = document.querySelector('.bpx-player-subtitle-wrap');
+      if (subtitleWrap instanceof HTMLElement) {
+        const display = window.getComputedStyle(subtitleWrap).display;
+        if (display !== 'none') return true;
+      }
+
+      // Fail-closed: if no active subtitle is detected, assume subtitles are off
+      return false;
+    }
 
     return null;
   }

@@ -8,6 +8,7 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
   private settings: Settings | null = null;
   private bvid: string | null = null;
   private cid: string | null = null;
+  private bilibiliCaptionHideStyle: HTMLStyleElement | null = null;
 
   async init(url: string, settings: Settings): Promise<void> {
     const info = parseVideoInfo(url);
@@ -21,9 +22,41 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
   }
 
   destroy(): void {
+    this.showNativeCaptions();
     this.settings = null;
     this.bvid = null;
     this.cid = null;
+  }
+
+  hideNativeCaptions(): void {
+    const styleId = 'lexipath-hide-bilibili-captions';
+
+    if (this.bilibiliCaptionHideStyle && this.bilibiliCaptionHideStyle.isConnected) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      /* Hide Bilibili's native captions when LexiPath overlay is available */
+      .bpx-player-subtitle-wrap,
+      .bilibili-player-video-subtitle,
+      .bpx-player-subtitle-panel-text {
+        display: none !important;
+        visibility: hidden !important;
+      }
+    `;
+    (document.documentElement || document.head || document.body).appendChild(style);
+    this.bilibiliCaptionHideStyle = style;
+  }
+
+  showNativeCaptions(): void {
+    const styleId = 'lexipath-hide-bilibili-captions';
+
+    if (this.bilibiliCaptionHideStyle) {
+      this.bilibiliCaptionHideStyle.remove();
+      this.bilibiliCaptionHideStyle = null;
+    } else {
+      document.getElementById(styleId)?.remove();
+    }
   }
 
   async fetchSubtitles(): Promise<SubtitleFetchResult> {
