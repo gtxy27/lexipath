@@ -811,7 +811,8 @@ export class SubtitleOverlay {
       }
     }
 
-    return null;
+    // Fallback for general web pages where no video player is targetted
+    return document.body;
   }
 
   private refineBilibiliVideoContainer(container: HTMLElement): HTMLElement {
