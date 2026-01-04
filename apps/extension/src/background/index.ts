@@ -158,6 +158,10 @@ type ChatProvider = OpenAICompatibleProvider | ClaudeProvider | GeminiProvider;
 
 const chatProviders = new Map<string, ChatProvider>();
 
+const DEFAULT_OPENAI_URL = 'https://api.openai.com/v1';
+const DEFAULT_CLAUDE_URL = 'https://api.anthropic.com/v1';
+const DEFAULT_GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta';
+
 function providerKey(type: LLMProviderChannel, config: ProviderConfig | ClaudeProviderConfig | GeminiProviderConfig): string {
   return stableStringify({ type, config });
 }
@@ -268,7 +272,7 @@ function getChatProviderByChannel(
 
   if (type === 'openai') {
     const parsed = ProviderConfigSchema.safeParse({
-      baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : '',
+      baseUrl: typeof config.baseUrl === 'string' && config.baseUrl.trim() ? config.baseUrl : DEFAULT_OPENAI_URL,
       model: channel.model,
       ...(typeof config.apiKey === 'string' ? { apiKey: config.apiKey } : {}),
       ...(normalizedHeaders ? { customHeaders: normalizedHeaders } : {}),
@@ -281,7 +285,7 @@ function getChatProviderByChannel(
     const parsed = ClaudeProviderConfigSchema.safeParse({
       model: channel.model,
       apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
-      ...(typeof config.baseUrl === 'string' && config.baseUrl.trim() ? { baseUrl: config.baseUrl } : {}),
+      baseUrl: typeof config.baseUrl === 'string' && config.baseUrl.trim() ? config.baseUrl : DEFAULT_CLAUDE_URL,
       ...(normalizedHeaders ? { customHeaders: normalizedHeaders } : {}),
     });
     if (!parsed.success) return null;
@@ -291,7 +295,7 @@ function getChatProviderByChannel(
   const parsed = GeminiProviderConfigSchema.safeParse({
     model: channel.model,
     apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
-    ...(typeof config.baseUrl === 'string' && config.baseUrl.trim() ? { baseUrl: config.baseUrl } : {}),
+    baseUrl: typeof config.baseUrl === 'string' && config.baseUrl.trim() ? config.baseUrl : DEFAULT_GEMINI_URL,
     ...(normalizedHeaders ? { customHeaders: normalizedHeaders } : {}),
   });
   if (!parsed.success) return null;
@@ -517,11 +521,11 @@ registry.register('TEST_PROVIDER_CONNECTION', async (payload) => {
   const origin = (() => {
     switch (payload.type) {
       case 'openai':
-        return payload.config.baseUrl;
+        return payload.config.baseUrl || DEFAULT_OPENAI_URL;
       case 'claude':
-        return payload.config.baseUrl ?? 'https://api.anthropic.com/v1';
+        return payload.config.baseUrl ?? DEFAULT_CLAUDE_URL;
       case 'gemini':
-        return payload.config.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta';
+        return payload.config.baseUrl ?? DEFAULT_GEMINI_URL;
       case 'google':
         return 'https://translate.googleapis.com';
       case 'bing':

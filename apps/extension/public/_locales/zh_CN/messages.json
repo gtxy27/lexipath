@@ -456,7 +456,7 @@
     "description": "服务商 baseUrl 描述"
   },
   "optionsProviderBaseUrlPlaceholder": {
-    "message": "https://api.openai.com/v1",
+    "message": "默认：https://api.openai.com/v1",
     "description": "服务商 baseUrl 占位符"
   },
   "optionsProviderModelLabel": {
@@ -956,7 +956,7 @@
     "description": "Claude base url description"
   },
   "optionsClaudeBaseUrlPlaceholder": {
-    "message": "https://api.anthropic.com/v1",
+    "message": "默认：https://api.anthropic.com/v1",
     "description": "Claude base url placeholder"
   },
   "optionsGeminiBaseUrlDesc": {
@@ -964,7 +964,7 @@
     "description": "Gemini base url description"
   },
   "optionsGeminiBaseUrlPlaceholder": {
-    "message": "https://generativelanguage.googleapis.com/v1beta",
+    "message": "默认：https://generativelanguage.googleapis.com/v1beta",
     "description": "Gemini base url placeholder"
   },
   "providerChannel_openai": {

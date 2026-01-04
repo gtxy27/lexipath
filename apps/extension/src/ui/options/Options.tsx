@@ -1162,7 +1162,13 @@ export function Options(): React.ReactElement {
                                         channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, baseUrl: e.target.value } : ch)
                                       })}
                                       className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
-                                      placeholder="https://api.openai.com/v1"
+                                      placeholder={
+                                        channel.typeId === 1 
+                                          ? t("optionsProviderBaseUrlPlaceholder") 
+                                          : channel.typeId === 2 
+                                            ? t("optionsClaudeBaseUrlPlaceholder") 
+                                            : t("optionsGeminiBaseUrlPlaceholder")
+                                      }
                                    />
                                    {channelErrors.baseUrl && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(channelErrors.baseUrl)}</p>}
                                 </div>
