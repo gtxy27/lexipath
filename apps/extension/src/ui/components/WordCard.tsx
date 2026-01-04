@@ -8,6 +8,10 @@ import { Volume2, Star, Check, X, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
+function t(key: string): string {
+  return browser.i18n.getMessage(key) || key;
+}
+
 export interface WordCardData {
   word: string;
   phonetic?: string;
@@ -130,7 +134,7 @@ export function WordCard({
                 stop();
                 onClose();
               }}
-              aria-label={browser.i18n.getMessage("wordCard_close")}
+              aria-label={t("wordCard_close")}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -152,13 +156,13 @@ export function WordCard({
             onClick={handleSpeak}
             disabled={isPlayingAudio}
             className="h-10 gap-2.5 px-4 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all font-bold"
-            aria-label={browser.i18n.getMessage("wordCard_pronounce")}
+            aria-label={t("wordCard_pronounce")}
           >
             <motion.div animate={isPlayingAudio ? { scale: [1, 1.2, 1] } : {}} transition={{ repeat: Infinity }}>
               <Volume2 className={cn("h-4 w-4", isPlayingAudio && "text-indigo-500")} />
             </motion.div>
             <span className="text-[10px] font-black uppercase tracking-widest">
-              {browser.i18n.getMessage("wordCard_pronounce") || "Speak"}
+              {t("wordCard_pronounce")}
             </span>
           </Button>
 
@@ -173,7 +177,7 @@ export function WordCard({
                   ? "text-amber-500 bg-amber-500/10 border border-amber-500/20"
                   : "text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-white/5 border border-transparent",
               )}
-              aria-label={browser.i18n.getMessage("wordCard_favorite")}
+              aria-label={t("wordCard_favorite")}
             >
               <Star className={cn("h-4 w-4", isFavorited && "fill-current")} />
             </Button>
@@ -188,11 +192,11 @@ export function WordCard({
                   ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
                   : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/5 border-transparent",
               )}
-              aria-label={browser.i18n.getMessage("wordCard_markLearned")}
+              aria-label={t("wordCard_markLearned")}
             >
               <Check className={cn("h-4 w-4", isLearned && "text-emerald-500")} />
               <span className="text-[10px] font-black uppercase tracking-widest">
-                {isLearned ? "Learned" : browser.i18n.getMessage("wordCard_markLearned")}
+                {t("wordCard_markLearned")}
               </span>
             </Button>
           </div>

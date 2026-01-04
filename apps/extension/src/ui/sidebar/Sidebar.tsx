@@ -73,7 +73,7 @@ export function Sidebar(): React.ReactElement {
       setError(
         err instanceof Error
           ? err.message
-          : browser.i18n.getMessage("error_unknown") || "error_unknown",
+          : t("error_unknown"),
       );
     } finally {
       setIsLoading(false);
@@ -93,7 +93,7 @@ export function Sidebar(): React.ReactElement {
 
   const handleClear = useCallback(() => {
     if (messages.length === 0) return;
-    if (confirm(browser.i18n.getMessage("chatClearConfirm"))) {
+    if (confirm(t("chatClearConfirm"))) {
       setMessages([]);
       setConversationId(undefined);
       setError(null);
@@ -120,11 +120,13 @@ export function Sidebar(): React.ReactElement {
           </motion.div>
           <div>
             <h1 className="font-black text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/70">
-              {browser.i18n.getMessage("chatTitle") || "Lexi Assistant"}
+              {t("chatTitle")}
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Online</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                {t("chatStatusOnline")}
+              </span>
             </div>
           </div>
         </div>
@@ -133,6 +135,8 @@ export function Sidebar(): React.ReactElement {
             variant="ghost"
             size="icon"
             onClick={handleClear}
+            aria-label={t("chatClear")}
+            title={t("chatClear")}
             className="h-9 w-9 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-white/5 rounded-lg transition-colors"
           >
             <Trash2 className="h-4 w-4" />
@@ -156,8 +160,12 @@ export function Sidebar(): React.ReactElement {
                    </div>
                 </div>
                 <div className="space-y-2 max-w-[240px]">
-                  <p className="text-xl font-black text-gray-900 dark:text-white tracking-tight">How can I help you learn?</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-relaxed">{browser.i18n.getMessage("chatEmpty") || "Ask me anything about the content you're reading."}</p>
+                  <p className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                    {t("chatEmptyTitle")}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
+                    {t("chatEmpty")}
+                  </p>
                 </div>
               </motion.div>
             ) : (
@@ -248,13 +256,15 @@ export function Sidebar(): React.ReactElement {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={browser.i18n.getMessage("chatPlaceholder") || "Type a message..."}
+              placeholder={t("chatPlaceholder")}
               disabled={isLoading}
               className="flex-1 h-12 bg-gray-50 dark:bg-[#1a1b23] border-gray-200 dark:border-white/5 focus-visible:ring-indigo-500/30 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 rounded-xl transition-all font-medium"
             />
             <Button
               onClick={handleSend}
               disabled={!inputValue.trim() || isLoading}
+              aria-label={t("chatSend")}
+              title={t("chatSend")}
               className={cn(
                 "h-12 w-12 shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/10 transition-all",
                 !inputValue.trim() && !isLoading && "opacity-50 grayscale",

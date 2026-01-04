@@ -98,13 +98,13 @@ export function Popup(): React.ReactElement {
                     <img
                       src="../../icons/icon.svg"
                       className="h-6 w-6"
-                      alt="LexiPath"
+                      alt={t("extensionName")}
                     />
                   </div>
                 </motion.div>
                 <div>
                   <CardTitle className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
-                    LexiPath
+                    {t("extensionName")}
                   </CardTitle>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className={`h-1.5 w-1.5 rounded-full ${isEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
@@ -134,8 +134,12 @@ export function Popup(): React.ReactElement {
                     <Zap className={`h-5 w-5 ${isEnabled ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400'}`} />
                   </div>
                   <div>
-                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400/70">{t("status") || "Mode"}</div>
-                    <div className="text-sm font-bold text-gray-900 dark:text-white">Smart Learning</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400/70">
+                      {t("popupStatusLabel")}
+                    </div>
+                    <div className="text-sm font-bold text-gray-900 dark:text-white">
+                      {t("popupModeSmartLearning")}
+                    </div>
                   </div>
                 </div>
                 <Badge className={`${isEnabled ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30' : 'bg-gray-100 dark:bg-gray-500/10 text-gray-500 border-gray-200 dark:border-gray-500/20'} border shadow-none font-bold`}>
@@ -153,10 +157,14 @@ export function Popup(): React.ReactElement {
                   <div className="p-1 rounded-md bg-blue-50 dark:bg-blue-500/10">
                     <Languages className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t("targetLanguage") || "Target"}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    {t("targetLanguage")}
+                  </span>
                 </div>
                 <div className="text-base font-black text-gray-900 dark:text-white tracking-wide">
-                  {settings?.targetLanguage || "EN"}
+                  {settings?.targetLanguage
+                    ? t(`languageTarget_${settings.targetLanguage}`)
+                    : t("popupValueUnset")}
                 </div>
               </motion.div>
 
@@ -168,10 +176,14 @@ export function Popup(): React.ReactElement {
                   <div className="p-1 rounded-md bg-purple-50 dark:bg-purple-500/10">
                     <GraduationCap className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t("proficiencyLevel") || "Level"}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    {t("proficiencyLevel")}
+                  </span>
                 </div>
                 <div className="text-base font-black text-gray-900 dark:text-white tracking-wide">
-                  {settings?.proficiencyLevel || "A2"}
+                  {settings?.proficiencyLevel
+                    ? t(`proficiency_${settings.proficiencyLevel}`)
+                    : t("popupValueUnset")}
                 </div>
               </motion.div>
             </div>

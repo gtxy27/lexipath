@@ -560,8 +560,8 @@ describe('Onboarding', () => {
       // Verify key i18n calls (check that they were called at some point)
       expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('welcomeTitle');
       expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('welcomeDesc');
-      expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('onboardingNext', undefined);
-      expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('onboardingPrevious', undefined);
+      expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('onboardingNext');
+      expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('onboardingPrevious');
       expect(browserMock.i18n.getMessage).toHaveBeenCalledWith('onboardingStepProgress', '1');
     });
   });

@@ -49,7 +49,10 @@ type OnboardingFormData = {
 };
 
 function t(key: string, substitutions?: string | string[]): string {
-  const message = browser.i18n.getMessage(key, substitutions);
+  const message =
+    substitutions === undefined
+      ? browser.i18n.getMessage(key)
+      : browser.i18n.getMessage(key, substitutions);
   return message || key;
 }
 
@@ -219,23 +222,29 @@ export function Onboarding(): React.ReactElement {
               className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-premium p-[1px] shadow-2xl shadow-indigo-500/10 dark:shadow-indigo-500/20"
             >
               <div className="flex h-full w-full items-center justify-center rounded-[15px] bg-white dark:bg-[#0d0e14]">
-                <img src="../../icons/icon.svg" className="h-9 w-9" alt="LexiPath" />
+                <img src="../../icons/icon.svg" className="h-9 w-9" alt={t("extensionName")} />
               </div>
             </motion.div>
             
             <CardTitle className="text-4xl font-black tracking-tighter text-gray-900 dark:text-white mb-2">
-              {browser.i18n.getMessage("welcomeTitle") || "LexiPath"}
+              {t("welcomeTitle")}
             </CardTitle>
             <CardDescription className="text-lg text-gray-500 dark:text-gray-400 font-bold max-w-md mx-auto leading-relaxed uppercase tracking-wider text-[11px]">
-              {browser.i18n.getMessage("welcomeDesc") || "Experience the next generation of language learning."}
+              {t("welcomeDesc")}
             </CardDescription>
           </CardHeader>
 
           <div className="px-10 py-0">
             <div
               role="progressbar"
-              aria-label={`Setup Progress: ${Math.round(progress)}% complete`}
-              aria-valuetext={`${Math.round(progress)} percent`}
+              aria-label={t(
+                "onboardingProgressAriaLabel",
+                String(Math.round(progress)),
+              )}
+              aria-valuetext={t(
+                "onboardingProgressAriaValueText",
+                String(Math.round(progress)),
+              )}
               className="relative h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden"
             >
               <motion.div
@@ -491,7 +500,7 @@ export function Onboarding(): React.ReactElement {
                 className="gap-2 h-14 px-10 bg-gradient-premium text-white rounded-2xl shadow-2xl shadow-indigo-600/20 dark:shadow-indigo-600/30 transition-all font-black text-lg group"
               >
                 {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6 group-hover:rotate-12 transition-transform" />}
-                {saving ? t("optionsSaving") : t("onboardingFinish") || "Start Learning"}
+                {saving ? t("optionsSaving") : t("onboardingFinish")}
               </Button>
             )}
           </CardFooter>

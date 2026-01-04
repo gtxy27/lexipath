@@ -139,6 +139,18 @@
     "message": "打开设置",
     "description": "打开设置链接"
   },
+  "popupStatusLabel": {
+    "message": "模式",
+    "description": "弹窗：状态标签"
+  },
+  "popupModeSmartLearning": {
+    "message": "智能学习",
+    "description": "弹窗：模式名称"
+  },
+  "popupValueUnset": {
+    "message": "—",
+    "description": "弹窗：未设置占位符"
+  },
   "settingsTitle": {
     "message": "LexiPath 设置",
     "description": "设置页面标题"
@@ -148,7 +160,7 @@
     "description": "服务商设置区域标题"
   },
   "providerSettingsDesc": {
-    "message": "配置 OpenAI-compatible / Claude / Gemini 渠道，并选择“选词/翻译”的路由。",
+    "message": "配置 OpenAI-compatible / Claude / Gemini 模型，并选择“选词/翻译”的路由。",
     "description": "服务商设置描述"
   },
   "languageSettings": {
@@ -174,6 +186,18 @@
   "chatTitle": {
     "message": "对话",
     "description": "侧边栏对话标题"
+  },
+  "chatPageTitle": {
+    "message": "LexiPath 对话",
+    "description": "侧边栏页面标题"
+  },
+  "chatStatusOnline": {
+    "message": "在线",
+    "description": "侧边栏状态：在线"
+  },
+  "chatEmptyTitle": {
+    "message": "我能帮你学什么？",
+    "description": "空对话标题"
   },
   "chatEmpty": {
     "message": "询问任何关于您正在阅读的单词或内容的问题",
@@ -204,11 +228,11 @@
     "description": "设置页标题"
   },
   "optionsDesc": {
-    "message": "配置 Channel 与行为路由。",
+    "message": "配置模型与行为路由。",
     "description": "设置页描述"
   },
   "optionsTab_channels": {
-    "message": "Channels",
+    "message": "模型",
     "description": "设置页 Tab：Channels"
   },
   "optionsTab_language": {
@@ -220,15 +244,15 @@
     "description": "设置页 Tab：站点"
   },
   "optionsChannelsTitle": {
-    "message": "Channels",
+    "message": "模型",
     "description": "Channels 标题"
   },
   "optionsChannelsDesc": {
-    "message": "可新增多个 Channel（同一家可多条，每条只绑定一个 model）。",
+    "message": "可新增多个模型配置（同一家可多条，每条只绑定一个模型）。",
     "description": "Channels 描述"
   },
   "optionsAddChannel": {
-    "message": "新增 Channel",
+    "message": "新增模型",
     "description": "新增 Channel 按钮"
   },
   "optionsChannelModelUnset": {
@@ -240,7 +264,7 @@
     "description": "测试服务商连接按钮"
   },
   "optionsCopyChannel": {
-    "message": "复制 Channel",
+    "message": "复制模型",
     "description": "复制 Channel 按钮"
   },
   "optionsChannelCopySuffix": {
@@ -248,7 +272,7 @@
     "description": "复制 Channel 时的名称后缀"
   },
   "optionsDeleteChannel": {
-    "message": "删除 Channel",
+    "message": "删除模型",
     "description": "删除 Channel 按钮"
   },
   "optionsResetButton": {
@@ -284,7 +308,7 @@
     "description": "Channel 图标 URL 占位符"
   },
   "optionsRouteKind_channel": {
-    "message": "Channel",
+    "message": "模型",
     "description": "路由类型：Channel"
   },
   "optionsRouteKindLabel": {
@@ -292,11 +316,11 @@
     "description": "行为路由类型标签"
   },
   "optionsRouteChannelLabel": {
-    "message": "Channel",
+    "message": "模型",
     "description": "行为路由 Channel 标签"
   },
   "optionsRouteChannelPlaceholder": {
-    "message": "选择一个 Channel",
+    "message": "选择一个模型",
     "description": "行为路由 Channel 占位符"
   },
   "optionsTestInvalidConfig": {
@@ -388,11 +412,11 @@
     "description": "校验：图标 URL 无效"
   },
   "optionsRouteChannelMissing": {
-    "message": "请选择一个 Channel。",
+    "message": "请选择一个模型。",
     "description": "校验：路由缺少 Channel"
   },
   "optionsRouteChannelNotConfigured": {
-    "message": "选中的 Channel 未完成配置。",
+    "message": "选中的模型未完成配置。",
     "description": "校验：路由 Channel 未配置"
   },
   "optionsSaveButton": {
@@ -523,6 +547,10 @@
     "message": "熟练度",
     "description": "熟练度标签"
   },
+  "optionsProficiencyHint": {
+    "message": "调整此项会影响高亮单词的范围；等级越高，高亮越少、词更难。",
+    "description": "熟练度提示"
+  },
   "languageNative_zh_CN": {
     "message": "中文（简体）",
     "description": "母语 zh-CN 选项"
@@ -635,9 +663,37 @@
     "message": "暂无条目。",
     "description": "列表为空提示"
   },
+  "wordCard_close": {
+    "message": "关闭",
+    "description": "关闭单词卡按钮"
+  },
+  "dialogClose": {
+    "message": "关闭",
+    "description": "对话框关闭按钮（仅屏幕阅读器可见）"
+  },
+  "wordCard_pronounce": {
+    "message": "发音",
+    "description": "单词发音按钮"
+  },
+  "wordCard_favorite": {
+    "message": "收藏",
+    "description": "收藏按钮"
+  },
+  "wordCard_markLearned": {
+    "message": "已掌握",
+    "description": "标记为已掌握按钮"
+  },
   "onboardingStepProgress": {
     "message": "步骤 $1 / 3",
     "description": "步骤进度指示器"
+  },
+  "onboardingProgressAriaLabel": {
+    "message": "设置进度：已完成 $1%",
+    "description": "引导页进度条 aria-label"
+  },
+  "onboardingProgressAriaValueText": {
+    "message": "已完成 $1%",
+    "description": "引导页进度条 aria-valuetext"
   },
   "onboardingStep1Title": {
     "message": "选择您的学习水平",
@@ -796,11 +852,11 @@
     "description": "Options page advanced section title"
   },
   "optionsConcurrencyDesc": {
-    "message": "限制每个渠道并行运行的请求数量。留空使用默认值（20）。",
+    "message": "限制每个模型配置并行运行的请求数量。留空使用默认值（20）。",
     "description": "Options page concurrency description"
   },
   "optionsConcurrencyLabel": {
-    "message": "按渠道并发限制",
+    "message": "按模型并发限制",
     "description": "Concurrency limits label"
   },
   "optionsConcurrencyHint": {
@@ -848,11 +904,11 @@
     "description": "Provider API key required error"
   },
   "optionsKeywordProviderNotConfigured": {
-    "message": "所选的选词渠道尚未配置。",
+    "message": "所选的选词模型尚未配置。",
     "description": "Keyword provider not configured error"
   },
   "optionsTranslationProviderNotConfigured": {
-    "message": "所选的翻译渠道尚未配置。",
+    "message": "所选的翻译模型尚未配置。",
     "description": "Translation provider not configured error"
   },
   "optionsChannelOpenAI": {
@@ -860,7 +916,7 @@
     "description": "OpenAI channel section title"
   },
   "optionsChannelOpenAIDesc": {
-    "message": "OpenAI 兼容聊天接口（例如 /v1/chat/completions）。每个渠道仅一个模型。",
+    "message": "OpenAI 兼容聊天接口（例如 /v1/chat/completions）。每条配置仅一个模型。",
     "description": "OpenAI channel section description"
   },
   "optionsChannelClaude": {
@@ -868,7 +924,7 @@
     "description": "Claude channel section title"
   },
   "optionsChannelClaudeDesc": {
-    "message": "Anthropic Messages API（/v1/messages）。每个渠道仅一个模型。",
+    "message": "Anthropic Messages API（/v1/messages）。每条配置仅一个模型。",
     "description": "Claude channel section description"
   },
   "optionsChannelGemini": {
@@ -876,7 +932,7 @@
     "description": "Gemini channel section title"
   },
   "optionsChannelGeminiDesc": {
-    "message": "Gemini generateContent API。每个渠道仅一个模型。",
+    "message": "Gemini generateContent API。每条配置仅一个模型。",
     "description": "Gemini channel section description"
   },
   "optionsClaudeModelPlaceholder": {
@@ -948,11 +1004,11 @@
     "description": "Routing section title"
   },
   "optionsRoutingDesc": {
-    "message": "选词与翻译可以使用不同渠道。",
+    "message": "选词与翻译可以使用不同模型。",
     "description": "Routing section description"
   },
   "optionsKeywordProviderLabel": {
-    "message": "选词渠道",
+    "message": "选词模型",
     "description": "Keyword provider label"
   },
   "optionsKeywordProviderDesc": {
@@ -960,7 +1016,7 @@
     "description": "Keyword provider description"
   },
   "optionsTranslationProviderLabel": {
-    "message": "翻译渠道",
+    "message": "翻译模型",
     "description": "Translation provider label"
   },
   "optionsTranslationProviderDesc": {

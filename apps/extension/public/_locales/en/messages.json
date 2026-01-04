@@ -139,6 +139,18 @@
     "message": "Open Settings",
     "description": "Open settings link"
   },
+  "popupStatusLabel": {
+    "message": "Mode",
+    "description": "Popup: status label"
+  },
+  "popupModeSmartLearning": {
+    "message": "Smart Learning",
+    "description": "Popup: mode name"
+  },
+  "popupValueUnset": {
+    "message": "—",
+    "description": "Popup: unset value placeholder"
+  },
   "settingsTitle": {
     "message": "LexiPath Settings",
     "description": "Settings page title"
@@ -148,7 +160,7 @@
     "description": "Provider settings section title"
   },
   "providerSettingsDesc": {
-    "message": "Configure OpenAI-compatible / Claude / Gemini channels and choose routing for keyword selection + translation.",
+    "message": "Configure OpenAI-compatible / Claude / Gemini models and choose routing for keyword selection + translation.",
     "description": "Provider settings description"
   },
   "languageSettings": {
@@ -174,6 +186,18 @@
   "chatTitle": {
     "message": "Chat",
     "description": "Sidebar chat title"
+  },
+  "chatPageTitle": {
+    "message": "LexiPath Chat",
+    "description": "Sidebar page title"
+  },
+  "chatStatusOnline": {
+    "message": "Online",
+    "description": "Sidebar status: online"
+  },
+  "chatEmptyTitle": {
+    "message": "How can I help you learn?",
+    "description": "Empty chat title"
   },
   "chatEmpty": {
     "message": "Ask anything about the words or content you're reading",
@@ -204,11 +228,11 @@
     "description": "Options page title"
   },
   "optionsDesc": {
-    "message": "Configure channels and routing.",
+    "message": "Configure models and routing.",
     "description": "Options page description"
   },
   "optionsTab_channels": {
-    "message": "Channels",
+    "message": "Models",
     "description": "Options tab: channels"
   },
   "optionsTab_language": {
@@ -220,15 +244,15 @@
     "description": "Options tab: sites"
   },
   "optionsChannelsTitle": {
-    "message": "Channels",
+    "message": "Models",
     "description": "Channels section title"
   },
   "optionsChannelsDesc": {
-    "message": "Add multiple provider channels (one model per channel).",
+    "message": "Add one or more model profiles (one model per entry).",
     "description": "Channels section description"
   },
   "optionsAddChannel": {
-    "message": "Add channel",
+    "message": "Add model",
     "description": "Add channel button"
   },
   "optionsChannelModelUnset": {
@@ -240,7 +264,7 @@
     "description": "Test provider connection button"
   },
   "optionsCopyChannel": {
-    "message": "Duplicate channel",
+    "message": "Duplicate model",
     "description": "Copy channel button"
   },
   "optionsChannelCopySuffix": {
@@ -248,7 +272,7 @@
     "description": "Channel name suffix when duplicating"
   },
   "optionsDeleteChannel": {
-    "message": "Delete channel",
+    "message": "Delete model",
     "description": "Delete channel button"
   },
   "optionsResetButton": {
@@ -284,7 +308,7 @@
     "description": "Channel icon URL placeholder"
   },
   "optionsRouteKind_channel": {
-    "message": "Channel",
+    "message": "Model",
     "description": "Route kind label: channel"
   },
   "optionsRouteKindLabel": {
@@ -292,11 +316,11 @@
     "description": "Behavior route kind label"
   },
   "optionsRouteChannelLabel": {
-    "message": "Channel",
+    "message": "Model",
     "description": "Behavior route channel label"
   },
   "optionsRouteChannelPlaceholder": {
-    "message": "Select a channel",
+    "message": "Select a model",
     "description": "Behavior route channel placeholder"
   },
   "optionsTestInvalidConfig": {
@@ -388,11 +412,11 @@
     "description": "Validation: icon URL invalid"
   },
   "optionsRouteChannelMissing": {
-    "message": "Please select a channel.",
+    "message": "Please select a model.",
     "description": "Validation: route missing channel"
   },
   "optionsRouteChannelNotConfigured": {
-    "message": "Selected channel is not configured.",
+    "message": "Selected model is not configured.",
     "description": "Validation: route channel not configured"
   },
   "optionsSaveButton": {
@@ -523,6 +547,10 @@
     "message": "Proficiency",
     "description": "Proficiency level label"
   },
+  "optionsProficiencyHint": {
+    "message": "Changing this affects which words are highlighted. Higher levels highlight fewer, more advanced words.",
+    "description": "Proficiency level hint"
+  },
   "languageNative_zh_CN": {
     "message": "Chinese (Simplified)",
     "description": "Native language zh-CN option"
@@ -639,6 +667,10 @@
     "message": "Close",
     "description": "Close word card button"
   },
+  "dialogClose": {
+    "message": "Close",
+    "description": "Dialog close button (screen reader only)"
+  },
   "wordCard_pronounce": {
     "message": "Pronounce",
     "description": "Pronounce word button"
@@ -654,6 +686,14 @@
   "onboardingStepProgress": {
     "message": "Step $1 of 3",
     "description": "Step progress indicator"
+  },
+  "onboardingProgressAriaLabel": {
+    "message": "Setup progress: $1% complete",
+    "description": "Onboarding progress bar aria-label"
+  },
+  "onboardingProgressAriaValueText": {
+    "message": "$1 percent",
+    "description": "Onboarding progress bar aria-valuetext"
   },
   "onboardingStep1Title": {
     "message": "Choose Your Learning Level",
@@ -812,11 +852,11 @@
     "description": "Options page advanced section title"
   },
   "optionsConcurrencyDesc": {
-    "message": "Limit how many requests run in parallel per channel. Empty values use the default (20).",
+    "message": "Limit how many requests run in parallel per model profile. Empty values use the default (20).",
     "description": "Options page concurrency description"
   },
   "optionsConcurrencyLabel": {
-    "message": "Per-channel concurrency limits",
+    "message": "Per-model concurrency limits",
     "description": "Concurrency limits label"
   },
   "optionsConcurrencyHint": {
@@ -864,11 +904,11 @@
     "description": "Provider API key required error"
   },
   "optionsKeywordProviderNotConfigured": {
-    "message": "Selected keyword channel is not configured.",
+    "message": "Selected keyword model is not configured.",
     "description": "Keyword provider not configured error"
   },
   "optionsTranslationProviderNotConfigured": {
-    "message": "Selected translation channel is not configured.",
+    "message": "Selected translation model is not configured.",
     "description": "Translation provider not configured error"
   },
   "optionsChannelOpenAI": {
@@ -876,7 +916,7 @@
     "description": "OpenAI channel section title"
   },
   "optionsChannelOpenAIDesc": {
-    "message": "OpenAI-compatible chat endpoint (e.g. /v1/chat/completions). One model per channel.",
+    "message": "OpenAI-compatible chat endpoint (e.g. /v1/chat/completions). One model per entry.",
     "description": "OpenAI channel section description"
   },
   "optionsChannelClaude": {
@@ -884,7 +924,7 @@
     "description": "Claude channel section title"
   },
   "optionsChannelClaudeDesc": {
-    "message": "Anthropic Messages API (/v1/messages). One model per channel.",
+    "message": "Anthropic Messages API (/v1/messages). One model per entry.",
     "description": "Claude channel section description"
   },
   "optionsChannelGemini": {
@@ -892,7 +932,7 @@
     "description": "Gemini channel section title"
   },
   "optionsChannelGeminiDesc": {
-    "message": "Gemini generateContent API. One model per channel.",
+    "message": "Gemini generateContent API. One model per entry.",
     "description": "Gemini channel section description"
   },
   "optionsClaudeModelPlaceholder": {
@@ -964,11 +1004,11 @@
     "description": "Routing section title"
   },
   "optionsRoutingDesc": {
-    "message": "Keyword selection and translation can use different channels.",
+    "message": "Keyword selection and translation can use different models.",
     "description": "Routing section description"
   },
   "optionsKeywordProviderLabel": {
-    "message": "Keyword channel",
+    "message": "Keyword model",
     "description": "Keyword provider label"
   },
   "optionsKeywordProviderDesc": {
@@ -976,7 +1016,7 @@
     "description": "Keyword provider description"
   },
   "optionsTranslationProviderLabel": {
-    "message": "Translation channel",
+    "message": "Translation model",
     "description": "Translation provider label"
   },
   "optionsTranslationProviderDesc": {

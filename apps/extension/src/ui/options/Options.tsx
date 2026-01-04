@@ -6,6 +6,7 @@ import {
   ChannelTypeIdSchema,
   ClaudeProviderConfigSchema,
   GeminiProviderConfigSchema,
+  NativeLanguageSchema,
   ProviderConfigSchema,
   RouteKindSchema,
   SettingsSchema,
@@ -153,7 +154,10 @@ type FieldErrors = Partial<{
 }>;
 
 function t(key: string, substitutions?: string | string[]): string {
-  const message = browser.i18n.getMessage(key, substitutions as any);
+  const message =
+    substitutions === undefined
+      ? browser.i18n.getMessage(key)
+      : browser.i18n.getMessage(key, substitutions as any);
   return message || key;
 }
 
@@ -166,6 +170,11 @@ function dedupeStrings(values: string[]): string[] {
     result.push(value);
   }
   return result;
+}
+
+function nativeLanguageLabel(lang: Settings["nativeLanguage"]): string {
+  const key = `languageNative_${lang.replace("-", "_")}`;
+  return t(key);
 }
 
 function normalizeSiteEntry(value: string): string | null {
@@ -864,11 +873,11 @@ export function Options(): React.ReactElement {
           <div className="flex items-center gap-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/20">
               <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
-                <img src="../../icons/icon.svg" className="h-6 w-6" alt="LexiPath" />
+                <img src="../../icons/icon.svg" className="h-6 w-6" alt={t("extensionName")} />
               </div>
             </div>
             <h1 className="font-black text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/70">
-              LexiPath
+              {t("extensionName")}
             </h1>
           </div>
 
@@ -1130,7 +1139,7 @@ export function Options(): React.ReactElement {
                                           channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, apiKey: e.target.value } : ch)
                                         })}
                                         className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium"
-                                        placeholder="sk-..."
+                                        placeholder={t("optionsProviderApiKeyPlaceholder")}
                                       />
                                    </div>
                                 </div>
@@ -1150,7 +1159,7 @@ export function Options(): React.ReactElement {
                                         channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, baseUrl: e.target.value } : ch)
                                       })}
                                       className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium"
-                                      placeholder="https://api.openai.com/v1"
+                                      placeholder={t("optionsProviderBaseUrlPlaceholder")}
                                    />
                                 </div>
                               </CardContent>
@@ -1195,7 +1204,9 @@ export function Options(): React.ReactElement {
 
                                               <h4 className="font-bold text-gray-900 dark:text-white text-base">{behaviorLabel(key)}</h4>
 
-                                              <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider mt-0.5">Feature Routing Configuration</p>
+                                              <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider mt-0.5">
+                                                {behaviorDesc(key)}
+                                              </p>
 
                                            </div>
 
@@ -1362,10 +1373,14 @@ export function Options(): React.ReactElement {
                                <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white max-h-60">
-                               {SupportedLanguageSchema.options.map(lang => <SelectItem key={lang} value={lang}>{lang}</SelectItem>)}
-                            </SelectContent>
-                         </Select>
-                      </div>
+                               {NativeLanguageSchema.options.map((lang) => (
+                                 <SelectItem key={lang} value={lang}>
+                                   {nativeLanguageLabel(lang)}
+                                 </SelectItem>
+                               ))}
+                             </SelectContent>
+                          </Select>
+                       </div>
                       
                       <div className="space-y-2">
                          <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">{t("targetLanguage")}</Label>
@@ -1397,7 +1412,7 @@ export function Options(): React.ReactElement {
                          </Select>
                       </div>
                       <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-4 leading-relaxed font-medium">
-                        {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
+                        {t("optionsProficiencyHint")}
                       </p>
                    </div>
                 </div>
@@ -1438,7 +1453,7 @@ export function Options(): React.ReactElement {
                         }}
                         rows={8}
                         className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-2xl p-4 focus:ring-indigo-500/30 font-medium"
-                        placeholder="example.com"
+                        placeholder={t("optionsSiteEntryPlaceholder")}
                       />
                    </div>
                    <div className="space-y-3">
@@ -1454,7 +1469,7 @@ export function Options(): React.ReactElement {
                         }}
                         rows={8}
                         className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-2xl p-4 focus:ring-rose-500/20 font-medium"
-                        placeholder="google.com"
+                        placeholder={t("optionsSiteEntryPlaceholder")}
                       />
                    </div>
                 </div>

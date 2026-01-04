@@ -41,7 +41,10 @@ function resolveTtsLang(options: {
 
 function t(key: string, substitutions?: string | string[]): string {
   try {
-    const message = browser.i18n.getMessage(key, substitutions as any);
+    const message =
+      substitutions === undefined
+        ? browser.i18n.getMessage(key)
+        : browser.i18n.getMessage(key, substitutions as any);
     return message || key;
   } catch {
     return key;
