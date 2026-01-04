@@ -38,13 +38,20 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
 import { Badge } from "../components/ui/badge";
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Loader2,
   Plus,
@@ -186,13 +193,19 @@ function parseCustomHeaders(
   return { ok: true, value: result.data };
 }
 
-function omitKeys<T extends Record<string, unknown>>(obj: T, keys: string[]): Record<string, unknown> {
+function omitKeys<T extends Record<string, unknown>>(
+  obj: T,
+  keys: string[],
+): Record<string, unknown> {
   const next: Record<string, unknown> = { ...obj };
   for (const key of keys) delete next[key];
   return next;
 }
 
-function resolveChannel(channels: ChannelFormState[], channelId: number | null): ChannelFormState | null {
+function resolveChannel(
+  channels: ChannelFormState[],
+  channelId: number | null,
+): ChannelFormState | null {
   if (typeof channelId !== "number") return null;
   return channels.find((channel) => channel.channelId === channelId) ?? null;
 }
@@ -206,19 +219,24 @@ function ensureBehaviorRoutesComplete(
   settings: Settings,
 ): Record<BehaviorKey, RouteFormState> {
   const fallbackChannelId = (() => {
-    const first = settings.channels.slice().sort((a, b) => a.channelId - b.channelId)[0];
+    const first = settings.channels
+      .slice()
+      .sort((a, b) => a.channelId - b.channelId)[0];
     return first?.channelId ?? 1;
   })();
 
   const routes: Record<BehaviorKey, RouteFormState> = {} as any;
   for (const key of BEHAVIOR_KEYS) {
     const raw = settings.behaviorRoutes?.[key];
-    const kind = RouteKindSchema.safeParse(raw?.kind).success ? (raw!.kind as RouteKind) : 1;
+    const kind = RouteKindSchema.safeParse(raw?.kind).success
+      ? (raw!.kind as RouteKind)
+      : 1;
     const channelId = typeof raw?.channelId === "number" ? raw.channelId : null;
     routes[key] = {
       kind,
       channelId: kind === 1 ? (channelId ?? fallbackChannelId) : null,
-      extra: raw?.extra && typeof raw.extra === "object" ? (raw.extra as any) : {},
+      extra:
+        raw?.extra && typeof raw.extra === "object" ? (raw.extra as any) : {},
     };
   }
   return routes;
@@ -233,7 +251,8 @@ function settingsToFormState(settings: Settings): FormState {
       const baseUrl = typeof cfg.baseUrl === "string" ? cfg.baseUrl : "";
       const apiKey = typeof cfg.apiKey === "string" ? cfg.apiKey : "";
       const customHeaders = cfg.customHeaders as unknown;
-      const customHeadersText = z.record(z.string()).safeParse(customHeaders).success
+      const customHeadersText = z.record(z.string()).safeParse(customHeaders)
+        .success
         ? JSON.stringify(customHeaders, null, 2)
         : "";
 
@@ -330,17 +349,19 @@ function channelIsConfigured(channel: ChannelFormState): boolean {
 function channelHasAnyInput(channel: ChannelFormState): boolean {
   return Boolean(
     channel.model.trim() ||
-      channel.baseUrl.trim() ||
-      channel.apiKey.trim() ||
-      channel.customHeadersText.trim() ||
-      channel.iconUrl.trim(),
+    channel.baseUrl.trim() ||
+    channel.apiKey.trim() ||
+    channel.customHeadersText.trim() ||
+    channel.iconUrl.trim(),
   );
 }
 
 function buildChannel(
   channel: ChannelFormState,
   required: boolean,
-): { ok: true; value: ProviderChannel } | { ok: false; errors: ChannelFieldErrors } {
+):
+  | { ok: true; value: ProviderChannel }
+  | { ok: false; errors: ChannelFieldErrors } {
   const errors: ChannelFieldErrors = {};
 
   const name = channel.name.trim();
@@ -388,9 +409,11 @@ function buildChannel(
 
   if (channel.typeId === 1) {
     if (!baseUrl) errors.baseUrl = "optionsProviderBaseUrlRequired";
-    else if (!z.string().url().safeParse(baseUrl).success) errors.baseUrl = "optionsProviderBaseUrlInvalid";
+    else if (!z.string().url().safeParse(baseUrl).success)
+      errors.baseUrl = "optionsProviderBaseUrlInvalid";
   } else {
-    if (baseUrl && !z.string().url().safeParse(baseUrl).success) errors.baseUrl = "optionsProviderBaseUrlInvalid";
+    if (baseUrl && !z.string().url().safeParse(baseUrl).success)
+      errors.baseUrl = "optionsProviderBaseUrlInvalid";
     if (!apiKey) errors.apiKey = "optionsProviderApiKeyRequired";
   }
 
@@ -403,7 +426,9 @@ function buildChannel(
     ...(channel.typeId === 1 ? { baseUrl } : {}),
     ...(channel.typeId !== 1 && baseUrl ? { baseUrl } : {}),
     ...(apiKey ? { apiKey } : {}),
-    ...(customHeadersResult.ok && customHeadersResult.value ? { customHeaders: customHeadersResult.value } : {}),
+    ...(customHeadersResult.ok && customHeadersResult.value
+      ? { customHeaders: customHeadersResult.value }
+      : {}),
   };
 
   const validateConfig = (() => {
@@ -411,22 +436,32 @@ function buildChannel(
       return ProviderConfigSchema.safeParse({
         baseUrl: String(config.baseUrl ?? ""),
         model,
-        ...(typeof config.apiKey === "string" && config.apiKey ? { apiKey: config.apiKey } : {}),
-        ...(config.customHeaders ? { customHeaders: config.customHeaders } : {}),
+        ...(typeof config.apiKey === "string" && config.apiKey
+          ? { apiKey: config.apiKey }
+          : {}),
+        ...(config.customHeaders
+          ? { customHeaders: config.customHeaders }
+          : {}),
       });
     }
     if (channel.typeId === 2) {
       return ClaudeProviderConfigSchema.safeParse({
         model,
         apiKey: String(config.apiKey ?? ""),
-        ...(typeof config.baseUrl === "string" && config.baseUrl ? { baseUrl: config.baseUrl } : {}),
-        ...(config.customHeaders ? { customHeaders: config.customHeaders } : {}),
+        ...(typeof config.baseUrl === "string" && config.baseUrl
+          ? { baseUrl: config.baseUrl }
+          : {}),
+        ...(config.customHeaders
+          ? { customHeaders: config.customHeaders }
+          : {}),
       });
     }
     return GeminiProviderConfigSchema.safeParse({
       model,
       apiKey: String(config.apiKey ?? ""),
-      ...(typeof config.baseUrl === "string" && config.baseUrl ? { baseUrl: config.baseUrl } : {}),
+      ...(typeof config.baseUrl === "string" && config.baseUrl
+        ? { baseUrl: config.baseUrl }
+        : {}),
       ...(config.customHeaders ? { customHeaders: config.customHeaders } : {}),
     });
   })();
@@ -456,7 +491,12 @@ function buildChannel(
 }
 
 function buildSettingsPatch(form: FormState):
-  | { ok: true; patch: Partial<Settings>; errors: FieldErrors; iconOriginsToRequest: string[] }
+  | {
+      ok: true;
+      patch: Partial<Settings>;
+      errors: FieldErrors;
+      iconOriginsToRequest: string[];
+    }
   | { ok: false; errors: FieldErrors } {
   const errors: FieldErrors = {};
   const channelsErrors: Record<number, ChannelFieldErrors> = {};
@@ -469,7 +509,8 @@ function buildSettingsPatch(form: FormState):
   for (const key of BEHAVIOR_KEYS) {
     const route = form.behaviorRoutes[key];
     if (route.kind !== 1) continue;
-    if (typeof route.channelId === "number") requiredChannelIds.add(route.channelId);
+    if (typeof route.channelId === "number")
+      requiredChannelIds.add(route.channelId);
   }
 
   for (const channel of form.channels) {
@@ -484,7 +525,9 @@ function buildSettingsPatch(form: FormState):
   }
 
   const iconOriginsToRequest = dedupeStrings(
-    builtChannels.map((channel) => iconOrigin(channel.iconUrl ?? "")).filter(Boolean) as string[],
+    builtChannels
+      .map((channel) => iconOrigin(channel.iconUrl ?? ""))
+      .filter(Boolean) as string[],
   );
 
   for (const key of BEHAVIOR_KEYS) {
@@ -528,7 +571,9 @@ function buildSettingsPatch(form: FormState):
     const route = form.behaviorRoutes[key];
     behaviorRoutes[key] = {
       kind: route.kind,
-      ...(route.kind === 1 && typeof route.channelId === "number" ? { channelId: route.channelId } : {}),
+      ...(route.kind === 1 && typeof route.channelId === "number"
+        ? { channelId: route.channelId }
+        : {}),
       extra: route.extra ?? {},
     };
   }
@@ -589,7 +634,9 @@ async function requestIconHostPermissions(origins: string[]): Promise<void> {
   }
 }
 
-function buildTestPayload(channel: ChannelFormState): TestProviderConnectionPayload | null {
+function buildTestPayload(
+  channel: ChannelFormState,
+): TestProviderConnectionPayload | null {
   const model = channel.model.trim();
   if (!model) return null;
 
@@ -603,7 +650,9 @@ function buildTestPayload(channel: ChannelFormState): TestProviderConnectionPayl
       baseUrl,
       model,
       ...(channel.apiKey.trim() ? { apiKey: channel.apiKey.trim() } : {}),
-      ...(customHeadersResult.value ? { customHeaders: customHeadersResult.value } : {}),
+      ...(customHeadersResult.value
+        ? { customHeaders: customHeadersResult.value }
+        : {}),
     });
     if (!parsed.success) return null;
     return { type: "openai", config: parsed.data };
@@ -614,7 +663,9 @@ function buildTestPayload(channel: ChannelFormState): TestProviderConnectionPayl
       model,
       apiKey: channel.apiKey.trim(),
       ...(channel.baseUrl.trim() ? { baseUrl: channel.baseUrl.trim() } : {}),
-      ...(customHeadersResult.value ? { customHeaders: customHeadersResult.value } : {}),
+      ...(customHeadersResult.value
+        ? { customHeaders: customHeadersResult.value }
+        : {}),
     });
     if (!parsed.success) return null;
     return { type: "claude", config: parsed.data };
@@ -624,7 +675,9 @@ function buildTestPayload(channel: ChannelFormState): TestProviderConnectionPayl
     model,
     apiKey: channel.apiKey.trim(),
     ...(channel.baseUrl.trim() ? { baseUrl: channel.baseUrl.trim() } : {}),
-    ...(customHeadersResult.value ? { customHeaders: customHeadersResult.value } : {}),
+    ...(customHeadersResult.value
+      ? { customHeaders: customHeadersResult.value }
+      : {}),
   });
   if (!parsed.success) return null;
   return { type: "gemini", config: parsed.data };
@@ -638,6 +691,9 @@ export function Options(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingChannelId, setTestingChannelId] = useState<number | null>(null);
+  const [expandedChannels, setExpandedChannels] = useState<
+    Record<number, boolean>
+  >({});
 
   useEffect(() => {
     async function load() {
@@ -649,7 +705,16 @@ export function Options(): React.ReactElement {
       }
 
       setSettings(response.value);
-      setForm(settingsToFormState(response.value));
+      const formState = settingsToFormState(response.value);
+      setForm(formState);
+
+      const sortedChannels = formState.channels
+        .slice()
+        .sort((a, b) => a.channelId - b.channelId);
+      if (sortedChannels.length > 0 && sortedChannels[0]) {
+        setExpandedChannels({ [sortedChannels[0].channelId]: true });
+      }
+
       setLoading(false);
     }
     load();
@@ -695,7 +760,10 @@ export function Options(): React.ReactElement {
         return;
       }
 
-      const merged = SettingsSchema.parse({ ...(settings ?? {}), ...built.patch });
+      const merged = SettingsSchema.parse({
+        ...(settings ?? {}),
+        ...built.patch,
+      });
       setSettings(merged);
       setForm(settingsToFormState(merged));
       toast({
@@ -735,20 +803,30 @@ export function Options(): React.ReactElement {
   }
 
   async function testGoogleTranslate() {
-    const response = await sendMessage("TEST_PROVIDER_CONNECTION", { type: "google" });
+    const response = await sendMessage("TEST_PROVIDER_CONNECTION", {
+      type: "google",
+    });
     if (response.ok) {
       toast({ title: t("optionsTestSuccess") });
     } else {
-      toast({ title: t("optionsTestError", response.error.message), variant: "destructive" });
+      toast({
+        title: t("optionsTestError", response.error.message),
+        variant: "destructive",
+      });
     }
   }
 
   async function testBingTranslate() {
-    const response = await sendMessage("TEST_PROVIDER_CONNECTION", { type: "bing" });
+    const response = await sendMessage("TEST_PROVIDER_CONNECTION", {
+      type: "bing",
+    });
     if (response.ok) {
       toast({ title: t("optionsTestSuccess") });
     } else {
-      toast({ title: t("optionsTestError", response.error.message), variant: "destructive" });
+      toast({
+        title: t("optionsTestError", response.error.message),
+        variant: "destructive",
+      });
     }
   }
 
@@ -780,17 +858,27 @@ export function Options(): React.ReactElement {
           <CardContent className="p-0">
             <Tabs defaultValue="channels" className="w-full">
               <TabsList className="w-full justify-start rounded-none border-b bg-white px-6 py-3">
-                <TabsTrigger value="channels">{t("optionsTab_channels")}</TabsTrigger>
-                <TabsTrigger value="routing">{t("optionsRoutingTitle")}</TabsTrigger>
-                <TabsTrigger value="language">{t("optionsTab_language")}</TabsTrigger>
+                <TabsTrigger value="channels">
+                  {t("optionsTab_channels")}
+                </TabsTrigger>
+                <TabsTrigger value="routing">
+                  {t("optionsRoutingTitle")}
+                </TabsTrigger>
+                <TabsTrigger value="language">
+                  {t("optionsTab_language")}
+                </TabsTrigger>
                 <TabsTrigger value="sites">{t("optionsTab_sites")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="channels" className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold">{t("optionsChannelsTitle")}</h2>
-                    <p className="text-sm text-gray-600">{t("optionsChannelsDesc")}</p>
+                    <h2 className="text-lg font-semibold">
+                      {t("optionsChannelsTitle")}
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                      {t("optionsChannelsDesc")}
+                    </p>
                   </div>
                   <Button
                     onClick={() => {
@@ -829,27 +917,59 @@ export function Options(): React.ReactElement {
                     .slice()
                     .sort((a, b) => a.channelId - b.channelId)
                     .map((channel) => {
-                      const channelErrors = errors.channels?.[channel.channelId] ?? {};
+                      const channelErrors =
+                        errors.channels?.[channel.channelId] ?? {};
                       const isTesting = testingChannelId === channel.channelId;
+                      const isExpanded =
+                        expandedChannels[channel.channelId] ?? false;
+
+                      const toggleExpanded = () => {
+                        setExpandedChannels((prev) => ({
+                          ...prev,
+                          [channel.channelId]: !prev[channel.channelId],
+                        }));
+                      };
 
                       return (
-                        <Card key={channel.channelId} className="border border-gray-200">
-                          <CardHeader className="pb-3">
+                        <Card
+                          key={channel.channelId}
+                          className="border border-gray-200 overflow-hidden"
+                        >
+                          <CardHeader
+                            className="pb-3 cursor-pointer hover:bg-gray-50 transition-colors duration-200"
+                            onClick={toggleExpanded}
+                          >
                             <div className="flex items-start justify-between gap-4">
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
+                                  <div className="transition-transform duration-300 ease-in-out">
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                                    ) : (
+                                      <ChevronRight className="h-5 w-5 text-gray-500" />
+                                    )}
+                                  </div>
                                   <CardTitle className="text-base truncate">
                                     {channel.name || `#${channel.channelId}`}
                                   </CardTitle>
-                                  <Badge variant="secondary">{channelTypeLabel(channel.typeId)}</Badge>
-                                  <Badge variant="outline">#{channel.channelId}</Badge>
+                                  <Badge variant="secondary">
+                                    {channelTypeLabel(channel.typeId)}
+                                  </Badge>
+                                  <Badge variant="outline">
+                                    #{channel.channelId}
+                                  </Badge>
                                 </div>
                                 <CardDescription className="mt-1">
-                                  {channel.model?.trim() ? channel.model.trim() : t("optionsChannelModelUnset")}
+                                  {channel.model?.trim()
+                                    ? channel.model.trim()
+                                    : t("optionsChannelModelUnset")}
                                 </CardDescription>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div
+                                className="flex items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -874,7 +994,12 @@ export function Options(): React.ReactElement {
                                       channelId: id,
                                       name: `${channel.name || defaultChannelName(channel.typeId)}${t("optionsChannelCopySuffix")}`,
                                     };
-                                    setForm(repairRoutes({ ...form, channels: [...form.channels, copy] }));
+                                    setForm(
+                                      repairRoutes({
+                                        ...form,
+                                        channels: [...form.channels, copy],
+                                      }),
+                                    );
                                   }}
                                   title={t("optionsCopyChannel")}
                                 >
@@ -886,7 +1011,10 @@ export function Options(): React.ReactElement {
                                   size="icon"
                                   onClick={() => {
                                     if (form.channels.length <= 1) return;
-                                    const nextChannels = form.channels.filter((ch) => ch.channelId !== channel.channelId);
+                                    const nextChannels = form.channels.filter(
+                                      (ch) =>
+                                        ch.channelId !== channel.channelId,
+                                    );
                                     setForm(
                                       repairRoutes({
                                         ...form,
@@ -903,10 +1031,19 @@ export function Options(): React.ReactElement {
                             </div>
                           </CardHeader>
 
-                          <CardContent className="space-y-4">
+                          <CardContent
+                            className={cn(
+                              "space-y-4 transition-all duration-300 ease-in-out overflow-hidden",
+                              isExpanded
+                                ? "max-h-[5000px] opacity-100"
+                                : "max-h-0 opacity-0",
+                            )}
+                          >
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                               <div className="space-y-2">
-                                <Label htmlFor={`channel-${channel.channelId}-name`}>
+                                <Label
+                                  htmlFor={`channel-${channel.channelId}-name`}
+                                >
                                   {t("optionsChannelNameLabel")}
                                 </Label>
                                 <Input
@@ -917,13 +1054,17 @@ export function Options(): React.ReactElement {
                                     setForm({
                                       ...form,
                                       channels: form.channels.map((ch) =>
-                                        ch.channelId === channel.channelId ? { ...ch, name } : ch,
+                                        ch.channelId === channel.channelId
+                                          ? { ...ch, name }
+                                          : ch,
                                       ),
                                     });
                                   }}
                                 />
                                 {channelErrors.name && (
-                                  <p className="text-xs text-red-600">{t(channelErrors.name)}</p>
+                                  <p className="text-xs text-red-600">
+                                    {t(channelErrors.name)}
+                                  </p>
                                 )}
                               </div>
 
@@ -932,23 +1073,36 @@ export function Options(): React.ReactElement {
                                 <Select
                                   value={String(channel.typeId)}
                                   onValueChange={(value) => {
-                                    const parsed = ChannelTypeIdSchema.safeParse(Number(value));
+                                    const parsed =
+                                      ChannelTypeIdSchema.safeParse(
+                                        Number(value),
+                                      );
                                     if (!parsed.success) return;
                                     setForm({
                                       ...form,
                                       channels: form.channels.map((ch) =>
-                                        ch.channelId === channel.channelId ? { ...ch, typeId: parsed.data } : ch,
+                                        ch.channelId === channel.channelId
+                                          ? { ...ch, typeId: parsed.data }
+                                          : ch,
                                       ),
                                     });
                                   }}
                                 >
-                                  <SelectTrigger data-testid={`channel-type-${channel.channelId}`}>
+                                  <SelectTrigger
+                                    data-testid={`channel-type-${channel.channelId}`}
+                                  >
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="1">{channelTypeLabel(1)}</SelectItem>
-                                    <SelectItem value="2">{channelTypeLabel(2)}</SelectItem>
-                                    <SelectItem value="3">{channelTypeLabel(3)}</SelectItem>
+                                    <SelectItem value="1">
+                                      {channelTypeLabel(1)}
+                                    </SelectItem>
+                                    <SelectItem value="2">
+                                      {channelTypeLabel(2)}
+                                    </SelectItem>
+                                    <SelectItem value="3">
+                                      {channelTypeLabel(3)}
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -956,7 +1110,9 @@ export function Options(): React.ReactElement {
 
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                               <div className="space-y-2">
-                                <Label htmlFor={`channel-${channel.channelId}-model`}>
+                                <Label
+                                  htmlFor={`channel-${channel.channelId}-model`}
+                                >
                                   {t("optionsProviderModelLabel")}
                                 </Label>
                                 <Input
@@ -967,18 +1123,24 @@ export function Options(): React.ReactElement {
                                     setForm({
                                       ...form,
                                       channels: form.channels.map((ch) =>
-                                        ch.channelId === channel.channelId ? { ...ch, model } : ch,
+                                        ch.channelId === channel.channelId
+                                          ? { ...ch, model }
+                                          : ch,
                                       ),
                                     });
                                   }}
                                 />
                                 {channelErrors.model && (
-                                  <p className="text-xs text-red-600">{t(channelErrors.model)}</p>
+                                  <p className="text-xs text-red-600">
+                                    {t(channelErrors.model)}
+                                  </p>
                                 )}
                               </div>
 
                               <div className="space-y-2">
-                                <Label htmlFor={`channel-${channel.channelId}-icon`}>
+                                <Label
+                                  htmlFor={`channel-${channel.channelId}-icon`}
+                                >
                                   {t("optionsChannelIconUrlLabel")}
                                 </Label>
                                 <Input
@@ -989,21 +1151,29 @@ export function Options(): React.ReactElement {
                                     setForm({
                                       ...form,
                                       channels: form.channels.map((ch) =>
-                                        ch.channelId === channel.channelId ? { ...ch, iconUrl } : ch,
+                                        ch.channelId === channel.channelId
+                                          ? { ...ch, iconUrl }
+                                          : ch,
                                       ),
                                     });
                                   }}
-                                  placeholder={t("optionsChannelIconUrlPlaceholder")}
+                                  placeholder={t(
+                                    "optionsChannelIconUrlPlaceholder",
+                                  )}
                                 />
                                 {channelErrors.iconUrl && (
-                                  <p className="text-xs text-red-600">{t(channelErrors.iconUrl)}</p>
+                                  <p className="text-xs text-red-600">
+                                    {t(channelErrors.iconUrl)}
+                                  </p>
                                 )}
                               </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                               <div className="space-y-2">
-                                <Label htmlFor={`channel-${channel.channelId}-base-url`}>
+                                <Label
+                                  htmlFor={`channel-${channel.channelId}-base-url`}
+                                >
                                   {t("optionsProviderBaseUrlLabel")}
                                 </Label>
                                 <Input
@@ -1014,23 +1184,31 @@ export function Options(): React.ReactElement {
                                     setForm({
                                       ...form,
                                       channels: form.channels.map((ch) =>
-                                        ch.channelId === channel.channelId ? { ...ch, baseUrl } : ch,
+                                        ch.channelId === channel.channelId
+                                          ? { ...ch, baseUrl }
+                                          : ch,
                                       ),
                                     });
                                   }}
                                   placeholder={
                                     channel.typeId === 1
                                       ? t("optionsProviderBaseUrlPlaceholder")
-                                      : t("optionsProviderBaseUrlOptionalPlaceholder")
+                                      : t(
+                                          "optionsProviderBaseUrlOptionalPlaceholder",
+                                        )
                                   }
                                 />
                                 {channelErrors.baseUrl && (
-                                  <p className="text-xs text-red-600">{t(channelErrors.baseUrl)}</p>
+                                  <p className="text-xs text-red-600">
+                                    {t(channelErrors.baseUrl)}
+                                  </p>
                                 )}
                               </div>
 
                               <div className="space-y-2">
-                                <Label htmlFor={`channel-${channel.channelId}-api-key`}>
+                                <Label
+                                  htmlFor={`channel-${channel.channelId}-api-key`}
+                                >
                                   {t("optionsProviderApiKeyLabel")}
                                 </Label>
                                 <Input
@@ -1041,20 +1219,30 @@ export function Options(): React.ReactElement {
                                     setForm({
                                       ...form,
                                       channels: form.channels.map((ch) =>
-                                        ch.channelId === channel.channelId ? { ...ch, apiKey } : ch,
+                                        ch.channelId === channel.channelId
+                                          ? { ...ch, apiKey }
+                                          : ch,
                                       ),
                                     });
                                   }}
-                                  placeholder={channel.typeId === 1 ? t("optionsProviderApiKeyOptional") : ""}
+                                  placeholder={
+                                    channel.typeId === 1
+                                      ? t("optionsProviderApiKeyOptional")
+                                      : ""
+                                  }
                                 />
                                 {channelErrors.apiKey && (
-                                  <p className="text-xs text-red-600">{t(channelErrors.apiKey)}</p>
+                                  <p className="text-xs text-red-600">
+                                    {t(channelErrors.apiKey)}
+                                  </p>
                                 )}
                               </div>
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor={`channel-${channel.channelId}-headers`}>
+                              <Label
+                                htmlFor={`channel-${channel.channelId}-headers`}
+                              >
                                 {t("optionsProviderCustomHeadersLabel")}
                               </Label>
                               <Textarea
@@ -1065,15 +1253,21 @@ export function Options(): React.ReactElement {
                                   setForm({
                                     ...form,
                                     channels: form.channels.map((ch) =>
-                                      ch.channelId === channel.channelId ? { ...ch, customHeadersText } : ch,
+                                      ch.channelId === channel.channelId
+                                        ? { ...ch, customHeadersText }
+                                        : ch,
                                     ),
                                   });
                                 }}
                                 rows={4}
-                                placeholder={t("optionsProviderCustomHeadersPlaceholder")}
+                                placeholder={t(
+                                  "optionsProviderCustomHeadersPlaceholder",
+                                )}
                               />
                               {channelErrors.customHeadersText && (
-                                <p className="text-xs text-red-600">{t(channelErrors.customHeadersText)}</p>
+                                <p className="text-xs text-red-600">
+                                  {t(channelErrors.customHeadersText)}
+                                </p>
                               )}
                             </div>
                           </CardContent>
@@ -1085,8 +1279,12 @@ export function Options(): React.ReactElement {
 
               <TabsContent value="routing" className="p-6 space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold">{t("optionsRoutingTitle")}</h2>
-                  <p className="text-sm text-gray-600">{t("optionsRoutingDesc")}</p>
+                  <h2 className="text-lg font-semibold">
+                    {t("optionsRoutingTitle")}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {t("optionsRoutingDesc")}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
@@ -1098,7 +1296,9 @@ export function Options(): React.ReactElement {
                     return (
                       <Card key={key} className="border border-gray-200">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-base">{behaviorLabel(key)}</CardTitle>
+                          <CardTitle className="text-base">
+                            {behaviorLabel(key)}
+                          </CardTitle>
                           <CardDescription>{behaviorDesc(key)}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -1108,7 +1308,9 @@ export function Options(): React.ReactElement {
                               <Select
                                 value={String(route.kind)}
                                 onValueChange={(value) => {
-                                  const parsed = RouteKindSchema.safeParse(Number(value));
+                                  const parsed = RouteKindSchema.safeParse(
+                                    Number(value),
+                                  );
                                   if (!parsed.success) return;
                                   setForm(
                                     repairRoutes({
@@ -1120,7 +1322,10 @@ export function Options(): React.ReactElement {
                                           kind: parsed.data,
                                           channelId:
                                             parsed.data === 1
-                                              ? route.channelId ?? firstAvailableChannelId(form.channels)
+                                              ? (route.channelId ??
+                                                firstAvailableChannelId(
+                                                  form.channels,
+                                                ))
                                               : null,
                                         },
                                       },
@@ -1128,10 +1333,14 @@ export function Options(): React.ReactElement {
                                   );
                                 }}
                               >
-                                <SelectTrigger data-testid={`route-kind-${key}`}>
+                                <SelectTrigger
+                                  data-testid={`route-kind-${key}`}
+                                >
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent>{routeKindOptions(allowedKinds)}</SelectContent>
+                                <SelectContent>
+                                  {routeKindOptions(allowedKinds)}
+                                </SelectContent>
                               </Select>
                             </div>
                           )}
@@ -1140,7 +1349,9 @@ export function Options(): React.ReactElement {
                             <div className="space-y-2">
                               <Label>{t("optionsRouteChannelLabel")}</Label>
                               <Select
-                                value={route.channelId ? String(route.channelId) : ""}
+                                value={
+                                  route.channelId ? String(route.channelId) : ""
+                                }
                                 onValueChange={(value) => {
                                   const id = Number(value);
                                   setForm(
@@ -1151,19 +1362,30 @@ export function Options(): React.ReactElement {
                                         [key]: {
                                           ...route,
                                           kind: 1,
-                                          channelId: Number.isFinite(id) ? id : null,
+                                          channelId: Number.isFinite(id)
+                                            ? id
+                                            : null,
                                         },
                                       },
                                     }),
                                   );
                                 }}
                               >
-                                <SelectTrigger data-testid={`route-channel-${key}`}>
-                                  <SelectValue placeholder={t("optionsRouteChannelPlaceholder")} />
+                                <SelectTrigger
+                                  data-testid={`route-channel-${key}`}
+                                >
+                                  <SelectValue
+                                    placeholder={t(
+                                      "optionsRouteChannelPlaceholder",
+                                    )}
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {channelOptions.map((opt) => (
-                                    <SelectItem key={opt.value} value={opt.value}>
+                                    <SelectItem
+                                      key={opt.value}
+                                      value={opt.value}
+                                    >
                                       {opt.label}
                                     </SelectItem>
                                   ))}
@@ -1196,8 +1418,12 @@ export function Options(): React.ReactElement {
 
               <TabsContent value="language" className="p-6 space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold">{t("optionsLanguageTitle")}</h2>
-                  <p className="text-sm text-gray-600">{t("optionsLanguageDesc")}</p>
+                  <h2 className="text-lg font-semibold">
+                    {t("optionsLanguageTitle")}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {t("optionsLanguageDesc")}
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -1205,7 +1431,9 @@ export function Options(): React.ReactElement {
                     <Label>{t("nativeLanguage")}</Label>
                     <Select
                       value={form.nativeLanguage}
-                      onValueChange={(value) => setForm({ ...form, nativeLanguage: value as any })}
+                      onValueChange={(value) =>
+                        setForm({ ...form, nativeLanguage: value as any })
+                      }
                     >
                       <SelectTrigger data-testid="native-language">
                         <SelectValue />
@@ -1268,22 +1496,32 @@ export function Options(): React.ReactElement {
 
               <TabsContent value="sites" className="p-6 space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold">{t("optionsSitesTitle")}</h2>
-                  <p className="text-sm text-gray-600">{t("optionsSiteModeDesc")}</p>
+                  <h2 className="text-lg font-semibold">
+                    {t("optionsSitesTitle")}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {t("optionsSiteModeDesc")}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
                   <Label>{t("optionsSiteModeLabel")}</Label>
                   <Select
                     value={form.siteMode}
-                    onValueChange={(value) => setForm({ ...form, siteMode: value as SiteMode })}
+                    onValueChange={(value) =>
+                      setForm({ ...form, siteMode: value as SiteMode })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{t("optionsSiteModeAll")}</SelectItem>
-                      <SelectItem value="whitelist">{t("optionsSiteModeWhitelist")}</SelectItem>
+                      <SelectItem value="all">
+                        {t("optionsSiteModeAll")}
+                      </SelectItem>
+                      <SelectItem value="whitelist">
+                        {t("optionsSiteModeWhitelist")}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1298,7 +1536,10 @@ export function Options(): React.ReactElement {
                           .split("\n")
                           .map(normalizeSiteEntry)
                           .filter(Boolean) as string[];
-                        setForm({ ...form, allowedSites: dedupeStrings(lines) });
+                        setForm({
+                          ...form,
+                          allowedSites: dedupeStrings(lines),
+                        });
                       }}
                       rows={6}
                       placeholder={t("optionsSiteEntryPlaceholder")}
@@ -1313,7 +1554,10 @@ export function Options(): React.ReactElement {
                           .split("\n")
                           .map(normalizeSiteEntry)
                           .filter(Boolean) as string[];
-                        setForm({ ...form, excludedSites: dedupeStrings(lines) });
+                        setForm({
+                          ...form,
+                          excludedSites: dedupeStrings(lines),
+                        });
                       }}
                       rows={6}
                       placeholder={t("optionsSiteEntryPlaceholder")}
@@ -1326,7 +1570,9 @@ export function Options(): React.ReactElement {
 
           <CardFooter className="flex items-center justify-between gap-3 border-t bg-white px-6 py-4">
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Badge className={cn(form.enabled ? "bg-emerald-500" : "bg-gray-300")}>
+              <Badge
+                className={cn(form.enabled ? "bg-emerald-500" : "bg-gray-300")}
+              >
                 {form.enabled ? t("on") : t("off")}
               </Badge>
               <span>{t("optionsEnabledHint")}</span>
@@ -1334,13 +1580,19 @@ export function Options(): React.ReactElement {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => setForm(settingsToFormState(settings ?? SettingsSchema.parse({})))}
+                onClick={() =>
+                  setForm(
+                    settingsToFormState(settings ?? SettingsSchema.parse({})),
+                  )
+                }
                 disabled={saving}
               >
                 {t("optionsResetButton")}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
                 {t("optionsSaveButton")}
               </Button>
             </div>
