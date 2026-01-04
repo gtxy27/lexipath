@@ -27,8 +27,13 @@
     "storage",
     "activeTab",
     "scripting",
-    "webRequest"
+    "webRequest",
+    "sidePanel",
+    "contextMenus"
   ],
+  "side_panel": {
+    "default_path": "src/ui/sidebar/index.html"
+  },
   "optional_host_permissions": [
     "https://*/*",
     "http://localhost/*"

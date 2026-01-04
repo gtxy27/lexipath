@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
+import type { ChatResponse } from "@lexipath/core";
 import { sendMessage } from "../../shared/messages";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -28,6 +29,47 @@ export function Sidebar(): React.ReactElement {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    async function checkPendingMessage() {
+      const data = await browser.storage.local.get("lexipath_sidebar_pending_message");
+      const pending = data.lexipath_sidebar_pending_message;
+      
+      if (pending && Date.now() - pending.timestamp < 10000) {
+        // Clear it immediately so it doesn't resend on reload
+        await browser.storage.local.remove("lexipath_sidebar_pending_message");
+        
+        if (pending.isAutoSend) {
+          // Trigger handleSend manually with the pending text
+          const userMessage: ChatMessage = {
+            role: "user",
+            content: pending.text,
+            timestamp: Date.now(),
+          };
+          setMessages((prev) => [...prev, userMessage]);
+          setIsLoading(true);
+          try {
+            const response = await sendMessage<ChatResponse>("CHAT", { message: pending.text });
+            if (response.ok) {
+              setMessages((prev) => [...prev, {
+                role: "assistant",
+                content: response.value.reply,
+                timestamp: Date.now(),
+              }]);
+              setConversationId(response.value.conversationId);
+            }
+          } catch (err) {
+            setError(err instanceof Error ? err.message : t("error_unknown"));
+          } finally {
+            setIsLoading(false);
+          }
+        } else {
+          setInputValue(pending.text);
+        }
+      }
+    }
+    checkPendingMessage();
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -52,7 +94,7 @@ export function Sidebar(): React.ReactElement {
     setError(null);
 
     try {
-      const response = await sendMessage("CHAT", {
+      const response = await sendMessage<ChatResponse>("CHAT", {
         message,
         conversationId,
       });

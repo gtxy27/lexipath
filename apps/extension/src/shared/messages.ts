@@ -122,6 +122,15 @@ const messageDefinitions = {
     payloadSchema: ChatPayloadSchema,
     valueSchema: ChatResponseSchema,
   },
+  OPEN_SIDEBAR: {
+    payloadSchema: z
+      .object({
+        initialMessage: z.string().optional(),
+        isAutoSend: z.boolean().optional(),
+      })
+      .optional(),
+    valueSchema: z.object({ ok: z.literal(true) }),
+  },
 } satisfies Record<
   MessageType,
   { payloadSchema: z.ZodTypeAny; valueSchema: z.ZodTypeAny }

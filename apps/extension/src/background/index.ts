@@ -1143,6 +1143,59 @@ registry.register('CHAT', async (payload) => {
   }
 });
 
+// =============================================================================
+// Side Panel and Context Menu Management
+// =============================================================================
+
+async function openSidePanel(tabId?: number) {
+  if (typeof (browser as any).sidePanel?.open === 'function') {
+    await (browser as any).sidePanel.open({ tabId });
+  }
+}
+
+registry.register('OPEN_SIDEBAR', async (payload, sender) => {
+  await openSidePanel(sender?.tab?.id);
+  if (payload?.initialMessage) {
+    // We'll store the initial message in local storage so the sidebar can read it on mount
+    await browser.storage.local.set({ 
+      lexipath_sidebar_pending_message: {
+        text: payload.initialMessage,
+        timestamp: Date.now(),
+        isAutoSend: payload.isAutoSend ?? false
+      } 
+    });
+  }
+  return { ok: true };
+});
+
+// Set up Context Menus
+browser.runtime.onInstalled.addListener(() => {
+  browser.contextMenus.create({
+    id: 'lexipath-explain-selection',
+    title: t('contextMenu_explainSelection'),
+    contexts: ['selection'],
+  });
+});
+
+browser.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'lexipath-explain-selection' && info.selectionText) {
+    const selectedText = info.selectionText.trim();
+    if (!selectedText) return;
+
+    // Use the prompt builder logic indirectly or just send the raw text
+    const prompt = `Please explain this sentence or phrase: "${selectedText}"`;
+    
+    await openSidePanel(tab?.id);
+    await browser.storage.local.set({ 
+      lexipath_sidebar_pending_message: {
+        text: prompt,
+        timestamp: Date.now(),
+        isAutoSend: true
+      } 
+    });
+  }
+});
+
 // Register message listener
 browser.runtime.onMessage.addListener((message, sender) => {
   // Align with src-extension behavior: content script can query additional params that

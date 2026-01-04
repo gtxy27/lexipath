@@ -48,6 +48,7 @@ export const MessageTypeSchema = z.enum([
   'ENHANCE_SUBTITLE',
   'EXPLAIN_WORD',
   'CHAT',
+  'OPEN_SIDEBAR',
 ]);
 export type MessageType = z.infer<typeof MessageTypeSchema>;
 
