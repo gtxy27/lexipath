@@ -104,5 +104,51 @@ describe('BingTranslateProvider', () => {
       globalThis.fetch = originalFetch;
     }
   });
-});
 
+  it('supports numeric key in AbusePreventionHelper params', async () => {
+    const originalFetch = globalThis.fetch;
+
+    const now = Date.now();
+    const html = `
+      <html>
+        <body>
+          <script>
+            var IG:"IG_TEST";
+            var params_AbusePreventionHelper = [${now},"TOKEN_TEST",3600000];
+          </script>
+          <div data-iid="Translator.1234"></div>
+        </body>
+      </html>
+    `;
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        url: 'https://www.bing.com/translator',
+        text: async () => html,
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ translations: [{ text: '你好' }] }],
+      } as any);
+
+    globalThis.fetch = fetchMock as any;
+
+    try {
+      const provider = new BingTranslateProvider();
+      const result = await provider.translate('hello', { from: 'en', to: 'zh-CN' });
+      expect(result).toBe('你好');
+
+      const call2 = fetchMock.mock.calls[1];
+      const init = call2?.[1] as RequestInit;
+      const body = String(init?.body ?? '');
+      expect(body).toContain(`token=TOKEN_TEST`);
+      expect(body).toContain(`key=${now}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

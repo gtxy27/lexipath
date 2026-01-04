@@ -33,7 +33,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 
 function extractBingToken(html: string, responseUrl: string): BingTokenState {
   const igMatch = html.match(/IG:\"([^\"]+)\"/);
-  const iidMatch = html.match(/data-iid=\"([^\"]+)\"/);
+  const iidMatch = html.match(/data-iid=\"([a-zA-Z0-9.]+)\"/);
   const paramsMatch = html.match(/params_AbusePreventionHelper\s*=\s*([^\]]+\])/);
 
   const ig = igMatch?.[1] ?? '';
@@ -54,11 +54,11 @@ function extractBingToken(html: string, responseUrl: string): BingTokenState {
     throw new Error('Failed to parse Bing token params (expected array)');
   }
 
-  const strings = params.filter((value) => typeof value === 'string') as string[];
-  const numbers = params.filter((value) => typeof value === 'number' && Number.isFinite(value)) as number[];
+  const keyRaw = (params as unknown[])[0];
+  const tokenRaw = (params as unknown[])[1];
 
-  const key = strings[0] ?? '';
-  const token = strings[1] ?? '';
+  const key = typeof keyRaw === 'string' || typeof keyRaw === 'number' ? String(keyRaw) : '';
+  const token = typeof tokenRaw === 'string' ? tokenRaw : '';
 
   if (!key || !token) {
     throw new Error('Failed to parse Bing key/token');
@@ -68,15 +68,21 @@ function extractBingToken(html: string, responseUrl: string): BingTokenState {
   let tokenTsMs = now;
   let tokenExpiryMs = 0;
 
-  const largeEpoch = numbers.find((value) => value > 1e11);
-  const epochSeconds = numbers.find((value) => value > 1e9 && value < 1e11);
+  const otherNumbers = (params as unknown[])
+    .slice(1)
+    .filter((value) => typeof value === 'number' && Number.isFinite(value)) as number[];
+
+  const largeEpoch =
+    (typeof keyRaw === 'number' && Number.isFinite(keyRaw) && keyRaw > 1e11 ? keyRaw : undefined) ??
+    otherNumbers.find((value) => value > 1e11);
+  const epochSeconds = otherNumbers.find((value) => value > 1e9 && value < 1e11);
   if (largeEpoch) {
     tokenTsMs = largeEpoch;
   } else if (epochSeconds) {
     tokenTsMs = epochSeconds * 1000;
   }
 
-  const remaining = numbers.filter((value) => value !== largeEpoch && value !== epochSeconds);
+  const remaining = otherNumbers.filter((value) => value !== largeEpoch && value !== epochSeconds);
   tokenExpiryMs = remaining.find((value) => value > 0 && value <= 24 * 60 * 60 * 1000) ?? remaining[0] ?? 0;
 
   const url = new URL(responseUrl);
@@ -168,6 +174,7 @@ export class BingTranslateProvider {
       key: state.key,
     });
 
+    const referrer = `https://${state.subdomain}.bing.com/translator`;
     const response = await fetchWithTimeout(
       url.toString(),
       {
@@ -175,8 +182,8 @@ export class BingTranslateProvider {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'Referer': `https://${state.subdomain}.bing.com/translator`,
         },
+        referrer,
         body: body.toString(),
       },
       timeoutMs
@@ -212,4 +219,3 @@ export class BingTranslateProvider {
     }
   }
 }
-
