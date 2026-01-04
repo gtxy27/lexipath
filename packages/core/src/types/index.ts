@@ -111,25 +111,83 @@ export type LLMProviderChannel = z.infer<typeof LLMProviderChannelSchema>;
 export const TranslationProviderSchema = z.enum(['openai', 'claude', 'gemini', 'google', 'bing']);
 export type TranslationProvider = z.infer<typeof TranslationProviderSchema>;
 
-export const ProviderChannelsSchema = z
+// =============================================================================
+// Channels & Routing (multi-channel + behavior routing table)
+// =============================================================================
+
+// Channel.typeId (adapter selection), starting from 1:
+// 1=openai-compatible, 2=claude, 3=gemini
+export const ChannelTypeIdSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+export type ChannelTypeId = z.infer<typeof ChannelTypeIdSchema>;
+
+export const ChannelConfigSchema = z.record(z.unknown()).default({});
+export type ChannelConfig = z.infer<typeof ChannelConfigSchema>;
+
+export const ProviderChannelSchema = z
   .object({
-    openai: ProviderConfigSchema.optional(),
-    claude: ClaudeProviderConfigSchema.optional(),
-    gemini: GeminiProviderConfigSchema.optional(),
+    channelId: z.number().int().min(1),
+    typeId: ChannelTypeIdSchema,
+    name: z.string().default(''),
+    model: z.string().default(''),
+    config: ChannelConfigSchema,
+    iconUrl: z.string().optional(),
+    concurrencyLimit: z.number().int().min(1).max(500).default(15),
+    extra: z.record(z.unknown()).default({}),
   })
-  .default({});
+  .strict();
+export type ProviderChannel = z.infer<typeof ProviderChannelSchema>;
+
+export const ProviderChannelsSchema = z
+  .array(ProviderChannelSchema)
+  .default([
+    {
+      channelId: 1,
+      typeId: 1,
+      name: 'Default',
+      model: '',
+      config: {},
+      concurrencyLimit: 15,
+      extra: {},
+    },
+  ]);
 export type ProviderChannels = z.infer<typeof ProviderChannelsSchema>;
 
-export const ChannelConcurrencyLimitsSchema = z
+// Routing table kinds, starting from 1:
+// 1=channel, 2=google, 3=bing
+export const RouteKindSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+export type RouteKind = z.infer<typeof RouteKindSchema>;
+
+export const RouteConfigSchema = z
   .object({
-    openai: z.number().int().min(1).max(500).optional(),
-    claude: z.number().int().min(1).max(500).optional(),
-    gemini: z.number().int().min(1).max(500).optional(),
-    google: z.number().int().min(1).max(500).optional(),
-    bing: z.number().int().min(1).max(500).optional(),
+    kind: RouteKindSchema,
+    channelId: z.number().int().min(1).optional(),
+    extra: z.record(z.unknown()).default({}),
   })
-  .default({});
-export type ChannelConcurrencyLimits = z.infer<typeof ChannelConcurrencyLimitsSchema>;
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.kind === 1 && typeof value.channelId !== 'number') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'channelId is required when kind=channel',
+        path: ['channelId'],
+      });
+    }
+  });
+export type RouteConfig = z.infer<typeof RouteConfigSchema>;
+
+const BehaviorKeySchema = z.string().regex(/^[a-z0-9_]+$/);
+export const BehaviorRoutesSchema = z
+  .record(BehaviorKeySchema, RouteConfigSchema)
+  .default({
+    select_keywords: { kind: 1, channelId: 1, extra: {} },
+    translate: { kind: 1, channelId: 1, extra: {} },
+    dictionary: { kind: 1, channelId: 1, extra: {} },
+    enhance_web: { kind: 1, channelId: 1, extra: {} },
+    enhance_subtitle: { kind: 1, channelId: 1, extra: {} },
+    chat: { kind: 1, channelId: 1, extra: {} },
+    explain_word: { kind: 1, channelId: 1, extra: {} },
+  });
+export type BehaviorRoutes = z.infer<typeof BehaviorRoutesSchema>;
 
 export const TestProviderConnectionPayloadSchema = z.discriminatedUnion('type', [
   z
@@ -173,16 +231,11 @@ export const SettingsSchema = z.object({
   targetLanguage: SupportedLanguageSchema.default('en'),
   proficiencyLevel: CEFRLevelSchema.default('B1'),
 
-  // Provider channels (one model per channel)
+  // Provider channels (multi-channel, one model per channel)
   channels: ProviderChannelsSchema,
 
-  // Routing
-  keywordProvider: LLMProviderChannelSchema.default('openai'),
-  translationProvider: TranslationProviderSchema.default('openai'),
-
-  // Concurrency (advanced)
-  // Keyed by channel name (e.g. openai/claude/gemini/google/bing).
-  channelConcurrencyLimits: ChannelConcurrencyLimitsSchema,
+  // Behavior routing table
+  behaviorRoutes: BehaviorRoutesSchema,
 
   // Behavior
   enabled: z.boolean().default(true),
