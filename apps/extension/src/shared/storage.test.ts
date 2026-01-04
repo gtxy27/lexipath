@@ -21,7 +21,7 @@ describe('storage settings migration', () => {
     vi.clearAllMocks();
   });
 
-  it('migrates legacy provider + modelConcurrencyLimits to channels + channelConcurrencyLimits', async () => {
+  it('migrates legacy provider + modelConcurrencyLimits to channels + behaviorRoutes', async () => {
     browserMock.storage.local.get.mockResolvedValue({
       settings: {
         provider: {
@@ -39,18 +39,29 @@ describe('storage settings migration', () => {
     const { getSettings } = await import('./storage');
     const settings = await getSettings();
 
-    expect(settings.channels.openai?.baseUrl).toBe('https://api.openai.com/v1');
-    expect(settings.channels.openai?.model).toBe('gpt-4o-mini');
-    expect(settings.channels.openai?.apiKey).toBe('sk-test');
-    expect(settings.keywordProvider).toBe('openai');
-    expect(settings.translationProvider).toBe('openai');
-    expect(settings.channelConcurrencyLimits.openai).toBe(42);
+    expect(settings.channels[0]?.channelId).toBe(1);
+    expect(settings.channels[0]?.typeId).toBe(1);
+    expect(settings.channels[0]?.model).toBe('gpt-4o-mini');
+    expect((settings.channels[0]?.config as any)?.baseUrl).toBe('https://api.openai.com/v1');
+    expect((settings.channels[0]?.config as any)?.apiKey).toBe('sk-test');
+    expect(settings.channels[0]?.concurrencyLimit).toBe(15);
+
+    const selectKeywords = settings.behaviorRoutes.select_keywords;
+    const translate = settings.behaviorRoutes.translate;
+
+    expect(selectKeywords).toBeDefined();
+    expect(translate).toBeDefined();
+
+    expect(selectKeywords!.kind).toBe(1);
+    expect(selectKeywords!.channelId).toBe(1);
+    expect(translate!.kind).toBe(1);
+    expect(translate!.channelId).toBe(1);
 
     expect(browserMock.storage.local.set).toHaveBeenCalledTimes(1);
     const setArg = browserMock.storage.local.set.mock.calls[0]?.[0] as any;
-    expect(setArg.settings.channels.openai.baseUrl).toBe('https://api.openai.com/v1');
     expect(setArg.settings.provider).toBeUndefined();
     expect(setArg.settings.modelConcurrencyLimits).toBeUndefined();
+    expect(Array.isArray(setArg.settings.channels)).toBe(true);
+    expect(setArg.settings.channels[0].channelId).toBe(1);
   });
 });
-

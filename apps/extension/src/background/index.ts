@@ -12,14 +12,9 @@ import browser from 'webextension-polyfill';
 import { z } from 'zod';
 
 import {
-  CEFRLevelSchema,
   ClaudeProviderConfigSchema,
   GeminiProviderConfigSchema,
-  LLMProviderChannelSchema,
-  NativeLanguageSchema,
   ProviderConfigSchema,
-  SupportedLanguageSchema,
-  TranslationProviderSchema,
   type EnhanceSubtitlePayload,
   type EnhanceWebPayload,
   type CEFRLevel,
@@ -27,14 +22,16 @@ import {
   type GeminiProviderConfig,
   type LLMProviderChannel,
   type ProviderConfig,
+  type ProviderChannel,
+  type RouteConfig,
+  type RouteKind,
   type ExplainWordOutput,
   type ExplainWordPayload,
-  type TranslationProvider,
   type Settings,
   type SubtitleEnhanceOutput,
   type WebEnhanceOutput,
 } from '@lexipath/core';
-import { validateSubtitleEnhanceOutput, validateWebEnhanceOutput } from '@lexipath/core/validators';
+import { validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
 import {
   BingTranslateProvider,
   ClaudeProvider,
@@ -71,7 +68,9 @@ const registry = createMessageHandlerRegistry();
 const CACHE_MAX_ENTRIES = 200;
 const CACHE_SUCCESS_TTL_MS = 5 * 60 * 1000;
 const CACHE_FALLBACK_TTL_MS = 60 * 1000;
-const DEFAULT_MODEL_CONCURRENCY = 20;
+const DEFAULT_CHANNEL_CONCURRENCY = 15;
+const GOOGLE_TRANSLATE_CONCURRENCY = 25;
+const BING_TRANSLATE_CONCURRENCY = 25;
 const CONCURRENCY_SATURATION_LOG_THROTTLE_MS = 1500;
 
 type ConcurrencyState = { inFlight: number; waiters: Array<() => void> };
@@ -89,14 +88,16 @@ function t(key: string, substitutions?: string | string[], fallback = ''): strin
 }
 
 function getChannelConcurrencyLimit(
-  settings: { channelConcurrencyLimits?: Partial<Record<TranslationProvider, number | undefined>> },
-  channel: TranslationProvider
+  channel: ProviderChannel | null,
+  kind: RouteKind
 ): number {
-  const raw = settings.channelConcurrencyLimits?.[channel];
+  if (kind === 2) return GOOGLE_TRANSLATE_CONCURRENCY;
+  if (kind === 3) return BING_TRANSLATE_CONCURRENCY;
+  const raw = channel?.concurrencyLimit;
   if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 1) {
     return Math.min(500, Math.floor(raw));
   }
-  return DEFAULT_MODEL_CONCURRENCY;
+  return DEFAULT_CHANNEL_CONCURRENCY;
 }
 
 async function acquireConcurrencySlot(key: string, limit: number): Promise<() => void> {
@@ -141,12 +142,11 @@ function releaseConcurrencySlot(key: string): void {
 }
 
 async function runWithChannelConcurrency<T>(
-  settings: { channelConcurrencyLimits?: Partial<Record<TranslationProvider, number | undefined>> },
-  channel: TranslationProvider,
+  routeKey: string,
+  limit: number,
   work: () => Promise<T>
 ): Promise<T> {
-  const limit = getChannelConcurrencyLimit(settings, channel);
-  const release = await acquireConcurrencySlot(channel, limit);
+  const release = await acquireConcurrencySlot(routeKey, limit);
   try {
     return await work();
   } finally {
@@ -185,54 +185,117 @@ function getChatProvider(type: LLMProviderChannel, config: ProviderConfig | Clau
 const googleTranslateProvider = new GoogleTranslateProvider();
 const bingTranslateProvider = new BingTranslateProvider();
 
-function isLLMProvider(type: TranslationProvider): type is LLMProviderChannel {
-  return type === 'openai' || type === 'claude' || type === 'gemini';
+type ResolvedRoute = { kind: RouteKind; channelId?: number };
+
+function resolveChannel(channelId: number | undefined, settings: Settings): ProviderChannel | null {
+  if (typeof channelId !== 'number' || !Number.isFinite(channelId)) return null;
+  return settings.channels.find((channel) => channel.channelId === channelId) ?? null;
 }
 
-function getChatProviderConfig(
-  settings: Settings,
-  channel: LLMProviderChannel
-): ProviderConfig | ClaudeProviderConfig | GeminiProviderConfig | null {
-  switch (channel) {
-    case 'openai': {
-      const raw = settings.channels.openai;
-      if (!raw) return null;
-      const parsed = ProviderConfigSchema.safeParse(raw);
-      if (!parsed.success) return null;
-      return parsed.data;
-    }
-    case 'claude': {
-      const raw = settings.channels.claude;
-      if (!raw) return null;
-      const parsed = ClaudeProviderConfigSchema.safeParse(raw);
-      if (!parsed.success) return null;
-      return parsed.data;
-    }
-    case 'gemini': {
-      const raw = settings.channels.gemini;
-      if (!raw) return null;
-      const parsed = GeminiProviderConfigSchema.safeParse(raw);
-      if (!parsed.success) return null;
-      return parsed.data;
-    }
+function firstAvailableChannel(settings: Settings): ProviderChannel | null {
+  let best: ProviderChannel | null = null;
+  for (const channel of settings.channels) {
+    if (!best || channel.channelId < best.channelId) best = channel;
   }
+  return best;
 }
 
-function providerIdentity(type: TranslationProvider, settings: Settings): Record<string, unknown> {
+function fallbackToFirstChannel(settings: Settings): ResolvedRoute {
+  const first = firstAvailableChannel(settings);
+  return { kind: 1, ...(first ? { channelId: first.channelId } : {}) };
+}
+
+function resolveRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
+  const config = (settings.behaviorRoutes?.[behaviorKey] ?? null) as RouteConfig | null;
+  if (!config) return fallbackToFirstChannel(settings);
+
+  if (config.kind === 2 || config.kind === 3) {
+    return { kind: config.kind };
+  }
+
+  const channel = resolveChannel(config.channelId, settings);
+  if (channel) return { kind: 1, channelId: channel.channelId };
+  return fallbackToFirstChannel(settings);
+}
+
+function resolveChannelRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
+  const resolved = resolveRoute(behaviorKey, settings);
+  if (resolved.kind !== 1) return fallbackToFirstChannel(settings);
+  if (typeof resolved.channelId === 'number') return resolved;
+  return fallbackToFirstChannel(settings);
+}
+
+function routeKey(resolved: ResolvedRoute): string {
+  if (resolved.kind === 2) return 'google';
+  if (resolved.kind === 3) return 'bing';
+  return `channel:${resolved.channelId ?? 'none'}`;
+}
+
+function routeIdentity(resolved: ResolvedRoute, settings: Settings): Record<string, unknown> {
+  if (resolved.kind === 2) return { kind: 'google' };
+  if (resolved.kind === 3) return { kind: 'bing' };
+  const channel = resolveChannel(resolved.channelId, settings);
+  if (!channel) return { kind: 'channel', channelId: resolved.channelId ?? null };
+  return {
+    kind: 'channel',
+    channelId: channel.channelId,
+    typeId: channel.typeId,
+    model: channel.model,
+    baseUrl: typeof (channel.config as any)?.baseUrl === 'string' ? (channel.config as any).baseUrl : '',
+  };
+}
+
+function llmTypeForChannel(channel: ProviderChannel): LLMProviderChannel | null {
+  if (channel.typeId === 1) return 'openai';
+  if (channel.typeId === 2) return 'claude';
+  if (channel.typeId === 3) return 'gemini';
+  return null;
+}
+
+function getChatProviderByChannel(
+  channel: ProviderChannel
+): { type: LLMProviderChannel; config: ProviderConfig | ClaudeProviderConfig | GeminiProviderConfig } | null {
+  const type = llmTypeForChannel(channel);
+  if (!type) return null;
+
+  const config = channel.config as Record<string, unknown>;
+  const customHeaders =
+    config.customHeaders && typeof config.customHeaders === 'object' ? (config.customHeaders as Record<string, unknown>) : undefined;
+  const normalizedHeaders =
+    customHeaders && Object.values(customHeaders).every((value) => typeof value === 'string')
+      ? (customHeaders as Record<string, string>)
+      : undefined;
+
   if (type === 'openai') {
-    return {
-      type,
-      baseUrl: settings.channels.openai?.baseUrl ?? '',
-      model: settings.channels.openai?.model ?? '',
-    };
+    const parsed = ProviderConfigSchema.safeParse({
+      baseUrl: typeof config.baseUrl === 'string' ? config.baseUrl : '',
+      model: channel.model,
+      ...(typeof config.apiKey === 'string' ? { apiKey: config.apiKey } : {}),
+      ...(normalizedHeaders ? { customHeaders: normalizedHeaders } : {}),
+    });
+    if (!parsed.success) return null;
+    return { type, config: parsed.data };
   }
+
   if (type === 'claude') {
-    return { type, model: settings.channels.claude?.model ?? '' };
+    const parsed = ClaudeProviderConfigSchema.safeParse({
+      model: channel.model,
+      apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
+      ...(typeof config.baseUrl === 'string' && config.baseUrl.trim() ? { baseUrl: config.baseUrl } : {}),
+      ...(normalizedHeaders ? { customHeaders: normalizedHeaders } : {}),
+    });
+    if (!parsed.success) return null;
+    return { type, config: parsed.data };
   }
-  if (type === 'gemini') {
-    return { type, model: settings.channels.gemini?.model ?? '' };
-  }
-  return { type };
+
+  const parsed = GeminiProviderConfigSchema.safeParse({
+    model: channel.model,
+    apiKey: typeof config.apiKey === 'string' ? config.apiKey : '',
+    ...(typeof config.baseUrl === 'string' && config.baseUrl.trim() ? { baseUrl: config.baseUrl } : {}),
+    ...(normalizedHeaders ? { customHeaders: normalizedHeaders } : {}),
+  });
+  if (!parsed.success) return null;
+  return { type, config: parsed.data };
 }
 
 const CEFR_LEVELS: readonly CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
@@ -269,15 +332,17 @@ async function getKeywordsForText(options: {
 }): Promise<string[]> {
   const { settings, text, sourceLang, targetLang, userLevel, scene, maxItems } = options;
 
-  const channel = settings.keywordProvider;
-  const providerConfig = getChatProviderConfig(settings, channel);
-  if (!providerConfig) return [];
+  const route = resolveChannelRoute('select_keywords', settings);
+  const channel = resolveChannel(route.channelId, settings);
+  if (!channel) return [];
 
-  const provider = getChatProvider(channel, providerConfig);
+  const providerInfo = getChatProviderByChannel(channel);
+  if (!providerInfo) return [];
+  const provider = getChatProvider(providerInfo.type, providerInfo.config);
 
   const cacheKey = makeCacheKey('SELECT_KEYWORDS', {
-    v: 2,
-    provider: providerIdentity(channel, settings),
+    v: 3,
+    provider: routeIdentity(route, settings),
     prompt: {
       text,
       sourceLang,
@@ -300,11 +365,9 @@ async function getKeywordsForText(options: {
           scene,
         });
 
-        const response = await runWithChannelConcurrency(settings, channel, () =>
-          provider.chat([{ role: 'user', content: prompt }], {
-            temperature: 0.1,
-            maxTokens: 250,
-          })
+        const limit = getChannelConcurrencyLimit(channel, route.kind);
+        const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
+          provider.chat([{ role: 'user', content: prompt }], { temperature: 0.1, maxTokens: 250 })
         );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
@@ -332,28 +395,28 @@ async function translateTerms(options: {
   targetLang: string;
 }): Promise<string[]> {
   const { settings } = options;
-  const translationProvider = settings.translationProvider;
   const terms = options.terms.map((term) => term.trim()).filter(Boolean);
   if (terms.length === 0) return [];
 
-  if (translationProvider === 'google') {
-    return runWithChannelConcurrency(settings, 'google', async () =>
+  const route = resolveRoute('translate', settings);
+  if (route.kind === 2) {
+    const limit = getChannelConcurrencyLimit(null, route.kind);
+    return runWithChannelConcurrency(routeKey(route), limit, async () =>
       googleTranslateProvider.translateList(terms, { from: options.sourceLang, to: options.targetLang })
     );
   }
-  if (translationProvider === 'bing') {
-    return runWithChannelConcurrency(settings, 'bing', async () =>
+  if (route.kind === 3) {
+    const limit = getChannelConcurrencyLimit(null, route.kind);
+    return runWithChannelConcurrency(routeKey(route), limit, async () =>
       bingTranslateProvider.translateList(terms, { from: options.sourceLang, to: options.targetLang })
     );
   }
 
-  if (!isLLMProvider(translationProvider)) {
-    return terms;
-  }
-
-  const providerConfig = getChatProviderConfig(settings, translationProvider);
-  if (!providerConfig) return terms;
-  const provider = getChatProvider(translationProvider, providerConfig);
+  const channel = resolveChannel(route.channelId, settings);
+  if (!channel) return terms;
+  const providerInfo = getChatProviderByChannel(channel);
+  if (!providerInfo) return terms;
+  const provider = getChatProvider(providerInfo.type, providerInfo.config);
 
   const prompt = buildTermTranslatePrompt({
     terms,
@@ -362,11 +425,9 @@ async function translateTerms(options: {
   });
 
   try {
-    const response = await runWithChannelConcurrency(settings, translationProvider, () =>
-      provider.chat([{ role: 'user', content: prompt }], {
-        temperature: 0,
-        maxTokens: 400,
-      })
+    const limit = getChannelConcurrencyLimit(channel, route.kind);
+    const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
+      provider.chat([{ role: 'user', content: prompt }], { temperature: 0, maxTokens: 400 })
     );
 
     const responseText = response.choices?.[0]?.message?.content ?? '';
@@ -529,11 +590,14 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const maxWords = payload.maxWords ?? 15;
   const userLevel = settings.proficiencyLevel;
 
+  const keywordRoute = resolveChannelRoute('select_keywords', settings);
+  const translateRoute = resolveRoute('translate', settings);
+
   const cacheKey = makeCacheKey('ENHANCE_WEB', {
-    v: 2,
+    v: 3,
     providers: {
-      keyword: providerIdentity(settings.keywordProvider, settings),
-      translation: providerIdentity(settings.translationProvider, settings),
+      keyword: routeIdentity(keywordRoute, settings),
+      translation: routeIdentity(translateRoute, settings),
     },
     params: {
       content,
@@ -591,17 +655,16 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
   const difficultyLevel = payload.difficultyLevel ?? settings.proficiencyLevel;
   const mode = payload.mode ?? 'bilingual';
 
-  const translationProvider = settings.translationProvider;
-  const enhanceChannel: LLMProviderChannel | null = isLLMProvider(translationProvider)
-    ? translationProvider
-    : settings.keywordProvider;
-  const enhanceConfig = enhanceChannel ? getChatProviderConfig(settings, enhanceChannel) : null;
+  const enhanceRoute = resolveChannelRoute('enhance_subtitle', settings);
+  const enhanceChannel = resolveChannel(enhanceRoute.channelId, settings);
+  const enhanceProviderInfo = enhanceChannel ? getChatProviderByChannel(enhanceChannel) : null;
+  const translateRoute = resolveRoute('translate', settings);
 
   const cacheKey = makeCacheKey('ENHANCE_SUBTITLE', {
-    v: 2,
+    v: 3,
     providers: {
-      enhance: enhanceChannel ? providerIdentity(enhanceChannel, settings) : { type: 'none' },
-      translation: providerIdentity(translationProvider, settings),
+      enhance: routeIdentity(enhanceRoute, settings),
+      translation: routeIdentity(translateRoute, settings),
     },
     params: {
       subtitle,
@@ -617,20 +680,29 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        if (!enhanceChannel || !enhanceConfig) {
+        if (!enhanceChannel || !enhanceProviderInfo) {
           if (mode === 'bilingual') {
             const translated = await (async () => {
-              if (translationProvider === 'google') {
-                return runWithChannelConcurrency(settings, 'google', () =>
+              if (translateRoute.kind === 2) {
+                const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
+                return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
                   googleTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(targetLang) })
                 );
               }
-              if (translationProvider === 'bing') {
-                return runWithChannelConcurrency(settings, 'bing', () =>
+              if (translateRoute.kind === 3) {
+                const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
+                return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
                   bingTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(targetLang) })
                 );
               }
-              return '';
+
+              const [fallback] = await translateTerms({
+                settings,
+                terms: [subtitle],
+                sourceLang: String(sourceLang),
+                targetLang: String(targetLang),
+              });
+              return fallback ?? '';
             })();
 
             return {
@@ -642,9 +714,9 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           return { value: { line1_final: subtitle }, ok: false };
         }
 
-        const provider = getChatProvider(enhanceChannel, enhanceConfig);
+        const provider = getChatProvider(enhanceProviderInfo.type, enhanceProviderInfo.config);
 
-        if (mode === 'bilingual' && !isLLMProvider(translationProvider)) {
+        if (mode === 'bilingual' && (translateRoute.kind === 2 || translateRoute.kind === 3)) {
           const prompt = buildSubtitleEnhancePrompt({
             subtitle,
             sourceLang,
@@ -653,7 +725,8 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
             mode: 'single',
           });
 
-          const response = await runWithChannelConcurrency(settings, enhanceChannel, () =>
+          const enhanceLimit = getChannelConcurrencyLimit(enhanceChannel, enhanceRoute.kind);
+          const response = await runWithChannelConcurrency(routeKey(enhanceRoute), enhanceLimit, () =>
             provider.chat([{ role: 'user', content: prompt }], {
               temperature: 0.2,
               maxTokens: 300,
@@ -665,13 +738,15 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           const enhancedLine = validated.ok ? validated.value.line1_final : subtitle;
 
           const translated = await (async () => {
-            if (translationProvider === 'google') {
-              return runWithChannelConcurrency(settings, 'google', () =>
+            if (translateRoute.kind === 2) {
+              const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
+              return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
                 googleTranslateProvider.translate(enhancedLine, { from: String(sourceLang), to: String(targetLang) })
               );
             }
-            if (translationProvider === 'bing') {
-              return runWithChannelConcurrency(settings, 'bing', () =>
+            if (translateRoute.kind === 3) {
+              const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
+              return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
                 bingTranslateProvider.translate(enhancedLine, { from: String(sourceLang), to: String(targetLang) })
               );
             }
@@ -692,7 +767,8 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           mode,
         });
 
-        const response = await runWithChannelConcurrency(settings, enhanceChannel, () =>
+        const enhanceLimit = getChannelConcurrencyLimit(enhanceChannel, enhanceRoute.kind);
+        const response = await runWithChannelConcurrency(routeKey(enhanceRoute), enhanceLimit, () =>
           provider.chat([{ role: 'user', content: prompt }], {
             temperature: 0.2,
             maxTokens: 400,
@@ -725,14 +801,14 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
   const sourceLang = settings.targetLanguage;
   const targetLang = settings.nativeLanguage;
   const userLevel = settings.proficiencyLevel;
-  const llmChannel: LLMProviderChannel = isLLMProvider(settings.translationProvider)
-    ? settings.translationProvider
-    : settings.keywordProvider;
-  const llmConfig = getChatProviderConfig(settings, llmChannel);
+
+  const dictionaryRoute = resolveRoute('dictionary', settings);
+  const dictionaryChannel = dictionaryRoute.kind === 1 ? resolveChannel(dictionaryRoute.channelId, settings) : null;
+  const dictionaryProviderInfo = dictionaryChannel ? getChatProviderByChannel(dictionaryChannel) : null;
 
   const cacheKey = makeCacheKey('EXPLAIN_WORD', {
-    v: 3,
-    provider: providerIdentity(llmChannel, settings),
+    v: 4,
+    provider: routeIdentity(dictionaryRoute, settings),
     word,
     sourceLang,
     targetLang,
@@ -765,14 +841,38 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     }
 
     // Fallback to provider-based explanation.
-    if (!llmConfig) {
+    if (dictionaryRoute.kind === 2 || dictionaryRoute.kind === 3) {
+      try {
+        const limit = getChannelConcurrencyLimit(null, dictionaryRoute.kind);
+        const translated = await runWithChannelConcurrency(routeKey(dictionaryRoute), limit, () =>
+          dictionaryRoute.kind === 2
+            ? googleTranslateProvider.translate(word, { from: String(sourceLang), to: String(targetLang) })
+            : bingTranslateProvider.translate(word, { from: String(sourceLang), to: String(targetLang) })
+        );
+
+        const definition = translated?.trim() ? translated.trim() : t('wordCard_definitionUnavailable');
+        const value: ExplainWordOutput = {
+          word,
+          definition,
+          ...(translated?.trim() ? { translation: translated.trim() } : {}),
+        };
+        explainWordCache.set(cacheKey, value, translated?.trim() ? CACHE_SUCCESS_TTL_MS : CACHE_FALLBACK_TTL_MS);
+        return value;
+      } catch {
+        const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
+        explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
+        return value;
+      }
+    }
+
+    if (!dictionaryProviderInfo) {
       const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
       explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
       return value;
     }
 
     try {
-      const provider = getChatProvider(llmChannel, llmConfig);
+      const provider = getChatProvider(dictionaryProviderInfo.type, dictionaryProviderInfo.config);
 
       const prompt = buildExplainWordPrompt({
         word,
@@ -782,7 +882,8 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
         userLevel,
       });
 
-      const response = await runWithChannelConcurrency(settings, llmChannel, () =>
+      const limit = getChannelConcurrencyLimit(dictionaryChannel, dictionaryRoute.kind);
+      const response = await runWithChannelConcurrency(routeKey(dictionaryRoute), limit, () =>
         provider.chat([{ role: 'user', content: prompt }], {
           temperature: 0.2,
           maxTokens: 350,
@@ -962,18 +1063,17 @@ registry.register('CHAT', async (payload) => {
   cleanupExpiredSessions();
 
   const settings = await getSettings();
-  const llmChannel: LLMProviderChannel = isLLMProvider(settings.translationProvider)
-    ? settings.translationProvider
-    : settings.keywordProvider;
-  const llmConfig = getChatProviderConfig(settings, llmChannel);
-  if (!llmConfig) {
+  const chatRoute = resolveChannelRoute('chat', settings);
+  const chatChannel = resolveChannel(chatRoute.channelId, settings);
+  const chatProviderInfo = chatChannel ? getChatProviderByChannel(chatChannel) : null;
+  if (!chatChannel || !chatProviderInfo) {
     throw new MessageError({
       code: 'PROVIDER_NOT_CONFIGURED',
       message: t('error_providerNotConfigured'),
     });
   }
 
-  const provider = getChatProvider(llmChannel, llmConfig);
+  const provider = getChatProvider(chatProviderInfo.type, chatProviderInfo.config);
 
   const sessionId = payload.conversationId ?? generateSessionId();
   let session = chatSessions.get(sessionId);
@@ -1004,7 +1104,8 @@ registry.register('CHAT', async (payload) => {
   };
 
   try {
-    const response = await runWithChannelConcurrency(settings, llmChannel, () =>
+    const limit = getChannelConcurrencyLimit(chatChannel, chatRoute.kind);
+    const response = await runWithChannelConcurrency(routeKey(chatRoute), limit, () =>
       provider.chat(
         [systemMessage, ...truncatedHistory],
         {

@@ -63,7 +63,7 @@ describe('WordCard', () => {
 
       const badge = screen.getByText('B1');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveClass('bg-yellow-100', 'text-yellow-700');
+      expect(badge).toHaveClass('bg-amber-500', 'text-white');
     });
 
     it('renders without phonetic when not provided', () => {
@@ -99,43 +99,43 @@ describe('WordCard', () => {
     it('applies green color for A1 level', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'A1' }} />);
       const badge = screen.getByText('A1');
-      expect(badge).toHaveClass('bg-green-100', 'text-green-700');
+      expect(badge).toHaveClass('bg-emerald-500', 'text-white');
     });
 
     it('applies green color for A2 level', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'A2' }} />);
       const badge = screen.getByText('A2');
-      expect(badge).toHaveClass('bg-green-100', 'text-green-700');
+      expect(badge).toHaveClass('bg-emerald-500', 'text-white');
     });
 
     it('applies yellow color for B1 level', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'B1' }} />);
       const badge = screen.getByText('B1');
-      expect(badge).toHaveClass('bg-yellow-100', 'text-yellow-700');
+      expect(badge).toHaveClass('bg-amber-500', 'text-white');
     });
 
     it('applies yellow color for B2 level', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'B2' }} />);
       const badge = screen.getByText('B2');
-      expect(badge).toHaveClass('bg-yellow-100', 'text-yellow-700');
+      expect(badge).toHaveClass('bg-amber-500', 'text-white');
     });
 
     it('applies red color for C1 level', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'C1' }} />);
       const badge = screen.getByText('C1');
-      expect(badge).toHaveClass('bg-red-100', 'text-red-700');
+      expect(badge).toHaveClass('bg-rose-500', 'text-white');
     });
 
     it('applies red color for C2 level', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'C2' }} />);
       const badge = screen.getByText('C2');
-      expect(badge).toHaveClass('bg-red-100', 'text-red-700');
+      expect(badge).toHaveClass('bg-rose-500', 'text-white');
     });
 
     it('applies gray color for unknown difficulty', () => {
       render(<WordCard data={{ ...mockData, difficulty: 'Unknown' }} />);
       const badge = screen.getByText('Unknown');
-      expect(badge).toHaveClass('bg-gray-100', 'text-gray-600');
+      expect(badge).toHaveClass('bg-gray-200', 'text-gray-600');
     });
   });
 
@@ -222,12 +222,12 @@ describe('WordCard', () => {
       // First click - toggle to favorited
       await user.click(favoriteButton);
       expect(onFavoriteToggle).toHaveBeenCalledWith('example', true);
-      expect(favoriteButton).toHaveClass('bg-yellow-100', 'text-yellow-700');
+      expect(favoriteButton).toHaveClass('text-yellow-600', 'bg-yellow-50');
 
       // Second click - toggle back to not favorited
       await user.click(favoriteButton);
       expect(onFavoriteToggle).toHaveBeenCalledWith('example', false);
-      expect(favoriteButton).toHaveClass('bg-gray-100', 'text-gray-700');
+      expect(favoriteButton).toHaveClass('text-gray-400');
     });
 
     it('renders with initial favorited state', () => {
@@ -235,10 +235,10 @@ describe('WordCard', () => {
       render(<WordCard data={dataFavorited} />);
 
       const favoriteButton = screen.getByLabelText('wordCard_favorite');
-      expect(favoriteButton).toHaveClass('bg-yellow-100', 'text-yellow-700');
+      expect(favoriteButton).toHaveClass('text-yellow-600', 'bg-yellow-50');
 
       const starIcon = favoriteButton.querySelector('svg');
-      expect(starIcon).toHaveAttribute('fill', 'currentColor');
+      expect(starIcon).toHaveClass('fill-current');
     });
 
     it('renders with initial unfavorited state', () => {
@@ -246,10 +246,10 @@ describe('WordCard', () => {
       render(<WordCard data={dataUnfavorited} />);
 
       const favoriteButton = screen.getByLabelText('wordCard_favorite');
-      expect(favoriteButton).toHaveClass('bg-gray-100', 'text-gray-700');
+      expect(favoriteButton).toHaveClass('text-gray-400');
 
       const starIcon = favoriteButton.querySelector('svg');
-      expect(starIcon).toHaveAttribute('fill', 'none');
+      expect(starIcon).not.toHaveClass('fill-current');
     });
 
     it('works without onFavoriteToggle callback', async () => {
@@ -260,7 +260,7 @@ describe('WordCard', () => {
 
       // Should not throw error when clicking
       await user.click(favoriteButton);
-      expect(favoriteButton).toHaveClass('bg-yellow-100', 'text-yellow-700');
+      expect(favoriteButton).toHaveClass('text-yellow-600', 'bg-yellow-50');
     });
   });
 
@@ -275,12 +275,12 @@ describe('WordCard', () => {
       // First click - toggle to learned
       await user.click(learnedButton);
       expect(onLearnedToggle).toHaveBeenCalledWith('example', true);
-      expect(learnedButton).toHaveClass('bg-green-100', 'text-green-700');
+      expect(learnedButton).toHaveClass('text-emerald-600', 'bg-emerald-50');
 
       // Second click - toggle back to not learned
       await user.click(learnedButton);
       expect(onLearnedToggle).toHaveBeenCalledWith('example', false);
-      expect(learnedButton).toHaveClass('bg-gray-100', 'text-gray-700');
+      expect(learnedButton).toHaveClass('text-gray-400');
     });
 
     it('renders with initial learned state', () => {
@@ -288,7 +288,7 @@ describe('WordCard', () => {
       render(<WordCard data={dataLearned} />);
 
       const learnedButton = screen.getByLabelText('wordCard_markLearned');
-      expect(learnedButton).toHaveClass('bg-green-100', 'text-green-700');
+      expect(learnedButton).toHaveClass('text-emerald-600', 'bg-emerald-50');
     });
 
     it('renders with initial unlearned state', () => {
@@ -296,7 +296,7 @@ describe('WordCard', () => {
       render(<WordCard data={dataUnlearned} />);
 
       const learnedButton = screen.getByLabelText('wordCard_markLearned');
-      expect(learnedButton).toHaveClass('bg-gray-100', 'text-gray-700');
+      expect(learnedButton).toHaveClass('text-gray-400');
     });
 
     it('works without onLearnedToggle callback', async () => {
@@ -307,7 +307,7 @@ describe('WordCard', () => {
 
       // Should not throw error when clicking
       await user.click(learnedButton);
-      expect(learnedButton).toHaveClass('bg-green-100', 'text-green-700');
+      expect(learnedButton).toHaveClass('text-emerald-600', 'bg-emerald-50');
     });
   });
 

@@ -8,6 +8,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 
+const elementProto = (globalThis.HTMLElement?.prototype ?? globalThis.Element?.prototype) as any;
+if (elementProto && typeof elementProto.hasPointerCapture !== 'function') {
+  elementProto.hasPointerCapture = () => false;
+}
+if (elementProto && typeof elementProto.setPointerCapture !== 'function') {
+  elementProto.setPointerCapture = () => {};
+}
+if (elementProto && typeof elementProto.releasePointerCapture !== 'function') {
+  elementProto.releasePointerCapture = () => {};
+}
+
 // Mock dependencies using vi.hoisted
 const { browserMock, sendMessageMock } = vi.hoisted(() => ({
   browserMock: {
@@ -74,7 +85,7 @@ describe('Onboarding', () => {
       render(<Onboarding />);
 
       const enButton = screen.getByText('languageTarget_en').closest('button');
-      expect(enButton).toHaveClass('border-primary-500');
+      expect(enButton).toHaveClass('bg-indigo-600');
     });
 
     it('shows CEFR levels for English', () => {
@@ -92,7 +103,7 @@ describe('Onboarding', () => {
       render(<Onboarding />);
 
       const b1Button = screen.getByText('proficiency_B1').closest('button');
-      expect(b1Button).toHaveClass('border-primary-500');
+      expect(b1Button).toHaveClass('bg-indigo-600');
     });
 
     it('switches to JLPT levels when Japanese is selected', async () => {
@@ -120,7 +131,7 @@ describe('Onboarding', () => {
       await user.click(jaButton!);
 
       const n3Button = screen.getByText('proficiency_N3').closest('button');
-      expect(n3Button).toHaveClass('border-primary-500');
+      expect(n3Button).toHaveClass('bg-indigo-600');
     });
 
     it('switches to TOPIK levels when Korean is selected', async () => {
@@ -145,7 +156,7 @@ describe('Onboarding', () => {
       const c1Button = screen.getByText('proficiency_C1').closest('button');
       await user.click(c1Button!);
 
-      expect(c1Button).toHaveClass('border-primary-500');
+      expect(c1Button).toHaveClass('bg-indigo-600');
     });
 
     it('preserves proficiency selection when switching between CEFR languages', async () => {
@@ -162,7 +173,7 @@ describe('Onboarding', () => {
 
       // C1 should still be selected
       const c1AfterSwitch = screen.getByText('proficiency_C1').closest('button');
-      expect(c1AfterSwitch).toHaveClass('border-primary-500');
+      expect(c1AfterSwitch).toHaveClass('bg-indigo-600');
     });
   });
 
@@ -209,11 +220,15 @@ describe('Onboarding', () => {
 
       await user.click(screen.getByText('onboardingNext'));
 
-      const sceneCards = screen.getAllByRole('button');
-      const enabledCards = sceneCards.filter((card) =>
-        card.className.includes('border-primary-500')
-      );
-      expect(enabledCards.length).toBe(4);
+      const switches = [
+        screen.getByRole('switch', { name: 'onboardingSceneWebNativeTitle' }),
+        screen.getByRole('switch', { name: 'onboardingSceneWebTargetTitle' }),
+        screen.getByRole('switch', { name: 'onboardingSceneVideoNativeTitle' }),
+        screen.getByRole('switch', { name: 'onboardingSceneVideoTargetTitle' }),
+      ];
+      for (const sw of switches) {
+        expect(sw).toHaveAttribute('data-state', 'checked');
+      }
     });
 
     it('allows toggling scene selections', async () => {
@@ -222,25 +237,17 @@ describe('Onboarding', () => {
 
       await user.click(screen.getByText('onboardingNext'));
 
-      // SceneCard renders a div with the title, find the button by its parent div
-      const webNativeTitle = screen.getByText('onboardingSceneWebNativeTitle');
-      const webNativeContainer = webNativeTitle.closest('.p-4.rounded-lg.border-2');
+      const webNativeSwitch = screen.getByRole('switch', {
+        name: 'onboardingSceneWebNativeTitle',
+      });
 
-      expect(webNativeContainer).not.toBeNull();
-      expect(webNativeContainer).toHaveClass('border-primary-500');
+      expect(webNativeSwitch).toHaveAttribute('data-state', 'checked');
 
-      // Find the checkbox button within the container
-      const checkboxButton = webNativeContainer?.querySelector('button');
-      expect(checkboxButton).not.toBeNull();
+      await user.click(webNativeSwitch);
+      expect(webNativeSwitch).toHaveAttribute('data-state', 'unchecked');
 
-      // Click to disable
-      await user.click(checkboxButton!);
-      expect(webNativeContainer).not.toHaveClass('border-primary-500');
-      expect(webNativeContainer).toHaveClass('border-gray-200');
-
-      // Click to re-enable
-      await user.click(checkboxButton!);
-      expect(webNativeContainer).toHaveClass('border-primary-500');
+      await user.click(webNativeSwitch);
+      expect(webNativeSwitch).toHaveAttribute('data-state', 'checked');
     });
 
     it('shows previous button on step 2', async () => {
@@ -358,34 +365,36 @@ describe('Onboarding', () => {
       render(<Onboarding />);
 
       // Select French and C2
-      const frButton = screen.getByText('languageTarget_fr').closest('button');
-      await user.click(frButton!);
-
-      const c2Button = screen.getByText('proficiency_C2').closest('button');
-      await user.click(c2Button!);
+      await user.click(screen.getByText('languageTarget_fr').closest('button')!);
+      await user.click(screen.getByText('proficiency_C2').closest('button')!);
 
       // Go to step 2
       await user.click(screen.getByText('onboardingNext'));
 
       // Disable a scene
-      const videoNativeTitle = screen.getByText('onboardingSceneVideoNativeTitle');
-      const videoNativeContainer = videoNativeTitle.closest('.p-4.rounded-lg.border-2');
-      const videoNativeCheckbox = videoNativeContainer?.querySelector('button');
-      await user.click(videoNativeCheckbox!);
+      const videoNativeSwitch = screen.getByRole('switch', {
+        name: 'onboardingSceneVideoNativeTitle',
+      });
+      await user.click(videoNativeSwitch);
+      expect(videoNativeSwitch).toHaveAttribute('data-state', 'unchecked');
 
       // Go back to step 1
       await user.click(screen.getByText('onboardingPrevious'));
 
       // Verify selections are preserved
-      expect(frButton).toHaveClass('border-primary-500');
-      expect(c2Button).toHaveClass('border-primary-500');
+      const frButtonAfter = screen.getByText('languageTarget_fr').closest('button');
+      const c2ButtonAfter = screen.getByText('proficiency_C2').closest('button');
+      expect(frButtonAfter).toHaveClass('bg-indigo-600');
+      expect(c2ButtonAfter).toHaveClass('bg-indigo-600');
 
       // Go forward to step 2 again
       await user.click(screen.getByText('onboardingNext'));
 
       // Verify scene selection is preserved
-      expect(videoNativeContainer).not.toHaveClass('border-primary-500');
-      expect(videoNativeContainer).toHaveClass('border-gray-200');
+      const videoNativeSwitchAfter = screen.getByRole('switch', {
+        name: 'onboardingSceneVideoNativeTitle',
+      });
+      expect(videoNativeSwitchAfter).toHaveAttribute('data-state', 'unchecked');
     });
   });
 
@@ -542,13 +551,9 @@ describe('Onboarding', () => {
       expect(screen.getByText('Step 3 of 3')).toBeInTheDocument();
     });
 
-    it('renders visual progress dots', () => {
-      const { container } = render(<Onboarding />);
-
-      // Find the progress indicator container
-      const progressContainer = container.querySelector('.flex.items-center.justify-center.gap-2');
-      const dots = progressContainer?.querySelectorAll('.h-2.rounded-full');
-      expect(dots?.length).toBe(3);
+    it('renders a progress bar', () => {
+      render(<Onboarding />);
+      expect(screen.getByRole('progressbar')).toBeInTheDocument();
     });
   });
 

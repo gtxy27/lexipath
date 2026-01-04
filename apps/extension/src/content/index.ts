@@ -8,7 +8,7 @@
  * - Subtitle rendering
  */
 
-import type { EnhanceWebPayload, Settings, WebEnhanceOutput } from '@lexipath/core';
+import type { EnhanceWebPayload, ProviderChannel, Settings, WebEnhanceOutput } from '@lexipath/core';
 import { detectPrimaryLanguage, qualifySite } from '@lexipath/core/qualify';
 import { sendMessage } from '../shared/messages';
 import { SubtitleController, detectPlatform, type Platform } from './subtitle-controller';
@@ -33,29 +33,64 @@ let tooltipInjected = false;
 let tooltipEl: HTMLDivElement | null = null;
 let tooltipTarget: HTMLElement | null = null;
 
-function isKeywordProviderConfigured(settings: Settings): boolean {
-  switch (settings.keywordProvider) {
-    case 'openai':
-      return Boolean(settings.channels.openai);
-    case 'claude':
-      return Boolean(settings.channels.claude);
-    case 'gemini':
-      return Boolean(settings.channels.gemini);
+type ResolvedRoute = { kind: 1 | 2 | 3; channelId?: number };
+
+function resolveChannel(channelId: number | undefined, settings: Settings): ProviderChannel | null {
+  if (typeof channelId !== 'number' || !Number.isFinite(channelId)) return null;
+  return settings.channels.find((channel) => channel.channelId === channelId) ?? null;
+}
+
+function firstAvailableChannel(settings: Settings): ProviderChannel | null {
+  let best: ProviderChannel | null = null;
+  for (const channel of settings.channels) {
+    if (!best || channel.channelId < best.channelId) best = channel;
   }
+  return best;
+}
+
+function fallbackToFirstChannel(settings: Settings): ResolvedRoute {
+  const first = firstAvailableChannel(settings);
+  return { kind: 1, ...(first ? { channelId: first.channelId } : {}) };
+}
+
+function resolveRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
+  const config = settings.behaviorRoutes?.[behaviorKey];
+  if (!config) return fallbackToFirstChannel(settings);
+  if (config.kind === 2 || config.kind === 3) return { kind: config.kind };
+  const channel = resolveChannel(config.channelId, settings);
+  if (channel) return { kind: 1, channelId: channel.channelId };
+  return fallbackToFirstChannel(settings);
+}
+
+function resolveChannelRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
+  const resolved = resolveRoute(behaviorKey, settings);
+  if (resolved.kind !== 1) return fallbackToFirstChannel(settings);
+  return resolved.channelId ? resolved : fallbackToFirstChannel(settings);
+}
+
+function isChannelConfigured(channel: ProviderChannel): boolean {
+  if (!channel.model?.trim()) return false;
+  const cfg = channel.config as Record<string, unknown>;
+  if (channel.typeId === 1) {
+    return typeof cfg.baseUrl === 'string' && cfg.baseUrl.trim().length > 0;
+  }
+  if (channel.typeId === 2 || channel.typeId === 3) {
+    return typeof cfg.apiKey === 'string' && cfg.apiKey.trim().length > 0;
+  }
+  return false;
+}
+
+function isKeywordProviderConfigured(settings: Settings): boolean {
+  const route = resolveChannelRoute('select_keywords', settings);
+  const channel = resolveChannel(route.channelId, settings);
+  return Boolean(channel && isChannelConfigured(channel));
 }
 
 function isTranslationProviderConfigured(settings: Settings): boolean {
-  switch (settings.translationProvider) {
-    case 'openai':
-      return Boolean(settings.channels.openai);
-    case 'claude':
-      return Boolean(settings.channels.claude);
-    case 'gemini':
-      return Boolean(settings.channels.gemini);
-    case 'google':
-    case 'bing':
-      return true;
-  }
+  const route = resolveRoute('translate', settings);
+  if (route.kind === 2 || route.kind === 3) return true;
+  const channel = resolveChannel(route.channelId, settings);
+  return Boolean(channel && isChannelConfigured(channel));
 }
 
 /**

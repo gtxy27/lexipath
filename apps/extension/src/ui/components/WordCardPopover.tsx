@@ -1,12 +1,12 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import browser from 'webextension-polyfill';
-import { WordCard, type WordCardData } from './WordCard';
-import { sendMessage } from '../../shared/messages';
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import browser from "webextension-polyfill";
+import { WordCard, type WordCardData } from "./WordCard";
+import { sendMessage } from "../../shared/messages";
 
 export interface WordCardPopoverProps {
   word: string;
   anchorRect: DOMRect;
-  mode?: 'hover' | 'click';
+  mode?: "hover" | "click";
   onClose: () => void;
   onFavoriteToggle?: (word: string, isFavorited: boolean) => void;
   onLearnedToggle?: (word: string, isLearned: boolean) => void;
@@ -17,22 +17,25 @@ interface Position {
   left: number;
 }
 
-function resolveTtsLang(options: { targetLanguage?: string; nativeLanguage?: string }): string {
+function resolveTtsLang(options: {
+  targetLanguage?: string;
+  nativeLanguage?: string;
+}): string {
   switch (options.targetLanguage) {
-    case 'en':
-      return 'en-US';
-    case 'ja':
-      return 'ja-JP';
-    case 'ko':
-      return 'ko-KR';
-    case 'fr':
-      return 'fr-FR';
-    case 'de':
-      return 'de-DE';
-    case 'zh':
-      return options.nativeLanguage === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+    case "en":
+      return "en-US";
+    case "ja":
+      return "ja-JP";
+    case "ko":
+      return "ko-KR";
+    case "fr":
+      return "fr-FR";
+    case "de":
+      return "de-DE";
+    case "zh":
+      return options.nativeLanguage === "zh-TW" ? "zh-TW" : "zh-CN";
     default:
-      return 'en-US';
+      return "en-US";
   }
 }
 
@@ -48,14 +51,14 @@ function t(key: string, substitutions?: string | string[]): string {
 export function WordCardPopover({
   word,
   anchorRect,
-  mode = 'click',
+  mode = "click",
   onClose,
   onFavoriteToggle,
   onLearnedToggle,
 }: WordCardPopoverProps): React.ReactElement {
   const [cardData, setCardData] = useState<WordCardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [ttsLang, setTtsLang] = useState<string>('en-US');
+  const [ttsLang, setTtsLang] = useState<string>("en-US");
   const [position, setPosition] = useState<Position>({ top: 0, left: 0 });
   const [isVisible, setIsVisible] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -66,7 +69,7 @@ export function WordCardPopover({
 
     async function loadSettings() {
       try {
-        const response = await sendMessage('GET_SETTINGS', undefined);
+        const response = await sendMessage("GET_SETTINGS", undefined);
         if (!response.ok || cancelled) return;
         setTtsLang(resolveTtsLang(response.value));
       } catch {
@@ -87,7 +90,7 @@ export function WordCardPopover({
     async function fetchWordData() {
       setIsLoading(true);
       try {
-        const response = await sendMessage('EXPLAIN_WORD', { word });
+        const response = await sendMessage("EXPLAIN_WORD", { word });
         if (cancelled) return;
 
         if (response.ok) {
@@ -100,22 +103,25 @@ export function WordCardPopover({
           setCardData({
             word: data.word || word,
             ...(data.phonetic ? { phonetic: data.phonetic } : {}),
-            definition: data.definition || t('wordCard_definitionUnavailable'),
+            definition: data.definition || t("wordCard_definitionUnavailable"),
             ...(data.difficulty ? { difficulty: data.difficulty } : {}),
           });
         } else {
-          console.error('[WordCardPopover] Failed to fetch word data:', response.error);
+          console.error(
+            "[WordCardPopover] Failed to fetch word data:",
+            response.error,
+          );
           setCardData({
             word,
-            definition: t('wordCard_definitionFailed'),
+            definition: t("wordCard_definitionFailed"),
           });
         }
       } catch (error) {
         if (cancelled) return;
-        console.error('[WordCardPopover] Error fetching word data:', error);
+        console.error("[WordCardPopover] Error fetching word data:", error);
         setCardData({
           word,
-          definition: t('wordCard_definitionError'),
+          definition: t("wordCard_definitionError"),
         });
       } finally {
         if (!cancelled) {
@@ -172,35 +178,38 @@ export function WordCardPopover({
 
   // Handle click outside to close
   useEffect(() => {
-    if (mode !== 'click') return;
+    if (mode !== "click") return;
 
     function handleClickOutside(event: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     }
 
     // Add listener after a small delay to avoid immediate close
     const timeout = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }, 100);
 
     return () => {
       clearTimeout(timeout);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [mode, onClose]);
 
   // Handle hover mode
   const handleMouseEnter = useCallback(() => {
-    if (mode === 'hover' && closeTimeoutRef.current) {
+    if (mode === "hover" && closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = undefined;
     }
   }, [mode]);
 
   const handleMouseLeave = useCallback(() => {
-    if (mode === 'hover') {
+    if (mode === "hover") {
       closeTimeoutRef.current = setTimeout(() => {
         onClose();
       }, 300);
@@ -220,7 +229,7 @@ export function WordCardPopover({
     <div
       ref={popoverRef}
       className={`fixed z-[10000] transition-opacity duration-200 ${
-        isVisible ? 'opacity-100' : 'opacity-0'
+        isVisible ? "opacity-100" : "opacity-0"
       }`}
       style={{
         top: `${position.top}px`,
@@ -232,7 +241,7 @@ export function WordCardPopover({
       {isLoading ? (
         <div className="bg-white rounded-lg shadow-lg p-4 min-w-[280px]">
           <div className="flex items-center justify-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
           </div>
         </div>
       ) : cardData ? (

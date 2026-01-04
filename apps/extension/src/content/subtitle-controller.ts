@@ -68,14 +68,15 @@ export class SubtitleController {
   }
 
   private getPrefetchConcurrencyLimit(): number {
-    const llmChannel = this.settings.translationProvider === 'openai' ||
-        this.settings.translationProvider === 'claude' ||
-        this.settings.translationProvider === 'gemini'
-      ? this.settings.translationProvider
-      : this.settings.keywordProvider;
+    const route = (() => {
+      const config = this.settings.behaviorRoutes?.select_keywords;
+      if (!config || config.kind !== 1) return null;
+      return this.settings.channels.find((channel) => channel.channelId === config.channelId) ?? null;
+    })();
 
-    const configured = this.settings.channelConcurrencyLimits?.[llmChannel];
-    const channelLimit = typeof configured === 'number' && Number.isFinite(configured) ? configured : 20;
+    const channelLimit = typeof route?.concurrencyLimit === 'number' && Number.isFinite(route.concurrencyLimit)
+      ? route.concurrencyLimit
+      : 15;
     // Reserve headroom for user hover/click; prefetch uses ~25% of model concurrency, capped.
     const suggested = Math.floor(channelLimit / 4);
     return Math.min(20, Math.max(2, suggested || 2));

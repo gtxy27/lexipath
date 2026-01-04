@@ -199,6 +199,202 @@
     "message": "Failed to load settings: $1",
     "description": "Options page load error"
   },
+  "optionsTitle": {
+    "message": "Settings",
+    "description": "Options page title"
+  },
+  "optionsDesc": {
+    "message": "Configure channels and routing.",
+    "description": "Options page description"
+  },
+  "optionsTab_channels": {
+    "message": "Channels",
+    "description": "Options tab: channels"
+  },
+  "optionsTab_language": {
+    "message": "Language",
+    "description": "Options tab: language"
+  },
+  "optionsTab_sites": {
+    "message": "Sites",
+    "description": "Options tab: sites"
+  },
+  "optionsChannelsTitle": {
+    "message": "Channels",
+    "description": "Channels section title"
+  },
+  "optionsChannelsDesc": {
+    "message": "Add multiple provider channels (one model per channel).",
+    "description": "Channels section description"
+  },
+  "optionsAddChannel": {
+    "message": "Add channel",
+    "description": "Add channel button"
+  },
+  "optionsChannelModelUnset": {
+    "message": "Model not set",
+    "description": "Channel card model fallback"
+  },
+  "optionsTestConnection": {
+    "message": "Test connection",
+    "description": "Test provider connection button"
+  },
+  "optionsCopyChannel": {
+    "message": "Duplicate channel",
+    "description": "Copy channel button"
+  },
+  "optionsChannelCopySuffix": {
+    "message": " (copy)",
+    "description": "Channel name suffix when duplicating"
+  },
+  "optionsDeleteChannel": {
+    "message": "Delete channel",
+    "description": "Delete channel button"
+  },
+  "optionsResetButton": {
+    "message": "Reset",
+    "description": "Reset options form button"
+  },
+  "optionsEnabledHint": {
+    "message": "Extension status",
+    "description": "Footer status hint"
+  },
+  "optionsProviderApiKeyOptional": {
+    "message": "Optional",
+    "description": "API key optional placeholder"
+  },
+  "optionsProviderBaseUrlOptionalPlaceholder": {
+    "message": "https://... (optional)",
+    "description": "Base URL placeholder for optional baseUrl"
+  },
+  "optionsChannelNameLabel": {
+    "message": "Name",
+    "description": "Channel name label"
+  },
+  "optionsChannelTypeLabel": {
+    "message": "Type",
+    "description": "Channel type label"
+  },
+  "optionsChannelIconUrlLabel": {
+    "message": "Icon URL",
+    "description": "Channel icon URL label"
+  },
+  "optionsChannelIconUrlPlaceholder": {
+    "message": "assets/icons/openai.png or https://...",
+    "description": "Channel icon URL placeholder"
+  },
+  "optionsRouteKind_channel": {
+    "message": "Channel",
+    "description": "Route kind label: channel"
+  },
+  "optionsRouteKindLabel": {
+    "message": "Route kind",
+    "description": "Behavior route kind label"
+  },
+  "optionsRouteChannelLabel": {
+    "message": "Channel",
+    "description": "Behavior route channel label"
+  },
+  "optionsRouteChannelPlaceholder": {
+    "message": "Select a channel",
+    "description": "Behavior route channel placeholder"
+  },
+  "optionsTestInvalidConfig": {
+    "message": "Please fill a valid configuration first.",
+    "description": "Test connection: invalid config"
+  },
+  "optionsTestSuccess": {
+    "message": "Connection ok.",
+    "description": "Test connection: success"
+  },
+  "optionsTestError": {
+    "message": "Connection failed: $1",
+    "description": "Test connection: error"
+  },
+  "optionsLanguageTitle": {
+    "message": "Language",
+    "description": "Language section title"
+  },
+  "optionsLanguageDesc": {
+    "message": "Configure your native/target languages and proficiency.",
+    "description": "Language section description"
+  },
+  "optionsSitesTitle": {
+    "message": "Site rules",
+    "description": "Sites section title"
+  },
+  "optionsBehavior_select_keywords": {
+    "message": "Select keywords",
+    "description": "Behavior label: select_keywords"
+  },
+  "optionsBehaviorDesc_select_keywords": {
+    "message": "LLM-only keyword selection.",
+    "description": "Behavior description: select_keywords"
+  },
+  "optionsBehavior_translate": {
+    "message": "Translate",
+    "description": "Behavior label: translate"
+  },
+  "optionsBehaviorDesc_translate": {
+    "message": "Translate selected terms (Channel/Google/Bing).",
+    "description": "Behavior description: translate"
+  },
+  "optionsBehavior_dictionary": {
+    "message": "Dictionary fallback",
+    "description": "Behavior label: dictionary"
+  },
+  "optionsBehaviorDesc_dictionary": {
+    "message": "Offline-first; fallback via routing when missed.",
+    "description": "Behavior description: dictionary"
+  },
+  "optionsBehavior_enhance_web": {
+    "message": "Enhance web",
+    "description": "Behavior label: enhance_web"
+  },
+  "optionsBehaviorDesc_enhance_web": {
+    "message": "LLM-only web enhancement.",
+    "description": "Behavior description: enhance_web"
+  },
+  "optionsBehavior_enhance_subtitle": {
+    "message": "Enhance subtitles",
+    "description": "Behavior label: enhance_subtitle"
+  },
+  "optionsBehaviorDesc_enhance_subtitle": {
+    "message": "LLM-only subtitle enhancement.",
+    "description": "Behavior description: enhance_subtitle"
+  },
+  "optionsBehavior_chat": {
+    "message": "Chat",
+    "description": "Behavior label: chat"
+  },
+  "optionsBehaviorDesc_chat": {
+    "message": "LLM-only sidebar chat.",
+    "description": "Behavior description: chat"
+  },
+  "optionsBehavior_explain_word": {
+    "message": "Explain word",
+    "description": "Behavior label: explain_word"
+  },
+  "optionsBehaviorDesc_explain_word": {
+    "message": "Offline-first; fallback via routing when missed.",
+    "description": "Behavior description: explain_word"
+  },
+  "optionsChannelNameRequired": {
+    "message": "Channel name is required.",
+    "description": "Validation: channel name required"
+  },
+  "optionsChannelIconUrlInvalid": {
+    "message": "Icon URL must be https://... or an extension path (assets/... or icons/...).",
+    "description": "Validation: icon URL invalid"
+  },
+  "optionsRouteChannelMissing": {
+    "message": "Please select a channel.",
+    "description": "Validation: route missing channel"
+  },
+  "optionsRouteChannelNotConfigured": {
+    "message": "Selected channel is not configured.",
+    "description": "Validation: route channel not configured"
+  },
   "optionsSaveButton": {
     "message": "Save",
     "description": "Options page save button"

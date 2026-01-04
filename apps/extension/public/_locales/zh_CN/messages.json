@@ -199,6 +199,202 @@
     "message": "加载设置失败：$1",
     "description": "设置页加载错误"
   },
+  "optionsTitle": {
+    "message": "设置",
+    "description": "设置页标题"
+  },
+  "optionsDesc": {
+    "message": "配置 Channel 与行为路由。",
+    "description": "设置页描述"
+  },
+  "optionsTab_channels": {
+    "message": "Channels",
+    "description": "设置页 Tab：Channels"
+  },
+  "optionsTab_language": {
+    "message": "语言",
+    "description": "设置页 Tab：语言"
+  },
+  "optionsTab_sites": {
+    "message": "站点",
+    "description": "设置页 Tab：站点"
+  },
+  "optionsChannelsTitle": {
+    "message": "Channels",
+    "description": "Channels 标题"
+  },
+  "optionsChannelsDesc": {
+    "message": "可新增多个 Channel（同一家可多条，每条只绑定一个 model）。",
+    "description": "Channels 描述"
+  },
+  "optionsAddChannel": {
+    "message": "新增 Channel",
+    "description": "新增 Channel 按钮"
+  },
+  "optionsChannelModelUnset": {
+    "message": "未设置模型",
+    "description": "Channel 卡片模型为空提示"
+  },
+  "optionsTestConnection": {
+    "message": "测试连接",
+    "description": "测试服务商连接按钮"
+  },
+  "optionsCopyChannel": {
+    "message": "复制 Channel",
+    "description": "复制 Channel 按钮"
+  },
+  "optionsChannelCopySuffix": {
+    "message": "（副本）",
+    "description": "复制 Channel 时的名称后缀"
+  },
+  "optionsDeleteChannel": {
+    "message": "删除 Channel",
+    "description": "删除 Channel 按钮"
+  },
+  "optionsResetButton": {
+    "message": "重置",
+    "description": "重置表单按钮"
+  },
+  "optionsEnabledHint": {
+    "message": "扩展状态",
+    "description": "底部状态提示"
+  },
+  "optionsProviderApiKeyOptional": {
+    "message": "可选",
+    "description": "API Key 可选占位提示"
+  },
+  "optionsProviderBaseUrlOptionalPlaceholder": {
+    "message": "https://...（可选）",
+    "description": "可选 baseUrl 占位符"
+  },
+  "optionsChannelNameLabel": {
+    "message": "名称",
+    "description": "Channel 名称标签"
+  },
+  "optionsChannelTypeLabel": {
+    "message": "类型",
+    "description": "Channel 类型标签"
+  },
+  "optionsChannelIconUrlLabel": {
+    "message": "图标 URL",
+    "description": "Channel 图标 URL 标签"
+  },
+  "optionsChannelIconUrlPlaceholder": {
+    "message": "assets/icons/openai.png 或 https://...",
+    "description": "Channel 图标 URL 占位符"
+  },
+  "optionsRouteKind_channel": {
+    "message": "Channel",
+    "description": "路由类型：Channel"
+  },
+  "optionsRouteKindLabel": {
+    "message": "路由类型",
+    "description": "行为路由类型标签"
+  },
+  "optionsRouteChannelLabel": {
+    "message": "Channel",
+    "description": "行为路由 Channel 标签"
+  },
+  "optionsRouteChannelPlaceholder": {
+    "message": "选择一个 Channel",
+    "description": "行为路由 Channel 占位符"
+  },
+  "optionsTestInvalidConfig": {
+    "message": "请先填写有效配置。",
+    "description": "测试连接：配置无效"
+  },
+  "optionsTestSuccess": {
+    "message": "连接成功。",
+    "description": "测试连接：成功"
+  },
+  "optionsTestError": {
+    "message": "连接失败：$1",
+    "description": "测试连接：失败"
+  },
+  "optionsLanguageTitle": {
+    "message": "语言",
+    "description": "语言设置标题"
+  },
+  "optionsLanguageDesc": {
+    "message": "配置母语/目标语言与水平。",
+    "description": "语言设置描述"
+  },
+  "optionsSitesTitle": {
+    "message": "站点规则",
+    "description": "站点规则标题"
+  },
+  "optionsBehavior_select_keywords": {
+    "message": "关键词选择",
+    "description": "行为标签：select_keywords"
+  },
+  "optionsBehaviorDesc_select_keywords": {
+    "message": "仅支持 Channel（LLM）。",
+    "description": "行为描述：select_keywords"
+  },
+  "optionsBehavior_translate": {
+    "message": "翻译",
+    "description": "行为标签：translate"
+  },
+  "optionsBehaviorDesc_translate": {
+    "message": "可选 Channel/Google/Bing。",
+    "description": "行为描述：translate"
+  },
+  "optionsBehavior_dictionary": {
+    "message": "词典兜底",
+    "description": "行为标签：dictionary"
+  },
+  "optionsBehaviorDesc_dictionary": {
+    "message": "离线优先，未命中时按路由兜底。",
+    "description": "行为描述：dictionary"
+  },
+  "optionsBehavior_enhance_web": {
+    "message": "网页增强",
+    "description": "行为标签：enhance_web"
+  },
+  "optionsBehaviorDesc_enhance_web": {
+    "message": "仅支持 Channel（LLM）。",
+    "description": "行为描述：enhance_web"
+  },
+  "optionsBehavior_enhance_subtitle": {
+    "message": "字幕增强",
+    "description": "行为标签：enhance_subtitle"
+  },
+  "optionsBehaviorDesc_enhance_subtitle": {
+    "message": "仅支持 Channel（LLM）。",
+    "description": "行为描述：enhance_subtitle"
+  },
+  "optionsBehavior_chat": {
+    "message": "对话",
+    "description": "行为标签：chat"
+  },
+  "optionsBehaviorDesc_chat": {
+    "message": "仅支持 Channel（LLM）。",
+    "description": "行为描述：chat"
+  },
+  "optionsBehavior_explain_word": {
+    "message": "单词解释",
+    "description": "行为标签：explain_word"
+  },
+  "optionsBehaviorDesc_explain_word": {
+    "message": "离线优先，未命中时按路由兜底。",
+    "description": "行为描述：explain_word"
+  },
+  "optionsChannelNameRequired": {
+    "message": "Channel 名称为必填项。",
+    "description": "校验：Channel 名称必填"
+  },
+  "optionsChannelIconUrlInvalid": {
+    "message": "图标 URL 只能是 https://... 或扩展内路径（assets/... 或 icons/...）。",
+    "description": "校验：图标 URL 无效"
+  },
+  "optionsRouteChannelMissing": {
+    "message": "请选择一个 Channel。",
+    "description": "校验：路由缺少 Channel"
+  },
+  "optionsRouteChannelNotConfigured": {
+    "message": "选中的 Channel 未完成配置。",
+    "description": "校验：路由 Channel 未配置"
+  },
   "optionsSaveButton": {
     "message": "保存",
     "description": "设置页保存按钮"
