@@ -60,6 +60,7 @@ export class SubtitleOverlay {
   private forcedVideoContainerPosition = false;
   private platform: 'youtube' | 'bilibili';
   private mode: SubtitleMode = 'enhanced';
+  private theme: 'light' | 'dark' = 'dark';
   private onModeChange?: (mode: SubtitleMode) => void;
   private onWordClick?: (word: string, anchorRect: DOMRect) => void;
   private onWordHover?: (word: string, anchorRect: DOMRect) => void;
@@ -80,12 +81,14 @@ export class SubtitleOverlay {
   constructor(
     platform: 'youtube' | 'bilibili',
     options?: {
+      theme?: 'light' | 'dark';
       onModeChange?: (mode: SubtitleMode) => void;
       onWordClick?: (word: string, anchorRect: DOMRect) => void;
       onWordHover?: (word: string, anchorRect: DOMRect) => void;
     }
   ) {
     this.platform = platform;
+    this.theme = options?.theme === 'light' ? 'light' : 'dark';
     if (options?.onModeChange) {
       this.onModeChange = options.onModeChange;
     }
@@ -350,18 +353,17 @@ export class SubtitleOverlay {
   }
 
   /**
-   * Get current mode
+   * Set theme
    */
-  getMode(): SubtitleMode {
-    return this.mode;
-  }
-
-  /**
-   * Set mode
-   */
-  setMode(mode: SubtitleMode): void {
-    this.mode = mode;
-    this.updateModeLabel();
+  setTheme(theme: 'light' | 'dark'): void {
+    if (this.theme === theme) return;
+    this.theme = theme;
+    if (this.shadow) {
+      const styleEl = this.shadow.querySelector('style');
+      if (styleEl) {
+        styleEl.textContent = this.getStyles();
+      }
+    }
   }
 
   /**
@@ -809,8 +811,7 @@ export class SubtitleOverlay {
       }
     }
 
-    // Fallback for general web pages where no video player is targetted
-    return document.body;
+    return null;
   }
 
   private refineBilibiliVideoContainer(container: HTMLElement): HTMLElement {
@@ -827,6 +828,16 @@ export class SubtitleOverlay {
    * Get Shadow DOM styles
    */
   private getStyles(): string {
+    const isDark = this.theme === 'dark';
+    const bgMain = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.98)';
+    const textMain = isDark ? '#ffffff' : '#1e293b';
+    const textMuted = isDark ? 'rgba(226, 232, 240, 0.9)' : '#64748b';
+    const borderMain = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(226, 232, 240, 0.8)';
+    const shadowMain = isDark ? '0 12px 28px rgba(0, 0, 0, 0.5)' : '0 12px 28px rgba(0, 0, 0, 0.1)';
+    const btnBg = isDark ? 'rgba(15, 23, 42, 0.75)' : 'rgba(241, 245, 249, 0.9)';
+    const btnText = isDark ? 'rgba(248, 250, 252, 0.95)' : '#475569';
+    const btnBorder = isDark ? 'rgba(148, 163, 184, 0.35)' : 'rgba(203, 213, 225, 0.5)';
+
     return `
         .lexipath-subtitle {
           display: none;
@@ -873,14 +884,15 @@ export class SubtitleOverlay {
           line-height: 1;
           padding: 4px 8px;
           border-radius: 999px;
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          background: rgba(15, 23, 42, 0.75);
-          color: rgba(248, 250, 252, 0.95);
+          border: 1px solid ${btnBorder};
+          background: ${btnBg};
+          color: ${btnText};
+          transition: all 0.2s ease;
         }
 
         .lexipath-subtitle__mode-toggle:hover {
-          background: rgba(15, 23, 42, 0.9);
-          border-color: rgba(148, 163, 184, 0.55);
+          background: ${isDark ? 'rgba(15, 23, 42, 0.9)' : 'rgba(226, 232, 240, 1)'};
+          border-color: ${isDark ? 'rgba(148, 163, 184, 0.55)' : 'rgba(148, 163, 184, 0.5)'};
         }
 
         .lexipath-subtitle__lines {
@@ -924,10 +936,10 @@ export class SubtitleOverlay {
           max-width: calc(100vw - 20px);
           z-index: 10001;
           pointer-events: auto;
-          background: rgba(15, 23, 42, 0.95);
-          color: #ffffff;
-          border: 1px solid rgba(148, 163, 184, 0.25);
-          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+          background: ${bgMain};
+          color: ${textMain};
+          border: 1px solid ${borderMain};
+          box-shadow: ${shadowMain};
           border-radius: 12px;
           backdrop-filter: blur(8px);
           padding: 12px;
@@ -952,7 +964,7 @@ export class SubtitleOverlay {
 
         .lexipath-wordcard__meta {
           font-size: 12px;
-          color: rgba(226, 232, 240, 0.9);
+          color: ${textMuted};
         }
 
         .lexipath-wordcard__body {
@@ -961,7 +973,7 @@ export class SubtitleOverlay {
           gap: 8px;
           font-size: 13px;
           line-height: 1.45;
-          color: rgba(241, 245, 249, 0.95);
+          color: ${isDark ? 'rgba(241, 245, 249, 0.95)' : '#334155'};
         }
 
         .lexipath-wordcard__definition {
@@ -970,19 +982,19 @@ export class SubtitleOverlay {
 
         .lexipath-wordcard__example {
           padding-top: 8px;
-          border-top: 1px solid rgba(148, 163, 184, 0.22);
+          border-top: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(226, 232, 240, 0.8)'};
           font-style: italic;
-          color: rgba(226, 232, 240, 0.95);
+          color: ${isDark ? 'rgba(226, 232, 240, 0.95)' : '#475569'};
         }
 
         .lexipath-wordcard__example-translation {
-          color: rgba(148, 163, 184, 0.95);
+          color: ${isDark ? 'rgba(148, 163, 184, 0.95)' : '#64748b'};
         }
 
         .lexipath-wordcard__footer {
           margin-top: 14px;
           padding-top: 10px;
-          border-top: 1px solid rgba(148, 163, 184, 0.15);
+          border-top: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(226, 232, 240, 0.5)'};
           display: flex;
           justify-content: flex-end;
         }

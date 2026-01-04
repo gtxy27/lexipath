@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import browser from "webextension-polyfill";
 import {
   CEFRLevelSchema,
@@ -9,6 +9,7 @@ import {
   type JLPTLevel,
   type TOPIKLevel,
   type SupportedLanguage,
+  type Theme,
 } from "@lexipath/core";
 import { sendMessage } from "../../shared/messages";
 import {
@@ -33,6 +34,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useApplyTheme } from "../lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
 
 type ProficiencyLevel = CEFRLevel | JLPTLevel | TOPIKLevel;
@@ -112,6 +114,7 @@ function toCEFRLevel(
 
 export function Onboarding(): React.ReactElement {
   const [currentStep, setCurrentStep] = useState(1);
+  const [theme, setTheme] = useState<Theme | null>(null);
   const [formData, setFormData] = useState<OnboardingFormData>({
     targetLanguage: "en",
     proficiencyLevel: "B1",
@@ -123,6 +126,22 @@ export function Onboarding(): React.ReactElement {
     },
   });
   const [saving, setSaving] = useState(false);
+
+  useApplyTheme(theme);
+
+  useEffect(() => {
+    async function loadTheme() {
+      try {
+        const response = await sendMessage("GET_SETTINGS", undefined);
+        if (response.ok) {
+          setTheme(response.value.theme);
+        }
+      } catch {
+        // Ignore; fall back to system theme.
+      }
+    }
+    loadTheme();
+  }, []);
 
   const targetLanguageOptions = useMemo(
     () =>
@@ -189,7 +208,7 @@ export function Onboarding(): React.ReactElement {
         proficiencyLevel: cefrLevel,
       });
 
-      window.close();
+      globalThis.close?.();
     } catch (error) {
       console.error("[LexiPath] Failed to save onboarding settings:", error);
     } finally {

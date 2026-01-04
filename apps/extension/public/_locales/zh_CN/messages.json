@@ -139,6 +139,10 @@
     "message": "打开设置",
     "description": "打开设置链接"
   },
+  "toggleTheme": {
+    "message": "切换主题",
+    "description": "切换浅色/深色主题"
+  },
   "popupStatusLabel": {
     "message": "模式",
     "description": "弹窗：状态标签"
@@ -342,6 +346,30 @@
   "optionsLanguageDesc": {
     "message": "配置母语/目标语言与水平。",
     "description": "语言设置描述"
+  },
+  "optionsAppearanceTitle": {
+    "message": "外观",
+    "description": "外观设置标题"
+  },
+  "optionsThemeLabel": {
+    "message": "主题",
+    "description": "主题选择标签"
+  },
+  "optionsTheme_system": {
+    "message": "跟随系统",
+    "description": "主题选项：系统"
+  },
+  "optionsTheme_light": {
+    "message": "浅色",
+    "description": "主题选项：浅色"
+  },
+  "optionsTheme_dark": {
+    "message": "深色",
+    "description": "主题选项：深色"
+  },
+  "optionsThemeHint": {
+    "message": "选择“跟随系统”将根据系统的深浅色偏好自动切换。",
+    "description": "主题提示文案"
   },
   "optionsSitesTitle": {
     "message": "站点规则",

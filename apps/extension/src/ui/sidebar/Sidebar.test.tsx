@@ -25,6 +25,12 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
       i18n: {
         getMessage: vi.fn((key: string) => key),
       },
+      storage: {
+        local: {
+          get: vi.fn(async () => ({})),
+          remove: vi.fn(async () => {}),
+        },
+      },
     },
     sendMessageMock: vi.fn(async (type: string, payload: unknown) => {
       if (type === "CHAT") {
@@ -80,4 +86,3 @@ describe("Sidebar", () => {
     expect(await screen.findByText("assistantReply")).toBeInTheDocument();
   });
 });
-

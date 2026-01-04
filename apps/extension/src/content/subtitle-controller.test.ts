@@ -146,6 +146,7 @@ describe('SubtitleController', () => {
       nativeLanguage: 'zh-CN',
       targetLanguage: 'en',
       proficiencyLevel: 'B1',
+      theme: 'system',
       channels: [
         {
           channelId: 1,

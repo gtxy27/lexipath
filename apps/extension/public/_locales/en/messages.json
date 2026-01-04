@@ -139,6 +139,10 @@
     "message": "Open Settings",
     "description": "Open settings link"
   },
+  "toggleTheme": {
+    "message": "Toggle theme",
+    "description": "Toggle light/dark theme"
+  },
   "popupStatusLabel": {
     "message": "Mode",
     "description": "Popup: status label"
@@ -342,6 +346,30 @@
   "optionsLanguageDesc": {
     "message": "Configure your native/target languages and proficiency.",
     "description": "Language section description"
+  },
+  "optionsAppearanceTitle": {
+    "message": "Appearance",
+    "description": "Appearance section title"
+  },
+  "optionsThemeLabel": {
+    "message": "Theme",
+    "description": "Theme label"
+  },
+  "optionsTheme_system": {
+    "message": "System",
+    "description": "Theme option: system"
+  },
+  "optionsTheme_light": {
+    "message": "Light",
+    "description": "Theme option: light"
+  },
+  "optionsTheme_dark": {
+    "message": "Dark",
+    "description": "Theme option: dark"
+  },
+  "optionsThemeHint": {
+    "message": "Choose System to follow your OS preference.",
+    "description": "Theme hint text"
   },
   "optionsSitesTitle": {
     "message": "Site rules",

@@ -63,6 +63,23 @@ export class SubtitleController {
 
   constructor(private settings: Settings) {}
 
+  private getResolvedTheme(): 'light' | 'dark' {
+    if (this.settings.theme === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return this.settings.theme === 'dark' ? 'dark' : 'light';
+  }
+
+  /**
+   * Set theme
+   */
+  setTheme(theme: 'light' | 'dark' | 'system'): void {
+    this.settings.theme = theme;
+    if (this.overlay) {
+      this.overlay.setTheme(this.getResolvedTheme());
+    }
+  }
+
   private isVideoPaused(): boolean {
     return Boolean(this.videoElement?.paused);
   }
@@ -141,6 +158,7 @@ export class SubtitleController {
 
     // Create overlay
     this.overlay = new SubtitleOverlay(this.provider.platform, {
+      theme: this.getResolvedTheme(),
       onModeChange: (mode) => {
         this.mode = mode;
         this.updateSubtitleDisplay();

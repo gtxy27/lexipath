@@ -29,12 +29,23 @@ const HOVER_UPGRADE_DELAY_MS = 800;
 const wordExplainCache = new Map<string, WordCardData>();
 const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
 
+function getResolvedTheme(): 'light' | 'dark' {
+  if (!currentSettings) return 'dark';
+  if (currentSettings.theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return currentSettings.theme === 'dark' ? 'dark' : 'light';
+}
+
 function getWebOverlay(): SubtitleOverlay {
   if (!webOverlay) {
     webOverlay = new SubtitleOverlay('youtube', { // platform doesn't matter for web card
+      theme: getResolvedTheme(),
       onWordClick: (word, rect) => showFullWordCard(word, rect, true),
     });
     webOverlay.mount();
+  } else {
+    webOverlay.setTheme(getResolvedTheme());
   }
   return webOverlay;
 }
@@ -471,12 +482,22 @@ let stylesInjected = false;
 let intersectionObserver: IntersectionObserver | null = null;
 
 function ensureStylesInjected(): void {
-  if (stylesInjected) return;
-  stylesInjected = true;
+  const theme = getResolvedTheme();
+  const isDark = theme === 'dark';
+  
+  const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.98)';
+  const tooltipText = isDark ? '#ffffff' : '#1e293b';
+  const tooltipShadow = isDark ? '0 10px 30px rgba(0, 0, 0, 0.35)' : '0 10px 30px rgba(0, 0, 0, 0.1)';
+  const tooltipBorder = isDark ? '1px solid rgba(148, 163, 184, 0.2)' : '1px solid rgba(226, 232, 240, 0.8)';
 
-  const style = document.createElement('style');
-  style.id = 'lexipath-styles';
-  style.textContent = `
+  let styleEl = document.getElementById('lexipath-styles') as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'lexipath-styles';
+    document.documentElement.appendChild(styleEl);
+  }
+
+  styleEl.textContent = `
     .lexipath-word {
       background: rgba(59, 130, 246, 0.18) !important;
       border-bottom: 2px dotted #3b82f6 !important;
@@ -495,18 +516,21 @@ function ensureStylesInjected(): void {
       max-width: min(420px, calc(100vw - 24px));
       padding: 6px 10px;
       border-radius: 8px;
-      background: rgba(15, 23, 42, 0.92);
-      color: #ffffff;
+      background: ${tooltipBg};
+      color: ${tooltipText};
       font-size: 13px;
       line-height: 1.35;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      box-shadow: ${tooltipShadow};
+      border: ${tooltipBorder};
       pointer-events: none;
       white-space: pre-wrap;
       backdrop-filter: blur(6px);
     }
   `;
-  document.documentElement.appendChild(style);
-  ensureTooltipInjected();
+
+  if (!tooltipInjected) {
+    ensureTooltipInjected();
+  }
 }
 
 let priorityQueuedElements = new WeakSet<Element>();

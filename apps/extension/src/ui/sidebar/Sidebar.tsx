@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
-import type { ChatResponse } from "@lexipath/core";
+import type { ChatResponse, Theme } from "@lexipath/core";
 import { sendMessage } from "../../shared/messages";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Send, Trash2, Bot, User, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useApplyTheme } from "../lib/theme";
 
 function t(key: string): string {
   return browser.i18n.getMessage(key) || key;
@@ -26,8 +27,25 @@ export function Sidebar(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<Theme | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useApplyTheme(theme);
+
+  useEffect(() => {
+    async function loadTheme() {
+      try {
+        const response = await sendMessage("GET_SETTINGS", undefined);
+        if (response.ok) {
+          setTheme(response.value.theme);
+        }
+      } catch {
+        // Ignore; fall back to system theme.
+      }
+    }
+    loadTheme();
+  }, []);
 
   useEffect(() => {
     async function checkPendingMessage() {

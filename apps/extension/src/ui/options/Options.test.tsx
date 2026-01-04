@@ -127,7 +127,7 @@ describe("Options", () => {
     await user.click(screen.getByTestId("route-kind-translate"));
     await user.click(await screen.findByText("translationProvider_google"));
 
-    await user.click(screen.getByRole("button", { name: "optionsSaveButton" }));
+    await user.click(screen.getAllByRole("button", { name: "optionsSaveButton" })[0]!);
 
     const setCalls = sendMessageMock.mock.calls.filter((call) => call[0] === "SET_SETTINGS");
     expect(setCalls).toHaveLength(1);

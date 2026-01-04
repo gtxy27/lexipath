@@ -59,6 +59,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useApplyTheme } from "../lib/theme";
 
 type SiteMode = "all" | "whitelist";
 
@@ -117,6 +118,7 @@ type FormState = {
   nativeLanguage: Settings["nativeLanguage"];
   targetLanguage: Settings["targetLanguage"];
   proficiencyLevel: CEFRLevel;
+  theme: Settings["theme"];
   enabled: boolean;
   autoEnhance: boolean;
   siteMode: SiteMode;
@@ -280,6 +282,7 @@ function settingsToFormState(settings: Settings): FormState {
     nativeLanguage: settings.nativeLanguage,
     targetLanguage: settings.targetLanguage,
     proficiencyLevel: settings.proficiencyLevel,
+    theme: settings.theme,
     enabled: settings.enabled,
     autoEnhance: settings.autoEnhance,
     siteMode: settings.siteMode,
@@ -410,8 +413,7 @@ function buildChannel(
   const apiKey = channel.apiKey.trim();
 
   if (channel.typeId === 1) {
-    if (!baseUrl) errors.baseUrl = "optionsProviderBaseUrlRequired";
-    else if (!z.string().url().safeParse(baseUrl).success)
+    if (baseUrl && !z.string().url().safeParse(baseUrl).success)
       errors.baseUrl = "optionsProviderBaseUrlInvalid";
   } else {
     if (baseUrl && !z.string().url().safeParse(baseUrl).success)
@@ -434,12 +436,14 @@ function buildChannel(
   };
 
   const validateConfig = (() => {
+    const baseUrlToValidate = typeof config.baseUrl === "string" && config.baseUrl.trim() ? config.baseUrl.trim() : undefined;
+    
     if (channel.typeId === 1) {
       return ProviderConfigSchema.safeParse({
-        baseUrl: String(config.baseUrl ?? ""),
         model,
-        ...(typeof config.apiKey === "string" && config.apiKey
-          ? { apiKey: config.apiKey }
+        ...(baseUrlToValidate ? { baseUrl: baseUrlToValidate } : {}),
+        ...(typeof config.apiKey === "string" && config.apiKey.trim()
+          ? { apiKey: config.apiKey.trim() }
           : {}),
         ...(config.customHeaders
           ? { customHeaders: config.customHeaders }
@@ -450,9 +454,7 @@ function buildChannel(
       return ClaudeProviderConfigSchema.safeParse({
         model,
         apiKey: String(config.apiKey ?? ""),
-        ...(typeof config.baseUrl === "string" && config.baseUrl
-          ? { baseUrl: config.baseUrl }
-          : {}),
+        ...(baseUrlToValidate ? { baseUrl: baseUrlToValidate } : {}),
         ...(config.customHeaders
           ? { customHeaders: config.customHeaders }
           : {}),
@@ -461,9 +463,7 @@ function buildChannel(
     return GeminiProviderConfigSchema.safeParse({
       model,
       apiKey: String(config.apiKey ?? ""),
-      ...(typeof config.baseUrl === "string" && config.baseUrl
-        ? { baseUrl: config.baseUrl }
-        : {}),
+      ...(baseUrlToValidate ? { baseUrl: baseUrlToValidate } : {}),
       ...(config.customHeaders ? { customHeaders: config.customHeaders } : {}),
     });
   })();
@@ -586,6 +586,7 @@ function buildSettingsPatch(form: FormState):
     nativeLanguage: form.nativeLanguage,
     targetLanguage: form.targetLanguage,
     proficiencyLevel: form.proficiencyLevel,
+    theme: form.theme,
     enabled: form.enabled,
     autoEnhance: form.autoEnhance,
     siteMode: form.siteMode,
@@ -694,6 +695,8 @@ export function Options(): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [testingChannelId, setTestingChannelId] = useState<number | null>(null);
   const [expandedChannels, setExpandedChannels] = useState<Record<number, boolean>>({});
+
+  useApplyTheme(form?.theme ?? settings?.theme);
 
   useEffect(() => {
     async function load() {
@@ -1285,11 +1288,11 @@ export function Options(): React.ReactElement {
                 <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsLanguageDesc")}</p>
              </header>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-                <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsLanguageTitle")}</h4>
-                   
-                   <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+                  <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+                     <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsLanguageTitle")}</h4>
+                     
+                     <div className="space-y-5">
                       <div className="space-y-2.5">
                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("nativeLanguage")}</Label>
                          <Select value={form.nativeLanguage} onValueChange={v => setForm({...form, nativeLanguage: v as any})}>
@@ -1313,11 +1316,11 @@ export function Options(): React.ReactElement {
                             </SelectContent>
                          </Select>
                       </div>
-                   </div>
-                </div>
+                     </div>
+                  </div>
 
-                <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("proficiencyLevel")}</h4>
+                  <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+                     <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("proficiencyLevel")}</h4>
                    
                    <div className="space-y-5">
                       <div className="space-y-2.5">
@@ -1336,10 +1339,40 @@ export function Options(): React.ReactElement {
                           {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
                         </p>
                       </div>
-                   </div>
+                     </div>
+                  </div>
+
+                  <div className="md:col-span-2 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+                     <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsAppearanceTitle")}</h4>
+
+                     <div className="space-y-5">
+                        <div className="space-y-2.5">
+                           <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsThemeLabel")}</Label>
+                           <Select
+                              value={form.theme}
+                              onValueChange={(v) =>
+                                setForm({ ...form, theme: v as Settings["theme"] })
+                              }
+                           >
+                              <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                 <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                                 <SelectItem value="system">{t("optionsTheme_system")}</SelectItem>
+                                 <SelectItem value="light">{t("optionsTheme_light")}</SelectItem>
+                                 <SelectItem value="dark">{t("optionsTheme_dark")}</SelectItem>
+                              </SelectContent>
+                           </Select>
+                        </div>
+                        <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
+                            {t("optionsThemeHint")}
+                          </p>
+                        </div>
+                     </div>
+                  </div>
                 </div>
-             </div>
-          </TabsContent>
+             </TabsContent>
 
           <TabsContent value="sites" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none">
              <header className="space-y-3">

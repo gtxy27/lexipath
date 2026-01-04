@@ -13,6 +13,7 @@ import {
 import { Switch } from "../components/ui/switch";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { useApplyTheme } from "../lib/theme";
 import {
   Loader2,
   Settings2,
@@ -21,6 +22,8 @@ import {
   GraduationCap,
   ChevronRight,
   Zap,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 function t(key: string): string {
@@ -30,6 +33,8 @@ function t(key: string): string {
 export function Popup(): React.ReactElement {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useApplyTheme(settings?.theme);
 
   useEffect(() => {
     async function loadSettings() {
@@ -57,6 +62,21 @@ export function Popup(): React.ReactElement {
     }
   }
 
+  async function toggleTheme() {
+    if (!settings) return;
+    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+    const currentTheme = settings.theme ?? "system";
+    const isDark = currentTheme === "dark" || (currentTheme === "system" && prefersDark);
+    const nextTheme = isDark ? "light" : "dark";
+
+    const response = await sendMessage("SET_SETTINGS", { theme: nextTheme });
+    if (response.ok) {
+      setSettings({ ...settings, theme: nextTheme });
+    } else {
+      console.error("[LexiPath] Failed to update theme:", response.error);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-72 w-[340px] items-center justify-center bg-white dark:bg-[#0d0e14]">
@@ -78,6 +98,9 @@ export function Popup(): React.ReactElement {
   }
 
   const isEnabled = !!settings?.enabled;
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+  const currentTheme = settings?.theme ?? "system";
+  const isDark = currentTheme === "dark" || (currentTheme === "system" && prefersDark);
 
   return (
     <motion.div
@@ -115,11 +138,24 @@ export function Popup(): React.ReactElement {
                   </div>
                 </div>
               </div>
-              <Switch
-                checked={isEnabled}
-                onCheckedChange={toggleEnabled}
-                className="data-[state=checked]:bg-indigo-600"
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-10 w-10 rounded-xl bg-white/60 dark:bg-white/[0.03] hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200"
+                  onClick={toggleTheme}
+                  aria-label={t("toggleTheme")}
+                  title={t("toggleTheme")}
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+                <Switch
+                  checked={isEnabled}
+                  onCheckedChange={toggleEnabled}
+                  className="data-[state=checked]:bg-indigo-600"
+                />
+              </div>
             </div>
           </CardHeader>
 

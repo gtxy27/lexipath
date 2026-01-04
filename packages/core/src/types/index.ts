@@ -81,7 +81,7 @@ export type Response<T> = SuccessResponse<T> | ErrorResponse;
 // =============================================================================
 
 export const ProviderConfigSchema = z.object({
-  baseUrl: z.string().url(),
+  baseUrl: z.string().url().optional(),
   model: z.string().min(1),
   apiKey: z.string().optional(),
   customHeaders: z.record(z.string()).optional(),
@@ -226,11 +226,17 @@ export type TestProviderConnectionPayload = z.infer<typeof TestProviderConnectio
 // Settings
 // =============================================================================
 
+export const ThemeSchema = z.enum(['light', 'dark', 'system']);
+export type Theme = z.infer<typeof ThemeSchema>;
+
 export const SettingsSchema = z.object({
   // Language
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
   targetLanguage: SupportedLanguageSchema.default('en'),
   proficiencyLevel: CEFRLevelSchema.default('B1'),
+
+  // Appearance
+  theme: ThemeSchema.default('system'),
 
   // Provider channels (multi-channel, one model per channel)
   channels: ProviderChannelsSchema,

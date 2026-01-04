@@ -47,6 +47,7 @@ import { Onboarding } from './Onboarding';
 describe('Onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sendMessageMock.mockImplementation(() => Promise.resolve({ ok: true, value: {} }));
     // Mock window.close
     vi.stubGlobal('close', vi.fn());
   });
