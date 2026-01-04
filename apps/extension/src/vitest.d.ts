@@ -9,4 +9,7 @@ declare global {
   }
 }
 
+// CSS module declarations - supports both default imports and side-effect imports
+declare module '*.css';
+
 export {};
