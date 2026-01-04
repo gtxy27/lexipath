@@ -67,12 +67,13 @@ describe('SubtitleOverlay', () => {
       expect(videoContainer.querySelectorAll('#lexipath-subtitle-overlay')).toHaveLength(1);
     });
 
-    it('returns false when video container not found', () => {
+    it('falls back to document.body when video container not found', () => {
       document.body.innerHTML = '';
       const overlay = new SubtitleOverlay('youtube');
       const result = overlay.mount();
 
-      expect(result).toBe(false);
+      expect(result).toBe(true);
+      expect(document.body.querySelector('#lexipath-subtitle-overlay')).toBeTruthy();
     });
 
     it('creates shadow DOM for style isolation', () => {

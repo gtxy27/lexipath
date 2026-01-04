@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
 import type { ChatResponse, Theme } from "@lexipath/core";
 import { sendMessage } from "../../shared/messages";
+import { chatStream } from "../../shared/chat-stream";
+import { MessageContent } from "./MessageContent";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -16,9 +18,11 @@ function t(key: string): string {
 }
 
 interface ChatMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  isStreaming?: boolean;
 }
 
 export function Sidebar(): React.ReactElement {
@@ -30,8 +34,15 @@ export function Sidebar(): React.ReactElement {
   const [theme, setTheme] = useState<Theme | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const streamCancelRef = useRef<null | (() => void)>(null);
 
   useApplyTheme(theme);
+
+  useEffect(() => {
+    return () => {
+      streamCancelRef.current?.();
+    };
+  }, []);
 
   useEffect(() => {
     async function loadTheme() {
@@ -47,6 +58,112 @@ export function Sidebar(): React.ReactElement {
     loadTheme();
   }, []);
 
+  const sendChatText = useCallback(
+    async (text: string) => {
+      const message = text.trim();
+      if (!message || isLoading) return;
+
+      streamCancelRef.current?.();
+      setError(null);
+      setIsLoading(true);
+
+      const now = Date.now();
+      const userId = `${now}-user-${Math.random().toString(16).slice(2)}`;
+      const assistantId = `${now}-assistant-${Math.random().toString(16).slice(2)}`;
+
+      const userMessage: ChatMessage = {
+        id: userId,
+        role: "user",
+        content: message,
+        timestamp: now,
+      };
+
+      const assistantMessage: ChatMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: "",
+        timestamp: now,
+        isStreaming: true,
+      };
+
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      setInputValue("");
+
+      let contentSoFar = "";
+      let pending = "";
+      let flushTimer: number | null = null;
+      let finished = false;
+
+      const flush = () => {
+        if (!pending) return;
+        contentSoFar += pending;
+        pending = "";
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId ? { ...msg, content: contentSoFar, isStreaming: true } : msg,
+          ),
+        );
+      };
+
+      const scheduleFlush = () => {
+        if (flushTimer !== null) return;
+        flushTimer = window.setTimeout(() => {
+          flushTimer = null;
+          flush();
+        }, 60);
+      };
+
+      const { cancel } = chatStream(
+        { message, conversationId },
+        {
+          onChunk: (delta) => {
+            if (finished) return;
+            pending += delta;
+            scheduleFlush();
+          },
+          onDone: ({ reply, conversationId: nextConversationId }) => {
+            if (finished) return;
+            finished = true;
+            if (flushTimer !== null) {
+              window.clearTimeout(flushTimer);
+              flushTimer = null;
+            }
+            flush();
+            const finalReply = reply || contentSoFar;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId ? { ...msg, content: finalReply, isStreaming: false } : msg,
+              ),
+            );
+            setConversationId(nextConversationId);
+            setIsLoading(false);
+            inputRef.current?.focus();
+          },
+          onError: (err) => {
+            if (finished) return;
+            finished = true;
+            if (flushTimer !== null) {
+              window.clearTimeout(flushTimer);
+              flushTimer = null;
+            }
+            flush();
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId ? { ...msg, content: contentSoFar, isStreaming: false } : msg,
+              ),
+            );
+            setError(err.message);
+            setIsLoading(false);
+            inputRef.current?.focus();
+          },
+        },
+      );
+
+      streamCancelRef.current = cancel;
+    },
+    [conversationId, isLoading],
+  );
+
   useEffect(() => {
     async function checkPendingMessage() {
       const data = await browser.storage.local.get("lexipath_sidebar_pending_message");
@@ -57,36 +174,14 @@ export function Sidebar(): React.ReactElement {
         await browser.storage.local.remove("lexipath_sidebar_pending_message");
         
         if (pending.isAutoSend) {
-          // Trigger handleSend manually with the pending text
-          const userMessage: ChatMessage = {
-            role: "user",
-            content: pending.text,
-            timestamp: Date.now(),
-          };
-          setMessages((prev) => [...prev, userMessage]);
-          setIsLoading(true);
-          try {
-            const response = await sendMessage<ChatResponse>("CHAT", { message: pending.text });
-            if (response.ok) {
-              setMessages((prev) => [...prev, {
-                role: "assistant",
-                content: response.value.reply,
-                timestamp: Date.now(),
-              }]);
-              setConversationId(response.value.conversationId);
-            }
-          } catch (err) {
-            setError(err instanceof Error ? err.message : t("error_unknown"));
-          } finally {
-            setIsLoading(false);
-          }
+          await sendChatText(pending.text);
         } else {
           setInputValue(pending.text);
         }
       }
     }
     checkPendingMessage();
-  }, []);
+  }, [sendChatText]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -96,50 +191,9 @@ export function Sidebar(): React.ReactElement {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const handleSend = useCallback(async () => {
-    const message = inputValue.trim();
-    if (!message || isLoading) return;
-
-    const userMessage: ChatMessage = {
-      role: "user",
-      content: message,
-      timestamp: Date.now(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await sendMessage<ChatResponse>("CHAT", {
-        message,
-        conversationId,
-      });
-
-      if (response.ok) {
-        const assistantMessage: ChatMessage = {
-          role: "assistant",
-          content: response.value.reply,
-          timestamp: Date.now(),
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-        setConversationId(response.value.conversationId);
-      } else {
-        setError(response.error.message);
-        // We don't remove user message here to allow retry or reference
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t("error_unknown"),
-      );
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
-    }
-  }, [inputValue, isLoading, conversationId]);
+  const handleSend = useCallback(() => {
+    void sendChatText(inputValue);
+  }, [inputValue, sendChatText]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -154,9 +208,11 @@ export function Sidebar(): React.ReactElement {
   const handleClear = useCallback(() => {
     if (messages.length === 0) return;
     if (confirm(t("chatClearConfirm"))) {
+      streamCancelRef.current?.();
       setMessages([]);
       setConversationId(undefined);
       setError(null);
+      setIsLoading(false);
     }
   }, [messages.length]);
 
@@ -257,9 +313,13 @@ export function Sidebar(): React.ReactElement {
                         : "bg-white dark:bg-white/5 glass-card text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5"
                     )}
                   >
-                    <div className="whitespace-pre-wrap break-words font-medium">
-                      {msg.content}
-                    </div>
+                    {msg.role === "assistant" ? (
+                      <MessageContent content={msg.content} isStreaming={Boolean(msg.isStreaming)} />
+                    ) : (
+                      <div className="whitespace-pre-wrap break-words font-medium">
+                        {msg.content}
+                      </div>
+                    )}
                     <div
                       className={cn(
                         "text-[10px] mt-2 font-black uppercase tracking-widest opacity-40",
@@ -274,22 +334,6 @@ export function Sidebar(): React.ReactElement {
                   </div>
                 </motion.div>
               ))
-            )}
-            {isLoading && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4 mr-auto max-w-[90%]"
-              >
-                <div className="h-8 w-8 mt-1 rounded-lg flex items-center justify-center shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 shadow-sm">
-                   <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
-                </div>
-                <div className="bg-white dark:bg-white/5 glass-card rounded-2xl rounded-tl-none border border-gray-100 dark:border-white/5 px-4 py-4 flex items-center gap-1.5 shadow-lg">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce"></span>
-                </div>
-              </motion.div>
             )}
           </AnimatePresence>
           <div ref={messagesEndRef} />

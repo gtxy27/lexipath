@@ -12,6 +12,42 @@ const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
 
 let cachedSettings: Settings | null = null;
 
+function migrateBehaviorRoutes(settings: Settings): { settings: Settings; migrated: boolean } {
+  const routes = { ...(settings.behaviorRoutes ?? {}) } as Record<string, any>;
+  let migrated = false;
+
+  if (routes.enhance_subtitle && !routes.adapt_subtitle) {
+    routes.adapt_subtitle = routes.enhance_subtitle;
+    delete routes.enhance_subtitle;
+    migrated = true;
+  }
+
+  if (routes.enhance_web) {
+    delete routes.enhance_web;
+    migrated = true;
+  }
+
+  if (routes.explain_word) {
+    delete routes.explain_word;
+    migrated = true;
+  }
+
+  if (!routes.translate_keywords) {
+    const base = routes.translate ?? null;
+    routes.translate_keywords = base ? { ...base } : { kind: 1, channelId: 1, extra: {} };
+    migrated = true;
+  }
+
+  if (!migrated) return { settings, migrated: false };
+  return {
+    settings: {
+      ...settings,
+      behaviorRoutes: routes,
+    },
+    migrated: true,
+  };
+}
+
 function migrateLegacySettings(raw: unknown): { value: unknown; migrated: boolean } {
   if (!raw || typeof raw !== 'object') return { value: raw, migrated: false };
 
@@ -161,11 +197,10 @@ function migrateLegacySettings(raw: unknown): { value: unknown; migrated: boolea
   next.behaviorRoutes = {
     select_keywords: { kind: 1, channelId: keywordChannelId, extra: {} },
     translate: translateRoute,
+    translate_keywords: translateRoute,
     dictionary: translateRoute,
-    enhance_web: { kind: 1, channelId: enhanceChannelId, extra: {} },
-    enhance_subtitle: { kind: 1, channelId: enhanceChannelId, extra: {} },
+    adapt_subtitle: { kind: 1, channelId: enhanceChannelId, extra: {} },
     chat: { kind: 1, channelId: enhanceChannelId, extra: {} },
-    explain_word: { kind: 1, channelId: enhanceChannelId, extra: {} },
   };
 
   if (migrated) {
@@ -185,11 +220,12 @@ export async function getSettings(): Promise<Settings> {
   const migrated = migrateLegacySettings(raw);
   const parsed = SettingsSchema.safeParse(migrated.value);
   if (parsed.success) {
-    cachedSettings = parsed.data;
-    if (migrated.migrated) {
-      await browser.storage.local.set({ [SETTINGS_KEY]: parsed.data });
+    const normalized = migrateBehaviorRoutes(parsed.data);
+    cachedSettings = normalized.settings;
+    if (migrated.migrated || normalized.migrated) {
+      await browser.storage.local.set({ [SETTINGS_KEY]: normalized.settings });
     }
-    return parsed.data;
+    return normalized.settings;
   }
 
   console.warn('[LexiPath] Invalid settings in storage, resetting to defaults');

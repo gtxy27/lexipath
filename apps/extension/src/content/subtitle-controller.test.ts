@@ -46,6 +46,7 @@ vi.mock('./ui/SubtitleOverlay', () => {
   SubtitleOverlay.prototype.clear = vi.fn();
   SubtitleOverlay.prototype.showWordCardLoading = vi.fn();
   SubtitleOverlay.prototype.showWordCard = vi.fn();
+  SubtitleOverlay.prototype.setModeLabels = vi.fn();
   SubtitleOverlay.prototype.setMode = vi.fn();
   SubtitleOverlay.prototype.getMode = vi.fn(() => 'enhanced');
 
@@ -165,7 +166,6 @@ describe('SubtitleController', () => {
         enhance_web: { kind: 1, channelId: 1, extra: {} },
         enhance_subtitle: { kind: 1, channelId: 1, extra: {} },
         chat: { kind: 1, channelId: 1, extra: {} },
-        explain_word: { kind: 1, channelId: 1, extra: {} },
       },
       enabled: true,
       autoEnhance: true,
@@ -426,7 +426,7 @@ describe('SubtitleController', () => {
           startMs: 0,
           endMs: 1000,
           text: 'First subtitle',
-          lang: 'en',
+          lang: 'zh',
           source: 'youtube',
         },
         {
@@ -434,7 +434,7 @@ describe('SubtitleController', () => {
           startMs: 1000,
           endMs: 2000,
           text: 'Second subtitle',
-          lang: 'en',
+          lang: 'zh',
           source: 'youtube',
         },
       ];
@@ -454,12 +454,12 @@ describe('SubtitleController', () => {
       expect(enhanceCalls).toHaveLength(2);
       expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
         subtitle: 'First subtitle',
-        sourceLang: 'en',
+        sourceLang: 'zh',
         mode: 'single',
       });
       expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
         subtitle: 'Second subtitle',
-        sourceLang: 'en',
+        sourceLang: 'zh',
         mode: 'single',
       });
     });
@@ -492,9 +492,9 @@ describe('SubtitleController', () => {
 
     it('does not schedule new enhancements while paused', async () => {
       const mockCues: Cue[] = [
-        { id: 'cue1', startMs: 0, endMs: 1000, text: 'First subtitle', lang: 'en', source: 'youtube' },
-        { id: 'cue2', startMs: 1000, endMs: 2000, text: 'Second subtitle', lang: 'en', source: 'youtube' },
-        { id: 'cue3', startMs: 2000, endMs: 3000, text: 'Third subtitle', lang: 'en', source: 'youtube' },
+        { id: 'cue1', startMs: 0, endMs: 1000, text: 'First subtitle', lang: 'zh', source: 'youtube' },
+        { id: 'cue2', startMs: 1000, endMs: 2000, text: 'Second subtitle', lang: 'zh', source: 'youtube' },
+        { id: 'cue3', startMs: 2000, endMs: 3000, text: 'Third subtitle', lang: 'zh', source: 'youtube' },
       ];
 
       vi.mocked(getVideoId).mockReturnValue('test123');

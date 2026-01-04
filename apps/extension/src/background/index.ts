@@ -30,6 +30,7 @@ import {
   type Settings,
   type SubtitleEnhanceOutput,
   type WebEnhanceOutput,
+  type TranslateKeywordsPayload,
 } from '@lexipath/core';
 import { validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
 import {
@@ -42,12 +43,15 @@ import {
 import {
   buildExplainWordPrompt,
   buildKeywordSelectPrompt,
+  buildSubtitleAdaptPrompt,
   buildSubtitleEnhancePrompt,
   buildTermTranslatePrompt,
+  buildTranslateKeywordsPrompt,
   buildWebEnhancePrompt,
   parseExplainWordResponse,
   parseKeywordSelectResponse,
   parseTermTranslateResponse,
+  parseTranslateKeywordsResponse,
 } from '@lexipath/providers/prompts';
 import { DictionaryService } from '@lexipath/dictionary';
 
@@ -322,10 +326,12 @@ function getDefaultDifficultyRange(level: CEFRLevel): { difficultyMin: CEFRLevel
 const webEnhanceCache = createExpiringLruCache<WebEnhanceOutput>(CACHE_MAX_ENTRIES);
 const subtitleEnhanceCache = createExpiringLruCache<SubtitleEnhanceOutput>(CACHE_MAX_ENTRIES);
 const keywordSelectCache = createExpiringLruCache<string[]>(CACHE_MAX_ENTRIES);
+const translateKeywordsCache = createExpiringLruCache<Record<string, string>>(CACHE_MAX_ENTRIES);
 const explainWordCache = createExpiringLruCache<ExplainWordOutput>(CACHE_MAX_ENTRIES);
 const webEnhanceInFlight = new Map<string, Promise<WebEnhanceOutput>>();
 const subtitleEnhanceInFlight = new Map<string, Promise<SubtitleEnhanceOutput>>();
 const keywordSelectInFlight = new Map<string, Promise<string[]>>();
+const translateKeywordsInFlight = new Map<string, Promise<Record<string, string>>>();
 const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
 const dictionaryService = new DictionaryService();
 
@@ -392,6 +398,144 @@ async function getKeywordsForText(options: {
       } catch {
         return { value: [], ok: false };
       }
+    },
+  });
+}
+
+function splitTranslatedLines(text: string): string[] {
+  const lines = text
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^\d+[.)]\s*/, '').replace(/^[-*]\s*/, '').trim())
+    .map((line) => {
+      const idx = Math.max(line.lastIndexOf(':'), line.lastIndexOf('：'));
+      if (idx <= 0) return line;
+      const maybe = line.slice(idx + 1).trim();
+      return maybe || line;
+    })
+    .filter(Boolean);
+
+  return lines;
+}
+
+async function translateKeywords(options: {
+  settings: Settings;
+  keywords: string[];
+  context?: string;
+  sourceLang: string;
+  targetLang: string;
+}): Promise<Record<string, string>> {
+  const { settings } = options;
+  const inputKeywords = options.keywords.map((term) => term.trim()).filter(Boolean);
+  if (inputKeywords.length === 0) return {};
+
+  const unique = Array.from(new Set(inputKeywords));
+  const normalizedKeywords = unique.slice().sort((a, b) => a.localeCompare(b));
+
+  const route = resolveRoute('translate_keywords', settings);
+
+  const cacheKey = makeCacheKey('TRANSLATE_KEYWORDS', {
+    v: 1,
+    provider: routeIdentity(route, settings),
+    params: {
+      keywords: normalizedKeywords.join('|'),
+      context: options.context ?? '',
+      sourceLang: options.sourceLang,
+      targetLang: options.targetLang,
+    },
+  });
+
+  return getOrRunCachedTask(translateKeywordsCache, translateKeywordsInFlight, cacheKey, {
+    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
+    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
+    run: async () => {
+      try {
+        switch (route.kind) {
+          case 1: {
+            const channel = resolveChannel(route.channelId, settings);
+            if (!channel) return { value: {}, ok: false };
+            const providerInfo = getChatProviderByChannel(channel);
+            if (!providerInfo) return { value: {}, ok: false };
+            const provider = getChatProvider(providerInfo.type, providerInfo.config);
+
+            const prompt = buildTranslateKeywordsPrompt({
+              keywords: normalizedKeywords,
+              ...(options.context ? { context: options.context } : {}),
+              sourceLang: options.sourceLang,
+              targetLang: options.targetLang,
+            });
+
+            const limit = getChannelConcurrencyLimit(channel, route.kind);
+            const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
+              provider.chat([{ role: 'user', content: prompt }], { temperature: 0, maxTokens: 400 })
+            );
+
+            const responseText = response.choices?.[0]?.message?.content ?? '';
+            const parsed = parseTranslateKeywordsResponse(responseText, normalizedKeywords.length);
+            if (!parsed.ok) return { value: {}, ok: false };
+
+            const mapping: Record<string, string> = {};
+            for (let i = 0; i < normalizedKeywords.length; i++) {
+              const keyword = normalizedKeywords[i];
+              const translated = parsed.translations[i];
+              if (!keyword) continue;
+              mapping[keyword] = typeof translated === 'string' && translated.trim() ? translated.trim() : keyword;
+            }
+            return { value: mapping, ok: true };
+          }
+
+          case 2: {
+            const inputString = normalizedKeywords.join('\n');
+            const limit = getChannelConcurrencyLimit(null, route.kind);
+            const output = await runWithChannelConcurrency(routeKey(route), limit, () =>
+              googleTranslateProvider.translate(inputString, { from: options.sourceLang, to: options.targetLang })
+            );
+            const lines = splitTranslatedLines(output);
+            if (lines.length !== normalizedKeywords.length) {
+              console.warn(
+                `[LexiPath] TRANSLATE_KEYWORDS (google) line mismatch expected=${normalizedKeywords.length} got=${lines.length}`
+              );
+              return { value: {}, ok: false };
+            }
+            const mapping: Record<string, string> = {};
+            for (let i = 0; i < normalizedKeywords.length; i++) {
+              const keyword = normalizedKeywords[i];
+              const translated = lines[i];
+              if (!keyword) continue;
+              mapping[keyword] = translated?.trim() ? translated.trim() : keyword;
+            }
+            return { value: mapping, ok: true };
+          }
+
+          case 3: {
+            const inputString = normalizedKeywords.join('\n');
+            const limit = getChannelConcurrencyLimit(null, route.kind);
+            const output = await runWithChannelConcurrency(routeKey(route), limit, () =>
+              bingTranslateProvider.translate(inputString, { from: options.sourceLang, to: options.targetLang })
+            );
+            const lines = splitTranslatedLines(output);
+            if (lines.length !== normalizedKeywords.length) {
+              console.warn(
+                `[LexiPath] TRANSLATE_KEYWORDS (bing) line mismatch expected=${normalizedKeywords.length} got=${lines.length}`
+              );
+              return { value: {}, ok: false };
+            }
+            const mapping: Record<string, string> = {};
+            for (let i = 0; i < normalizedKeywords.length; i++) {
+              const keyword = normalizedKeywords[i];
+              const translated = lines[i];
+              if (!keyword) continue;
+              mapping[keyword] = translated?.trim() ? translated.trim() : keyword;
+            }
+            return { value: mapping, ok: true };
+          }
+        }
+      } catch {
+        // fallthrough
+      }
+      return { value: {}, ok: false };
     },
   });
 }
@@ -569,6 +713,22 @@ registry.register('SELECT_KEYWORDS', async (payload) => {
   });
 });
 
+registry.register('TRANSLATE_KEYWORDS', async (payload: TranslateKeywordsPayload) => {
+  const settings = await getSettings();
+  const keywords = payload.keywords.map((term) => term.trim()).filter(Boolean);
+  if (keywords.length === 0) return [];
+
+  const mapping = await translateKeywords({
+    settings,
+    keywords,
+    ...(payload.context ? { context: payload.context } : {}),
+    sourceLang: payload.sourceLang,
+    targetLang: payload.targetLang,
+  });
+
+  return keywords.map((term) => mapping[term] ?? term);
+});
+
 registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const settings = await getSettings();
   const content = payload.content;
@@ -638,27 +798,31 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
   const settings = await getSettings();
   const subtitle = payload.subtitle;
   const sourceLang = payload.sourceLang ?? settings.targetLanguage;
-  const targetLang = payload.targetLang ?? settings.nativeLanguage;
   const difficultyLevel = payload.difficultyLevel ?? settings.proficiencyLevel;
   const mode = payload.mode ?? 'bilingual';
 
-  const enhanceRoute = resolveChannelRoute('enhance_subtitle', settings);
-  const enhanceChannel = resolveChannel(enhanceRoute.channelId, settings);
-  const enhanceProviderInfo = enhanceChannel ? getChatProviderByChannel(enhanceChannel) : null;
   const translateRoute = resolveRoute('translate', settings);
+  const nativeLang = payload.targetLang ?? settings.nativeLanguage;
+  const needsAdapt = sourceLang !== settings.targetLanguage;
+
+  const adaptRoute = needsAdapt ? resolveChannelRoute('adapt_subtitle', settings) : null;
+  const adaptChannel = adaptRoute ? resolveChannel(adaptRoute.channelId, settings) : null;
+  const adaptProviderInfo = adaptChannel ? getChatProviderByChannel(adaptChannel) : null;
 
   const cacheKey = makeCacheKey('ENHANCE_SUBTITLE', {
-    v: 3,
+    v: 4,
     providers: {
-      enhance: routeIdentity(enhanceRoute, settings),
-      translation: routeIdentity(translateRoute, settings),
+      ...(needsAdapt
+        ? { adapt: routeIdentity(adaptRoute!, settings) }
+        : { translation: routeIdentity(translateRoute, settings) }),
     },
     params: {
       subtitle,
       sourceLang,
-      targetLang,
+      targetLang: nativeLang,
       difficultyLevel,
       mode,
+      needsAdapt,
     },
   });
 
@@ -667,104 +831,68 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        if (!enhanceChannel || !enhanceProviderInfo) {
-          if (mode === 'bilingual') {
-            const translated = await (async () => {
-              if (translateRoute.kind === 2) {
-                const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
-                return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
-                  googleTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(targetLang) })
-                );
-              }
-              if (translateRoute.kind === 3) {
-                const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
-                return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
-                  bingTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(targetLang) })
-                );
-              }
-
-              const [fallback] = await translateTerms({
-                settings,
-                terms: [subtitle],
-                sourceLang: String(sourceLang),
-                targetLang: String(targetLang),
-              });
-              return fallback ?? '';
-            })();
-
-            return {
-              value: { line1_final: subtitle, ...(translated ? { line2_final: translated } : {}) },
-              ok: Boolean(translated),
-            };
+        if (!needsAdapt) {
+          if (mode === 'single') {
+            return { value: { line1_final: subtitle }, ok: true };
           }
-
-          return { value: { line1_final: subtitle }, ok: false };
-        }
-
-        const provider = getChatProvider(enhanceProviderInfo.type, enhanceProviderInfo.config);
-
-        if (mode === 'bilingual' && (translateRoute.kind === 2 || translateRoute.kind === 3)) {
-          const prompt = buildSubtitleEnhancePrompt({
-            subtitle,
-            sourceLang,
-            targetLang,
-            difficultyLevel,
-            mode: 'single',
-          });
-
-          const enhanceLimit = getChannelConcurrencyLimit(enhanceChannel, enhanceRoute.kind);
-          const response = await runWithChannelConcurrency(routeKey(enhanceRoute), enhanceLimit, () =>
-            provider.chat([{ role: 'user', content: prompt }], {
-              temperature: 0.2,
-              maxTokens: 300,
-            })
-          );
-
-          const responseText = response.choices?.[0]?.message?.content ?? '';
-          const validated = validateSubtitleEnhanceOutput(responseText);
-          const enhancedLine = validated.ok ? validated.value.line1_final : subtitle;
 
           const translated = await (async () => {
             if (translateRoute.kind === 2) {
               const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
               return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
-                googleTranslateProvider.translate(enhancedLine, { from: String(sourceLang), to: String(targetLang) })
+                googleTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(nativeLang) })
               );
             }
             if (translateRoute.kind === 3) {
               const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
               return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
-                bingTranslateProvider.translate(enhancedLine, { from: String(sourceLang), to: String(targetLang) })
+                bingTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(nativeLang) })
               );
             }
-            return '';
+
+            const [fallback] = await translateTerms({
+              settings,
+              terms: [subtitle],
+              sourceLang: String(sourceLang),
+              targetLang: String(nativeLang),
+            });
+            return fallback ?? '';
           })();
 
           return {
-            value: { line1_final: enhancedLine, ...(translated ? { line2_final: translated } : {}) },
+            value: { line1_final: subtitle, ...(translated ? { line2_final: translated } : {}) },
             ok: Boolean(translated),
           };
         }
 
-        const prompt = buildSubtitleEnhancePrompt({
+        if (!adaptChannel || !adaptProviderInfo) {
+          return { value: { line1_final: subtitle }, ok: false };
+        }
+
+        const provider = getChatProvider(adaptProviderInfo.type, adaptProviderInfo.config);
+
+        const prompt = buildSubtitleAdaptPrompt({
           subtitle,
           sourceLang,
-          targetLang,
           difficultyLevel,
-          mode,
+          targetLang: settings.targetLanguage,
         });
 
-        const enhanceLimit = getChannelConcurrencyLimit(enhanceChannel, enhanceRoute.kind);
-        const response = await runWithChannelConcurrency(routeKey(enhanceRoute), enhanceLimit, () =>
+        const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute!.kind);
+        const response = await runWithChannelConcurrency(routeKey(adaptRoute!), adaptLimit, () =>
           provider.chat([{ role: 'user', content: prompt }], {
             temperature: 0.2,
-            maxTokens: 400,
+            maxTokens: 350,
           })
         );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
         const validated = validateSubtitleEnhanceOutput(responseText);
-        const value = validated.ok ? validated.value : validated.fallback;
+        const baseValue = validated.ok ? validated.value : validated.fallback;
+        const value =
+          mode === 'bilingual'
+            ? { ...baseValue, ...(subtitle.trim() ? { line2_final: subtitle } : {}) }
+            : baseValue;
         return { value, ok: validated.ok };
       } catch {
         const fallbackResult = validateSubtitleEnhanceOutput(undefined);
@@ -1045,7 +1173,322 @@ async function ensureChatSessionsLoaded(): Promise<void> {
   return chatSessionsLoadPromise;
 }
 
-registry.register('CHAT', async (payload) => {
+type ChatHistoryMessage = { role: 'user' | 'assistant'; content: string };
+type StructuredStreamError = { code: string; message: string };
+
+function toStructuredStreamError(error: unknown): StructuredStreamError {
+  if (error instanceof MessageError) {
+    return { code: error.code, message: error.message };
+  }
+  if (error instanceof Error) {
+    return { code: 'INTERNAL_ERROR', message: error.message || t('error_unknown') };
+  }
+  return { code: 'INTERNAL_ERROR', message: t('error_unknown') };
+}
+
+function joinUrl(baseUrl: string, path: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+async function parseSseStream(
+  response: Response,
+  options: { onData: (data: string) => void; signal?: AbortSignal }
+): Promise<void> {
+  const reader = response.body?.getReader();
+  if (!reader) return;
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  for (;;) {
+    if (options.signal?.aborted) break;
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split(/\r?\n\r?\n/);
+    buffer = parts.pop() ?? '';
+
+    for (const part of parts) {
+      const lines = part.split(/\r?\n/);
+      const dataLines: string[] = [];
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trimStart());
+        }
+      }
+      const data = dataLines.join('\n').trim();
+      if (data) options.onData(data);
+    }
+  }
+}
+
+async function streamOpenAICompatibleChat(options: {
+  config: ProviderConfig;
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  temperature: number;
+  maxTokens: number;
+  onDelta: (delta: string) => void;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const baseUrl = options.config.baseUrl ?? DEFAULT_OPENAI_URL;
+  const url = joinUrl(baseUrl, '/chat/completions');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.config.customHeaders,
+  };
+  if (options.config.apiKey) {
+    headers['Authorization'] = `Bearer ${options.config.apiKey}`;
+  }
+
+  const body = {
+    model: options.config.model,
+    messages: options.messages,
+    temperature: options.temperature,
+    max_tokens: options.maxTokens,
+    stream: true,
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new MessageError({ code: 'PROVIDER_ERROR', message: `Provider error: ${response.status} - ${errorText}` });
+  }
+
+  let accumulated = '';
+  await parseSseStream(response, {
+    ...(options.signal ? { signal: options.signal } : {}),
+    onData: (data) => {
+      if (data === '[DONE]') return;
+      try {
+        const parsed = JSON.parse(data);
+        const delta =
+          parsed?.choices?.[0]?.delta?.content ??
+          parsed?.choices?.[0]?.delta?.text ??
+          parsed?.choices?.[0]?.message?.content ??
+          '';
+        if (typeof delta === 'string' && delta) {
+          accumulated += delta;
+          options.onDelta(delta);
+        }
+      } catch {
+        // ignore malformed chunks
+      }
+    },
+  });
+
+  return accumulated;
+}
+
+function extractClaudeSystemPrompt(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+): { system?: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> } {
+  const systemParts: string[] = [];
+  const output: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+  for (const message of messages) {
+    if (message.role === 'system') {
+      if (message.content.trim()) systemParts.push(message.content.trim());
+      continue;
+    }
+    if (message.role === 'user' || message.role === 'assistant') {
+      output.push({ role: message.role, content: message.content });
+    }
+  }
+
+  return { ...(systemParts.length ? { system: systemParts.join('\n\n') } : {}), messages: output };
+}
+
+const ANTHROPIC_VERSION = '2023-06-01';
+
+async function streamClaudeChat(options: {
+  config: ClaudeProviderConfig;
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  temperature: number;
+  maxTokens: number;
+  onDelta: (delta: string) => void;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const baseUrl = options.config.baseUrl ?? DEFAULT_CLAUDE_URL;
+  const url = joinUrl(baseUrl, '/messages');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'anthropic-version': ANTHROPIC_VERSION,
+    'x-api-key': options.config.apiKey,
+    ...options.config.customHeaders,
+  };
+
+  const { system, messages } = extractClaudeSystemPrompt(options.messages);
+  const body: Record<string, unknown> = {
+    model: options.config.model,
+    max_tokens: options.maxTokens,
+    temperature: options.temperature,
+    stream: true,
+    ...(system ? { system } : {}),
+    messages,
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new MessageError({ code: 'PROVIDER_ERROR', message: `Provider error: ${response.status} - ${errorText}` });
+  }
+
+  let accumulated = '';
+  await parseSseStream(response, {
+    ...(options.signal ? { signal: options.signal } : {}),
+    onData: (data) => {
+      try {
+        const parsed = JSON.parse(data);
+        const type = typeof parsed?.type === 'string' ? parsed.type : '';
+        if (type === 'content_block_delta') {
+          const delta = parsed?.delta?.text;
+          if (typeof delta === 'string' && delta) {
+            accumulated += delta;
+            options.onDelta(delta);
+          }
+          return;
+        }
+        if (type === 'content_block_start') {
+          const text = parsed?.content_block?.text;
+          if (typeof text === 'string' && text) {
+            accumulated += text;
+            options.onDelta(text);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    },
+  });
+
+  return accumulated;
+}
+
+function normalizeGeminiModel(model: string): string {
+  const trimmed = model.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.includes('/')) return trimmed;
+  return `models/${trimmed}`;
+}
+
+function extractGeminiPrompts(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+): {
+  systemInstruction?: string;
+  contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
+} {
+  const systemParts: string[] = [];
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+
+  for (const message of messages) {
+    if (message.role === 'system') {
+      if (message.content.trim()) systemParts.push(message.content.trim());
+      continue;
+    }
+    if (message.role === 'user') {
+      contents.push({ role: 'user', parts: [{ text: message.content }] });
+      continue;
+    }
+    if (message.role === 'assistant') {
+      contents.push({ role: 'model', parts: [{ text: message.content }] });
+      continue;
+    }
+  }
+
+  const systemInstruction = systemParts.length ? systemParts.join('\n\n') : undefined;
+  return { ...(systemInstruction ? { systemInstruction } : {}), contents };
+}
+
+async function streamGeminiChat(options: {
+  config: GeminiProviderConfig;
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  temperature: number;
+  maxTokens: number;
+  onDelta: (delta: string) => void;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const baseUrl = options.config.baseUrl ?? DEFAULT_GEMINI_URL;
+  const model = normalizeGeminiModel(options.config.model);
+  const url = new URL(joinUrl(baseUrl, `${model}:streamGenerateContent`));
+  url.searchParams.set('key', options.config.apiKey);
+  url.searchParams.set('alt', 'sse');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...options.config.customHeaders,
+  };
+
+  const { systemInstruction, contents } = extractGeminiPrompts(options.messages);
+  const body: Record<string, unknown> = {
+    ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
+    contents,
+    generationConfig: {
+      temperature: options.temperature,
+      maxOutputTokens: options.maxTokens,
+    },
+  };
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new MessageError({ code: 'PROVIDER_ERROR', message: `Provider error: ${response.status} - ${errorText}` });
+  }
+
+  let accumulated = '';
+  await parseSseStream(response, {
+    ...(options.signal ? { signal: options.signal } : {}),
+    onData: (data) => {
+      try {
+        const parsed = JSON.parse(data);
+        const candidates = parsed?.candidates;
+        if (!Array.isArray(candidates) || candidates.length === 0) return;
+        const content = candidates[0]?.content;
+        const parts = content?.parts;
+        if (!Array.isArray(parts)) return;
+        let text = '';
+        for (const part of parts) {
+          const chunk = part?.text;
+          if (typeof chunk === 'string') text += chunk;
+        }
+
+        if (!text) return;
+        const delta = text.startsWith(accumulated) ? text.slice(accumulated.length) : text;
+        if (!delta) return;
+        accumulated += delta;
+        options.onDelta(delta);
+      } catch {
+        // ignore
+      }
+    },
+  });
+
+  return accumulated;
+}
+
+async function runChatStream(
+  payload: { message: string; conversationId?: string },
+  options: { onDelta: (delta: string) => void; signal?: AbortSignal }
+): Promise<{ reply: string; conversationId: string }> {
   await ensureChatSessionsLoaded();
   cleanupExpiredSessions();
 
@@ -1059,8 +1502,6 @@ registry.register('CHAT', async (payload) => {
       message: t('error_providerNotConfigured'),
     });
   }
-
-  const provider = getChatProvider(chatProviderInfo.type, chatProviderInfo.config);
 
   const sessionId = payload.conversationId ?? generateSessionId();
   let session = chatSessions.get(sessionId);
@@ -1076,14 +1517,11 @@ registry.register('CHAT', async (payload) => {
     schedulePersistChatSessions();
   }
 
-  session.messages.push({
-    role: 'user',
-    content: payload.message,
-  });
+  session.messages.push({ role: 'user', content: payload.message });
   session.messages = truncateHistory(session.messages);
   schedulePersistChatSessions();
 
-  const truncatedHistory = truncateHistory(session.messages);
+  const truncatedHistory: ChatHistoryMessage[] = truncateHistory(session.messages);
 
   const systemMessage = {
     role: 'system' as const,
@@ -1092,42 +1530,145 @@ registry.register('CHAT', async (payload) => {
 
   try {
     const limit = getChannelConcurrencyLimit(chatChannel, chatRoute.kind);
-    const response = await runWithChannelConcurrency(routeKey(chatRoute), limit, () =>
-      provider.chat(
-        [systemMessage, ...truncatedHistory],
-        {
-          temperature: 0.7,
-          maxTokens: 1000,
-        }
-      )
-    );
+    const reply = await runWithChannelConcurrency(routeKey(chatRoute), limit, () => {
+      const messages = [systemMessage, ...truncatedHistory] as Array<{
+        role: 'system' | 'user' | 'assistant';
+        content: string;
+      }>;
 
-    const assistantReply = response.choices?.[0]?.message?.content ?? '';
-    if (!assistantReply) {
+      switch (chatProviderInfo.type) {
+        case 'openai':
+          return streamOpenAICompatibleChat({
+            config: chatProviderInfo.config as ProviderConfig,
+            messages,
+            temperature: 0.7,
+            maxTokens: 1000,
+            onDelta: options.onDelta,
+            ...(options.signal ? { signal: options.signal } : {}),
+          });
+        case 'claude':
+          return streamClaudeChat({
+            config: chatProviderInfo.config as ClaudeProviderConfig,
+            messages,
+            temperature: 0.7,
+            maxTokens: 1000,
+            onDelta: options.onDelta,
+            ...(options.signal ? { signal: options.signal } : {}),
+          });
+        case 'gemini':
+          return streamGeminiChat({
+            config: chatProviderInfo.config as GeminiProviderConfig,
+            messages,
+            temperature: 0.7,
+            maxTokens: 1000,
+            onDelta: options.onDelta,
+            ...(options.signal ? { signal: options.signal } : {}),
+          });
+      }
+    });
+
+    const assistantReply = reply ?? '';
+    if (!assistantReply.trim()) {
       throw new MessageError({
         code: 'EMPTY_RESPONSE',
         message: t('error_emptyResponse'),
       });
     }
 
-    session.messages.push({
-      role: 'assistant',
-      content: assistantReply,
-    });
+    session.messages.push({ role: 'assistant', content: assistantReply });
     session.messages = truncateHistory(session.messages);
-
     session.lastAccessedAt = Date.now();
     schedulePersistChatSessions();
 
-    return {
-      reply: assistantReply,
-      conversationId: sessionId,
-    };
+    return { reply: assistantReply, conversationId: sessionId };
   } catch (error) {
     session.messages.pop();
     schedulePersistChatSessions();
     throw error;
   }
+}
+
+registry.register('CHAT', async (payload) => {
+  let reply = '';
+  const result = await runChatStream(
+    {
+      message: payload.message,
+      ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
+    },
+    {
+    onDelta: (delta) => {
+      reply += delta;
+    },
+    }
+  );
+  return { reply: result.reply || reply, conversationId: result.conversationId };
+});
+
+browser.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'LEXIPATH_CHAT_STREAM') return;
+
+  let started = false;
+  const controller = new AbortController();
+
+  port.onDisconnect.addListener(() => {
+    controller.abort();
+  });
+
+  port.onMessage.addListener((message) => {
+    if (started) return;
+    if (!message || typeof message !== 'object') return;
+    const record = message as any;
+    if (record.type !== 'START' || !record.payload) return;
+    const payload = record.payload as { message?: string; conversationId?: string };
+    if (typeof payload.message !== 'string' || !payload.message.trim()) return;
+    const startMessage: string = payload.message;
+    const startConversationId = payload.conversationId;
+
+    started = true;
+
+    void (async () => {
+      try {
+        let reply = '';
+        const result = await runChatStream(
+          { message: startMessage, ...(startConversationId ? { conversationId: startConversationId } : {}) },
+          {
+            signal: controller.signal,
+            onDelta: (delta) => {
+              reply += delta;
+              try {
+                port.postMessage({ type: 'CHUNK', delta });
+              } catch {
+                // ignore
+              }
+            },
+          }
+        );
+
+        try {
+          port.postMessage({
+            type: 'DONE',
+            reply: result.reply || reply,
+            conversationId: result.conversationId,
+          });
+        } catch {
+          // ignore
+        }
+      } catch (error) {
+        const structured = toStructuredStreamError(error);
+        try {
+          port.postMessage({ type: 'ERROR', error: structured });
+        } catch {
+          // ignore
+        }
+      } finally {
+        try {
+          port.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+    })();
+  });
 });
 
 // =============================================================================

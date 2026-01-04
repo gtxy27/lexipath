@@ -391,6 +391,14 @@
     "message": "Translate selected terms (Channel/Google/Bing).",
     "description": "Behavior description: translate"
   },
+  "optionsBehavior_translate_keywords": {
+    "message": "Translate keywords",
+    "description": "Behavior label: translate_keywords"
+  },
+  "optionsBehaviorDesc_translate_keywords": {
+    "message": "Batch-translate subtitle/web keywords (Channel/Google/Bing).",
+    "description": "Behavior description: translate_keywords"
+  },
   "optionsBehavior_dictionary": {
     "message": "Dictionary fallback",
     "description": "Behavior label: dictionary"
@@ -399,21 +407,13 @@
     "message": "Offline-first; fallback via routing when missed.",
     "description": "Behavior description: dictionary"
   },
-  "optionsBehavior_enhance_web": {
-    "message": "Enhance web",
-    "description": "Behavior label: enhance_web"
+  "optionsBehavior_adapt_subtitle": {
+    "message": "Adaptive subtitle translation",
+    "description": "Behavior label: adapt_subtitle"
   },
-  "optionsBehaviorDesc_enhance_web": {
-    "message": "LLM-only web enhancement.",
-    "description": "Behavior description: enhance_web"
-  },
-  "optionsBehavior_enhance_subtitle": {
-    "message": "Enhance subtitles",
-    "description": "Behavior label: enhance_subtitle"
-  },
-  "optionsBehaviorDesc_enhance_subtitle": {
-    "message": "LLM-only subtitle enhancement.",
-    "description": "Behavior description: enhance_subtitle"
+  "optionsBehaviorDesc_adapt_subtitle": {
+    "message": "Translate native subtitles into your learning language and adapt difficulty (LLM-only).",
+    "description": "Behavior description: adapt_subtitle"
   },
   "optionsBehavior_chat": {
     "message": "Chat",
@@ -422,14 +422,6 @@
   "optionsBehaviorDesc_chat": {
     "message": "LLM-only sidebar chat.",
     "description": "Behavior description: chat"
-  },
-  "optionsBehavior_explain_word": {
-    "message": "Explain word",
-    "description": "Behavior label: explain_word"
-  },
-  "optionsBehaviorDesc_explain_word": {
-    "message": "Offline-first; fallback via routing when missed.",
-    "description": "Behavior description: explain_word"
   },
   "optionsChannelNameRequired": {
     "message": "Channel name is required.",

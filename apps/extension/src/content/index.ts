@@ -8,20 +8,30 @@
  * - Subtitle rendering
  */
 
-import type { EnhanceWebPayload, ProviderChannel, Settings, WebEnhanceOutput } from '@lexipath/core';
-import { detectPrimaryLanguage, qualifySite } from '@lexipath/core/qualify';
-import { sendMessage } from '../shared/messages';
-import { SubtitleController, detectPlatform, type Platform } from './subtitle-controller';
-import { createEnhancedElement, type WordRenderMode } from './enhanced-text';
-import { getI18nMessage } from './i18n';
-import { SubtitleOverlay, type WordCardData } from './ui/SubtitleOverlay';
+import browser from "webextension-polyfill";
+import type {
+  EnhanceWebPayload,
+  ProviderChannel,
+  Settings,
+  WebEnhanceOutput,
+} from "@lexipath/core";
+import { detectPrimaryLanguage, qualifySite } from "@lexipath/core/qualify";
+import { sendMessage } from "../shared/messages";
+import {
+  SubtitleController,
+  detectPlatform,
+  type Platform,
+} from "./subtitle-controller";
+import { createEnhancedElement, type WordRenderMode } from "./enhanced-text";
+import { getI18nMessage } from "./i18n";
+import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
 
 let subtitleController: SubtitleController | null = null;
 let currentSettings: Settings | null = null;
 let observer: MutationObserver | null = null;
 let urlPollTimer: number | null = null;
 let navigationToken = 0;
-let lastKnownUrl = '';
+let lastKnownUrl = "";
 
 let webOverlay: SubtitleOverlay | null = null;
 let hoverTimer: number | null = null;
@@ -29,17 +39,20 @@ const HOVER_UPGRADE_DELAY_MS = 800;
 const wordExplainCache = new Map<string, WordCardData>();
 const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
 
-function getResolvedTheme(): 'light' | 'dark' {
-  if (!currentSettings) return 'dark';
-  if (currentSettings.theme === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+function getResolvedTheme(): "light" | "dark" {
+  if (!currentSettings) return "dark";
+  if (currentSettings.theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   }
-  return currentSettings.theme === 'dark' ? 'dark' : 'light';
+  return currentSettings.theme === "dark" ? "dark" : "light";
 }
 
 function getWebOverlay(): SubtitleOverlay {
   if (!webOverlay) {
-    webOverlay = new SubtitleOverlay('youtube', { // platform doesn't matter for web card
+    webOverlay = new SubtitleOverlay("youtube", {
+      // platform doesn't matter for web card
       theme: getResolvedTheme(),
       onWordClick: (word, rect) => showFullWordCard(word, rect, true),
     });
@@ -59,14 +72,18 @@ async function getWordCardData(word: string): Promise<WordCardData> {
   if (inFlight) return inFlight;
 
   const promise = (async () => {
-    const response = await sendMessage('EXPLAIN_WORD', { word: normalized });
+    const response = await sendMessage("EXPLAIN_WORD", { word: normalized });
     if (!response.ok) {
-      return { word: normalized, definition: getI18nMessage('wordCard_definitionFailed') };
+      return {
+        word: normalized,
+        definition: getI18nMessage("wordCard_definitionFailed"),
+      };
     }
     const data = response.value as any;
     const card: WordCardData = {
       word: data.word || normalized,
-      definition: data.definition || getI18nMessage('wordCard_definitionUnavailable'),
+      definition:
+        data.definition || getI18nMessage("wordCard_definitionUnavailable"),
       phonetic: data.phonetic,
       difficulty: data.difficulty,
       translation: data.translation,
@@ -105,9 +122,14 @@ let tooltipTarget: HTMLElement | null = null;
 
 type ResolvedRoute = { kind: 1 | 2 | 3; channelId?: number };
 
-function resolveChannel(channelId: number | undefined, settings: Settings): ProviderChannel | null {
-  if (typeof channelId !== 'number' || !Number.isFinite(channelId)) return null;
-  return settings.channels.find((channel) => channel.channelId === channelId) ?? null;
+function resolveChannel(
+  channelId: number | undefined,
+  settings: Settings,
+): ProviderChannel | null {
+  if (typeof channelId !== "number" || !Number.isFinite(channelId)) return null;
+  return (
+    settings.channels.find((channel) => channel.channelId === channelId) ?? null
+  );
 }
 
 function firstAvailableChannel(settings: Settings): ProviderChannel | null {
@@ -132,7 +154,10 @@ function resolveRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
   return fallbackToFirstChannel(settings);
 }
 
-function resolveChannelRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
+function resolveChannelRoute(
+  behaviorKey: string,
+  settings: Settings,
+): ResolvedRoute {
   const resolved = resolveRoute(behaviorKey, settings);
   if (resolved.kind !== 1) return fallbackToFirstChannel(settings);
   return resolved.channelId ? resolved : fallbackToFirstChannel(settings);
@@ -142,22 +167,22 @@ function isChannelConfigured(channel: ProviderChannel): boolean {
   if (!channel.model?.trim()) return false;
   const cfg = channel.config as Record<string, unknown>;
   if (channel.typeId === 1) {
-    return typeof cfg.baseUrl === 'string' && cfg.baseUrl.trim().length > 0;
+    return typeof cfg.baseUrl === "string" && cfg.baseUrl.trim().length > 0;
   }
   if (channel.typeId === 2 || channel.typeId === 3) {
-    return typeof cfg.apiKey === 'string' && cfg.apiKey.trim().length > 0;
+    return typeof cfg.apiKey === "string" && cfg.apiKey.trim().length > 0;
   }
   return false;
 }
 
 function isKeywordProviderConfigured(settings: Settings): boolean {
-  const route = resolveChannelRoute('select_keywords', settings);
+  const route = resolveChannelRoute("select_keywords", settings);
   const channel = resolveChannel(route.channelId, settings);
   return Boolean(channel && isChannelConfigured(channel));
 }
 
 function isTranslationProviderConfigured(settings: Settings): boolean {
-  const route = resolveRoute('translate', settings);
+  const route = resolveRoute("translate", settings);
   if (route.kind === 2 || route.kind === 3) return true;
   const channel = resolveChannel(route.channelId, settings);
   return Boolean(channel && isChannelConfigured(channel));
@@ -167,18 +192,22 @@ function isTranslationProviderConfigured(settings: Settings): boolean {
  * Get current settings from background.
  */
 async function getSettings(): Promise<Settings | null> {
-  const response = await sendMessage('GET_SETTINGS', undefined);
+  const response = await sendMessage("GET_SETTINGS", undefined);
   if (response.ok) {
     return response.value;
   }
-  console.error('[LexiPath] Failed to get settings:', response.error);
+  console.error("[LexiPath] Failed to get settings:", response.error);
   return null;
 }
 
 /**
  * Initialize subtitle controller for video platforms
  */
-async function initSubtitleController(platform: Platform, url: string, token: number): Promise<void> {
+async function initSubtitleController(
+  platform: Platform,
+  url: string,
+  token: number,
+): Promise<void> {
   if (token !== navigationToken) return;
   console.log(`[LexiPath] Detected video platform: ${platform}`);
 
@@ -193,7 +222,7 @@ async function initSubtitleController(platform: Platform, url: string, token: nu
 
   const checkVideoElement = async (): Promise<void> => {
     if (token !== navigationToken) return;
-    const videoElement = document.querySelector('video');
+    const videoElement = document.querySelector("video");
 
     if (videoElement instanceof HTMLVideoElement) {
       // Video element found, initialize controller
@@ -202,16 +231,16 @@ async function initSubtitleController(platform: Platform, url: string, token: nu
       const success = await subtitleController.init(url);
 
       if (success) {
-        console.log('[LexiPath] Subtitle controller initialized');
+        console.log("[LexiPath] Subtitle controller initialized");
       } else {
-        console.warn('[LexiPath] Subtitle controller initialization failed');
+        console.warn("[LexiPath] Subtitle controller initialization failed");
       }
     } else if (retries < maxRetries) {
       // Retry after delay
       retries++;
       setTimeout(checkVideoElement, 500);
     } else {
-      console.warn('[LexiPath] Video element not found after retries');
+      console.warn("[LexiPath] Video element not found after retries");
     }
   };
 
@@ -224,15 +253,30 @@ async function initSubtitleController(platform: Platform, url: string, token: nu
 function shouldProcessElement(element: Element): boolean {
   // Skip non-text elements
   const tagName = element.tagName.toLowerCase();
-  const skipTags = ['script', 'style', 'noscript', 'iframe', 'svg', 'canvas', 'video', 'audio', 'input', 'textarea', 'select', 'button', 'code', 'pre'];
+  const skipTags = [
+    "script",
+    "style",
+    "noscript",
+    "iframe",
+    "svg",
+    "canvas",
+    "video",
+    "audio",
+    "input",
+    "textarea",
+    "select",
+    "button",
+    "code",
+    "pre",
+  ];
   if (skipTags.includes(tagName)) return false;
 
   // Skip elements with contenteditable
-  if (element.getAttribute('contenteditable') === 'true') return false;
+  if (element.getAttribute("contenteditable") === "true") return false;
 
   // Skip hidden elements
   const style = window.getComputedStyle(element);
-  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  if (style.display === "none" || style.visibility === "hidden") return false;
 
   return true;
 }
@@ -241,17 +285,17 @@ function shouldProcessElement(element: Element): boolean {
  * Extract text content from element, respecting boundaries
  */
 function extractTextContent(element: Element): string {
-  const text = element.textContent?.trim() || '';
+  const text = element.textContent?.trim() || "";
   return text.slice(0, MAX_TEXT_LENGTH);
 }
 
 function computeTextSignature(text: string): string {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized) return '';
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
 
   let hash = 5381;
   for (let i = 0; i < normalized.length; i++) {
-    hash = ((hash << 5) + hash) + normalized.charCodeAt(i);
+    hash = (hash << 5) + hash + normalized.charCodeAt(i);
     hash |= 0;
   }
 
@@ -261,7 +305,10 @@ function computeTextSignature(text: string): string {
 /**
  * Process a text node and its parent element
  */
-async function processTextElement(element: Element, token: number): Promise<void> {
+async function processTextElement(
+  element: Element,
+  token: number,
+): Promise<void> {
   if (token !== pageProcessingToken) return;
   if (!shouldProcessElement(element)) return;
 
@@ -273,36 +320,43 @@ async function processTextElement(element: Element, token: number): Promise<void
 
   try {
     ensureStylesInjected();
-    element.classList.add('lexipath-processing');
+    element.classList.add("lexipath-processing");
 
     const startMs = performance.now();
 
     const detected = detectPrimaryLanguage({ text });
-    const nativeDetected = currentSettings?.nativeLanguage === 'en' ? 'en' : 'zh';
+    const nativeDetected =
+      currentSettings?.nativeLanguage === "en" ? "en" : "zh";
 
     const enhancePayload: EnhanceWebPayload = { content: text };
-    let renderMode: WordRenderMode = 'target-to-native';
+    let renderMode: WordRenderMode = "target-to-native";
     if (currentSettings) {
       // Default mode: target language text -> native language tooltip.
-      let sourceLang: EnhanceWebPayload['sourceLang'] = currentSettings.targetLanguage;
-      let targetLang: EnhanceWebPayload['targetLang'] = currentSettings.nativeLanguage;
+      let sourceLang: EnhanceWebPayload["sourceLang"] =
+        currentSettings.targetLanguage;
+      let targetLang: EnhanceWebPayload["targetLang"] =
+        currentSettings.nativeLanguage;
 
       // If we're learning English and the paragraph is in native Chinese,
       // flip direction so we can still learn from native-language pages.
-      if (currentSettings.targetLanguage === 'en' && detected.language === nativeDetected && nativeDetected === 'zh') {
-        sourceLang = 'zh';
-        targetLang = 'en';
-        renderMode = 'native-to-target';
+      if (
+        currentSettings.targetLanguage === "en" &&
+        detected.language === nativeDetected &&
+        nativeDetected === "zh"
+      ) {
+        sourceLang = "zh";
+        targetLang = "en";
+        renderMode = "native-to-target";
       }
 
       enhancePayload.sourceLang = sourceLang;
       enhancePayload.targetLang = targetLang;
     }
 
-    const response = await sendMessage('ENHANCE_WEB', enhancePayload);
+    const response = await sendMessage("ENHANCE_WEB", enhancePayload);
 
     if (!response.ok) {
-      console.warn('[LexiPath] Enhancement failed:', response.error);
+      console.warn("[LexiPath] Enhancement failed:", response.error);
       return;
     }
 
@@ -326,8 +380,12 @@ async function processTextElement(element: Element, token: number): Promise<void
 
       // Process each text node
       for (const textNode of textNodes) {
-        const nodeText = textNode.textContent || '';
-        const enhancedFragment = createEnhancedElement(nodeText, enhanced, renderMode);
+        const nodeText = textNode.textContent || "";
+        const enhancedFragment = createEnhancedElement(
+          nodeText,
+          enhanced,
+          renderMode,
+        );
 
         // Replace the text node with enhanced content
         const parent = textNode.parentNode;
@@ -337,12 +395,14 @@ async function processTextElement(element: Element, token: number): Promise<void
       }
 
       const elapsedMs = Math.round(performance.now() - startMs);
-      console.log(`[LexiPath] Enhanced ${enhanced.convert_word.length} words (textNodes=${textNodes.length}, ms=${elapsedMs}, lang=${detected.language})`);
+      console.log(
+        `[LexiPath] Enhanced ${enhanced.convert_word.length} words (textNodes=${textNodes.length}, ms=${elapsedMs}, lang=${detected.language})`,
+      );
     }
   } catch (error) {
-    console.error('[LexiPath] Processing error:', error);
+    console.error("[LexiPath] Processing error:", error);
   } finally {
-    element.classList.remove('lexipath-processing');
+    element.classList.remove("lexipath-processing");
   }
 }
 
@@ -350,15 +410,15 @@ function ensureTooltipInjected(): void {
   if (tooltipInjected) return;
   tooltipInjected = true;
 
-  tooltipEl = document.createElement('div');
-  tooltipEl.id = 'lexipath-tooltip';
-  tooltipEl.style.display = 'none';
+  tooltipEl = document.createElement("div");
+  tooltipEl.id = "lexipath-tooltip";
+  tooltipEl.style.display = "none";
   document.documentElement.appendChild(tooltipEl);
 
   const hideTooltip = () => {
     if (!tooltipEl) return;
     tooltipTarget = null;
-    tooltipEl.style.display = 'none';
+    tooltipEl.style.display = "none";
     if (hoverTimer) {
       clearTimeout(hoverTimer);
       hoverTimer = null;
@@ -371,8 +431,8 @@ function ensureTooltipInjected(): void {
     const padding = 12;
     const offset = 14;
 
-    tooltipEl.style.left = '0px';
-    tooltipEl.style.top = '0px';
+    tooltipEl.style.left = "0px";
+    tooltipEl.style.top = "0px";
 
     const rect = tooltipEl.getBoundingClientRect();
     let x = clientX + offset;
@@ -387,7 +447,11 @@ function ensureTooltipInjected(): void {
     tooltipEl.style.top = `${Math.round(y)}px`;
   };
 
-  const showTooltipForWord = (wordEl: HTMLElement, clientX: number, clientY: number) => {
+  const showTooltipForWord = (
+    wordEl: HTMLElement,
+    clientX: number,
+    clientY: number,
+  ) => {
     if (!tooltipEl || isFullCardVisible()) return;
     const tooltipText = wordEl.dataset.tooltip?.trim();
     if (!tooltipText) {
@@ -397,7 +461,7 @@ function ensureTooltipInjected(): void {
 
     tooltipTarget = wordEl;
     tooltipEl.textContent = tooltipText;
-    tooltipEl.style.display = 'block';
+    tooltipEl.style.display = "block";
     positionTooltip(clientX, clientY);
 
     // Start timer to upgrade to full card
@@ -406,7 +470,7 @@ function ensureTooltipInjected(): void {
       if (tooltipTarget === wordEl) {
         hideTooltip();
         const rect = wordEl.getBoundingClientRect();
-        const word = wordEl.dataset.original || wordEl.textContent || '';
+        const word = wordEl.dataset.original || wordEl.textContent || "";
         showFullWordCard(word, rect, false);
       }
     }, HOVER_UPGRADE_DELAY_MS);
@@ -414,57 +478,77 @@ function ensureTooltipInjected(): void {
 
   const getWordEl = (target: EventTarget | null): HTMLElement | null => {
     if (!(target instanceof Element)) return null;
-    const found = target.closest('.lexipath-word');
+    const found = target.closest(".lexipath-word");
     return found instanceof HTMLElement ? found : null;
   };
 
-  document.addEventListener('pointerover', (event) => {
-    const wordEl = getWordEl(event.target);
-    if (!wordEl) return;
-    showTooltipForWord(wordEl, event.clientX, event.clientY);
-  }, true);
+  document.addEventListener(
+    "pointerover",
+    (event) => {
+      const wordEl = getWordEl(event.target);
+      if (!wordEl) return;
+      showTooltipForWord(wordEl, event.clientX, event.clientY);
+    },
+    true,
+  );
 
-  document.addEventListener('pointermove', (event) => {
-    if (!tooltipEl || !tooltipTarget) return;
-    positionTooltip(event.clientX, event.clientY);
-  }, true);
+  document.addEventListener(
+    "pointermove",
+    (event) => {
+      if (!tooltipEl || !tooltipTarget) return;
+      positionTooltip(event.clientX, event.clientY);
+    },
+    true,
+  );
 
-  document.addEventListener('pointerout', (event) => {
-    if (hoverTimer) {
-      clearTimeout(hoverTimer);
-      hoverTimer = null;
-    }
-    if (!tooltipTarget) return;
-    const next = getWordEl(event.relatedTarget);
-    if (next && next === tooltipTarget) return;
-    hideTooltip();
-  }, true);
+  document.addEventListener(
+    "pointerout",
+    (event) => {
+      if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+      }
+      if (!tooltipTarget) return;
+      const next = getWordEl(event.relatedTarget);
+      if (next && next === tooltipTarget) return;
+      hideTooltip();
+    },
+    true,
+  );
 
   // Support click to show full card immediately
-  document.addEventListener('click', (event) => {
-    const wordEl = getWordEl(event.target);
-    if (!wordEl) return;
-    
-    event.preventDefault();
-    event.stopPropagation();
-    
-    hideTooltip();
-    const rect = wordEl.getBoundingClientRect();
-    const word = wordEl.dataset.original || wordEl.textContent || '';
-    showFullWordCard(word, rect, true); // Pinned on click
-  }, true);
+  document.addEventListener(
+    "click",
+    (event) => {
+      const wordEl = getWordEl(event.target);
+      if (!wordEl) return;
 
-  document.addEventListener('focusin', (event) => {
-    const wordEl = getWordEl(event.target);
-    if (!wordEl) return;
-    const rect = wordEl.getBoundingClientRect();
-    showTooltipForWord(wordEl, rect.left, rect.bottom);
-  }, true);
+      event.preventDefault();
+      event.stopPropagation();
 
-  document.addEventListener('focusout', hideTooltip, true);
-  window.addEventListener('scroll', hideTooltip, true);
-  window.addEventListener('blur', hideTooltip);
-  window.addEventListener('resize', hideTooltip);
+      hideTooltip();
+      const rect = wordEl.getBoundingClientRect();
+      const word = wordEl.dataset.original || wordEl.textContent || "";
+      showFullWordCard(word, rect, true); // Pinned on click
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "focusin",
+    (event) => {
+      const wordEl = getWordEl(event.target);
+      if (!wordEl) return;
+      const rect = wordEl.getBoundingClientRect();
+      showTooltipForWord(wordEl, rect.left, rect.bottom);
+    },
+    true,
+  );
+
+  document.addEventListener("focusout", hideTooltip, true);
+  window.addEventListener("scroll", hideTooltip, true);
+  window.addEventListener("blur", hideTooltip);
+  window.addEventListener("resize", hideTooltip);
 }
 
 let processedElementSignature = new WeakMap<Element, string>();
@@ -483,17 +567,25 @@ let intersectionObserver: IntersectionObserver | null = null;
 
 function ensureStylesInjected(): void {
   const theme = getResolvedTheme();
-  const isDark = theme === 'dark';
-  
-  const tooltipBg = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.98)';
-  const tooltipText = isDark ? '#ffffff' : '#1e293b';
-  const tooltipShadow = isDark ? '0 10px 30px rgba(0, 0, 0, 0.35)' : '0 10px 30px rgba(0, 0, 0, 0.1)';
-  const tooltipBorder = isDark ? '1px solid rgba(148, 163, 184, 0.2)' : '1px solid rgba(226, 232, 240, 0.8)';
+  const isDark = theme === "dark";
 
-  let styleEl = document.getElementById('lexipath-styles') as HTMLStyleElement | null;
+  const tooltipBg = isDark
+    ? "rgba(15, 23, 42, 0.92)"
+    : "rgba(255, 255, 255, 0.98)";
+  const tooltipText = isDark ? "#ffffff" : "#1e293b";
+  const tooltipShadow = isDark
+    ? "0 10px 30px rgba(0, 0, 0, 0.35)"
+    : "0 10px 30px rgba(0, 0, 0, 0.1)";
+  const tooltipBorder = isDark
+    ? "1px solid rgba(148, 163, 184, 0.2)"
+    : "1px solid rgba(226, 232, 240, 0.8)";
+
+  let styleEl = document.getElementById(
+    "lexipath-styles",
+  ) as HTMLStyleElement | null;
   if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'lexipath-styles';
+    styleEl = document.createElement("style");
+    styleEl.id = "lexipath-styles";
     document.documentElement.appendChild(styleEl);
   }
 
@@ -537,7 +629,7 @@ let priorityQueuedElements = new WeakSet<Element>();
 
 function ensureIntersectionObserver(): void {
   if (intersectionObserver) return;
-  if (typeof IntersectionObserver === 'undefined') return;
+  if (typeof IntersectionObserver === "undefined") return;
 
   intersectionObserver = new IntersectionObserver(
     (entries) => {
@@ -557,9 +649,9 @@ function ensureIntersectionObserver(): void {
     },
     {
       root: null,
-      rootMargin: '400px 0px',
+      rootMargin: "400px 0px",
       threshold: 0.01,
-    }
+    },
   );
 }
 
@@ -573,9 +665,15 @@ function schedulePumpQueue(): void {
   };
 
   // Prefer idle time to reduce UI jank, but keep a timeout so it progresses.
-  const requestIdleCallback = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number })
-    .requestIdleCallback;
-  if (typeof requestIdleCallback === 'function') {
+  const requestIdleCallback = (
+    window as unknown as {
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout?: number },
+      ) => number;
+    }
+  ).requestIdleCallback;
+  if (typeof requestIdleCallback === "function") {
     requestIdleCallback(run, { timeout: 200 });
   } else {
     setTimeout(run, 0);
@@ -651,7 +749,8 @@ function queueElements(elements: Element[]): void {
     // If element is near viewport, prioritize it for better perceived speed.
     const rect = (el as HTMLElement).getBoundingClientRect?.();
     const isNearViewport = rect
-      ? rect.top < window.innerHeight * 1.5 && rect.bottom > -window.innerHeight * 0.5
+      ? rect.top < window.innerHeight * 1.5 &&
+        rect.bottom > -window.innerHeight * 0.5
       : false;
 
     if (isNearViewport) {
@@ -666,18 +765,23 @@ function queueElements(elements: Element[]): void {
 }
 
 const TEXT_SELECTOR = [
-  'p',
-  'article p',
-  'main p',
-  '.content p',
-  '.article-content p',
+  "p",
+  "article p",
+  "main p",
+  ".content p",
+  ".article-content p",
   'div[class*="content"] p',
   'div[class*="article"] p',
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'li',
-  'td',
-  'blockquote',
-].join(', ');
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "li",
+  "td",
+  "blockquote",
+].join(", ");
 
 /**
  * Set up MutationObserver to handle dynamic content
@@ -689,7 +793,7 @@ function setupMutationObserver(): void {
     const newElements: Element[] = [];
 
     for (const mutation of mutations) {
-      if (mutation.type === 'childList') {
+      if (mutation.type === "childList") {
         mutation.addedNodes.forEach((node) => {
           if (node instanceof Element) {
             // Check the added element itself + descendants (scoped query, avoids rescanning entire document)
@@ -716,7 +820,7 @@ function setupMutationObserver(): void {
 
   observer.observe(document.body, {
     childList: true,
-    subtree: true
+    subtree: true,
   });
 }
 
@@ -748,10 +852,12 @@ function resetPageProcessingState(): void {
  */
 async function initPageProcessing(): Promise<void> {
   resetPageProcessingState();
-  console.log('[LexiPath] Starting page processing...');
+  console.log("[LexiPath] Starting page processing...");
 
   // Initial processing of existing content
-  const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(shouldProcessElement);
+  const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(
+    shouldProcessElement,
+  );
   elements.sort((a, b) => {
     const ra = (a as HTMLElement).getBoundingClientRect?.();
     const rb = (b as HTMLElement).getBoundingClientRect?.();
@@ -773,7 +879,7 @@ async function initForUrl(url: string, token: number): Promise<void> {
   if (token !== navigationToken) return;
 
   if (!currentSettings?.enabled) {
-    console.log('[LexiPath] Extension is disabled');
+    console.log("[LexiPath] Extension is disabled");
     return;
   }
 
@@ -787,17 +893,19 @@ async function initForUrl(url: string, token: number): Promise<void> {
   });
   if (!siteDecision.qualified) {
     console.log(
-      `[LexiPath] Site gate blocked processing reason=${siteDecision.reason}${siteDecision.matchedRule ? ` rule=${siteDecision.matchedRule}` : ''}`
+      `[LexiPath] Site gate blocked processing reason=${siteDecision.reason}${siteDecision.matchedRule ? ` rule=${siteDecision.matchedRule}` : ""}`,
     );
     return;
   }
 
-  console.log('[LexiPath] Content script initialized');
+  console.log("[LexiPath] Content script initialized");
 
   const platform = detectPlatform(url);
-  if (platform !== 'unknown') {
+  if (platform !== "unknown") {
     if (!isTranslationProviderConfigured(currentSettings)) {
-      console.log(`[LexiPath] ${getI18nMessage('log_providerNotConfiguredSkipPageProcessing')}`);
+      console.log(
+        `[LexiPath] ${getI18nMessage("log_providerNotConfiguredSkipPageProcessing")}`,
+      );
       return;
     }
     // Video sites: focus on subtitles only (avoid modifying page content).
@@ -805,8 +913,13 @@ async function initForUrl(url: string, token: number): Promise<void> {
     return;
   }
 
-  if (!isKeywordProviderConfigured(currentSettings) || !isTranslationProviderConfigured(currentSettings)) {
-    console.log(`[LexiPath] ${getI18nMessage('log_providerNotConfiguredSkipPageProcessing')}`);
+  if (
+    !isKeywordProviderConfigured(currentSettings) ||
+    !isTranslationProviderConfigured(currentSettings)
+  ) {
+    console.log(
+      `[LexiPath] ${getI18nMessage("log_providerNotConfiguredSkipPageProcessing")}`,
+    );
     return;
   }
 
@@ -841,6 +954,16 @@ async function init(): Promise<void> {
   resetAllState();
   await initForUrl(lastKnownUrl, token);
   startUrlWatcher();
+  browser.storage?.onChanged?.addListener?.((changes: any, area: string) => {
+    if (area !== "local") return;
+    const nextSettings = changes?.settings?.newValue;
+    if (!nextSettings || nextSettings?.theme === currentSettings?.theme) return;
+    currentSettings = nextSettings;
+    const resolvedTheme = getResolvedTheme();
+    if (webOverlay) webOverlay.setTheme(resolvedTheme);
+    if (subtitleController) subtitleController.setTheme(nextSettings.theme);
+    ensureStylesInjected();
+  });
 }
 
 /**
@@ -855,11 +978,11 @@ function cleanup(): void {
 }
 
 // Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
 } else {
   init();
 }
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', cleanup);
+window.addEventListener("beforeunload", cleanup);

@@ -66,30 +66,27 @@ type SiteMode = "all" | "whitelist";
 type BehaviorKey =
   | "select_keywords"
   | "translate"
+  | "translate_keywords"
   | "dictionary"
-  | "enhance_web"
-  | "enhance_subtitle"
-  | "chat"
-  | "explain_word";
+  | "adapt_subtitle"
+  | "chat";
 
 const BEHAVIOR_KEYS: BehaviorKey[] = [
   "select_keywords",
   "translate",
+  "translate_keywords",
   "dictionary",
-  "enhance_web",
-  "enhance_subtitle",
+  "adapt_subtitle",
   "chat",
-  "explain_word",
 ];
 
 const BEHAVIOR_KIND_ALLOWLIST: Record<BehaviorKey, RouteKind[]> = {
   select_keywords: [1],
   translate: [1, 2, 3],
   dictionary: [1, 2, 3],
-  enhance_web: [1],
-  enhance_subtitle: [1],
+  translate_keywords: [1, 2, 3],
+  adapt_subtitle: [1],
   chat: [1],
-  explain_word: [1],
 };
 
 type ChannelFormState = {

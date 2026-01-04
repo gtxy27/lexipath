@@ -35,6 +35,7 @@ interface InFlightRequest {
   controller: AbortController;
 }
 
+const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -63,6 +64,10 @@ export class OpenAICompatibleProvider {
 
   constructor(config: ProviderConfig) {
     this.config = config;
+  }
+
+  private resolveBaseUrl(): string {
+    return this.config.baseUrl ?? DEFAULT_BASE_URL;
   }
 
   private resolveThinkingMode(options: ChatOptions): ThinkingMode {
@@ -99,7 +104,7 @@ export class OpenAICompatibleProvider {
     // Heuristic: official OpenAI endpoints are less likely to accept vendor fields.
     // Gateways commonly ignore unknown fields, so we try enabling by default there.
     try {
-      const url = new URL(this.config.baseUrl);
+      const url = new URL(this.resolveBaseUrl());
       if (url.hostname === 'api.openai.com') return false;
     } catch {
       // ignore
@@ -175,7 +180,7 @@ export class OpenAICompatibleProvider {
     cancelSignal: AbortSignal,
     maxRetries: number = DEFAULT_MAX_RETRIES
   ): Promise<ChatCompletionResponse> {
-    const url = `${this.config.baseUrl}/chat/completions`;
+    const url = `${this.resolveBaseUrl().replace(/\/+$/, '')}/chat/completions`;
     const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
     const thinkingMode = this.resolveThinkingMode(options);
 

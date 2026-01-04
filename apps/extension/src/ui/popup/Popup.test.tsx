@@ -41,7 +41,6 @@ const { browserMock, sendMessageMock, defaultSettings } = vi.hoisted(() => {
       enhance_web: { kind: 1, channelId: 1, extra: {} },
       enhance_subtitle: { kind: 1, channelId: 1, extra: {} },
       chat: { kind: 1, channelId: 1, extra: {} },
-      explain_word: { kind: 1, channelId: 1, extra: {} },
     },
     enabled: true,
     autoEnhance: true,
@@ -117,4 +116,3 @@ describe("Popup", () => {
     expect(screen.getAllByText("popupValueUnset").length).toBeGreaterThan(0);
   });
 });
-

@@ -21,6 +21,11 @@ export {
 } from './subtitle-enhance-prompt';
 
 export {
+  buildSubtitleAdaptPrompt,
+  type SubtitleAdaptPromptOptions,
+} from './subtitle-adapt-prompt';
+
+export {
   buildExplainWordPrompt,
   parseExplainWordResponse,
   type ExplainWordPromptOptions,
@@ -37,3 +42,9 @@ export {
   parseTermTranslateResponse,
   type TermTranslatePromptOptions,
 } from './term-translate-prompt';
+
+export {
+  buildTranslateKeywordsPrompt,
+  parseTranslateKeywordsResponse,
+  type TranslateKeywordsPromptOptions,
+} from './translate-keywords-prompt';

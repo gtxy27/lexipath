@@ -17,6 +17,7 @@ import {
   SupportedLanguageSchema,
   SuccessResponseSchema,
   TestProviderConnectionPayloadSchema,
+  TranslateKeywordsPayloadSchema,
   WebEnhanceOutputSchema,
   type ErrorResponse,
   type MessageType,
@@ -104,6 +105,10 @@ const messageDefinitions = {
         userLevel: CEFRLevelSchema.optional(),
       })
       .strict(),
+    valueSchema: z.array(z.string()),
+  },
+  TRANSLATE_KEYWORDS: {
+    payloadSchema: TranslateKeywordsPayloadSchema,
     valueSchema: z.array(z.string()),
   },
   ENHANCE_WEB: {

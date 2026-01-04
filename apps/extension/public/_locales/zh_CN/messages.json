@@ -391,6 +391,14 @@
     "message": "可选 Channel/Google/Bing。",
     "description": "行为描述：translate"
   },
+  "optionsBehavior_translate_keywords": {
+    "message": "关键词翻译",
+    "description": "行为标签：translate_keywords"
+  },
+  "optionsBehaviorDesc_translate_keywords": {
+    "message": "批量翻译字幕/网页关键词（Channel/Google/Bing）。",
+    "description": "行为描述：translate_keywords"
+  },
   "optionsBehavior_dictionary": {
     "message": "词典兜底",
     "description": "行为标签：dictionary"
@@ -399,21 +407,13 @@
     "message": "离线优先，未命中时按路由兜底。",
     "description": "行为描述：dictionary"
   },
-  "optionsBehavior_enhance_web": {
-    "message": "网页增强",
-    "description": "行为标签：enhance_web"
+  "optionsBehavior_adapt_subtitle": {
+    "message": "字幕学习翻译",
+    "description": "行为标签：adapt_subtitle"
   },
-  "optionsBehaviorDesc_enhance_web": {
-    "message": "仅支持 Channel（LLM）。",
-    "description": "行为描述：enhance_web"
-  },
-  "optionsBehavior_enhance_subtitle": {
-    "message": "字幕增强",
-    "description": "行为标签：enhance_subtitle"
-  },
-  "optionsBehaviorDesc_enhance_subtitle": {
-    "message": "仅支持 Channel（LLM）。",
-    "description": "行为描述：enhance_subtitle"
+  "optionsBehaviorDesc_adapt_subtitle": {
+    "message": "将母语字幕翻译成适合你水平的学习语言（仅支持 LLM Channel）。例如：看中文视频时，显示简化的英文字幕。",
+    "description": "行为描述：adapt_subtitle"
   },
   "optionsBehavior_chat": {
     "message": "对话",
@@ -422,14 +422,6 @@
   "optionsBehaviorDesc_chat": {
     "message": "仅支持 Channel（LLM）。",
     "description": "行为描述：chat"
-  },
-  "optionsBehavior_explain_word": {
-    "message": "单词解释",
-    "description": "行为标签：explain_word"
-  },
-  "optionsBehaviorDesc_explain_word": {
-    "message": "离线优先，未命中时按路由兜底。",
-    "description": "行为描述：explain_word"
   },
   "optionsChannelNameRequired": {
     "message": "Channel 名称为必填项。",

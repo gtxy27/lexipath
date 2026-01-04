@@ -44,6 +44,7 @@ export const MessageTypeSchema = z.enum([
   'REQUEST_HOST_PERMISSION',
   'TEST_PROVIDER_CONNECTION',
   'SELECT_KEYWORDS',
+  'TRANSLATE_KEYWORDS',
   'ENHANCE_WEB',
   'ENHANCE_SUBTITLE',
   'EXPLAIN_WORD',
@@ -182,11 +183,10 @@ export const BehaviorRoutesSchema = z
   .default({
     select_keywords: { kind: 1, channelId: 1, extra: {} },
     translate: { kind: 1, channelId: 1, extra: {} },
+    translate_keywords: { kind: 1, channelId: 1, extra: {} },
     dictionary: { kind: 1, channelId: 1, extra: {} },
-    enhance_web: { kind: 1, channelId: 1, extra: {} },
-    enhance_subtitle: { kind: 1, channelId: 1, extra: {} },
+    adapt_subtitle: { kind: 1, channelId: 1, extra: {} },
     chat: { kind: 1, channelId: 1, extra: {} },
-    explain_word: { kind: 1, channelId: 1, extra: {} },
   });
 export type BehaviorRoutes = z.infer<typeof BehaviorRoutesSchema>;
 
@@ -330,6 +330,20 @@ export const EnhanceSubtitlePayloadSchema = z
   })
   .strict();
 export type EnhanceSubtitlePayload = z.infer<typeof EnhanceSubtitlePayloadSchema>;
+
+// =============================================================================
+// Keyword Batch Translation Payload
+// =============================================================================
+
+export const TranslateKeywordsPayloadSchema = z
+  .object({
+    keywords: z.array(z.string().min(1)).min(1),
+    context: z.string().optional(),
+    sourceLang: z.string().min(1),
+    targetLang: z.string().min(1),
+  })
+  .strict();
+export type TranslateKeywordsPayload = z.infer<typeof TranslateKeywordsPayloadSchema>;
 
 // =============================================================================
 // Word & Familiarity

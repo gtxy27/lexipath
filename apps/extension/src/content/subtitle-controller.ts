@@ -5,6 +5,7 @@
  * Supports YouTube and Bilibili platforms.
  */
 
+import browser from 'webextension-polyfill';
 import type { Cue, Settings, SupportedLanguage } from '@lexipath/core';
 import { sendMessage } from '../shared/messages';
 import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './ui/SubtitleOverlay';
@@ -45,6 +46,9 @@ export class SubtitleController {
   private cueKeywords = new Map<string, string[]>();
   private cueKeywordSignatures = new Map<string, string>();
   private cueKeywordsInFlight = new Map<string, Promise<string[]>>();
+  private cueKeywordTranslations = new Map<string, Record<string, string>>();
+  private cueKeywordTranslationSignatures = new Map<string, string>();
+  private cueKeywordTranslationsInFlight = new Map<string, Promise<Record<string, string>>>();
 
   private readonly keywordPrefetchLookaheadMs = 15_000;
   private prefetchToken = 0;
@@ -201,9 +205,6 @@ export class SubtitleController {
     // Setup keyboard listener for temporary bilingual mode
     this.setupKeyboardListener();
 
-    // Enhance subtitles in background (do not block initial rendering)
-    this.enhancer.start();
-
     console.log('[SubtitleController] Initialized successfully');
     return true;
   }
@@ -233,6 +234,9 @@ export class SubtitleController {
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
+    this.cueKeywordTranslations.clear();
+    this.cueKeywordTranslationSignatures.clear();
+    this.cueKeywordTranslationsInFlight.clear();
     this.currentCueIndex = -1;
     document.removeEventListener('keydown', this.handleKeyDown);
     document.removeEventListener('keyup', this.handleKeyUp);
@@ -280,6 +284,11 @@ export class SubtitleController {
     this.cueKeywords.clear();
     this.cueKeywordSignatures.clear();
     this.cueKeywordsInFlight.clear();
+    this.cueKeywordTranslations.clear();
+    this.cueKeywordTranslationSignatures.clear();
+    this.cueKeywordTranslationsInFlight.clear();
+
+    this.updateModeLabels();
 
     if (cues.length > 0) {
       this.statusMessage = '';
@@ -287,7 +296,14 @@ export class SubtitleController {
         this.provider?.hideNativeCaptions?.();
       }
       this.videoSync?.syncOnce();
-      this.enhancer?.start();
+
+      const cueLang = this.getCueSourceLanguage(cues[0]!, this.subtitleLanguage);
+      if (this.shouldAdaptSubtitle(cueLang)) {
+        this.enhancer?.start();
+        console.log('[SubtitleController] Enhancer started (adapt mode)');
+      } else {
+        console.log('[SubtitleController] Enhancer disabled (direct mode)');
+      }
     } else {
       this.provider?.showNativeCaptions?.();
       this.renderStatusMessage();
@@ -343,50 +359,108 @@ export class SubtitleController {
       return;
     }
 
-    this.currentSubtitleContext = cue.text;
+    const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
+    const shouldAdapt = this.shouldAdaptSubtitle(cueLang);
+
     const enhanced = this.enhancer?.getEnhanced(cue.id);
     const effectiveMode = this.tempBilingualKeyPressed ? 'bilingual-temp' : this.mode;
+    const loadingTranslationText = getI18nMessage('subtitle_loadingTranslation');
 
     let lines: SubtitleLine[] = [];
 
     if (effectiveMode === 'enhanced') {
-      // Single line: enhanced only
-      lines = [
-        {
-          text: enhanced?.line1_final || cue.text,
-          isEnhanced: true,
-        },
-      ];
-    } else {
-      // Bilingual: enhanced + native translation (on-demand)
-      const translation = typeof enhanced?.line2_final === 'string' ? enhanced.line2_final.trim() : '';
-      if (!translation) {
-        void this.enhancer?.ensureBilingual(cue);
+      if (shouldAdapt) {
+        const adapted = typeof enhanced?.line1_final === 'string' ? enhanced.line1_final.trim() : '';
+        lines = [
+          {
+            text: adapted || cue.text,
+            isEnhanced: Boolean(adapted),
+          },
+        ];
+        if (!adapted) {
+          this.enhancer?.start();
+        }
+      } else {
+        lines = [
+          {
+            text: cue.text,
+            isEnhanced: false,
+          },
+        ];
       }
+    } else {
+      if (shouldAdapt) {
+        const adapted = typeof enhanced?.line1_final === 'string' ? enhanced.line1_final.trim() : '';
+        lines = [
+          {
+            text: adapted || loadingTranslationText || cue.text,
+            isEnhanced: Boolean(adapted),
+          },
+          {
+            text: cue.text,
+            isEnhanced: false,
+          },
+        ];
+        if (!adapted) {
+          this.enhancer?.start();
+        }
+      } else {
+        const translation = typeof enhanced?.line2_final === 'string' ? enhanced.line2_final.trim() : '';
+        if (!translation) {
+          void this.enhancer?.ensureBilingual(cue);
+        }
 
-      const loadingTranslationText = getI18nMessage('subtitle_loadingTranslation');
-      lines = [
-        {
-          text: enhanced?.line1_final || cue.text,
-          isEnhanced: true,
-        },
-        {
-          text: translation || loadingTranslationText,
-          isEnhanced: false,
-        },
-      ];
+        lines = [
+          {
+            text: cue.text,
+            isEnhanced: false,
+          },
+          {
+            text: translation || loadingTranslationText,
+            isEnhanced: false,
+          },
+        ];
+      }
     }
 
-    const primaryText = lines[0]?.text ?? cue.text;
-    void this.ensureCueKeywords(cue.id, primaryText);
+    const keywordText = shouldAdapt
+      ? typeof enhanced?.line1_final === 'string' && enhanced.line1_final.trim()
+        ? enhanced.line1_final
+        : ''
+      : cue.text;
 
-    const signature = this.computeTextSignature(primaryText);
-    const keywords = this.cueKeywordSignatures.get(cue.id) === signature ? this.cueKeywords.get(cue.id) : undefined;
+    this.currentSubtitleContext = keywordText || cue.text;
+
+    if (keywordText) {
+      void this.ensureCueKeywords(cue.id, keywordText);
+    }
+
+    const keywordSignature = keywordText ? this.computeTextSignature(keywordText) : '';
+    const keywords =
+      keywordText && this.cueKeywordSignatures.get(cue.id) === keywordSignature ? this.cueKeywords.get(cue.id) : undefined;
+
+    if (keywordText && keywords && keywords.length > 0) {
+      void this.ensureCueKeywordTranslations(cue.id, keywordText, keywords);
+    }
+
+    const translationSignature =
+      keywordText && keywords && keywords.length > 0 ? this.computeKeywordTranslationSignature(keywordText, keywords) : '';
+    const keywordTranslations =
+      translationSignature && this.cueKeywordTranslationSignatures.get(cue.id) === translationSignature
+        ? this.cueKeywordTranslations.get(cue.id)
+        : undefined;
     const interactiveWords =
       keywords && keywords.length > 0
         ? new Set(keywords.map((term) => this.normalizeTerm(term)))
         : this.computeInteractiveWords(lines.map((line) => line.text));
-    this.overlay.display({ mode: effectiveMode, lines, interactiveWords });
+
+    const displayOptions: Parameters<SubtitleOverlay['display']>[0] = {
+      mode: effectiveMode,
+      lines,
+      interactiveWords,
+      ...(keywordTranslations ? { keywordTranslations } : {}),
+    };
+    this.overlay.display(displayOptions);
   }
 
   private startPlatformCaptionsWatch(): void {
@@ -564,6 +638,69 @@ export class SubtitleController {
     return this.settings.targetLanguage;
   }
 
+  private shouldAdaptSubtitle(subtitleLang: SupportedLanguage): boolean {
+    if (subtitleLang === this.settings.targetLanguage) return false;
+
+    const nativeLang =
+      this.normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
+    if (subtitleLang === nativeLang) return true;
+
+    return true;
+  }
+
+  private updateModeLabels(): void {
+    const overlay = this.overlay;
+    if (!overlay) return;
+
+    const uiLang = (() => {
+      try {
+        return browser.i18n.getUILanguage?.() ?? navigator.language ?? 'en';
+      } catch {
+        return navigator.language ?? 'en';
+      }
+    })();
+
+    const isZh = uiLang.toLowerCase().startsWith('zh');
+
+    const labelFor = (lang: SupportedLanguage): { full: string; short: string } => {
+      if (isZh) {
+        const map: Record<SupportedLanguage, { full: string; short: string }> = {
+          en: { full: '英文', short: '英' },
+          zh: { full: '中文', short: '中' },
+          ja: { full: '日语', short: '日' },
+          ko: { full: '韩语', short: '韩' },
+          fr: { full: '法语', short: '法' },
+          de: { full: '德语', short: '德' },
+        };
+        return map[lang] ?? { full: lang, short: lang.toUpperCase() };
+      }
+
+      const map: Record<SupportedLanguage, { full: string; short: string }> = {
+        en: { full: 'English', short: 'EN' },
+        zh: { full: 'Chinese', short: 'ZH' },
+        ja: { full: 'Japanese', short: 'JA' },
+        ko: { full: 'Korean', short: 'KO' },
+        fr: { full: 'French', short: 'FR' },
+        de: { full: 'German', short: 'DE' },
+      };
+      return map[lang] ?? { full: lang.toUpperCase(), short: lang.toUpperCase() };
+    };
+
+    const target = labelFor(this.settings.targetLanguage);
+    const nativeLang =
+      this.normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
+    const native = labelFor(nativeLang);
+
+    const bilingual = `${native.short}${target.short}`;
+    const holdSuffix = isZh ? '(按住)' : ' (hold)';
+
+    overlay.setModeLabels({
+      enhanced: target.full,
+      bilingual,
+      bilingualTemp: `${bilingual}${holdSuffix}`,
+    });
+  }
+
   private normalizeTerm(term: string): string {
     return term
       .replace(/\u2019/g, "'")
@@ -611,6 +748,9 @@ export class SubtitleController {
       .then((keywords) => {
         this.cueKeywords.set(cueId, keywords);
         this.cueKeywordSignatures.set(cueId, signature);
+        if (keywords.length > 0) {
+          void this.ensureCueKeywordTranslations(cueId, trimmed, keywords);
+        }
         const currentCue = this.cues[this.currentCueIndex];
         if (currentCue?.id === cueId) {
           this.updateSubtitleDisplay();
@@ -625,6 +765,73 @@ export class SubtitleController {
       });
 
     this.cueKeywordsInFlight.set(inFlightKey, promise);
+    return promise;
+  }
+
+  private computeKeywordTranslationSignature(text: string, keywords: string[]): string {
+    const normalizedKeywords = keywords.map((term) => this.normalizeTerm(term)).filter(Boolean);
+    normalizedKeywords.sort((a, b) => a.localeCompare(b));
+    return `${this.computeTextSignature(text)}|${normalizedKeywords.join('|')}`;
+  }
+
+  private ensureCueKeywordTranslations(
+    cueId: string,
+    contextText: string,
+    keywords: string[]
+  ): Promise<Record<string, string>> {
+    const trimmedContext = contextText.trim();
+    if (!trimmedContext) return Promise.resolve({});
+    if (keywords.length === 0) return Promise.resolve({});
+
+    const signature = this.computeKeywordTranslationSignature(trimmedContext, keywords);
+    if (this.cueKeywordTranslationSignatures.get(cueId) === signature && this.cueKeywordTranslations.has(cueId)) {
+      return Promise.resolve(this.cueKeywordTranslations.get(cueId) ?? {});
+    }
+
+    const inFlightKey = `${cueId}:${signature}`;
+    const inFlight = this.cueKeywordTranslationsInFlight.get(inFlightKey);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      const response = await sendMessage('TRANSLATE_KEYWORDS', {
+        keywords,
+        context: trimmedContext,
+        sourceLang: this.settings.targetLanguage,
+        targetLang: this.settings.nativeLanguage,
+      });
+
+      if (!response.ok) return {};
+      const translated = response.value;
+
+      const mapping: Record<string, string> = {};
+      for (let i = 0; i < keywords.length; i++) {
+        const term = this.normalizeTerm(keywords[i] ?? '');
+        if (!term) continue;
+        const value = typeof translated[i] === 'string' && translated[i]!.trim() ? translated[i]!.trim() : keywords[i] ?? term;
+        if (!(term in mapping)) {
+          mapping[term] = value;
+        }
+      }
+
+      return mapping;
+    })()
+      .then((mapping) => {
+        this.cueKeywordTranslations.set(cueId, mapping);
+        this.cueKeywordTranslationSignatures.set(cueId, signature);
+        const currentCue = this.cues[this.currentCueIndex];
+        if (currentCue?.id === cueId) {
+          this.updateSubtitleDisplay();
+        }
+        return mapping;
+      })
+      .catch(() => {
+        return {};
+      })
+      .finally(() => {
+        this.cueKeywordTranslationsInFlight.delete(inFlightKey);
+      });
+
+    this.cueKeywordTranslationsInFlight.set(inFlightKey, promise);
     return promise;
   }
 
@@ -679,7 +886,18 @@ export class SubtitleController {
       );
     }
 
-    const keywordLists = await Promise.all(cuesInWindow.map((cue) => this.ensureCueKeywords(cue.id, cue.text)));
+    const keywordLists = await Promise.all(
+      cuesInWindow.map((cue) => {
+        const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
+        if (!this.shouldAdaptSubtitle(cueLang)) {
+          return this.ensureCueKeywords(cue.id, cue.text);
+        }
+
+        const adapted = this.enhancer?.getEnhanced(cue.id)?.line1_final?.trim() ?? '';
+        if (!adapted) return Promise.resolve([]);
+        return this.ensureCueKeywords(cue.id, adapted);
+      })
+    );
     if (this.destroyed) return;
     if (token !== this.prefetchToken) {
       console.debug(
@@ -692,12 +910,15 @@ export class SubtitleController {
     for (let i = 0; i < cuesInWindow.length; i++) {
       const cue = cuesInWindow[i];
       if (!cue) continue;
+      const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
+      const shouldAdapt = this.shouldAdaptSubtitle(cueLang);
+      const contextText = shouldAdapt ? this.enhancer?.getEnhanced(cue.id)?.line1_final?.trim() || cue.text : cue.text;
       const terms = keywordLists[i] ?? [];
       for (const rawTerm of terms) {
         const normalized = this.normalizeTerm(rawTerm);
         if (!normalized) continue;
         if (!termContexts.has(normalized)) {
-          termContexts.set(normalized, cue.text);
+          termContexts.set(normalized, contextText);
         }
       }
     }

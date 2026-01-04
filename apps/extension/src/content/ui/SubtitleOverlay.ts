@@ -19,6 +19,8 @@ export interface SubtitleDisplayOptions {
   mode: SubtitleMode;
   lines: SubtitleLine[];
   interactiveWords?: Set<string>;
+  keywordTranslations?: Record<string, string>;
+  modeLabels?: { enhanced?: string; bilingual?: string; bilingualTemp?: string };
 }
 
 export interface WordCardData {
@@ -61,6 +63,7 @@ export class SubtitleOverlay {
   private platform: 'youtube' | 'bilibili';
   private mode: SubtitleMode = 'enhanced';
   private theme: 'light' | 'dark' = 'dark';
+  private modeLabels: Partial<Record<SubtitleMode, string>> = {};
   private onModeChange?: (mode: SubtitleMode) => void;
   private onWordClick?: (word: string, anchorRect: DOMRect) => void;
   private onWordHover?: (word: string, anchorRect: DOMRect) => void;
@@ -323,6 +326,10 @@ export class SubtitleOverlay {
       return;
     }
 
+    if (options.modeLabels) {
+      this.setModeLabels(options.modeLabels);
+    }
+
     this.mode = options.mode;
     const { lines } = options;
     this.updateModeLabel();
@@ -336,7 +343,7 @@ export class SubtitleOverlay {
     for (const line of lines) {
       const div = document.createElement('div');
       div.className = line.isEnhanced ? 'line-enhanced' : 'line-original';
-      this.renderLineWithWordSpans(div, line.text, options.interactiveWords);
+      this.renderLineWithWordSpans(div, line.text, options.interactiveWords, options.keywordTranslations);
       this.subtitleLinesElement.appendChild(div);
     }
     this.subtitleElement.classList.add('visible');
@@ -366,15 +373,26 @@ export class SubtitleOverlay {
     }
   }
 
+  getMode(): SubtitleMode {
+    return this.mode;
+  }
+
+  setMode(mode: SubtitleMode): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    this.updateModeLabel();
+  }
+
   /**
    * Handle click to toggle mode
    */
   private handleClick = (event: MouseEvent): void => {
     const target = event.target as HTMLElement | null;
-    const word = target?.dataset?.lexipathWord;
-    if (word && this.onWordClick) {
+    const wordEl = target?.closest?.('[data-lexipath-word]') as HTMLElement | null;
+    const word = wordEl?.dataset?.lexipathWord;
+    if (wordEl && word && this.onWordClick) {
       event.stopPropagation();
-      const rect = target.getBoundingClientRect();
+      const rect = wordEl.getBoundingClientRect();
       this.onWordClick(word, rect);
       return;
     }
@@ -395,6 +413,9 @@ export class SubtitleOverlay {
   }
 
   private getModeLabel(mode: SubtitleMode): string {
+    const override = this.modeLabels[mode];
+    if (typeof override === 'string' && override.trim()) return override;
+
     switch (mode) {
       case 'enhanced':
         return getI18nMessage('subtitle_modeSingle', undefined, mode);
@@ -405,6 +426,15 @@ export class SubtitleOverlay {
       default:
         return getI18nMessage('subtitle_modeSingle', undefined, mode);
     }
+  }
+
+  setModeLabels(labels: { enhanced?: string; bilingual?: string; bilingualTemp?: string }): void {
+    const next: Partial<Record<SubtitleMode, string>> = {};
+    if (labels.enhanced) next.enhanced = labels.enhanced;
+    if (labels.bilingual) next.bilingual = labels.bilingual;
+    if (labels.bilingualTemp) next['bilingual-temp'] = labels.bilingualTemp;
+    this.modeLabels = next;
+    this.updateModeLabel();
   }
 
   showWordCardLoading(word: string, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
@@ -639,7 +669,12 @@ export class SubtitleOverlay {
     return { top, left };
   }
 
-  private renderLineWithWordSpans(container: HTMLElement, text: string, interactiveWords?: Set<string>): void {
+  private renderLineWithWordSpans(
+    container: HTMLElement,
+    text: string,
+    interactiveWords?: Set<string>,
+    keywordTranslations?: Record<string, string>
+  ): void {
     if (!interactiveWords) {
       this.renderAllWords(container, text);
       return;
@@ -673,7 +708,22 @@ export class SubtitleOverlay {
 
       const span = document.createElement('span');
       span.className = 'lexipath-subtitle-word';
-      span.textContent = text.slice(match.start, match.end);
+
+      const wordText = text.slice(match.start, match.end);
+      const wordEl = document.createElement('span');
+      wordEl.className = 'lexipath-subtitle-word__text';
+      wordEl.textContent = wordText;
+      span.appendChild(wordEl);
+
+      const translationRaw = keywordTranslations?.[match.term];
+      const translation = typeof translationRaw === 'string' ? translationRaw.trim() : '';
+      if (translation && translation.toLowerCase() !== match.term.toLowerCase()) {
+        const sub = document.createElement('sub');
+        sub.className = 'lexipath-subtitle-word__translation';
+        sub.textContent = translation;
+        span.appendChild(sub);
+      }
+
       span.dataset.lexipathWord = match.term;
       container.appendChild(span);
 
@@ -920,6 +970,9 @@ export class SubtitleOverlay {
         }
 
         .lexipath-subtitle-word {
+          display: inline-flex;
+          align-items: baseline;
+          gap: 3px;
           border-bottom: 2px dotted rgba(59, 130, 246, 0.9);
           cursor: pointer;
           padding: 0 1px;
@@ -928,6 +981,13 @@ export class SubtitleOverlay {
         .lexipath-subtitle-word:hover {
           background: rgba(59, 130, 246, 0.22);
           border-radius: 3px;
+        }
+
+        .lexipath-subtitle-word__translation {
+          font-size: 0.62em;
+          line-height: 1;
+          opacity: 0.85;
+          color: ${isDark ? 'rgba(226, 232, 240, 0.9)' : '#334155'};
         }
 
         .lexipath-wordcard {
