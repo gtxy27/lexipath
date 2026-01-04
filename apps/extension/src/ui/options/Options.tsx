@@ -6,7 +6,6 @@ import {
   ChannelTypeIdSchema,
   ClaudeProviderConfigSchema,
   GeminiProviderConfigSchema,
-  NativeLanguageSchema,
   ProviderConfigSchema,
   RouteKindSchema,
   SettingsSchema,
@@ -35,7 +34,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
@@ -51,7 +49,6 @@ import { useToast } from "../components/ui/use-toast";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Copy,
   Loader2,
@@ -154,10 +151,7 @@ type FieldErrors = Partial<{
 }>;
 
 function t(key: string, substitutions?: string | string[]): string {
-  const message =
-    substitutions === undefined
-      ? browser.i18n.getMessage(key)
-      : browser.i18n.getMessage(key, substitutions as any);
+  const message = browser.i18n.getMessage(key, substitutions as any);
   return message || key;
 }
 
@@ -172,11 +166,6 @@ function dedupeStrings(values: string[]): string[] {
   return result;
 }
 
-function nativeLanguageLabel(lang: Settings["nativeLanguage"]): string {
-  const key = `languageNative_${lang.replace("-", "_")}`;
-  return t(key);
-}
-
 function normalizeSiteEntry(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -185,9 +174,10 @@ function normalizeSiteEntry(value: string): string | null {
 
 function parseCustomHeaders(
   rawText: string,
-):
-  | { ok: true; value: Record<string, string> | undefined }
-  | { ok: false; errorKey: FieldErrorKey } {
+): { ok: true; value: Record<string, string> | undefined } | {
+  ok: false;
+  errorKey: FieldErrorKey;
+} {
   const text = rawText.trim();
   if (!text) return { ok: true, value: undefined };
 
@@ -324,10 +314,6 @@ function behaviorLabel(key: BehaviorKey): string {
   return t(`optionsBehavior_${key}`);
 }
 
-function behaviorDesc(key: BehaviorKey): string {
-  return t(`optionsBehaviorDesc_${key}`);
-}
-
 function isIconUrlAllowed(raw: string): boolean {
   const value = raw.trim();
   if (!value) return true;
@@ -371,9 +357,13 @@ function channelHasAnyInput(channel: ChannelFormState): boolean {
 function buildChannel(
   channel: ChannelFormState,
   required: boolean,
-):
-  | { ok: true; value: ProviderChannel }
-  | { ok: false; errors: ChannelFieldErrors } {
+): {
+  ok: true;
+  value: ProviderChannel;
+} | {
+  ok: false;
+  errors: ChannelFieldErrors;
+} {
   const errors: ChannelFieldErrors = {};
 
   const name = channel.name.trim();
@@ -703,9 +693,7 @@ export function Options(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingChannelId, setTestingChannelId] = useState<number | null>(null);
-  const [expandedChannels, setExpandedChannels] = useState<
-    Record<number, boolean>
-  >({});
+  const [expandedChannels, setExpandedChannels] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     async function load() {
@@ -867,9 +855,9 @@ export function Options(): React.ReactElement {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/5 dark:bg-purple-600/10 rounded-full blur-[120px]" />
       </div>
 
-      <Tabs defaultValue="channels" className="relative z-10 mx-auto max-w-[1200px] min-h-screen flex flex-col md:flex-row">
+      <Tabs defaultValue="channels" className="relative z-10 mx-auto max-w-[1440px] min-h-screen flex flex-col lg:flex-row">
         {/* Sidebar Navigation */}
-        <div className="w-full md:w-64 md:h-screen md:sticky md:top-0 border-r border-gray-200 dark:border-white/5 bg-white/50 dark:bg-[#0d0e14]/50 backdrop-blur-xl p-6 flex flex-col gap-8">
+        <div className="w-full lg:w-72 lg:h-screen lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5 bg-white/70 dark:bg-[#0d0e14]/70 backdrop-blur-xl p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-10 transition-all">
           <div className="flex items-center gap-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/20">
               <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
@@ -881,7 +869,7 @@ export function Options(): React.ReactElement {
             </h1>
           </div>
 
-          <TabsList className="flex flex-col h-auto bg-transparent border-0 space-y-1 p-0">
+          <TabsList className="flex flex-row lg:flex-col h-auto bg-transparent border-0 space-x-1 lg:space-x-0 lg:space-y-1.5 p-0 overflow-x-auto lg:overflow-x-visible no-scrollbar">
             {[
               { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
               { value: "routing", label: t("optionsRoutingTitle"), icon: ChevronRight },
@@ -891,26 +879,26 @@ export function Options(): React.ReactElement {
               <TabsTrigger 
                 key={tab.value}
                 value={tab.value}
-                className="w-full justify-start gap-3 px-4 py-3 rounded-xl data-[state=active]:bg-indigo-50 dark:data-[state=active]:bg-white/5 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-white text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all border-0 shadow-none"
+                className="flex-1 lg:flex-none justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl data-[state=active]:bg-indigo-600 dark:data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all border-0 shadow-none"
               >
-                <tab.icon className="h-4 w-4" />
-                <span className="font-bold">{tab.label}</span>
+                <tab.icon className="h-4 w-4 shrink-0" />
+                <span className="font-bold whitespace-nowrap">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <div className="mt-auto pt-6 border-t border-gray-200 dark:border-white/5 space-y-4">
+          <div className="hidden lg:flex mt-auto pt-6 border-t border-gray-200 dark:border-white/5 flex-col gap-4">
              <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-2">
                   <div className={cn("h-2 w-2 rounded-full", form.enabled ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-gray-400")} />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
                      {form.enabled ? t("on") : t("off")}
                   </span>
                 </div>
                 <Button 
                   size="sm"
                   variant="ghost"
-                  className="h-8 px-3 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-400/10 rounded-lg"
+                  className="h-9 px-4 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-400/10 rounded-xl"
                   onClick={handleSave}
                   disabled={saving}
                 >
@@ -922,17 +910,29 @@ export function Options(): React.ReactElement {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col p-6 md:p-10 lg:p-16 max-w-4xl overflow-y-auto h-screen custom-scrollbar relative">
-          <TabsContent value="channels" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 outline-none">
-            <header className="space-y-2">
-              <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsChannelsTitle")}</h2>
-              <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium">{t("optionsChannelsDesc")}</p>
+        <div className="flex-1 flex flex-col p-5 md:p-8 lg:p-12 xl:p-16 max-w-5xl mx-auto w-full overflow-y-auto h-screen custom-scrollbar relative">
+          <div className="lg:hidden flex justify-end mb-6">
+            <Button 
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-6 h-10 shadow-lg shadow-indigo-600/20"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {t("optionsSaveButton")}
+            </Button>
+          </div>
+
+          <TabsContent value="channels" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none">
+            <header className="space-y-3">
+              <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsChannelsTitle")}</h2>
+              <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsChannelsDesc")}</p>
             </header>
 
-            <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-white/5">
-               <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/80">{t("optionsTab_channels")}</h3>
+            <div className="flex items-center justify-between py-4 border-b border-gray-100 dark:border-white/5">
+               <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsTab_channels")}</h3>
                <Button
-                className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 rounded-xl px-5 h-10 font-bold"
+                className="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200 dark:border-indigo-500/20 rounded-xl px-5 h-10 font-bold transition-all"
                 onClick={() => {
                   const id = nextChannelId(form.channels);
                   const typeId: ChannelTypeId = 1;
@@ -964,7 +964,7 @@ export function Options(): React.ReactElement {
               </Button>
             </div>
 
-            <div className="grid gap-6">
+            <div className="grid gap-5">
               {form.channels
                 .slice()
                 .sort((a, b) => a.channelId - b.channelId)
@@ -975,15 +975,15 @@ export function Options(): React.ReactElement {
 
                   return (
                     <div key={channel.channelId} className="relative group">
-                      <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                      <Card className="relative border-gray-200 dark:border-white/5 bg-white dark:bg-white/5 backdrop-blur-sm overflow-hidden rounded-2xl transition-all duration-300 group-hover:shadow-xl group-hover:shadow-indigo-500/5">
+                      <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
+                      <Card className="relative border-gray-200 dark:border-white/10 bg-white dark:bg-[#15161e] shadow-sm overflow-hidden rounded-2xl transition-all duration-300">
                         <CardHeader
                           className="pb-4 pt-5 px-6 cursor-pointer select-none"
                           onClick={() => setExpandedChannels(prev => ({ ...prev, [channel.channelId]: !isExpanded }))}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className={cn("p-2 rounded-xl bg-gray-50 dark:bg-[#0d0e14] border border-gray-200 dark:border-white/5 transition-transform duration-300", isExpanded ? "rotate-90" : "")}>
+                              <div className={cn("p-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 transition-transform duration-300", isExpanded ? "rotate-90" : "")}>
                                 <ChevronRight className="h-4 w-4 text-gray-400" />
                               </div>
                               <div>
@@ -991,11 +991,11 @@ export function Options(): React.ReactElement {
                                   <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">
                                     {channel.name || `#${channel.channelId}`}
                                   </CardTitle>
-                                  <Badge className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border-indigo-100 dark:border-indigo-500/20 px-2 py-0 text-[10px] font-bold">
+                                  <Badge variant="outline" className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20 px-2 py-0 text-[10px] font-bold">
                                     {channelTypeLabel(channel.typeId)}
                                   </Badge>
                                 </div>
-                                <CardDescription className="text-gray-400 dark:text-gray-500 mt-0.5 font-bold text-[11px] uppercase tracking-wider">
+                                <CardDescription className="text-gray-500 dark:text-gray-400 mt-1 font-semibold text-[11px] uppercase tracking-wider">
                                   {channel.model?.trim() ? channel.model.trim() : t("optionsChannelModelUnset")}
                                 </CardDescription>
                               </div>
@@ -1005,15 +1005,15 @@ export function Options(): React.ReactElement {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-9 border-gray-200 dark:border-white/5 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white gap-2 rounded-xl px-4"
+                                className="h-9 border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white gap-2 rounded-xl px-4"
                                 onClick={() => testProvider(channel)}
                                 disabled={isTesting}
                               >
                                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 text-indigo-500" />}
-                                <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">{t("optionsTestConnection")}</span>
+                                <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest">{t("optionsTestConnection")}</span>
                               </Button>
                               
-                              <div className="h-8 w-px bg-gray-200 dark:bg-white/5 mx-1" />
+                              <div className="h-6 w-px bg-gray-200 dark:bg-white/10 mx-1" />
 
                               <Button
                                 variant="ghost"
@@ -1054,12 +1054,12 @@ export function Options(): React.ReactElement {
                             isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                           )}>
                             <div className="overflow-hidden">
-                              <CardContent className="px-6 pb-6 pt-2 space-y-6">
+                              <CardContent className="px-6 pb-8 pt-2 space-y-8">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                   <div className="space-y-2">
+                                   <div className="space-y-2.5">
                                       <Label 
                                         htmlFor={`channel-${channel.channelId}-name`}
-                                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1"
+                                        className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
                                       >
                                         {t("optionsChannelNameLabel")}
                                       </Label>
@@ -1070,13 +1070,14 @@ export function Options(): React.ReactElement {
                                           ...form,
                                           channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, name: e.target.value } : ch)
                                         })}
-                                        className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 focus:ring-indigo-500/30 rounded-xl h-11 font-medium"
+                                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 focus:ring-indigo-500/30 rounded-xl h-11 font-medium transition-all"
                                       />
+                                      {channelErrors.name && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(channelErrors.name)}</p>}
                                    </div>
-                                   <div className="space-y-2">
+                                   <div className="space-y-2.5">
                                       <Label 
                                         htmlFor={`channel-${channel.channelId}-type`}
-                                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1"
+                                        className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
                                       >
                                         {t("optionsChannelTypeLabel")}
                                       </Label>
@@ -1092,11 +1093,11 @@ export function Options(): React.ReactElement {
                                       >
                                         <SelectTrigger 
                                           id={`channel-${channel.channelId}-type`}
-                                          className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 h-11 rounded-xl font-medium"
+                                          className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 h-11 rounded-xl font-medium"
                                         >
                                           <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white">
+                                        <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
                                           <SelectItem value="1">{channelTypeLabel(1)}</SelectItem>
                                           <SelectItem value="2">{channelTypeLabel(2)}</SelectItem>
                                           <SelectItem value="3">{channelTypeLabel(3)}</SelectItem>
@@ -1106,10 +1107,10 @@ export function Options(): React.ReactElement {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                   <div className="space-y-2">
+                                   <div className="space-y-2.5">
                                       <Label 
                                         htmlFor={`channel-${channel.channelId}-model`}
-                                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1"
+                                        className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
                                       >
                                         {t("optionsProviderModelLabel")}
                                       </Label>
@@ -1120,13 +1121,14 @@ export function Options(): React.ReactElement {
                                           ...form,
                                           channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, model: e.target.value } : ch)
                                         })}
-                                        className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium"
+                                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
                                       />
+                                      {channelErrors.model && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(channelErrors.model)}</p>}
                                    </div>
-                                   <div className="space-y-2">
+                                   <div className="space-y-2.5">
                                       <Label 
                                         htmlFor={`channel-${channel.channelId}-api-key`}
-                                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1"
+                                        className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
                                       >
                                         {t("optionsProviderApiKeyLabel")}
                                       </Label>
@@ -1138,16 +1140,17 @@ export function Options(): React.ReactElement {
                                           ...form,
                                           channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, apiKey: e.target.value } : ch)
                                         })}
-                                        className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium"
+                                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
                                         placeholder={t("optionsProviderApiKeyPlaceholder")}
                                       />
+                                      {channelErrors.apiKey && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(channelErrors.apiKey)}</p>}
                                    </div>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-2.5">
                                    <Label 
                                      htmlFor={`channel-${channel.channelId}-base-url`}
-                                     className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1"
+                                     className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
                                    >
                                      {t("optionsProviderBaseUrlLabel")}
                                    </Label>
@@ -1158,9 +1161,10 @@ export function Options(): React.ReactElement {
                                         ...form,
                                         channels: form.channels.map(ch => ch.channelId === channel.channelId ? { ...ch, baseUrl: e.target.value } : ch)
                                       })}
-                                      className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium"
-                                      placeholder={t("optionsProviderBaseUrlPlaceholder")}
+                                      className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                                      placeholder="https://api.openai.com/v1"
                                    />
+                                   {channelErrors.baseUrl && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(channelErrors.baseUrl)}</p>}
                                 </div>
                               </CardContent>
                             </div>
@@ -1172,223 +1176,133 @@ export function Options(): React.ReactElement {
             </div>
           </TabsContent>
 
-          <TabsContent value="routing" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 outline-none">
-             <header className="space-y-2">
-                <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsRoutingTitle")}</h2>
-                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium">{t("optionsRoutingDesc")}</p>
+          <TabsContent value="routing" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none">
+             <header className="space-y-3">
+                <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsRoutingTitle")}</h2>
+                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsRoutingDesc")}</p>
              </header>
 
-                              <div className="grid gap-4">
-
-                                 {BEHAVIOR_KEYS.map((key) => {
-
-                                   const route = form.behaviorRoutes[key];
-
-                                   const allowedKinds = BEHAVIOR_KIND_ALLOWLIST[key];
-
-                                   
-
-                                   return (
-
-                                     <div key={key} className="relative glass-card bg-white dark:bg-white/5 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-gray-200 dark:border-white/5 shadow-sm">
-
-                                        <div className="flex items-center gap-4">
-
-                                           <div className="h-12 w-12 rounded-xl bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5 flex items-center justify-center shadow-inner">
-
-                                              <Zap className="h-6 w-6 text-indigo-500 dark:text-indigo-400" />
-
-                                           </div>
-
-                                           <div>
-
-                                              <h4 className="font-bold text-gray-900 dark:text-white text-base">{behaviorLabel(key)}</h4>
-
-                                              <p className="text-[11px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider mt-0.5">
-                                                {behaviorDesc(key)}
-                                              </p>
-
-                                           </div>
-
-                                        </div>
-
-             
-
-                                        <div className="flex items-center gap-3">
-
-                                                                     <Select
-
-                                                                       value={String(route.kind)}
-
-                                                                       onValueChange={v => {
-
-                                                                         const kind = Number(v) as RouteKind;
-
-                                                                         setForm({
-
-                                                                           ...form,
-
-                                                                           behaviorRoutes: {
-
-                                                                             ...form.behaviorRoutes,
-
-                                                                             [key]: { ...route, kind, channelId: kind === 1 ? (form.channels[0]?.channelId ?? null) : null }
-
-                                                                           }
-
-                                                                         });
-
-                                                                       }}
-
-                                                                     >
-
-                                                                       <SelectTrigger 
-
-                                                                         data-testid={`route-kind-${key}`}
-
-                                                                         className="w-40 bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-10 font-bold text-xs"
-
-                                                                       >
-
-                                                                         <SelectValue />
-
-                                                                       </SelectTrigger>
-
-                                                                       <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white">
-
-                                                                          {routeKindOptions(allowedKinds)}
-
-                                                                       </SelectContent>
-
-                                                                     </Select>
-
-                                           
-
-             
-
-                                           {route.kind === 1 && (
-
-                                             <Select
-
-                                               value={route.channelId === null ? "null" : String(route.channelId)}
-
-                                               onValueChange={v => setForm({
-
-                                                 ...form,
-
-                                                 behaviorRoutes: {
-
-                                                   ...form.behaviorRoutes,
-
-                                                   [key]: { ...route, channelId: v === "null" ? null : Number(v) }
-
-                                                 }
-
-                                               })}
-
-                                             >
-
-                                               <SelectTrigger className="w-48 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-300 rounded-xl h-10 font-bold text-xs">
-
-                                                 <SelectValue placeholder={t("optionsRouteChannelPlaceholder")} />
-
-                                               </SelectTrigger>
-
-                                               <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white">
-
-                                                  {form.channels.map(ch => (
-
-                                                    <SelectItem key={ch.channelId} value={String(ch.channelId)}>{ch.name || `#${ch.channelId}`}</SelectItem>
-
-                                                  ))}
-
-                                               </SelectContent>
-
-                                             </Select>
-
-                                           )}
-
-                                        </div>
-
-                                     </div>
-
-                                   );
-
-                                 })}
-
-                              </div>
-
-             
-
-                              <div className="flex flex-wrap gap-3 pt-4">
-
-                                 <Button 
-
-                                   variant="outline" 
-
-                                   onClick={testGoogleTranslate}
-
-                                   className="h-10 px-6 rounded-xl border-gray-200 dark:border-white/5 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
-
-                                 >
-
-                                   {t("optionsTestGoogleTranslate")}
-
-                                 </Button>
-
-                                 <Button 
-
-                                   variant="outline" 
-
-                                   onClick={testBingTranslate}
-
-                                   className="h-10 px-6 rounded-xl border-gray-200 dark:border-white/5 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
-
-                                 >
-
-                                   {t("optionsTestBingTranslate")}
-
-                                 </Button>
-
-                              </div>
-
-             
+             <div className="grid gap-4">
+                {BEHAVIOR_KEYS.map((key) => {
+                  const route = form.behaviorRoutes[key];
+                  const allowedKinds = BEHAVIOR_KIND_ALLOWLIST[key];
+                  const routeError = errors.routes?.[key];
+
+                  return (
+                    <div key={key} className="relative bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all hover:shadow-md">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-xl bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5 flex items-center justify-center shadow-sm">
+                          <Zap className="h-6 w-6 text-indigo-500 dark:text-indigo-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 dark:text-white text-base">{behaviorLabel(key)}</h4>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mt-1">{t("optionsRoutingDesc").split(".")[0]}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-3">
+                          <Select
+                            value={String(route.kind)}
+                            onValueChange={v => {
+                              const kind = Number(v) as RouteKind;
+                              setForm({
+                                ...form,
+                                behaviorRoutes: {
+                                  ...form.behaviorRoutes,
+                                  [key]: { ...route, kind, channelId: kind === 1 ? (form.channels[0]?.channelId ?? null) : null }
+                                }
+                              });
+                            }}
+                          >
+                            <SelectTrigger 
+                              data-testid={`route-kind-${key}`}
+                              className="w-40 bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                              {routeKindOptions(allowedKinds)}
+                            </SelectContent>
+                          </Select>
+
+                          {route.kind === 1 && (
+                            <Select
+                              value={route.channelId === null ? "null" : String(route.channelId)}
+                              onValueChange={v => setForm({
+                                ...form,
+                                behaviorRoutes: {
+                                  ...form.behaviorRoutes,
+                                  [key]: { ...route, channelId: v === "null" ? null : Number(v) }
+                                }
+                              })}
+                            >
+                              <SelectTrigger className="w-48 bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl h-10 font-bold text-xs">
+                                <SelectValue placeholder={t("optionsRouteChannelPlaceholder")} />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                                {form.channels.map(ch => (
+                                  <SelectItem key={ch.channelId} value={String(ch.channelId)}>{ch.name || `#${ch.channelId}`}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                        {routeError && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(routeError)}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+             </div>
+
+             <div className="flex flex-wrap gap-3 pt-6">
+                <Button 
+                  variant="outline" 
+                  onClick={testGoogleTranslate}
+                  className="h-10 px-6 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 font-bold text-[10px] uppercase tracking-widest transition-all shadow-sm"
+                >
+                  {t("optionsTestGoogleTranslate")}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={testBingTranslate}
+                  className="h-10 px-6 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 font-bold text-[10px] uppercase tracking-widest transition-all shadow-sm"
+                >
+                  {t("optionsTestBingTranslate")}
+                </Button>
+             </div>
           </TabsContent>
 
-          <TabsContent value="language" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 outline-none">
-             <header className="space-y-2">
-                <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsTab_language")}</h2>
-                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium">{t("optionsLanguageDesc")}</p>
+          <TabsContent value="language" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none">
+             <header className="space-y-3">
+                <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsTab_language")}</h2>
+                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsLanguageDesc")}</p>
              </header>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-                <div className="glass-card bg-white dark:bg-white/5 rounded-2xl p-6 border-gray-200 dark:border-white/5 space-y-6 shadow-sm">
-                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/80">{t("optionsLanguageTitle")}</h4>
+                <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsLanguageTitle")}</h4>
                    
-                   <div className="space-y-4">
-                      <div className="space-y-2">
-                         <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">{t("nativeLanguage")}</Label>
+                   <div className="space-y-5">
+                      <div className="space-y-2.5">
+                         <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("nativeLanguage")}</Label>
                          <Select value={form.nativeLanguage} onValueChange={v => setForm({...form, nativeLanguage: v as any})}>
-                            <SelectTrigger className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium">
+                            <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
                                <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white max-h-60">
-                               {NativeLanguageSchema.options.map((lang) => (
-                                 <SelectItem key={lang} value={lang}>
-                                   {nativeLanguageLabel(lang)}
-                                 </SelectItem>
-                               ))}
-                             </SelectContent>
-                          </Select>
-                       </div>
+                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                               {SupportedLanguageSchema.options.map(lang => <SelectItem key={lang} value={lang}>{lang}</SelectItem>)}
+                            </SelectContent>
+                         </Select>
+                      </div>
                       
-                      <div className="space-y-2">
-                         <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">{t("targetLanguage")}</Label>
+                      <div className="space-y-2.5">
+                         <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("targetLanguage")}</Label>
                          <Select value={form.targetLanguage} onValueChange={v => setForm({...form, targetLanguage: v as any})}>
-                            <SelectTrigger className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium">
+                            <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
                                <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white max-h-60">
+                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
                                {SupportedLanguageSchema.options.map(lang => <SelectItem key={lang} value={lang}>{t(`languageTarget_${lang}`)}</SelectItem>)}
                             </SelectContent>
                          </Select>
@@ -1396,52 +1310,54 @@ export function Options(): React.ReactElement {
                    </div>
                 </div>
 
-                <div className="glass-card bg-white dark:bg-white/5 rounded-2xl p-6 border-gray-200 dark:border-white/5 space-y-6 shadow-sm">
-                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/80">{t("proficiencyLevel")}</h4>
+                <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("proficiencyLevel")}</h4>
                    
-                   <div className="space-y-4">
-                      <div className="space-y-2">
-                         <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">{t("proficiencyLevel")}</Label>
+                   <div className="space-y-5">
+                      <div className="space-y-2.5">
+                         <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("proficiencyLevel")}</Label>
                          <Select value={form.proficiencyLevel} onValueChange={v => setForm({...form, proficiencyLevel: v as CEFRLevel})}>
-                            <SelectTrigger className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-11 font-medium">
+                            <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
                                <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white">
+                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
                                {CEFRLevelSchema.options.map(level => <SelectItem key={level} value={level}>{t(`proficiency_${level}`)}</SelectItem>)}
                             </SelectContent>
                          </Select>
                       </div>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-4 leading-relaxed font-medium">
-                        {t("optionsProficiencyHint")}
-                      </p>
+                      <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
+                          {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
+                        </p>
+                      </div>
                    </div>
                 </div>
              </div>
           </TabsContent>
 
-          <TabsContent value="sites" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 outline-none">
-             <header className="space-y-2">
-                <h2 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsTab_sites")}</h2>
-                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium">{t("optionsSiteModeDesc")}</p>
+          <TabsContent value="sites" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none">
+             <header className="space-y-3">
+                <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsTab_sites")}</h2>
+                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsSiteModeDesc")}</p>
              </header>
 
-             <div className="glass-card bg-white dark:bg-white/5 rounded-2xl p-6 border-gray-200 dark:border-white/5 space-y-6 shadow-sm">
-                <div className="flex items-center justify-between">
-                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/80">{t("optionsSiteModeLabel")}</h4>
+             <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-8 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsSiteModeLabel")}</h4>
                    <Select value={form.siteMode} onValueChange={v => setForm({...form, siteMode: v as SiteMode})}>
-                      <SelectTrigger className="w-48 bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-xl h-10 font-bold text-xs">
+                      <SelectTrigger className="w-full sm:w-48 bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs">
                          <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 text-gray-900 dark:text-white">
+                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
                          <SelectItem value="all">{t("optionsSiteModeAll")}</SelectItem>
                          <SelectItem value="whitelist">{t("optionsSiteModeWhitelist")}</SelectItem>
                       </SelectContent>
                    </Select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                   <div className="space-y-3">
-                      <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                   <div className="space-y-4">
+                      <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                          {t("optionsAllowedSitesLabel")}
                       </Label>
@@ -1452,12 +1368,12 @@ export function Options(): React.ReactElement {
                            setForm({...form, allowedSites: dedupeStrings(lines)});
                         }}
                         rows={8}
-                        className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-2xl p-4 focus:ring-indigo-500/30 font-medium"
-                        placeholder={t("optionsSiteEntryPlaceholder")}
+                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-indigo-500/30 font-medium transition-all"
+                        placeholder="example.com"
                       />
                    </div>
-                   <div className="space-y-3">
-                      <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                   <div className="space-y-4">
+                      <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
                          <AlertCircle className="h-4 w-4 text-rose-500" />
                          {t("optionsExcludedSitesLabel")}
                       </Label>
@@ -1468,8 +1384,8 @@ export function Options(): React.ReactElement {
                            setForm({...form, excludedSites: dedupeStrings(lines)});
                         }}
                         rows={8}
-                        className="bg-gray-50 dark:bg-[#0d0e14]/50 border-gray-200 dark:border-white/5 rounded-2xl p-4 focus:ring-rose-500/20 font-medium"
-                        placeholder={t("optionsSiteEntryPlaceholder")}
+                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-rose-500/20 font-medium transition-all"
+                        placeholder="google.com"
                       />
                    </div>
                 </div>
@@ -1485,6 +1401,8 @@ export function Options(): React.ReactElement {
         .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.1); }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
     </div>
   );
