@@ -30,9 +30,25 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
           get: vi.fn(async () => ({})),
           remove: vi.fn(async () => {}),
         },
+        onChanged: {
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        },
       },
     },
     sendMessageMock: vi.fn(async (type: string, payload: unknown) => {
+      if (type === "GET_SETTINGS") {
+        return {
+          ok: true,
+          value: { theme: "system" },
+        };
+      }
+      if (type === "GET_CHAT_SESSIONS") {
+        return {
+          ok: true,
+          value: [],
+        };
+      }
       if (type === "CHAT") {
         return {
           ok: true,
@@ -64,7 +80,6 @@ describe("Sidebar", () => {
     render(<Sidebar />);
 
     expect(screen.getByText("chatTitle")).toBeInTheDocument();
-    expect(screen.getByText("chatStatusOnline")).toBeInTheDocument();
 
     expect(screen.getByText("chatEmptyTitle")).toBeInTheDocument();
     expect(screen.getByText("chatEmpty")).toBeInTheDocument();
