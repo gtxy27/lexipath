@@ -10,6 +10,7 @@ import {
   RouteKindSchema,
   SettingsSchema,
   SupportedLanguageSchema,
+  WebDAVConfigSchema,
   type CEFRLevel,
   type ChannelTypeId,
   type ProviderChannel,
@@ -51,6 +52,8 @@ import {
   CheckCircle2,
   ChevronRight,
   Copy,
+  Download,
+  Upload,
   Loader2,
   Plus,
   Trash2,
@@ -121,6 +124,12 @@ type FormState = {
   siteMode: SiteMode;
   excludedSites: string[];
   allowedSites: string[];
+  webdav: {
+    url: string;
+    username: string;
+    password: string;
+    path: string;
+  };
 };
 
 type FieldErrorKey =
@@ -133,7 +142,10 @@ type FieldErrorKey =
   | "optionsChannelNameRequired"
   | "optionsChannelIconUrlInvalid"
   | "optionsRouteChannelMissing"
-  | "optionsRouteChannelNotConfigured";
+  | "optionsRouteChannelNotConfigured"
+  | "optionsWebDAVUrlInvalid"
+  | "optionsWebDAVUserRequired"
+  | "optionsWebDAVPassRequired";
 
 type ChannelFieldErrors = Partial<{
   name: FieldErrorKey;
@@ -144,9 +156,16 @@ type ChannelFieldErrors = Partial<{
   iconUrl: FieldErrorKey;
 }>;
 
+type WebDAVFieldErrors = Partial<{
+  url: FieldErrorKey;
+  username: FieldErrorKey;
+  password: FieldErrorKey;
+}>;
+
 type FieldErrors = Partial<{
   channels: Record<number, ChannelFieldErrors>;
   routes: Partial<Record<BehaviorKey, FieldErrorKey>>;
+  webdav: WebDAVFieldErrors;
 }>;
 
 function t(key: string, substitutions?: string | string[]): string {
@@ -285,6 +304,12 @@ function settingsToFormState(settings: Settings): FormState {
     siteMode: settings.siteMode,
     excludedSites: settings.excludedSites,
     allowedSites: settings.allowedSites,
+    webdav: {
+      url: settings.webdav?.url ?? "",
+      username: settings.webdav?.username ?? "",
+      password: settings.webdav?.password ?? "",
+      path: settings.webdav?.path ?? "/LexiPath/backup.json",
+    },
   };
 }
 
@@ -504,6 +529,7 @@ function buildSettingsPatch(form: FormState):
   const errors: FieldErrors = {};
   const channelsErrors: Record<number, ChannelFieldErrors> = {};
   const routesErrors: Partial<Record<BehaviorKey, FieldErrorKey>> = {};
+  const webdavErrors: WebDAVFieldErrors = {};
 
   const builtChannels: ProviderChannel[] = [];
   const builtById = new Map<number, ProviderChannel>();
@@ -565,6 +591,49 @@ function buildSettingsPatch(form: FormState):
     errors.routes = routesErrors;
   }
 
+  const webdavHasAnyInput = Boolean(
+    form.webdav.url.trim() ||
+      form.webdav.username.trim() ||
+      form.webdav.password.trim(),
+  );
+
+  const builtWebdav = (() => {
+    if (!webdavHasAnyInput) return undefined;
+
+    const url = form.webdav.url.trim();
+    if (!z.string().url().safeParse(url).success) {
+      webdavErrors.url = "optionsWebDAVUrlInvalid";
+      return undefined;
+    }
+
+    if (!form.webdav.username.trim()) {
+      webdavErrors.username = "optionsWebDAVUserRequired";
+      return undefined;
+    }
+
+    if (!form.webdav.password.trim()) {
+      webdavErrors.password = "optionsWebDAVPassRequired";
+      return undefined;
+    }
+
+    const parsed = WebDAVConfigSchema.safeParse({
+      url,
+      username: form.webdav.username,
+      password: form.webdav.password,
+      path: form.webdav.path.trim() || "/LexiPath/backup.json",
+    });
+    if (!parsed.success) {
+      webdavErrors.url = "optionsWebDAVUrlInvalid";
+      return undefined;
+    }
+
+    return parsed.data;
+  })();
+
+  if (Object.keys(webdavErrors).length > 0) {
+    errors.webdav = webdavErrors;
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -593,6 +662,7 @@ function buildSettingsPatch(form: FormState):
     siteMode: form.siteMode,
     excludedSites: form.excludedSites,
     allowedSites: form.allowedSites,
+    webdav: webdavHasAnyInput ? builtWebdav : undefined,
   };
 
   const parsed = SettingsSchema.partial().strict().safeParse(patch);
@@ -695,6 +765,9 @@ export function Options(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testingChannelId, setTestingChannelId] = useState<number | null>(null);
+  const [webdavAction, setWebdavAction] = useState<"upload" | "download" | null>(
+    null,
+  );
   const [expandedChannels, setExpandedChannels] = useState<Record<number, boolean>>({});
 
   useApplyTheme(form?.theme ?? settings?.theme);
@@ -806,6 +879,162 @@ export function Options(): React.ReactElement {
     }
   }
 
+  async function ensureWebDAVPermission(url: string): Promise<boolean> {
+    try {
+      const origin = new URL(url).origin;
+      const response = await sendMessage("REQUEST_HOST_PERMISSION", { origin });
+      if (response.ok && response.value) return true;
+      toast({
+        title: t("optionsWebDAVPermissionDenied"),
+        variant: "destructive",
+      });
+      return false;
+    } catch (error) {
+      toast({
+        title: t(
+          "optionsWebDAVPermissionError",
+          error instanceof Error ? error.message : "Permission error",
+        ),
+        variant: "destructive",
+      });
+      return false;
+    }
+  }
+
+  function buildWebDAVConfig():
+    | { ok: true; value: NonNullable<Settings["webdav"]> }
+    | { ok: false } {
+    if (!form) return { ok: false };
+    const parsed = WebDAVConfigSchema.safeParse({
+      url: form.webdav.url.trim(),
+      username: form.webdav.username,
+      password: form.webdav.password,
+      path: form.webdav.path.trim() || "/LexiPath/backup.json",
+    });
+    if (!parsed.success) {
+      toast({
+        title: t("optionsWebDAVInvalidConfig"),
+        variant: "destructive",
+      });
+      return { ok: false };
+    }
+    return { ok: true, value: parsed.data };
+  }
+
+  async function handleWebDAVUpload() {
+    if (!form || webdavAction) return;
+    const configResult = buildWebDAVConfig();
+    if (!configResult.ok) return;
+
+    const hasPermission = await ensureWebDAVPermission(configResult.value.url);
+    if (!hasPermission) return;
+
+    setWebdavAction("upload");
+    try {
+      const response = await sendMessage("WEBDAV_UPLOAD", configResult.value);
+      if (response.ok) {
+        toast({ title: t("optionsWebDAVUploadSuccess") });
+      } else {
+        toast({
+          title: t("optionsWebDAVUploadError", response.error.message),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setWebdavAction(null);
+    }
+  }
+
+  async function handleWebDAVDownload() {
+    if (!form || webdavAction) return;
+    const configResult = buildWebDAVConfig();
+    if (!configResult.ok) return;
+
+    const hasPermission = await ensureWebDAVPermission(configResult.value.url);
+    if (!hasPermission) return;
+
+    setWebdavAction("download");
+    try {
+      const response = await sendMessage("WEBDAV_DOWNLOAD", configResult.value);
+      if (response.ok) {
+        toast({ title: t("optionsWebDAVDownloadSuccess") });
+        const settingsRes = await sendMessage("GET_SETTINGS", undefined);
+        if (settingsRes.ok) {
+          setSettings(settingsRes.value);
+          setForm(settingsToFormState(settingsRes.value));
+        }
+      } else {
+        toast({
+          title: t("optionsWebDAVDownloadError", response.error.message),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setWebdavAction(null);
+    }
+  }
+
+  async function handleExport() {
+    const response = await sendMessage("EXPORT_DATA", undefined);
+    if (!response.ok) {
+      toast({
+        title: t("optionsExportError", response.error.message),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(response.value, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `lexipath-backup-${new Date().toISOString().split("T")[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({
+      title: t("optionsExportSuccess"),
+    });
+  }
+
+  async function handleImport(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const raw = e.target?.result;
+        if (typeof raw !== "string") return;
+        const data = JSON.parse(raw);
+        const response = await sendMessage("IMPORT_DATA", data);
+        if (response.ok) {
+          toast({
+            title: t("optionsImportSuccess"),
+          });
+          const settingsRes = await sendMessage("GET_SETTINGS", undefined);
+          if (settingsRes.ok) {
+            setSettings(settingsRes.value);
+            setForm(settingsToFormState(settingsRes.value));
+          }
+        } else {
+          toast({
+            title: t("optionsImportError", response.error.message),
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        toast({
+          title: t("optionsImportError", err instanceof Error ? err.message : "Invalid JSON"),
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+
   async function testGoogleTranslate() {
     const response = await sendMessage("TEST_PROVIDER_CONNECTION", {
       type: "google",
@@ -879,6 +1108,7 @@ export function Options(): React.ReactElement {
               { value: "routing", label: t("optionsRoutingTitle"), icon: ChevronRight },
               { value: "language", label: t("optionsTab_language"), icon: Languages },
               { value: "sites", label: t("optionsTab_sites"), icon: AlertCircle },
+              { value: "backup", label: t("optionsTab_backup"), icon: Copy },
             ].map((tab) => (
               <TabsTrigger 
                 key={tab.value}
@@ -1428,6 +1658,122 @@ export function Options(): React.ReactElement {
                         placeholder="google.com"
                       />
                    </div>
+                </div>
+             </div>
+          </TabsContent>
+
+          <TabsContent value="backup" className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none">
+             <header className="space-y-3">
+                <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">{t("optionsBackupTitle")}</h2>
+                <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsBackupDesc")}</p>
+             </header>
+
+             <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-8 shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="space-y-4">
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsExportButton")}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionsExportDesc") || "Download all your data as a JSON file."}</p>
+                      <Button 
+                        onClick={handleExport}
+                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl h-11 shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        {t("optionsExportButton")}
+                      </Button>
+                   </div>
+
+                   <div className="space-y-4">
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsImportButton")}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionsImportDesc") || "Restore data from a previously exported JSON file. This will overwrite current settings."}</p>
+                      <div className="relative">
+                        <Input
+                          type="file"
+                          accept=".json"
+                          onChange={handleImport}
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        />
+                        <Button 
+                          className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 font-bold rounded-xl h-11 flex items-center justify-center gap-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          {t("optionsImportButton")}
+                        </Button>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="h-px bg-gray-100 dark:bg-white/5 my-8" />
+
+                <div className="space-y-6">
+                  <header className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">WebDAV {t("optionsCloudSync") || "Cloud Sync"}</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("optionsWebDAVDesc") || "Configure your WebDAV server for manual cloud backup."}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest px-2 py-0">Phase 2</Badge>
+                  </header>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUrl") || "Server URL"}</Label>
+                      <Input 
+                        placeholder="https://dav.jianguoyun.com/dav/"
+                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+                        value={form.webdav.url}
+                        onChange={e => setForm({ ...form, webdav: { ...form.webdav, url: e.target.value } })}
+                      />
+                      {errors.webdav?.url && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(errors.webdav.url)}</p>}
+                    </div>
+                    <div className="space-y-2.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPath") || "Backup Path"}</Label>
+                      <Input 
+                        placeholder="/LexiPath/backup.json"
+                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+                        value={form.webdav.path}
+                        onChange={e => setForm({ ...form, webdav: { ...form.webdav, path: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-2.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUser") || "Username"}</Label>
+                      <Input 
+                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+                        value={form.webdav.username}
+                        onChange={e => setForm({ ...form, webdav: { ...form.webdav, username: e.target.value } })}
+                      />
+                      {errors.webdav?.username && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(errors.webdav.username)}</p>}
+                    </div>
+                    <div className="space-y-2.5">
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPass") || "Password"}</Label>
+                      <Input 
+                        type="password"
+                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+                        value={form.webdav.password}
+                        onChange={e => setForm({ ...form, webdav: { ...form.webdav, password: e.target.value } })}
+                      />
+                      {errors.webdav?.password && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(errors.webdav.password)}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 h-11 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 font-bold text-xs"
+                      onClick={handleWebDAVUpload}
+                      disabled={webdavAction !== null}
+                    >
+                      {webdavAction === "upload" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                      {t("optionsWebDAVUpload") || "Upload to Cloud"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 h-11 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 font-bold text-xs"
+                      onClick={handleWebDAVDownload}
+                      disabled={webdavAction !== null}
+                    >
+                      {webdavAction === "download" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                      {t("optionsWebDAVDownload") || "Download from Cloud"}
+                    </Button>
+                  </div>
                 </div>
              </div>
           </TabsContent>

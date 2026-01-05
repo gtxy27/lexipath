@@ -64,12 +64,29 @@ function tokenizeForIndex(text: string): string[] {
     if (term.length >= 2) terms.push(term);
   }
 
-  const cjkMatches = normalized.match(/[\u4e00-\u9fff]/g) ?? [];
-  for (const ch of cjkMatches) {
-    terms.push(ch);
+  const cjkRuns = normalized.match(/[\u4e00-\u9fff]+/g) ?? [];
+  for (const run of cjkRuns) {
+    if (run.length === 1) {
+      terms.push(run);
+      continue;
+    }
+    for (const ch of run) terms.push(ch);
+    for (let i = 0; i < run.length - 1; i += 1) {
+      terms.push(run.slice(i, i + 2));
+    }
   }
 
   return Array.from(new Set(terms));
+}
+
+function messageDedupeKey(record: {
+  sessionId: string;
+  role: string;
+  timestamp: number;
+  content: string;
+}): string {
+  const content = record.content.trim().replace(/\s+/g, ' ');
+  return `${record.sessionId}\u0000${record.role}\u0000${record.timestamp}\u0000${content}`;
 }
 
 export class StorageService {
@@ -498,8 +515,11 @@ export class StorageService {
 
   async searchMessages(query: string, options: { limit?: number } = {}): Promise<ChatMessageRecordWithId[]> {
     const limit = typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 50;
-    const terms = tokenizeForIndex(query).map(normalizeTerm);
-    if (terms.length === 0) return [];
+    const allTerms = tokenizeForIndex(query).map(normalizeTerm);
+    if (allTerms.length === 0) return [];
+    const preferredTerms = allTerms.some((term) => term.length >= 2)
+      ? allTerms.filter((term) => term.length >= 2)
+      : allTerms;
 
     const db = await this.getDb();
     const tx = db.transaction(['chat_term_messages', 'chat_messages'], 'readonly');
@@ -507,9 +527,8 @@ export class StorageService {
     const termIndex = termStore.index('term');
     const messageStore = tx.objectStore('chat_messages');
 
-    const messageIdSet = new Set<number>();
-
-    for (const term of terms) {
+    const idsForTerm = async (term: string): Promise<Set<number>> => {
+      const set = new Set<number>();
       await new Promise<void>((resolve, reject) => {
         const range = IDBKeyRange.only(term);
         const request = termIndex.openCursor(range);
@@ -521,15 +540,35 @@ export class StorageService {
             return;
           }
           const value = cursor.value as TermMessageRecord;
-          if (typeof value.messageId === 'number') {
-            messageIdSet.add(value.messageId);
-          }
+          if (typeof value.messageId === 'number') set.add(value.messageId);
           cursor.continue();
         };
       });
+      return set;
+    };
+
+    const resolveCandidateIds = async (terms: string[]): Promise<Set<number>> => {
+      let candidateIds: Set<number> | null = null;
+      for (const term of terms) {
+        const termIds = await idsForTerm(term);
+        if (!candidateIds) {
+          candidateIds = termIds;
+          continue;
+        }
+        for (const id of Array.from(candidateIds)) {
+          if (!termIds.has(id)) candidateIds.delete(id);
+        }
+        if (candidateIds.size === 0) break;
+      }
+      return candidateIds ?? new Set<number>();
+    };
+
+    let candidateIds = await resolveCandidateIds(preferredTerms);
+    if (candidateIds.size === 0 && preferredTerms !== allTerms) {
+      candidateIds = await resolveCandidateIds(allTerms);
     }
 
-    const ids = Array.from(messageIdSet).sort((a, b) => b - a).slice(0, limit);
+    const ids = Array.from(candidateIds).sort((a, b) => b - a).slice(0, limit);
     const messages: ChatMessageRecordWithId[] = [];
     for (const id of ids) {
       const raw = await requestToPromise(messageStore.get(id));
@@ -582,8 +621,9 @@ export class StorageService {
     return StorageExportSchema.parse(payload);
   }
 
-  async importAll(raw: unknown): Promise<void> {
+  async importAll(raw: unknown, options: { strategy?: 'overwrite' | 'merge' } = {}): Promise<void> {
     const data = StorageExportSchema.parse(raw);
+    const strategy = options.strategy ?? 'overwrite';
 
     const db = await this.getDb();
     const tx = db.transaction(['settings', 'chat_sessions', 'chat_messages', 'familiarity'], 'readwrite');
@@ -592,26 +632,109 @@ export class StorageService {
     const messageStore = tx.objectStore('chat_messages');
     const familiarityStore = tx.objectStore('familiarity');
 
-    await requestToPromise(settingsStore.put({ key: 'settings', value: data.settings } satisfies SettingsRecord));
+    if (strategy === 'overwrite') {
+      await requestToPromise(settingsStore.put({ key: 'settings', value: data.settings } satisfies SettingsRecord));
+
+      for (const session of data.sessions) {
+        await requestToPromise(sessionStore.put(session satisfies ChatSessionStoreRecord));
+      }
+
+      for (const message of data.messages) {
+        const messageSchema = StorageExportSchema.shape.messages.element;
+        const parsed = messageSchema.parse(message);
+        await requestToPromise(messageStore.put(parsed satisfies ChatMessageStoreRecord));
+      }
+
+      for (const record of data.familiarity) {
+        const parsed = WordFamiliaritySchema.parse(record);
+        await requestToPromise(familiarityStore.put(parsed));
+      }
+
+      await transactionDone(tx);
+      this.settingsCache = data.settings;
+      await this.rebuildSearchIndex();
+      return;
+    }
+
+    // Merge strategy: keep local settings; merge sessions/messages/familiarity.
+    const existingSettings = await requestToPromise(settingsStore.get('settings'));
+    if (!existingSettings) {
+      await requestToPromise(settingsStore.put({ key: 'settings', value: data.settings } satisfies SettingsRecord));
+      this.settingsCache = data.settings;
+    }
 
     for (const session of data.sessions) {
-      await requestToPromise(sessionStore.put(session satisfies ChatSessionStoreRecord));
+      const existing = await requestToPromise(sessionStore.get(session.sessionId));
+      const existingParsed = StorageExportSchema.shape.sessions.element.safeParse(existing);
+      if (!existingParsed.success) {
+        await requestToPromise(sessionStore.put(session satisfies ChatSessionStoreRecord));
+        continue;
+      }
+
+      const merged: ChatSessionStoreRecord = {
+        sessionId: session.sessionId,
+        keyword: existingParsed.data.keyword?.trim() ? existingParsed.data.keyword : session.keyword,
+        conversationIndex: Math.max(existingParsed.data.conversationIndex, session.conversationIndex),
+        createdAt: Math.min(existingParsed.data.createdAt, session.createdAt),
+        lastAccessedAt: Math.max(existingParsed.data.lastAccessedAt, session.lastAccessedAt),
+      };
+      await requestToPromise(sessionStore.put(merged));
     }
+
+    const existingMessageKeys = new Set<string>();
+    await new Promise<void>((resolve, reject) => {
+      const request = messageStore.openCursor();
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+        const parsed = StorageExportSchema.shape.messages.element.safeParse(cursor.value);
+        if (parsed.success) {
+          existingMessageKeys.add(messageDedupeKey(parsed.data));
+        }
+        cursor.continue();
+      };
+    });
 
     for (const message of data.messages) {
       const messageSchema = StorageExportSchema.shape.messages.element;
       const parsed = messageSchema.parse(message);
-      await requestToPromise(messageStore.put(parsed satisfies ChatMessageStoreRecord));
+      const key = messageDedupeKey(parsed);
+      if (existingMessageKeys.has(key)) continue;
+      existingMessageKeys.add(key);
+
+      const record: ChatMessageStoreRecord = {
+        sessionId: parsed.sessionId,
+        role: parsed.role,
+        content: parsed.content,
+        timestamp: parsed.timestamp,
+      };
+      await requestToPromise(messageStore.add(record));
     }
 
     for (const record of data.familiarity) {
       const parsed = WordFamiliaritySchema.parse(record);
-      await requestToPromise(familiarityStore.put(parsed));
+      const existing = await requestToPromise(familiarityStore.get(parsed.word));
+      const existingParsed = WordFamiliaritySchema.safeParse(existing);
+      if (!existingParsed.success) {
+        await requestToPromise(familiarityStore.put(parsed));
+        continue;
+      }
+
+      await requestToPromise(
+        familiarityStore.put({
+          word: parsed.word,
+          familiarity: Math.max(existingParsed.data.familiarity, parsed.familiarity),
+          lastSeen: Math.max(existingParsed.data.lastSeen, parsed.lastSeen),
+          encounters: Math.max(existingParsed.data.encounters, parsed.encounters),
+        }),
+      );
     }
 
     await transactionDone(tx);
-    this.settingsCache = data.settings;
-
     await this.rebuildSearchIndex();
   }
 }

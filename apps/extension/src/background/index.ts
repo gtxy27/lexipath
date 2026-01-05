@@ -39,6 +39,7 @@ import {
   GeminiProvider,
   GoogleTranslateProvider,
   OpenAICompatibleProvider,
+  WebDAVProvider,
 } from '@lexipath/providers';
 import {
   buildExplainWordPrompt,
@@ -640,6 +641,54 @@ registry.register('GET_CHAT_MESSAGES', async (payload) => {
 registry.register('SET_SETTINGS', async (payload) => {
   await setSettings(payload);
   return null;
+});
+
+registry.register('EXPORT_DATA', async () => {
+  const storageService = getStorageService();
+  return storageService.exportAll();
+});
+
+registry.register('IMPORT_DATA', async (payload) => {
+  const storageService = getStorageService();
+  await storageService.importAll(payload);
+  return { ok: true };
+});
+
+registry.register('SEARCH_MESSAGES', async (payload) => {
+  const storageService = getStorageService();
+  const limitOption = typeof payload.limit === 'number' ? { limit: payload.limit } : {};
+  return storageService.searchMessages(payload.query, limitOption);
+});
+
+registry.register('TEST_WEBDAV_CONNECTION', async (payload) => {
+  const provider = new WebDAVProvider(payload);
+  const result = await provider.testConnection();
+  if (result.ok) return { ok: true };
+  throw new MessageError(result.error);
+});
+
+registry.register('WEBDAV_UPLOAD', async (payload) => {
+  const storageService = getStorageService();
+  const data = await storageService.exportAll();
+  const provider = new WebDAVProvider(payload);
+  const result = await provider.upload(data);
+  if (!result.ok) {
+    throw new MessageError(result.error);
+  }
+  return { ok: true };
+});
+
+registry.register('WEBDAV_DOWNLOAD', async (payload) => {
+  const provider = new WebDAVProvider(payload);
+  const result = await provider.download();
+  if (!result.ok) {
+    throw new MessageError(result.error);
+  }
+  if (result.value) {
+    const storageService = getStorageService();
+    await storageService.importAll(result.value, { strategy: 'merge' });
+  }
+  return { ok: true };
 });
 
 function normalizeOriginToHostPattern(origin: string): string {

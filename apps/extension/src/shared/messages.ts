@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { z } from 'zod';
+import { StorageExportSchema } from '@lexipath/storage';
 import {
   CEFRLevelSchema,
   ChatPayloadSchema,
@@ -18,6 +19,7 @@ import {
   SuccessResponseSchema,
   TestProviderConnectionPayloadSchema,
   TranslateKeywordsPayloadSchema,
+  WebDAVConfigSchema,
   WebEnhanceOutputSchema,
   type ErrorResponse,
   type MessageType,
@@ -67,7 +69,7 @@ const SetSettingsPayloadSchema = SettingsSchema.partial()
   .transform((partial): Partial<Settings> => {
     const cleaned: Partial<Settings> = {};
     for (const [key, value] of Object.entries(partial)) {
-      if (value !== undefined) {
+      if (value !== undefined || key === 'webdav') {
         (cleaned as Record<string, unknown>)[key] = value;
       }
     }
@@ -142,6 +144,30 @@ const messageDefinitions = {
         isAutoSend: z.boolean().optional(),
       })
       .optional(),
+    valueSchema: z.object({ ok: z.literal(true) }),
+  },
+  EXPORT_DATA: {
+    payloadSchema: z.undefined(),
+    valueSchema: StorageExportSchema,
+  },
+  IMPORT_DATA: {
+    payloadSchema: StorageExportSchema,
+    valueSchema: z.object({ ok: z.literal(true) }),
+  },
+  SEARCH_MESSAGES: {
+    payloadSchema: z.object({ query: z.string(), limit: z.number().optional() }),
+    valueSchema: z.array(z.any()), // Can be more specific: StorageExportSchema.shape.messages.element
+  },
+  TEST_WEBDAV_CONNECTION: {
+    payloadSchema: WebDAVConfigSchema,
+    valueSchema: z.object({ ok: z.literal(true) }),
+  },
+  WEBDAV_UPLOAD: {
+    payloadSchema: WebDAVConfigSchema,
+    valueSchema: z.object({ ok: z.literal(true) }),
+  },
+  WEBDAV_DOWNLOAD: {
+    payloadSchema: WebDAVConfigSchema,
     valueSchema: z.object({ ok: z.literal(true) }),
   },
 } satisfies Record<

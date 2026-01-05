@@ -11,6 +11,7 @@ export { ClaudeProvider } from './claude';
 export { GeminiProvider } from './gemini';
 export { GoogleTranslateProvider } from './google-translate';
 export { BingTranslateProvider } from './bing-translate';
+export { WebDAVProvider } from './webdav';
 export { classifyError } from './errors';
 export type { ProviderError, ProviderErrorCode } from './errors';
 

@@ -223,6 +223,34 @@
     "message": "确定要清空所有对话吗？",
     "description": "清空对话确认消息"
   },
+  "chatHistory": {
+    "message": "对话历史",
+    "description": "侧边栏对话历史标题"
+  },
+  "chatNew": {
+    "message": "新对话",
+    "description": "侧边栏新对话按钮"
+  },
+  "chatNoHistory": {
+    "message": "暂无历史",
+    "description": "侧边栏暂无历史"
+  },
+  "chatSearchPlaceholder": {
+    "message": "搜索消息...",
+    "description": "侧边栏搜索占位符"
+  },
+  "chatNoSearchResults": {
+    "message": "未找到结果",
+    "description": "侧边栏搜索无结果"
+  },
+  "user": {
+    "message": "用户",
+    "description": "用户角色标签"
+  },
+  "assistant": {
+    "message": "AI",
+    "description": "助手角色标签"
+  },
   "optionsLoadError": {
     "message": "加载设置失败：$1",
     "description": "设置页加载错误"
@@ -246,6 +274,42 @@
   "optionsTab_sites": {
     "message": "站点",
     "description": "设置页 Tab：站点"
+  },
+  "optionsTab_backup": {
+    "message": "备份",
+    "description": "设置页 Tab：备份"
+  },
+  "optionsBackupTitle": {
+    "message": "备份与恢复",
+    "description": "备份标题"
+  },
+  "optionsBackupDesc": {
+    "message": "导出您的设置、对话历史和单词熟悉度到文件，或从之前的备份中恢复。",
+    "description": "备份描述"
+  },
+  "optionsExportButton": {
+    "message": "导出数据",
+    "description": "导出按钮"
+  },
+  "optionsImportButton": {
+    "message": "导入数据",
+    "description": "导入按钮"
+  },
+  "optionsExportSuccess": {
+    "message": "数据导出成功。",
+    "description": "导出成功提示"
+  },
+  "optionsExportError": {
+    "message": "导出失败：$1",
+    "description": "导出失败提示"
+  },
+  "optionsImportSuccess": {
+    "message": "数据导入成功。",
+    "description": "导入成功提示"
+  },
+  "optionsImportError": {
+    "message": "导入失败：$1",
+    "description": "导入失败提示"
   },
   "optionsChannelsTitle": {
     "message": "模型",
@@ -438,6 +502,46 @@
   "optionsRouteChannelNotConfigured": {
     "message": "选中的模型未完成配置。",
     "description": "校验：路由 Channel 未配置"
+  },
+  "optionsWebDAVUrlInvalid": {
+    "message": "请输入有效的 WebDAV 服务器地址。",
+    "description": "校验：WebDAV 服务器地址无效"
+  },
+  "optionsWebDAVUserRequired": {
+    "message": "WebDAV 用户名为必填项。",
+    "description": "校验：WebDAV 用户名必填"
+  },
+  "optionsWebDAVPassRequired": {
+    "message": "WebDAV 密码为必填项。",
+    "description": "校验：WebDAV 密码必填"
+  },
+  "optionsWebDAVInvalidConfig": {
+    "message": "WebDAV 配置无效。",
+    "description": "WebDAV 配置无效（Toast）"
+  },
+  "optionsWebDAVPermissionDenied": {
+    "message": "已拒绝此 WebDAV 主机权限。",
+    "description": "WebDAV 主机权限被拒绝（Toast）"
+  },
+  "optionsWebDAVPermissionError": {
+    "message": "无法请求 WebDAV 主机权限：$1",
+    "description": "WebDAV 主机权限请求错误（Toast）"
+  },
+  "optionsWebDAVUploadSuccess": {
+    "message": "已上传到 WebDAV。",
+    "description": "WebDAV 上传成功（Toast）"
+  },
+  "optionsWebDAVUploadError": {
+    "message": "WebDAV 上传失败：$1",
+    "description": "WebDAV 上传失败（Toast）"
+  },
+  "optionsWebDAVDownloadSuccess": {
+    "message": "已从 WebDAV 下载。",
+    "description": "WebDAV 下载成功（Toast）"
+  },
+  "optionsWebDAVDownloadError": {
+    "message": "WebDAV 下载失败：$1",
+    "description": "WebDAV 下载失败（Toast）"
   },
   "optionsSaveButton": {
     "message": "保存",

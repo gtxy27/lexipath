@@ -223,6 +223,34 @@
     "message": "Are you sure you want to clear all messages?",
     "description": "Clear chat confirmation message"
   },
+  "chatHistory": {
+    "message": "History",
+    "description": "Sidebar chat history title"
+  },
+  "chatNew": {
+    "message": "New Chat",
+    "description": "Sidebar new chat button"
+  },
+  "chatNoHistory": {
+    "message": "No history yet",
+    "description": "Sidebar no history message"
+  },
+  "chatSearchPlaceholder": {
+    "message": "Search messages...",
+    "description": "Sidebar chat search placeholder"
+  },
+  "chatNoSearchResults": {
+    "message": "No results found",
+    "description": "Sidebar chat search no results"
+  },
+  "user": {
+    "message": "User",
+    "description": "User role label"
+  },
+  "assistant": {
+    "message": "AI",
+    "description": "Assistant role label"
+  },
   "optionsLoadError": {
     "message": "Failed to load settings: $1",
     "description": "Options page load error"
@@ -246,6 +274,42 @@
   "optionsTab_sites": {
     "message": "Sites",
     "description": "Options tab: sites"
+  },
+  "optionsTab_backup": {
+    "message": "Backup",
+    "description": "Options tab: backup"
+  },
+  "optionsBackupTitle": {
+    "message": "Backup & Restore",
+    "description": "Backup section title"
+  },
+  "optionsBackupDesc": {
+    "message": "Export your settings, chat history, and word familiarity to a file or restore from a previous backup.",
+    "description": "Backup section description"
+  },
+  "optionsExportButton": {
+    "message": "Export Data",
+    "description": "Export data button"
+  },
+  "optionsImportButton": {
+    "message": "Import Data",
+    "description": "Import data button"
+  },
+  "optionsExportSuccess": {
+    "message": "Data exported successfully.",
+    "description": "Export success message"
+  },
+  "optionsExportError": {
+    "message": "Export failed: $1",
+    "description": "Export error message"
+  },
+  "optionsImportSuccess": {
+    "message": "Data imported successfully.",
+    "description": "Import success message"
+  },
+  "optionsImportError": {
+    "message": "Import failed: $1",
+    "description": "Import error message"
   },
   "optionsChannelsTitle": {
     "message": "Models",
@@ -438,6 +502,46 @@
   "optionsRouteChannelNotConfigured": {
     "message": "Selected model is not configured.",
     "description": "Validation: route channel not configured"
+  },
+  "optionsWebDAVUrlInvalid": {
+    "message": "Please enter a valid WebDAV server URL.",
+    "description": "Validation: WebDAV server URL invalid"
+  },
+  "optionsWebDAVUserRequired": {
+    "message": "WebDAV username is required.",
+    "description": "Validation: WebDAV username required"
+  },
+  "optionsWebDAVPassRequired": {
+    "message": "WebDAV password is required.",
+    "description": "Validation: WebDAV password required"
+  },
+  "optionsWebDAVInvalidConfig": {
+    "message": "Invalid WebDAV configuration.",
+    "description": "WebDAV config invalid (toast)"
+  },
+  "optionsWebDAVPermissionDenied": {
+    "message": "Permission denied for this WebDAV host.",
+    "description": "WebDAV host permission denied (toast)"
+  },
+  "optionsWebDAVPermissionError": {
+    "message": "Could not request WebDAV host permission: $1",
+    "description": "WebDAV host permission request error (toast)"
+  },
+  "optionsWebDAVUploadSuccess": {
+    "message": "Uploaded to WebDAV.",
+    "description": "WebDAV upload success (toast)"
+  },
+  "optionsWebDAVUploadError": {
+    "message": "WebDAV upload failed: $1",
+    "description": "WebDAV upload error (toast)"
+  },
+  "optionsWebDAVDownloadSuccess": {
+    "message": "Downloaded from WebDAV.",
+    "description": "WebDAV download success (toast)"
+  },
+  "optionsWebDAVDownloadError": {
+    "message": "WebDAV download failed: $1",
+    "description": "WebDAV download error (toast)"
   },
   "optionsSaveButton": {
     "message": "Save",

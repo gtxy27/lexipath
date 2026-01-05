@@ -52,6 +52,12 @@ export const MessageTypeSchema = z.enum([
   'GET_CHAT_SESSIONS',
   'GET_CHAT_MESSAGES',
   'OPEN_SIDEBAR',
+  'EXPORT_DATA',
+  'IMPORT_DATA',
+  'SEARCH_MESSAGES',
+  'TEST_WEBDAV_CONNECTION',
+  'WEBDAV_UPLOAD',
+  'WEBDAV_DOWNLOAD',
 ]);
 export type MessageType = z.infer<typeof MessageTypeSchema>;
 
@@ -231,6 +237,14 @@ export type TestProviderConnectionPayload = z.infer<typeof TestProviderConnectio
 export const ThemeSchema = z.enum(['light', 'dark', 'system']);
 export type Theme = z.infer<typeof ThemeSchema>;
 
+export const WebDAVConfigSchema = z.object({
+  url: z.string().url(),
+  username: z.string(),
+  password: z.string(),
+  path: z.string().default('/LexiPath/backup.json'),
+});
+export type WebDAVConfig = z.infer<typeof WebDAVConfigSchema>;
+
 export const SettingsSchema = z.object({
   // Language
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
@@ -254,6 +268,9 @@ export const SettingsSchema = z.object({
   siteMode: z.enum(['all', 'whitelist']).default('all'),
   excludedSites: z.array(z.string()).default([]),
   allowedSites: z.array(z.string()).default([]),
+
+  // Backup (Cloud)
+  webdav: WebDAVConfigSchema.optional(),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 

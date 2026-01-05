@@ -8,7 +8,8 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { Send, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, MessageSquare, History, ChevronLeft } from "lucide-react";
+import { Badge } from "../components/ui/badge";
+import { Send, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, MessageSquare, History, ChevronLeft, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApplyTheme } from "../lib/theme";
@@ -41,9 +42,29 @@ export function Sidebar(): React.ReactElement {
   const [theme, setTheme] = useState<Theme | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [showSessions, setShowSessions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+      if (!searchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+  
+      const timer = setTimeout(async () => {
+        setIsSearching(true);
+        const response = await sendMessage("SEARCH_MESSAGES", { query: searchQuery });
+        if (response.ok) {
+          setSearchResults(response.value);
+        }
+        setIsSearching(false);
+      }, 300);
+  
+      return () => clearTimeout(timer);
+    }, [searchQuery]);
+  
+    const messagesEndRef = useRef<HTMLDivElement>(null);  const inputRef = useRef<HTMLInputElement>(null);
   const streamCancelRef = useRef<null | (() => void)>(null);
 
   useApplyTheme(theme);
@@ -378,43 +399,90 @@ export function Sidebar(): React.ReactElement {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="flex-1 overflow-hidden"
+              className="flex-1 overflow-hidden flex flex-col"
             >
-              <ScrollArea className="h-full px-4">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-white/5">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t("chatSearchPlaceholder") || "Search messages..."}
+                    className="pl-10 h-10 bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/5 rounded-xl text-sm"
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                  )}
+                </div>
+              </div>
+              <ScrollArea className="flex-1 px-4">
                 <div className="flex flex-col gap-2 py-4">
-                  {sessions.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                      <MessageSquare className="h-12 w-12 opacity-20 mb-4" />
-                      <p className="text-sm font-medium">{t("chatNoHistory") || "No history yet"}</p>
-                    </div>
+                  {searchQuery.trim() ? (
+                    searchResults.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                        <Search className="h-12 w-12 opacity-20 mb-4" />
+                        <p className="text-sm font-medium">{t("chatNoSearchResults") || "No results found"}</p>
+                      </div>
+                    ) : (
+                      searchResults.map((result) => (
+                        <button
+                          key={result.id}
+                          onClick={() => {
+                            void loadMessages(result.sessionId);
+                            setShowSessions(false);
+                            setSearchQuery("");
+                          }}
+                          className="flex flex-col gap-1 p-4 rounded-2xl text-left transition-all border bg-white dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-indigo-200 dark:hover:border-indigo-500/20"
+                        >
+                          <div className="flex items-center justify-between w-full mb-1">
+                            <Badge className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20 text-[10px]">
+                              {result.role === 'user' ? t('user') || 'User' : t('assistant') || 'AI'}
+                            </Badge>
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(result.timestamp).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-sm line-clamp-2 text-gray-600 dark:text-gray-300">
+                            {result.content}
+                          </p>
+                        </button>
+                      ))
+                    )
                   ) : (
-                    sessions.map((session) => (
-                      <button
-                        key={session.sessionId}
-                        onClick={() => {
-                          void loadMessages(session.sessionId);
-                          setShowSessions(false);
-                        }}
-                        className={cn(
-                          "flex flex-col gap-1 p-4 rounded-2xl text-left transition-all border",
-                          conversationId === session.sessionId
-                            ? "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20"
-                            : "bg-white dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-indigo-200 dark:hover:border-indigo-500/20"
-                        )}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-bold text-sm truncate max-w-[180px]">
-                            {session.keyword || "General Conversation"}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {new Date(session.lastAccessedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="text-[10px] uppercase tracking-widest font-black opacity-40">
-                          {session.sessionId.split('-').slice(0, 2).join('-')}
-                        </div>
-                      </button>
-                    ))
+                    sessions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                        <MessageSquare className="h-12 w-12 opacity-20 mb-4" />
+                        <p className="text-sm font-medium">{t("chatNoHistory") || "No history yet"}</p>
+                      </div>
+                    ) : (
+                      sessions.map((session) => (
+                        <button
+                          key={session.sessionId}
+                          onClick={() => {
+                            void loadMessages(session.sessionId);
+                            setShowSessions(false);
+                          }}
+                          className={cn(
+                            "flex flex-col gap-1 p-4 rounded-2xl text-left transition-all border",
+                            conversationId === session.sessionId
+                              ? "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20"
+                              : "bg-white dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-indigo-200 dark:hover:border-indigo-500/20"
+                          )}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-bold text-sm truncate max-w-[180px]">
+                              {session.keyword || "General Conversation"}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(session.lastAccessedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="text-[10px] uppercase tracking-widest font-black opacity-40">
+                            {session.sessionId.split('-').slice(0, 2).join('-')}
+                          </div>
+                        </button>
+                      ))
+                    )
                   )}
                 </div>
               </ScrollArea>
