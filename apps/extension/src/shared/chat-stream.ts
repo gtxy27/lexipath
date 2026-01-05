@@ -51,6 +51,7 @@ export function chatStream(
 
   const port = connect.call(browser.runtime, { name: CHAT_STREAM_PORT_NAME });
   let finished = false;
+  let cancelled = false;
 
   const handleMessage = (raw: unknown) => {
     if (!raw || typeof raw !== "object") return;
@@ -82,7 +83,7 @@ export function chatStream(
 
   const handleDisconnect = () => {
     // If the background disconnects unexpectedly, treat it as an error unless DONE already fired.
-    if (finished) return;
+    if (finished || cancelled) return;
     handlers.onError({ code: "DISCONNECTED", message: "Stream disconnected" });
   };
 
@@ -93,6 +94,7 @@ export function chatStream(
 
   return {
     cancel: () => {
+      cancelled = true;
       try {
         port.onMessage.removeListener(handleMessage);
         port.onDisconnect.removeListener(handleDisconnect);
