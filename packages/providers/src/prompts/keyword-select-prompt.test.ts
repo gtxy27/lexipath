@@ -15,6 +15,7 @@ describe('buildKeywordSelectPrompt', () => {
     expect(prompt).toContain('只输出一个 JSON 字符串数组');
     expect(prompt).toContain('不要输出索引/位置');
     expect(prompt).toContain('排除人名、地名');
+    expect(prompt).toContain('学习目标：优先选择对');
     expect(prompt).toContain('This is a test subtitle');
   });
 });

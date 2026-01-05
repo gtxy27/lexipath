@@ -6,14 +6,18 @@ import {
   ChannelTypeIdSchema,
   ClaudeProviderConfigSchema,
   GeminiProviderConfigSchema,
+  JLPTLevelSchema,
   ProviderConfigSchema,
   RouteKindSchema,
   SettingsSchema,
   SupportedLanguageSchema,
+  TOPIKLevelSchema,
   WebDAVConfigSchema,
+  proficiencyPreferenceToCefrLevel,
   type CEFRLevel,
   type ChannelTypeId,
   type ProviderChannel,
+  type ProficiencyPreference,
   type RouteKind,
   type Settings,
   type TestProviderConnectionPayload,
@@ -118,6 +122,7 @@ type FormState = {
   nativeLanguage: Settings["nativeLanguage"];
   targetLanguage: Settings["targetLanguage"];
   proficiencyLevel: CEFRLevel;
+  proficiencyPreference?: Settings["proficiencyPreference"];
   theme: Settings["theme"];
   enabled: boolean;
   autoEnhance: boolean;
@@ -167,6 +172,78 @@ type FieldErrors = Partial<{
   routes: Partial<Record<BehaviorKey, FieldErrorKey>>;
   webdav: WebDAVFieldErrors;
 }>;
+
+const IELTS_BANDS: readonly string[] = [
+  "3.0",
+  "3.5",
+  "4.0",
+  "4.5",
+  "5.0",
+  "5.5",
+  "6.0",
+  "6.5",
+  "7.0",
+  "7.5",
+  "8.0",
+  "8.5",
+  "9.0",
+];
+
+type ProficiencyScaleOption = "CEFR" | ProficiencyPreference["standard"];
+
+function getProficiencyScaleOptions(input: {
+  targetLanguage: Settings["targetLanguage"];
+  nativeLanguage: Settings["nativeLanguage"];
+}): Array<{ value: ProficiencyScaleOption; label: string }> {
+  const options: Array<{ value: ProficiencyScaleOption; label: string }> = [
+    { value: "CEFR", label: "CEFR" },
+  ];
+
+  if (input.targetLanguage === "en") {
+    options.push({ value: "IELTS", label: "IELTS" });
+    if (input.nativeLanguage === "zh-CN" || input.nativeLanguage === "zh-TW") {
+      options.push({ value: "CET-4", label: "CET-4" });
+      options.push({ value: "CET-6", label: "CET-6" });
+    }
+  }
+
+  if (input.targetLanguage === "ja") options.push({ value: "JLPT", label: "JLPT" });
+  if (input.targetLanguage === "ko") options.push({ value: "TOPIK", label: "TOPIK" });
+
+  return options;
+}
+
+function isScaleApplicable(options: {
+  scale: ProficiencyScaleOption;
+  targetLanguage: Settings["targetLanguage"];
+  nativeLanguage: Settings["nativeLanguage"];
+}): boolean {
+  if (options.scale === "CEFR") return true;
+  if (options.scale === "IELTS") return options.targetLanguage === "en";
+  if (options.scale === "CET-4" || options.scale === "CET-6") {
+    return (
+      options.targetLanguage === "en" &&
+      (options.nativeLanguage === "zh-CN" || options.nativeLanguage === "zh-TW")
+    );
+  }
+  if (options.scale === "JLPT") return options.targetLanguage === "ja";
+  if (options.scale === "TOPIK") return options.targetLanguage === "ko";
+  return false;
+}
+
+function defaultPreferenceForScale(scale: ProficiencyScaleOption): ProficiencyPreference | undefined {
+  if (scale === "CEFR") return undefined;
+  if (scale === "IELTS") return { standard: "IELTS", value: "6.5" };
+  if (scale === "CET-4") return { standard: "CET-4", value: "pass" };
+  if (scale === "CET-6") return { standard: "CET-6", value: "pass" };
+  if (scale === "JLPT") return { standard: "JLPT", value: "N3" };
+  if (scale === "TOPIK") return { standard: "TOPIK", value: "3" };
+  return undefined;
+}
+
+function deriveCefrFromPreference(preference: ProficiencyPreference): CEFRLevel {
+  return proficiencyPreferenceToCefrLevel(preference);
+}
 
 function t(key: string, substitutions?: string | string[]): string {
   const message = browser.i18n.getMessage(key, substitutions as any);
@@ -292,12 +369,24 @@ function settingsToFormState(settings: Settings): FormState {
       };
     });
 
+  const proficiencyPreference = (() => {
+    const pref = settings.proficiencyPreference;
+    if (!pref) return undefined;
+    const ok = isScaleApplicable({
+      scale: pref.standard,
+      targetLanguage: settings.targetLanguage,
+      nativeLanguage: settings.nativeLanguage,
+    });
+    return ok ? pref : undefined;
+  })();
+
   return {
     channels,
     behaviorRoutes: ensureBehaviorRoutesComplete(settings),
     nativeLanguage: settings.nativeLanguage,
     targetLanguage: settings.targetLanguage,
     proficiencyLevel: settings.proficiencyLevel,
+    proficiencyPreference,
     theme: settings.theme,
     enabled: settings.enabled,
     autoEnhance: settings.autoEnhance,
@@ -656,6 +745,7 @@ function buildSettingsPatch(form: FormState):
     nativeLanguage: form.nativeLanguage,
     targetLanguage: form.targetLanguage,
     proficiencyLevel: form.proficiencyLevel,
+    proficiencyPreference: form.proficiencyPreference,
     theme: form.theme,
     enabled: form.enabled,
     autoEnhance: form.autoEnhance,
@@ -1529,7 +1619,23 @@ export function Options(): React.ReactElement {
                      <div className="space-y-5">
                       <div className="space-y-2.5">
                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("nativeLanguage")}</Label>
-                         <Select value={form.nativeLanguage} onValueChange={v => setForm({...form, nativeLanguage: v as any})}>
+                         <Select
+                           value={form.nativeLanguage}
+                           onValueChange={(v) => {
+                             const nextNativeLanguage = v as Settings["nativeLanguage"];
+                             const currentScale = (form.proficiencyPreference?.standard ?? "CEFR") as ProficiencyScaleOption;
+                             const nextScaleApplicable = isScaleApplicable({
+                               scale: currentScale,
+                               targetLanguage: form.targetLanguage,
+                               nativeLanguage: nextNativeLanguage,
+                             });
+                             setForm({
+                               ...form,
+                               nativeLanguage: nextNativeLanguage,
+                               ...(nextScaleApplicable ? {} : { proficiencyPreference: undefined }),
+                             });
+                           }}
+                         >
                             <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
                                <SelectValue />
                             </SelectTrigger>
@@ -1541,7 +1647,23 @@ export function Options(): React.ReactElement {
                       
                       <div className="space-y-2.5">
                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("targetLanguage")}</Label>
-                         <Select value={form.targetLanguage} onValueChange={v => setForm({...form, targetLanguage: v as any})}>
+                         <Select
+                           value={form.targetLanguage}
+                           onValueChange={(v) => {
+                             const nextTargetLanguage = v as Settings["targetLanguage"];
+                             const currentScale = (form.proficiencyPreference?.standard ?? "CEFR") as ProficiencyScaleOption;
+                             const nextScaleApplicable = isScaleApplicable({
+                               scale: currentScale,
+                               targetLanguage: nextTargetLanguage,
+                               nativeLanguage: form.nativeLanguage,
+                             });
+                             setForm({
+                               ...form,
+                               targetLanguage: nextTargetLanguage,
+                               ...(nextScaleApplicable ? {} : { proficiencyPreference: undefined }),
+                             });
+                           }}
+                         >
                             <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
                                <SelectValue />
                             </SelectTrigger>
@@ -1556,22 +1678,154 @@ export function Options(): React.ReactElement {
                   <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("proficiencyLevel")}</h4>
                    
-                   <div className="space-y-5">
-                      <div className="space-y-2.5">
-                         <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("proficiencyLevel")}</Label>
-                         <Select value={form.proficiencyLevel} onValueChange={v => setForm({...form, proficiencyLevel: v as CEFRLevel})}>
-                            <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
-                               <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-                               {CEFRLevelSchema.options.map(level => <SelectItem key={level} value={level}>{t(`proficiency_${level}`)}</SelectItem>)}
-                            </SelectContent>
-                         </Select>
-                      </div>
-                      <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
-                          {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
-                        </p>
+                    <div className="space-y-5">
+                       <div className="space-y-2.5">
+                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsProficiencyScaleLabel")}</Label>
+                          <Select
+                            value={(form.proficiencyPreference?.standard ?? "CEFR") as ProficiencyScaleOption}
+                            onValueChange={(v) => {
+                              const nextScale = v as ProficiencyScaleOption;
+                              const nextPreference = defaultPreferenceForScale(nextScale);
+                              if (!nextPreference) {
+                                setForm({ ...form, proficiencyPreference: undefined });
+                                return;
+                              }
+                              setForm({
+                                ...form,
+                                proficiencyPreference: nextPreference,
+                                proficiencyLevel: deriveCefrFromPreference(nextPreference),
+                              });
+                            }}
+                          >
+                             <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                {getProficiencyScaleOptions({
+                                  targetLanguage: form.targetLanguage,
+                                  nativeLanguage: form.nativeLanguage,
+                                }).map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </SelectItem>
+                                ))}
+                             </SelectContent>
+                          </Select>
+                       </div>
+
+                       {form.proficiencyPreference ? (
+                         <div className="space-y-2.5">
+                           <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsProficiencyScaleValueLabel")}</Label>
+
+                           {form.proficiencyPreference.standard === "IELTS" ? (
+                             <Select
+                               value={form.proficiencyPreference.value}
+                               onValueChange={(v) => {
+                                 const next: ProficiencyPreference = { standard: "IELTS", value: v };
+                                 setForm({
+                                   ...form,
+                                   proficiencyPreference: next,
+                                   proficiencyLevel: deriveCefrFromPreference(next),
+                                 });
+                               }}
+                             >
+                               <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                 {IELTS_BANDS.map((band) => (
+                                   <SelectItem key={band} value={band}>
+                                     {band}
+                                   </SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           ) : null}
+
+                           {form.proficiencyPreference.standard === "JLPT" ? (
+                             <Select
+                               value={form.proficiencyPreference.value}
+                               onValueChange={(v) => {
+                                 const next: ProficiencyPreference = { standard: "JLPT", value: v };
+                                 setForm({
+                                   ...form,
+                                   proficiencyPreference: next,
+                                   proficiencyLevel: deriveCefrFromPreference(next),
+                                 });
+                               }}
+                             >
+                               <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                                 {JLPTLevelSchema.options.map((level) => (
+                                   <SelectItem key={level} value={level}>
+                                     {t(`proficiency_${level}`)}
+                                   </SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           ) : null}
+
+                           {form.proficiencyPreference.standard === "TOPIK" ? (
+                             <Select
+                               value={form.proficiencyPreference.value}
+                               onValueChange={(v) => {
+                                 const next: ProficiencyPreference = { standard: "TOPIK", value: v };
+                                 setForm({
+                                   ...form,
+                                   proficiencyPreference: next,
+                                   proficiencyLevel: deriveCefrFromPreference(next),
+                                 });
+                               }}
+                             >
+                               <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                                 {TOPIKLevelSchema.options.map((level) => (
+                                   <SelectItem key={level} value={String(level)}>
+                                     {t(`proficiency_TOPIK${level}`)}
+                                   </SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           ) : null}
+
+                           {form.proficiencyPreference.standard === "CET-4" || form.proficiencyPreference.standard === "CET-6" ? (
+                             <Select value="pass" onValueChange={() => {}}>
+                               <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                                 <SelectItem value="pass">{t("optionsProficiencyValuePass")}</SelectItem>
+                               </SelectContent>
+                             </Select>
+                           ) : null}
+
+                           <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
+                             <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                               {t("optionsProficiencyDerivedCefr", [form.proficiencyLevel])}
+                             </p>
+                           </div>
+                         </div>
+                       ) : (
+                         <div className="space-y-2.5">
+                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("proficiencyLevel")}</Label>
+                          <Select value={form.proficiencyLevel} onValueChange={v => setForm({...form, proficiencyLevel: v as CEFRLevel})}>
+                             <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                                {CEFRLevelSchema.options.map(level => <SelectItem key={level} value={level}>{t(`proficiency_${level}`)}</SelectItem>)}
+                             </SelectContent>
+                          </Select>
+                         </div>
+                       )}
+                       <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
+                         <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
+                           {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
+                         </p>
                       </div>
                      </div>
                   </div>

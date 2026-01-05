@@ -1,18 +1,37 @@
-import type { CEFRLevel, SupportedLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage } from '@lexipath/core';
+import { buildCefrOutputGuidance } from './cefr-guidance';
+import { buildProficiencyReferenceLine } from './proficiency-reference';
 
 export interface SubtitleAdaptPromptOptions {
   subtitle: string;
   sourceLang: SupportedLanguage;
   targetLang: SupportedLanguage;
   difficultyLevel: CEFRLevel;
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 export function buildSubtitleAdaptPrompt(options: SubtitleAdaptPromptOptions): string {
   const subtitle = options.subtitle.trim();
   const sourceName = getLanguageName(options.sourceLang);
   const targetName = getLanguageName(options.targetLang);
+  const cefrGuidance = buildCefrOutputGuidance({
+    sourceLang: options.sourceLang,
+    targetLang: options.targetLang,
+    level: options.difficultyLevel,
+  });
+  const referenceLine = buildProficiencyReferenceLine({
+    sourceLang: options.sourceLang,
+    targetLang: 'zh-CN',
+    userLevel: options.difficultyLevel,
+    ...(options.proficiencyPreference
+      ? { proficiencyPreference: options.proficiencyPreference }
+      : {}),
+  });
+  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
 
   return `你是字幕学习翻译助手，服务于语言学习者。请将下面的 ${sourceName} 字幕翻译为 ${targetName}，并将 ${targetName} 的难度调整到 CEFR ${options.difficultyLevel} 水平，同时保持口语自然、适合字幕显示。
+
+${referenceSection}${cefrGuidance}
 
 规则：
 1. 保持核心含义不变
@@ -43,4 +62,3 @@ function getLanguageName(lang: SupportedLanguage): string {
   };
   return names[lang] || lang;
 }
-

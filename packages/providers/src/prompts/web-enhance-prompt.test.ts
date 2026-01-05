@@ -26,6 +26,7 @@ describe('buildWebEnhancePrompt', () => {
     expect(prompt).toContain('This is a test sentence');
     expect(prompt).toContain('"content_result"');
     expect(prompt).toContain('"convert_word"');
+    expect(prompt).toContain('输出约束');
   });
 
   it('should build prompt with difficulty range', () => {

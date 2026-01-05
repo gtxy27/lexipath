@@ -735,6 +735,22 @@
     "message": "调整此项会影响高亮单词的范围；等级越高，高亮越少、词更难。",
     "description": "熟练度提示"
   },
+  "optionsProficiencyScaleLabel": {
+    "message": "水平标准",
+    "description": "水平标准选择（CEFR/IELTS/JLPT 等）"
+  },
+  "optionsProficiencyScaleValueLabel": {
+    "message": "标准值",
+    "description": "水平标准值（如 IELTS 6.5）"
+  },
+  "optionsProficiencyValuePass": {
+    "message": "通过",
+    "description": "水平标准值：通过"
+  },
+  "optionsProficiencyDerivedCefr": {
+    "message": "已自动换算为 CEFR：$1",
+    "description": "显示换算后的 CEFR（$1: A1-C2）"
+  },
   "languageNative_zh_CN": {
     "message": "中文（简体）",
     "description": "母语 zh-CN 选项"

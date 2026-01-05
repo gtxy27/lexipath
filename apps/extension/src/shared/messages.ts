@@ -69,7 +69,7 @@ const SetSettingsPayloadSchema = SettingsSchema.partial()
   .transform((partial): Partial<Settings> => {
     const cleaned: Partial<Settings> = {};
     for (const [key, value] of Object.entries(partial)) {
-      if (value !== undefined || key === 'webdav') {
+      if (value !== undefined || key === 'webdav' || key === 'proficiencyPreference') {
         (cleaned as Record<string, unknown>)[key] = value;
       }
     }

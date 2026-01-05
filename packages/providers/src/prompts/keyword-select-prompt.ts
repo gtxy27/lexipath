@@ -1,4 +1,5 @@
-import type { CEFRLevel, NativeLanguage, SupportedLanguage } from '@lexipath/core';
+import type { CEFRLevel, NativeLanguage, ProficiencyPreference, SupportedLanguage } from '@lexipath/core';
+import { buildProficiencyReferenceLine } from './proficiency-reference';
 
 export interface KeywordSelectPromptOptions {
   text: string;
@@ -6,11 +7,22 @@ export interface KeywordSelectPromptOptions {
   targetLang: NativeLanguage;
   userLevel: CEFRLevel;
   scene?: 'subtitle' | 'web';
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 export function buildKeywordSelectPrompt(options: KeywordSelectPromptOptions): string {
   const scene = options.scene ?? 'subtitle';
   const text = options.text.trim();
+  const referenceLine = buildProficiencyReferenceLine({
+    sourceLang: options.sourceLang,
+    targetLang: options.targetLang,
+    userLevel: options.userLevel,
+    ...(options.proficiencyPreference
+      ? { proficiencyPreference: options.proficiencyPreference }
+      : {}),
+  });
+  const referenceSection = referenceLine ? `\n- ${referenceLine}` : '';
+  const levelHint = `学习目标：优先选择对 ${options.userLevel} 有提升价值的词/短语（接近或略高于该水平），不要挑太基础的词。`;
 
   return `你是 LexiPath，一个语言学习助手。
 
@@ -19,7 +31,8 @@ export function buildKeywordSelectPrompt(options: KeywordSelectPromptOptions): s
 学习者信息：
 - 母语：${options.targetLang}
 - 目标语言：${options.sourceLang}
-- 水平：${options.userLevel}
+- 水平：${options.userLevel}${referenceSection}
+${levelHint}
 
 规则（非常重要）：
 - 只输出一个 JSON 字符串数组（string array）。不要输出 Markdown、不要代码块、不要任何额外文字。

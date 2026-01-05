@@ -26,6 +26,7 @@ describe('buildExplainWordPrompt', () => {
     expect(prompt).toContain('"difficulty"');
     expect(prompt).toContain('"definition"');
     expect(prompt).toContain('"example"');
+    expect(prompt).toContain('输出约束');
     expect(prompt).not.toContain('出现语境');
   });
 

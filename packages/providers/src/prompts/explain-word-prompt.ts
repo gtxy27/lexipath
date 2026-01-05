@@ -1,4 +1,6 @@
-import type { CEFRLevel, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { buildCefrOutputGuidance } from './cefr-guidance';
 
 export interface ExplainWordPromptOptions {
   word: string;
@@ -6,6 +8,7 @@ export interface ExplainWordPromptOptions {
   sourceLang: SupportedLanguage;
   targetLang: NativeLanguage;
   userLevel: CEFRLevel;
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 /**
@@ -36,10 +39,26 @@ export function buildExplainWordPrompt(options: ExplainWordPromptOptions): strin
     : '';
 
   const phoneticInstruction = getPhoneticInstruction(sourceLang, targetLang);
+  const referenceLine = buildProficiencyReferenceLine({
+    sourceLang,
+    targetLang,
+    userLevel,
+    ...(options.proficiencyPreference
+      ? { proficiencyPreference: options.proficiencyPreference }
+      : {}),
+  });
+  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
+  const cefrGuidance = buildCefrOutputGuidance({
+    sourceLang,
+    targetLang,
+    level: userLevel,
+  });
 
-  return `你是词汇学习助手。请为一个 ${userLevel} 水平的语言学习者解释下面这个 ${sourceLanguageName} 的单词/短语。
+  return `你是词汇学习助手。请为一个 ${userLevel} 水平的语言学习者解释下面这个 ${sourceLanguageName} 的单词/短语。${referenceSection}
 
 单词/短语："${word}"${contextSection}
+
+${cefrGuidance}
 
 请输出一个 JSON 对象，包含字段：
 1. translation：翻译成 ${targetLanguageName}

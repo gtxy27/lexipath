@@ -366,6 +366,7 @@ async function getKeywordsForText(options: {
       targetLang,
       userLevel,
       scene,
+      proficiencyPreference: settings.proficiencyPreference ?? null,
     },
   });
 
@@ -374,13 +375,16 @@ async function getKeywordsForText(options: {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        const prompt = buildKeywordSelectPrompt({
-          text,
-          sourceLang: sourceLang ?? settings.targetLanguage,
-          targetLang: targetLang ?? settings.nativeLanguage,
-          userLevel,
-          scene,
-        });
+         const prompt = buildKeywordSelectPrompt({
+           text,
+           sourceLang: sourceLang ?? settings.targetLanguage,
+           targetLang: targetLang ?? settings.nativeLanguage,
+           userLevel,
+           scene,
+           ...(settings.proficiencyPreference
+             ? { proficiencyPreference: settings.proficiencyPreference }
+             : {}),
+         });
 
         const limit = getChannelConcurrencyLimit(channel, route.kind);
         const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
@@ -944,6 +948,9 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           sourceLang,
           difficultyLevel,
           targetLang: settings.targetLanguage,
+          ...(settings.proficiencyPreference
+            ? { proficiencyPreference: settings.proficiencyPreference }
+            : {}),
         });
 
         const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute!.kind);
@@ -996,6 +1003,7 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     sourceLang,
     targetLang,
     userLevel,
+    proficiencyPreference: settings.proficiencyPreference ?? null,
     context: context ?? '',
   });
 
@@ -1063,6 +1071,9 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
         sourceLang,
         targetLang,
         userLevel,
+        ...(settings.proficiencyPreference
+          ? { proficiencyPreference: settings.proficiencyPreference }
+          : {}),
       });
 
       const limit = getChannelConcurrencyLimit(dictionaryChannel, dictionaryRoute.kind);

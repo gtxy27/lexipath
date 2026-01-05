@@ -1,4 +1,6 @@
-import type { CEFRLevel, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import { buildProficiencyRangeReferenceLine } from './proficiency-reference';
+import { buildCefrOutputGuidance } from './cefr-guidance';
 
 export interface WebEnhancePromptOptions {
   content: string;
@@ -7,6 +9,7 @@ export interface WebEnhancePromptOptions {
   difficultyMin: CEFRLevel;
   difficultyMax: CEFRLevel;
   maxWords?: number;
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 /**
@@ -35,8 +38,24 @@ export function buildWebEnhancePrompt(options: WebEnhancePromptOptions): string 
 
   const sourceLanguageName = getLanguageName(sourceLang);
   const targetLanguageName = getLanguageName(targetLang);
+  const referenceLine = buildProficiencyRangeReferenceLine({
+    sourceLang,
+    targetLang,
+    difficultyMin,
+    difficultyMax,
+    ...(options.proficiencyPreference
+      ? { proficiencyPreference: options.proficiencyPreference }
+      : {}),
+  });
+  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
+  const cefrGuidance = buildCefrOutputGuidance({
+    sourceLang,
+    targetLang,
+    level: difficultyMax,
+  });
 
-  return `你是词汇学习助手。请分析下面这段 ${sourceLanguageName} 文本，为语言学习者挑选最多 ${maxWords} 个值得学习的词汇并翻译。
+  return `你是词汇学习助手。请分析下面这段 ${sourceLanguageName} 文本，为语言学习者挑选最多 ${maxWords} 个值得学习的词汇并翻译。${referenceSection}
+${cefrGuidance}
 
 规则：
 1. 只选择 CEFR 难度范围在 ${difficultyLabel} 内的词汇

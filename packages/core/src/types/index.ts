@@ -30,6 +30,18 @@ export type JLPTLevel = z.infer<typeof JLPTLevelSchema>;
 export const TOPIKLevelSchema = z.enum(['1', '2', '3', '4', '5', '6']);
 export type TOPIKLevel = z.infer<typeof TOPIKLevelSchema>;
 
+// User-facing proficiency standards (optional UI preference)
+export const ProficiencyStandardSchema = z.enum(['IELTS', 'CET-4', 'CET-6', 'JLPT', 'TOPIK']);
+export type ProficiencyStandard = z.infer<typeof ProficiencyStandardSchema>;
+
+export const ProficiencyPreferenceSchema = z
+  .object({
+    standard: ProficiencyStandardSchema,
+    value: z.string().min(1),
+  })
+  .strict();
+export type ProficiencyPreference = z.infer<typeof ProficiencyPreferenceSchema>;
+
 // Internal unified proficiency score (1-10)
 export const ProficiencyScoreSchema = z.number().min(1).max(10);
 export type ProficiencyScore = z.infer<typeof ProficiencyScoreSchema>;
@@ -250,6 +262,8 @@ export const SettingsSchema = z.object({
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
   targetLanguage: SupportedLanguageSchema.default('en'),
   proficiencyLevel: CEFRLevelSchema.default('B1'),
+  // Optional (for UI/prompt display): store the user's preferred exam scale (CEFR remains the internal value).
+  proficiencyPreference: ProficiencyPreferenceSchema.optional(),
 
   // Appearance
   theme: ThemeSchema.default('system'),

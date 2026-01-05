@@ -1,4 +1,6 @@
-import type { CEFRLevel, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { buildCefrOutputGuidance } from './cefr-guidance';
 
 export interface SubtitleEnhancePromptOptions {
   subtitle: string;
@@ -6,6 +8,7 @@ export interface SubtitleEnhancePromptOptions {
   targetLang: NativeLanguage;
   difficultyLevel: CEFRLevel;
   mode: 'single' | 'bilingual';
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 /**
@@ -31,9 +34,24 @@ export function buildSubtitleEnhancePrompt(options: SubtitleEnhancePromptOptions
 
   const sourceLanguageName = getLanguageName(sourceLang);
   const targetLanguageName = getLanguageName(targetLang);
+  const referenceLine = buildProficiencyReferenceLine({
+    sourceLang,
+    targetLang,
+    userLevel: difficultyLevel,
+    ...(options.proficiencyPreference
+      ? { proficiencyPreference: options.proficiencyPreference }
+      : {}),
+  });
+  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
+  const cefrGuidance = buildCefrOutputGuidance({
+    sourceLang,
+    targetLang,
+    level: difficultyLevel,
+  });
 
   if (mode === 'single') {
-    return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平，同时保持口语自然、适合字幕显示。
+    return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平，同时保持口语自然、适合字幕显示。${referenceSection}
+${cefrGuidance}
 
 规则：
 1. 词汇与语法难度适配 ${difficultyLevel}
@@ -54,7 +72,8 @@ ${subtitle}
 }`;
   }
 
-  return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕处理为双语展示。
+  return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕处理为双语展示。${referenceSection}
+${cefrGuidance}
 
 规则：
 1. line1_final：将 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平

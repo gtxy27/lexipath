@@ -14,6 +14,6 @@ describe('buildSubtitleAdaptPrompt', () => {
     expect(prompt).toContain('英语');
     expect(prompt).toContain('B1');
     expect(prompt).toContain('你好');
+    expect(prompt).toContain('输出约束');
   });
 });
-

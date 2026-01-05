@@ -735,6 +735,22 @@
     "message": "Changing this affects which words are highlighted. Higher levels highlight fewer, more advanced words.",
     "description": "Proficiency level hint"
   },
+  "optionsProficiencyScaleLabel": {
+    "message": "Proficiency Scale",
+    "description": "Proficiency scale selector label (CEFR/IELTS/JLPT/etc)"
+  },
+  "optionsProficiencyScaleValueLabel": {
+    "message": "Scale Value",
+    "description": "Proficiency scale value label (e.g. IELTS 6.5)"
+  },
+  "optionsProficiencyValuePass": {
+    "message": "Pass",
+    "description": "Proficiency scale value: pass"
+  },
+  "optionsProficiencyDerivedCefr": {
+    "message": "Derived CEFR: $1",
+    "description": "Show derived CEFR level ($1: A1-C2)"
+  },
   "languageNative_zh_CN": {
     "message": "Chinese (Simplified)",
     "description": "Native language zh-CN option"

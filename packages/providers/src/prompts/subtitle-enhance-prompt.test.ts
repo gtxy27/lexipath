@@ -23,6 +23,7 @@ describe('buildSubtitleEnhancePrompt', () => {
     expect(prompt).toContain('"line1_final"');
     expect(prompt).not.toContain('"line2_final"');
     expect(prompt).toContain('只返回增强后的 英语 字幕内容');
+    expect(prompt).toContain('输出约束');
   });
 
   it('should build prompt for bilingual mode', () => {
