@@ -512,7 +512,7 @@ export class SubtitleOverlay {
     chatButton.addEventListener('click', (e) => {
       e.stopPropagation();
       const prompt = `Please explain the usage of the word "${data.word}" in this context${data.example ? `: "${data.example}"` : ''}.`;
-      sendMessage('OPEN_SIDEBAR', { initialMessage: prompt, isAutoSend: true });
+      sendMessage('OPEN_SIDEBAR', { initialMessage: prompt, keyword: data.word, isAutoSend: true });
       this.hideWordCard();
     });
     footer.appendChild(chatButton);

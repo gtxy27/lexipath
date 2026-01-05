@@ -141,6 +141,7 @@ const messageDefinitions = {
     payloadSchema: z
       .object({
         initialMessage: z.string().optional(),
+        keyword: z.string().optional(),
         isAutoSend: z.boolean().optional(),
       })
       .optional(),

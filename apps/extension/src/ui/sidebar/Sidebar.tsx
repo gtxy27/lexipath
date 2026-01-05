@@ -3,6 +3,7 @@ import browser from "webextension-polyfill";
 import type { ChatResponse, Theme } from "@lexipath/core";
 import { sendMessage } from "../../shared/messages";
 import { chatStream } from "../../shared/chat-stream";
+import { makeKeywordSessionId, normalizeChatKeyword } from "../../shared/chat-session-id";
 import { MessageContent } from "./MessageContent";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -138,12 +139,20 @@ export function Sidebar(): React.ReactElement {
   }, []);
 
   const sendChatText = useCallback(
-    async (text: string, existingConvId?: string) => {
+    async (
+      text: string,
+      options?: { conversationId?: string; allowWhileLoading?: boolean }
+    ) => {
       const message = text.trim();
-      if (!message || isLoading) return;
+      if (!message) return;
 
-      const targetConvId = existingConvId || conversationId;
+      const allowWhileLoading = options?.allowWhileLoading ?? false;
+      if (isLoading && !allowWhileLoading) return;
 
+      const targetConvId = options?.conversationId || conversationId;
+
+      // Detach the previous UI stream (if any). The background should keep running
+      // and persist the final result to storage.
       streamCancelRef.current?.();
       setError(null);
       setIsLoading(true);
@@ -253,7 +262,35 @@ export function Sidebar(): React.ReactElement {
         if (Date.now() - pending.timestamp < 10000) {
           void browser.storage.local.remove("lexipath_sidebar_pending_message");
           if (pending.isAutoSend) {
-            void sendChatText(pending.text);
+            const keywordRaw = typeof pending.keyword === "string" ? pending.keyword : "";
+            const keyword = keywordRaw.trim();
+
+            if (keyword) {
+              void (async () => {
+                // Immediate UI switch: stop streaming in the UI, but let the background
+                // continue and persist the final assistant message to storage.
+                streamCancelRef.current?.();
+                setError(null);
+                setIsLoading(false);
+                setMessages([]);
+                setShowSessions(false);
+
+                const normalizedKeyword = normalizeChatKeyword(keyword);
+                const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
+                const sessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
+                const sessionId =
+                  sessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
+
+                setConversationId(sessionId);
+                if (sessions.length > 0) {
+                  await loadMessages(sessionId);
+                }
+
+                await sendChatText(pending.text, { conversationId: sessionId, allowWhileLoading: true });
+              })();
+            } else {
+              void sendChatText(pending.text, { allowWhileLoading: true });
+            }
           } else {
             setInputValue(pending.text);
           }
@@ -263,7 +300,7 @@ export function Sidebar(): React.ReactElement {
 
     browser.storage.onChanged.addListener(handleStorageChange);
     return () => browser.storage.onChanged.removeListener(handleStorageChange);
-  }, [sendChatText]);
+  }, [loadMessages, sendChatText]);
 
   useEffect(() => {
     async function checkPendingMessage() {
@@ -274,14 +311,39 @@ export function Sidebar(): React.ReactElement {
         await browser.storage.local.remove("lexipath_sidebar_pending_message");
         
         if (pending.isAutoSend) {
-          await sendChatText(pending.text);
+          const keywordRaw = typeof pending.keyword === "string" ? pending.keyword : "";
+          const keyword = keywordRaw.trim();
+
+          if (keyword) {
+            // Same behavior as the storage change listener.
+            streamCancelRef.current?.();
+            setError(null);
+            setIsLoading(false);
+            setMessages([]);
+            setShowSessions(false);
+
+            const normalizedKeyword = normalizeChatKeyword(keyword);
+            const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
+            const sessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
+            const sessionId =
+              sessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
+
+            setConversationId(sessionId);
+            if (sessions.length > 0) {
+              await loadMessages(sessionId);
+            }
+
+            await sendChatText(pending.text, { conversationId: sessionId, allowWhileLoading: true });
+          } else {
+            await sendChatText(pending.text, { allowWhileLoading: true });
+          }
         } else {
           setInputValue(pending.text);
         }
       }
     }
     checkPendingMessage();
-  }, [sendChatText]);
+  }, [loadMessages, sendChatText]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -24,10 +24,12 @@ import {
   Zap,
   Moon,
   Sun,
+  Monitor,
 } from "lucide-react";
 
-function t(key: string): string {
-  return browser.i18n.getMessage(key) || key;
+function t(key: string, substitutions?: string | string[]): string {
+  const message = browser.i18n.getMessage(key, substitutions as any);
+  return message || key;
 }
 
 export function Popup(): React.ReactElement {
@@ -64,10 +66,9 @@ export function Popup(): React.ReactElement {
 
   async function toggleTheme() {
     if (!settings) return;
-    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
     const currentTheme = settings.theme ?? "system";
-    const isDark = currentTheme === "dark" || (currentTheme === "system" && prefersDark);
-    const nextTheme = isDark ? "light" : "dark";
+    const nextTheme =
+      currentTheme === "system" ? "light" : currentTheme === "light" ? "dark" : "system";
 
     const response = await sendMessage("SET_SETTINGS", { theme: nextTheme });
     if (response.ok) {
@@ -101,6 +102,13 @@ export function Popup(): React.ReactElement {
   const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
   const currentTheme = settings?.theme ?? "system";
   const isDark = currentTheme === "dark" || (currentTheme === "system" && prefersDark);
+  const themeLabel =
+    currentTheme === "system"
+      ? t("themeSystem")
+      : currentTheme === "dark"
+        ? t("themeDark")
+        : t("themeLight");
+  const themeButtonLabel = t("toggleTheme", themeLabel);
 
   return (
     <motion.div
@@ -145,10 +153,16 @@ export function Popup(): React.ReactElement {
                   variant="ghost"
                   className="h-10 w-10 rounded-xl bg-white/60 dark:bg-white/[0.03] hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200"
                   onClick={toggleTheme}
-                  aria-label={t("toggleTheme")}
-                  title={t("toggleTheme")}
+                  aria-label={themeButtonLabel}
+                  title={themeButtonLabel}
                 >
-                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {currentTheme === "system" ? (
+                    <Monitor className="h-4 w-4" />
+                  ) : currentTheme === "dark" ? (
+                    <Moon className="h-4 w-4" />
+                  ) : (
+                    <Sun className="h-4 w-4" />
+                  )}
                 </Button>
                 <Switch
                   checked={isEnabled}

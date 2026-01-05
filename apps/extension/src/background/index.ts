@@ -60,6 +60,7 @@ import { MessageError, createMessageHandlerRegistry } from '../shared/messages';
 import { recordLookup } from '../shared/familiarity';
 import { getSettings, setSettings } from '../shared/storage';
 import { getStorageService } from '../shared/storage-service';
+import { parseKeywordSessionId } from '../shared/chat-session-id';
 import {
   createExpiringLruCache,
   getOrRunCachedTask,
@@ -1536,6 +1537,7 @@ async function runChatStream(
   }
 
   const sessionId = payload.conversationId ?? generateSessionId();
+  const parsedSessionId = parseKeywordSessionId(sessionId);
   const storageService = getStorageService();
   const now = Date.now();
 
@@ -1543,8 +1545,8 @@ async function runChatStream(
   if (!existing) {
     await storageService.upsertSession({
       sessionId,
-      keyword: '',
-      conversationIndex: 0,
+      keyword: parsedSessionId?.keyword ?? '',
+      conversationIndex: parsedSessionId?.conversationIndex ?? 0,
       createdAt: now,
       lastAccessedAt: now,
     });
@@ -1649,11 +1651,6 @@ browser.runtime.onConnect.addListener((port) => {
   if (port.name !== 'LEXIPATH_CHAT_STREAM') return;
 
   let started = false;
-  const controller = new AbortController();
-
-  port.onDisconnect.addListener(() => {
-    controller.abort();
-  });
 
   port.onMessage.addListener((message) => {
     if (started) return;
@@ -1673,7 +1670,6 @@ browser.runtime.onConnect.addListener((port) => {
         const result = await runChatStream(
           { message: startMessage, ...(startConversationId ? { conversationId: startConversationId } : {}) },
           {
-            signal: controller.signal,
             onDelta: (delta) => {
               reply += delta;
               try {
@@ -1729,6 +1725,7 @@ registry.register('OPEN_SIDEBAR', async (payload, sender) => {
     await browser.storage.local.set({ 
       lexipath_sidebar_pending_message: {
         text: payload.initialMessage,
+        keyword: typeof payload.keyword === 'string' ? payload.keyword : undefined,
         timestamp: Date.now(),
         isAutoSend: payload.isAutoSend ?? false
       } 
