@@ -140,8 +140,20 @@
     "description": "Open settings link"
   },
   "toggleTheme": {
-    "message": "Toggle theme",
-    "description": "Toggle light/dark theme"
+    "message": "Theme: $1",
+    "description": "Theme button label ($1: System/Light/Dark)"
+  },
+  "themeSystem": {
+    "message": "System",
+    "description": "Theme: system"
+  },
+  "themeLight": {
+    "message": "Light",
+    "description": "Theme: light"
+  },
+  "themeDark": {
+    "message": "Dark",
+    "description": "Theme: dark"
   },
   "popupStatusLabel": {
     "message": "Mode",
@@ -291,9 +303,21 @@
     "message": "Export Data",
     "description": "Export data button"
   },
+  "optionsExportDesc": {
+    "message": "Download all your data as a JSON file.",
+    "description": "Export data description"
+  },
   "optionsImportButton": {
     "message": "Import Data",
     "description": "Import data button"
+  },
+  "optionsImportDesc": {
+    "message": "Restore data from a previously exported JSON file. This will overwrite current settings.",
+    "description": "Import data description"
+  },
+  "optionsImportInvalidJson": {
+    "message": "Invalid JSON.",
+    "description": "Import JSON parse error"
   },
   "optionsExportSuccess": {
     "message": "Data exported successfully.",
@@ -310,6 +334,42 @@
   "optionsImportError": {
     "message": "Import failed: $1",
     "description": "Import error message"
+  },
+  "optionsWebDAVCloudSyncTitle": {
+    "message": "WebDAV Cloud Sync",
+    "description": "WebDAV cloud sync section title"
+  },
+  "optionsWebDAVDesc": {
+    "message": "Configure your WebDAV server for manual cloud backup.",
+    "description": "WebDAV section description"
+  },
+  "optionsWebDAVUrl": {
+    "message": "Server URL",
+    "description": "WebDAV server URL label"
+  },
+  "optionsWebDAVPath": {
+    "message": "Backup Path",
+    "description": "WebDAV backup path label"
+  },
+  "optionsWebDAVUser": {
+    "message": "Username",
+    "description": "WebDAV username label"
+  },
+  "optionsWebDAVPass": {
+    "message": "Password",
+    "description": "WebDAV password label"
+  },
+  "optionsWebDAVUpload": {
+    "message": "Upload to Cloud",
+    "description": "WebDAV upload button"
+  },
+  "optionsWebDAVDownload": {
+    "message": "Download from Cloud",
+    "description": "WebDAV download button"
+  },
+  "optionsPhase2Badge": {
+    "message": "Phase 2",
+    "description": "Phase badge in UI"
   },
   "optionsChannelsTitle": {
     "message": "Models",

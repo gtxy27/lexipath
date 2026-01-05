@@ -140,8 +140,20 @@
     "description": "打开设置链接"
   },
   "toggleTheme": {
-    "message": "切换主题",
-    "description": "切换浅色/深色主题"
+    "message": "主题：$1",
+    "description": "主题按钮文案（$1: 系统/浅色/深色）"
+  },
+  "themeSystem": {
+    "message": "跟随系统",
+    "description": "主题：系统"
+  },
+  "themeLight": {
+    "message": "浅色",
+    "description": "主题：浅色"
+  },
+  "themeDark": {
+    "message": "深色",
+    "description": "主题：深色"
   },
   "popupStatusLabel": {
     "message": "模式",
@@ -291,9 +303,21 @@
     "message": "导出数据",
     "description": "导出按钮"
   },
+  "optionsExportDesc": {
+    "message": "将所有数据下载为 JSON 文件。",
+    "description": "导出描述"
+  },
   "optionsImportButton": {
     "message": "导入数据",
     "description": "导入按钮"
+  },
+  "optionsImportDesc": {
+    "message": "从之前导出的 JSON 文件恢复数据。这将覆盖当前设置。",
+    "description": "导入描述"
+  },
+  "optionsImportInvalidJson": {
+    "message": "JSON 格式无效。",
+    "description": "导入 JSON 解析错误"
   },
   "optionsExportSuccess": {
     "message": "数据导出成功。",
@@ -310,6 +334,42 @@
   "optionsImportError": {
     "message": "导入失败：$1",
     "description": "导入失败提示"
+  },
+  "optionsWebDAVCloudSyncTitle": {
+    "message": "WebDAV 云同步",
+    "description": "WebDAV 云同步标题"
+  },
+  "optionsWebDAVDesc": {
+    "message": "配置 WebDAV 服务器用于手动云备份。",
+    "description": "WebDAV 描述"
+  },
+  "optionsWebDAVUrl": {
+    "message": "服务器地址",
+    "description": "WebDAV 地址标签"
+  },
+  "optionsWebDAVPath": {
+    "message": "备份路径",
+    "description": "WebDAV 备份路径标签"
+  },
+  "optionsWebDAVUser": {
+    "message": "用户名",
+    "description": "WebDAV 用户名标签"
+  },
+  "optionsWebDAVPass": {
+    "message": "密码",
+    "description": "WebDAV 密码标签"
+  },
+  "optionsWebDAVUpload": {
+    "message": "上传到云端",
+    "description": "WebDAV 上传按钮"
+  },
+  "optionsWebDAVDownload": {
+    "message": "从云端下载",
+    "description": "WebDAV 下载按钮"
+  },
+  "optionsPhase2Badge": {
+    "message": "阶段 2",
+    "description": "阶段徽标"
   },
   "optionsChannelsTitle": {
     "message": "模型",

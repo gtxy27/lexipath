@@ -1026,7 +1026,10 @@ export function Options(): React.ReactElement {
         }
       } catch (err) {
         toast({
-          title: t("optionsImportError", err instanceof Error ? err.message : "Invalid JSON"),
+          title: t(
+            "optionsImportError",
+            err instanceof Error ? err.message : t("optionsImportInvalidJson")
+          ),
           variant: "destructive",
         });
       }
@@ -1670,25 +1673,25 @@ export function Options(): React.ReactElement {
 
              <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-8 shadow-sm">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   <div className="space-y-4">
-                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsExportButton")}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionsExportDesc") || "Download all your data as a JSON file."}</p>
-                      <Button 
-                        onClick={handleExport}
-                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl h-11 shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
-                      >
+                    <div className="space-y-4">
+                       <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsExportButton")}</h4>
+                       <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionsExportDesc")}</p>
+                       <Button 
+                         onClick={handleExport}
+                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl h-11 shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+                       >
                         <Download className="h-4 w-4" />
                         {t("optionsExportButton")}
                       </Button>
                    </div>
 
-                   <div className="space-y-4">
-                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsImportButton")}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionsImportDesc") || "Restore data from a previously exported JSON file. This will overwrite current settings."}</p>
-                      <div className="relative">
-                        <Input
-                          type="file"
-                          accept=".json"
+                    <div className="space-y-4">
+                       <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsImportButton")}</h4>
+                       <p className="text-sm text-gray-500 dark:text-gray-400">{t("optionsImportDesc")}</p>
+                       <div className="relative">
+                         <Input
+                           type="file"
+                           accept=".json"
                           onChange={handleImport}
                           className="absolute inset-0 opacity-0 cursor-pointer z-10"
                         />
@@ -1707,15 +1710,15 @@ export function Options(): React.ReactElement {
                 <div className="space-y-6">
                   <header className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">WebDAV {t("optionsCloudSync") || "Cloud Sync"}</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("optionsWebDAVDesc") || "Configure your WebDAV server for manual cloud backup."}</p>
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsWebDAVCloudSyncTitle")}</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("optionsWebDAVDesc")}</p>
                     </div>
-                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest px-2 py-0">Phase 2</Badge>
+                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest px-2 py-0">{t("optionsPhase2Badge")}</Badge>
                   </header>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2.5">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUrl") || "Server URL"}</Label>
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUrl")}</Label>
                       <Input 
                         placeholder="https://dav.jianguoyun.com/dav/"
                         className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
@@ -1725,7 +1728,7 @@ export function Options(): React.ReactElement {
                       {errors.webdav?.url && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(errors.webdav.url)}</p>}
                     </div>
                     <div className="space-y-2.5">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPath") || "Backup Path"}</Label>
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPath")}</Label>
                       <Input 
                         placeholder="/LexiPath/backup.json"
                         className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
@@ -1734,7 +1737,7 @@ export function Options(): React.ReactElement {
                       />
                     </div>
                     <div className="space-y-2.5">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUser") || "Username"}</Label>
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUser")}</Label>
                       <Input 
                         className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
                         value={form.webdav.username}
@@ -1743,7 +1746,7 @@ export function Options(): React.ReactElement {
                       {errors.webdav?.username && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(errors.webdav.username)}</p>}
                     </div>
                     <div className="space-y-2.5">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPass") || "Password"}</Label>
+                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPass")}</Label>
                       <Input 
                         type="password"
                         className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
@@ -1762,7 +1765,7 @@ export function Options(): React.ReactElement {
                       disabled={webdavAction !== null}
                     >
                       {webdavAction === "upload" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                      {t("optionsWebDAVUpload") || "Upload to Cloud"}
+                      {t("optionsWebDAVUpload")}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -1771,7 +1774,7 @@ export function Options(): React.ReactElement {
                       disabled={webdavAction !== null}
                     >
                       {webdavAction === "download" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-                      {t("optionsWebDAVDownload") || "Download from Cloud"}
+                      {t("optionsWebDAVDownload")}
                     </Button>
                   </div>
                 </div>
