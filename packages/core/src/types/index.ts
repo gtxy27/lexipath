@@ -49,6 +49,8 @@ export const MessageTypeSchema = z.enum([
   'ENHANCE_SUBTITLE',
   'EXPLAIN_WORD',
   'CHAT',
+  'GET_CHAT_SESSIONS',
+  'GET_CHAT_MESSAGES',
   'OPEN_SIDEBAR',
 ]);
 export type MessageType = z.infer<typeof MessageTypeSchema>;
@@ -280,6 +282,7 @@ export const ConvertedWordSchema = z.object({
   original: z.string(),
   converted: z.string(),
   difficulty: z.string().optional(),
+  partOfSpeech: z.string().optional(),
 });
 export type ConvertedWord = z.infer<typeof ConvertedWordSchema>;
 

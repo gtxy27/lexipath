@@ -1,4 +1,5 @@
 import type { WebEnhanceOutput } from '@lexipath/core';
+import { getWordColor } from '../shared/word-colors';
 
 export type WordRenderMode = 'target-to-native' | 'native-to-target';
 
@@ -70,10 +71,12 @@ export function createEnhancedElement(
 
     const span = document.createElement('span');
     span.className = 'lexipath-word';
-    span.style.cssText = 'border-bottom: 2px dotted #3b82f6; cursor: pointer; position: relative;';
+    const color = getWordColor(bestWord.partOfSpeech, window.matchMedia('(prefers-color-scheme: dark)').matches);
+    span.style.cssText = `border-bottom: 2px dotted ${color}; cursor: pointer; position: relative;`;
     span.dataset.original = matchedOriginal;
     span.dataset.converted = bestWord.converted;
     span.dataset.difficulty = bestWord.difficulty || '';
+    span.dataset.partOfSpeech = bestWord.partOfSpeech || '';
     span.dataset.renderMode = mode;
 
     const displayText =

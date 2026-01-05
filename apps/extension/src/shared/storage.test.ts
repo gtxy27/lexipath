@@ -6,6 +6,7 @@ const { browserMock } = vi.hoisted(() => ({
       local: {
         get: vi.fn(),
         set: vi.fn(),
+        remove: vi.fn(),
       },
     },
   },
@@ -15,10 +16,20 @@ vi.mock('webextension-polyfill', () => ({
   default: browserMock,
 }));
 
+const storageServiceMock = {
+  getSettings: vi.fn(),
+  setSettings: vi.fn(),
+};
+
+vi.mock('./storage-service', () => ({
+  getStorageService: () => storageServiceMock,
+}));
+
 describe('storage settings migration', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    storageServiceMock.getSettings.mockResolvedValue(null);
   });
 
   it('migrates legacy provider + modelConcurrencyLimits to channels + behaviorRoutes', async () => {
@@ -35,6 +46,7 @@ describe('storage settings migration', () => {
       },
     });
     browserMock.storage.local.set.mockResolvedValue(undefined);
+    storageServiceMock.setSettings.mockResolvedValue(undefined);
 
     const { getSettings } = await import('./storage');
     const settings = await getSettings();
@@ -42,8 +54,9 @@ describe('storage settings migration', () => {
     expect(settings.channels[0]?.channelId).toBe(1);
     expect(settings.channels[0]?.typeId).toBe(1);
     expect(settings.channels[0]?.model).toBe('gpt-4o-mini');
-    expect((settings.channels[0]?.config as any)?.baseUrl).toBe('https://api.openai.com/v1');
-    expect((settings.channels[0]?.config as any)?.apiKey).toBe('sk-test');
+    const channelConfig = (settings.channels[0]?.config ?? {}) as Record<string, unknown>;
+    expect(channelConfig['baseUrl']).toBe('https://api.openai.com/v1');
+    expect(channelConfig['apiKey']).toBe('sk-test');
     expect(settings.channels[0]?.concurrencyLimit).toBe(15);
 
     const selectKeywords = settings.behaviorRoutes.select_keywords;
@@ -57,11 +70,15 @@ describe('storage settings migration', () => {
     expect(translate!.kind).toBe(1);
     expect(translate!.channelId).toBe(1);
 
+    expect(storageServiceMock.setSettings).toHaveBeenCalledTimes(1);
+    const persisted = storageServiceMock.setSettings.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(persisted['provider']).toBeUndefined();
+    expect(persisted['modelConcurrencyLimits']).toBeUndefined();
+    expect(Array.isArray(persisted['channels'])).toBe(true);
+    const channels = persisted['channels'] as Array<Record<string, unknown>>;
+    expect(channels[0]?.['channelId']).toBe(1);
+
     expect(browserMock.storage.local.set).toHaveBeenCalledTimes(1);
-    const setArg = browserMock.storage.local.set.mock.calls[0]?.[0] as any;
-    expect(setArg.settings.provider).toBeUndefined();
-    expect(setArg.settings.modelConcurrencyLimits).toBeUndefined();
-    expect(Array.isArray(setArg.settings.channels)).toBe(true);
-    expect(setArg.settings.channels[0].channelId).toBe(1);
+    expect(browserMock.storage.local.set).toHaveBeenCalledWith({ settings: { theme: 'system' } });
   });
 });

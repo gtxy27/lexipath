@@ -8,6 +8,7 @@ import {
   recordWordLearned,
   setWordFamiliarity,
 } from '@lexipath/core/familiarity';
+import { getStorageService } from './storage-service';
 
 const WORD_FAMILIARITY_PREFIX = 'wordFamiliarity:';
 
@@ -35,16 +36,91 @@ function createWordQueue() {
 
 const wordQueue = createWordQueue();
 
+let familiarityMigrationPromise: Promise<void> | null = null;
+let familiarityMigrated = false;
+
+async function ensureFamiliarityMigrated(): Promise<void> {
+  if (familiarityMigrated) return;
+  if (familiarityMigrationPromise) return familiarityMigrationPromise;
+
+  familiarityMigrationPromise = (async () => {
+    const storageService = getStorageService();
+
+    try {
+      const already = await storageService.getMeta('migration_familiarity_v1');
+      if (already) {
+        familiarityMigrated = true;
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    let stored: Record<string, unknown> = {};
+    try {
+      stored = (await browser.storage.local.get(null)) as Record<string, unknown>;
+    } catch {
+      stored = {};
+    }
+
+    const keysToRemove: string[] = [];
+    const records: WordFamiliarity[] = [];
+
+    for (const [key, value] of Object.entries(stored)) {
+      if (!key.startsWith(WORD_FAMILIARITY_PREFIX)) continue;
+      keysToRemove.push(key);
+
+      const parsed = WordFamiliaritySchema.safeParse(value);
+      if (parsed.success) {
+        records.push(parsed.data);
+      }
+    }
+
+    for (const record of records) {
+      await storageService.upsertWordFamiliarity(record);
+    }
+
+    if (keysToRemove.length > 0) {
+      try {
+        await browser.storage.local.remove(keysToRemove);
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      await storageService.setMeta('migration_familiarity_v1', true);
+    } catch {
+      // ignore
+    }
+
+    familiarityMigrated = true;
+  })().finally(() => {
+    familiarityMigrationPromise = null;
+  });
+
+  return familiarityMigrationPromise;
+}
+
 async function readWordRecord(normalizedWord: string): Promise<WordFamiliarity | null> {
+  await ensureFamiliarityMigrated();
+
+  const storageService = getStorageService();
+  const record = await storageService.getWordFamiliarity(normalizedWord);
+  if (record) return record;
+
   const key = storageKeyForWord(normalizedWord);
-  const stored = await browser.storage.local.get(key);
-  const raw = stored[key];
-  if (!raw) return null;
+  try {
+    const stored = (await browser.storage.local.get(key)) as Record<string, unknown>;
+    const raw = stored[key];
+    if (!raw) return null;
 
-  const parsed = WordFamiliaritySchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
+    const parsed = WordFamiliaritySchema.safeParse(raw);
+    if (parsed.success) return parsed.data;
+  } catch {
+    // ignore
+  }
 
-  console.warn(`[LexiPath] Invalid familiarity record for "${normalizedWord}", ignoring`);
   return null;
 }
 
@@ -52,8 +128,8 @@ async function writeWordRecord(record: WordFamiliarity): Promise<void> {
   const normalizedWord = normalizeWordForFamiliarity(record.word);
   if (!normalizedWord) return;
 
-  const key = storageKeyForWord(normalizedWord);
-  await browser.storage.local.set({ [key]: record });
+  await ensureFamiliarityMigrated();
+  await getStorageService().upsertWordFamiliarity(record);
 }
 
 export async function getFamiliarity(word: string): Promise<number> {
@@ -69,15 +145,17 @@ export async function batchGetFamiliarity(words: string[]): Promise<Map<string, 
     new Set(words.map(normalizeWordForFamiliarity).filter(Boolean))
   );
 
-  const keys = normalizedWords.map(storageKeyForWord);
-  const stored = keys.length > 0 ? await browser.storage.local.get(keys) : {};
+  await ensureFamiliarityMigrated();
+  const storageService = getStorageService();
 
   const result = new Map<string, number>();
+
+  const records = await storageService.batchGetWordFamiliarity(normalizedWords);
   for (const normalizedWord of normalizedWords) {
-    const raw = stored[storageKeyForWord(normalizedWord)];
-    const parsed = WordFamiliaritySchema.safeParse(raw);
-    result.set(normalizedWord, parsed.success ? parsed.data.familiarity : 0);
+    const record = records.get(normalizedWord);
+    result.set(normalizedWord, record?.familiarity ?? 0);
   }
+
   return result;
 }
 
@@ -128,4 +206,3 @@ export async function updateFamiliarity(word: string, familiarity: number): Prom
     await writeWordRecord(updated);
   });
 }
-

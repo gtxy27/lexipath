@@ -6,35 +6,52 @@ import {
   SettingsSchema,
   type Settings,
 } from '@lexipath/core';
+import { getStorageService } from './storage-service';
 
 const SETTINGS_KEY = 'settings';
 const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
 
 let cachedSettings: Settings | null = null;
+let mirroredTheme: Settings['theme'] | null = null;
+
+function buildLocalSettingsMirror(settings: Settings): Pick<Settings, 'theme'> {
+  return { theme: settings.theme };
+}
+
+async function ensureLocalSettingsMirror(settings: Settings): Promise<void> {
+  if (mirroredTheme === settings.theme) return;
+  try {
+    await browser.storage.local.set({ [SETTINGS_KEY]: buildLocalSettingsMirror(settings) });
+    mirroredTheme = settings.theme;
+  } catch {
+    // ignore
+  }
+}
 
 function migrateBehaviorRoutes(settings: Settings): { settings: Settings; migrated: boolean } {
-  const routes = { ...(settings.behaviorRoutes ?? {}) } as Record<string, any>;
+  const routes: Settings['behaviorRoutes'] = { ...(settings.behaviorRoutes ?? {}) };
   let migrated = false;
 
-  if (routes.enhance_subtitle && !routes.adapt_subtitle) {
-    routes.adapt_subtitle = routes.enhance_subtitle;
-    delete routes.enhance_subtitle;
+  if (routes['enhance_subtitle'] && !routes['adapt_subtitle']) {
+    routes['adapt_subtitle'] = routes['enhance_subtitle'];
+    delete routes['enhance_subtitle'];
     migrated = true;
   }
 
-  if (routes.enhance_web) {
-    delete routes.enhance_web;
+  if (routes['enhance_web']) {
+    delete routes['enhance_web'];
     migrated = true;
   }
 
-  if (routes.explain_word) {
-    delete routes.explain_word;
+  if (routes['explain_word']) {
+    delete routes['explain_word'];
     migrated = true;
   }
 
-  if (!routes.translate_keywords) {
-    const base = routes.translate ?? null;
-    routes.translate_keywords = base ? { ...base } : { kind: 1, channelId: 1, extra: {} };
+  if (!routes['translate_keywords']) {
+    const base = routes['translate'] ?? null;
+    routes['translate_keywords'] =
+      base ? { ...base } : { kind: 1, channelId: 1, extra: {} };
     migrated = true;
   }
 
@@ -174,8 +191,8 @@ function migrateLegacySettings(raw: unknown): { value: unknown; migrated: boolea
     return byLegacyProvider.get(parsed.data) ?? firstChannelId;
   };
 
-  const legacyKeywordProvider = (record as any).keywordProvider;
-  const legacyTranslationProvider = (record as any).translationProvider;
+  const legacyKeywordProvider = record['keywordProvider'];
+  const legacyTranslationProvider = record['translationProvider'];
 
   const keywordChannelId = resolveLegacyProviderChannelId(legacyKeywordProvider);
 
@@ -204,9 +221,9 @@ function migrateLegacySettings(raw: unknown): { value: unknown; migrated: boolea
   };
 
   if (migrated) {
-    delete (next as any).keywordProvider;
-    delete (next as any).translationProvider;
-    delete (next as any).channelConcurrencyLimits;
+    delete next['keywordProvider'];
+    delete next['translationProvider'];
+    delete next['channelConcurrencyLimits'];
   }
 
   return { value: next, migrated };
@@ -215,22 +232,32 @@ function migrateLegacySettings(raw: unknown): { value: unknown; migrated: boolea
 export async function getSettings(): Promise<Settings> {
   if (cachedSettings) return cachedSettings;
 
+  const storageService = getStorageService();
+
+  const storedFromIdb = await storageService.getSettings();
+  if (storedFromIdb) {
+    cachedSettings = storedFromIdb;
+    await ensureLocalSettingsMirror(storedFromIdb);
+    return storedFromIdb;
+  }
+
   const stored = await browser.storage.local.get(SETTINGS_KEY);
   const raw = stored[SETTINGS_KEY] ?? {};
+
   const migrated = migrateLegacySettings(raw);
   const parsed = SettingsSchema.safeParse(migrated.value);
   if (parsed.success) {
     const normalized = migrateBehaviorRoutes(parsed.data);
     cachedSettings = normalized.settings;
-    if (migrated.migrated || normalized.migrated) {
-      await browser.storage.local.set({ [SETTINGS_KEY]: normalized.settings });
-    }
+    await storageService.setSettings(normalized.settings);
+    await ensureLocalSettingsMirror(normalized.settings);
     return normalized.settings;
   }
 
   console.warn('[LexiPath] Invalid settings in storage, resetting to defaults');
   cachedSettings = DEFAULT_SETTINGS;
-  await browser.storage.local.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS });
+  await storageService.setSettings(DEFAULT_SETTINGS);
+  await ensureLocalSettingsMirror(DEFAULT_SETTINGS);
   return DEFAULT_SETTINGS;
 }
 
@@ -242,6 +269,7 @@ export async function setSettings(settings: Partial<Settings>): Promise<void> {
 
   const current = await getSettings();
   const merged = SettingsSchema.parse({ ...current, ...partialParsed.data });
-  await browser.storage.local.set({ [SETTINGS_KEY]: merged });
+  await getStorageService().setSettings(merged);
   cachedSettings = merged;
+  await ensureLocalSettingsMirror(merged);
 }

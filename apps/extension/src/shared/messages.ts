@@ -127,6 +127,14 @@ const messageDefinitions = {
     payloadSchema: ChatPayloadSchema,
     valueSchema: ChatResponseSchema,
   },
+  GET_CHAT_SESSIONS: {
+    payloadSchema: z.object({ keyword: z.string().optional() }).optional(),
+    valueSchema: z.array(z.any()), // We can be more specific if we want, but any is simpler for now
+  },
+  GET_CHAT_MESSAGES: {
+    payloadSchema: z.object({ sessionId: z.string(), limit: z.number().optional() }),
+    valueSchema: z.array(z.any()),
+  },
   OPEN_SIDEBAR: {
     payloadSchema: z
       .object({

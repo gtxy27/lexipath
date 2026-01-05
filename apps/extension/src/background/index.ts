@@ -58,6 +58,7 @@ import { DictionaryService } from '@lexipath/dictionary';
 import { MessageError, createMessageHandlerRegistry } from '../shared/messages';
 import { recordLookup } from '../shared/familiarity';
 import { getSettings, setSettings } from '../shared/storage';
+import { getStorageService } from '../shared/storage-service';
 import {
   createExpiringLruCache,
   getOrRunCachedTask,
@@ -619,6 +620,23 @@ registry.register('GET_SETTINGS', async () => {
   return getSettings();
 });
 
+registry.register('GET_CHAT_SESSIONS', async (payload) => {
+  const storageService = getStorageService();
+  if (payload?.keyword) {
+    return storageService.getSessionsByKeyword(payload.keyword);
+  }
+  return storageService.listAllSessions();
+});
+
+registry.register('GET_CHAT_MESSAGES', async (payload) => {
+  const storageService = getStorageService();
+  if (!payload?.sessionId) {
+    throw new MessageError({ code: 'INVALID_PAYLOAD', message: 'Expected sessionId' });
+  }
+  const limitOption = typeof payload.limit === 'number' ? { limit: payload.limit } : {};
+  return storageService.getMessages(payload.sessionId, limitOption);
+});
+
 registry.register('SET_SETTINGS', async (payload) => {
   await setSettings(payload);
   return null;
@@ -1051,17 +1069,10 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
 // Chat Session Management
 // =============================================================================
 
-interface ChatSession {
-  id: string;
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-  createdAt: number;
-  lastAccessedAt: number;
-}
+const CHAT_SESSIONS_LEGACY_STORAGE_KEY = 'lexipath_chat_sessions_v1';
+const CHAT_MAX_HISTORY_MESSAGES = 20; // Max messages to keep in prompt history (10 pairs)
 
-const chatSessions = new Map<string, ChatSession>();
-const CHAT_SESSIONS_STORAGE_KEY = 'lexipath_chat_sessions_v1';
-
-const ChatSessionSchema = z
+const LegacyChatSessionSchema = z
   .object({
     id: z.string().min(1),
     messages: z.array(
@@ -1077,103 +1088,76 @@ const ChatSessionSchema = z
   })
   .strict();
 
-const StoredChatSessionsSchema = z
+const LegacyStoredChatSessionsSchema = z
   .object({
-    sessions: z.array(ChatSessionSchema),
+    sessions: z.array(LegacyChatSessionSchema),
   })
   .strict();
 
-let chatSessionsLoaded = false;
-let chatSessionsLoadPromise: Promise<void> | null = null;
-let chatSessionsPersistTimer: ReturnType<typeof setTimeout> | null = null;
+let chatMigrationPromise: Promise<void> | null = null;
 
-const CHAT_SESSION_MAX_COUNT = 10;
-const CHAT_SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
-const CHAT_MAX_HISTORY_MESSAGES = 20; // Max messages to keep in history (10 pairs)
+async function ensureChatMigrated(): Promise<void> {
+  if (chatMigrationPromise) return chatMigrationPromise;
 
-function generateSessionId(): string {
-  return `chat-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-}
+  chatMigrationPromise = (async () => {
+    const storageService = getStorageService();
 
-function cleanupExpiredSessions() {
-  const now = Date.now();
-  for (const [id, session] of chatSessions.entries()) {
-    if (now - session.lastAccessedAt > CHAT_SESSION_TTL_MS) {
-      chatSessions.delete(id);
-    }
-  }
-
-  if (chatSessions.size > CHAT_SESSION_MAX_COUNT) {
-    const sorted = Array.from(chatSessions.entries()).sort(
-      (a, b) => a[1].lastAccessedAt - b[1].lastAccessedAt
-    );
-    const toDelete = sorted.slice(0, chatSessions.size - CHAT_SESSION_MAX_COUNT);
-    for (const [id] of toDelete) {
-      chatSessions.delete(id);
-    }
-  }
-}
-
-function truncateHistory(
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>
-): Array<{ role: 'user' | 'assistant'; content: string }> {
-  if (messages.length <= CHAT_MAX_HISTORY_MESSAGES) {
-    return messages;
-  }
-  return messages.slice(messages.length - CHAT_MAX_HISTORY_MESSAGES);
-}
-
-function snapshotChatSessionsForStorage(): ChatSession[] {
-  const sessions = Array.from(chatSessions.values())
-    .map((session) => ({
-      ...session,
-      messages: truncateHistory(session.messages),
-    }))
-    .sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
-
-  // Persist only what we'd keep in-memory, and ensure max-count.
-  return sessions.slice(Math.max(0, sessions.length - CHAT_SESSION_MAX_COUNT));
-}
-
-function schedulePersistChatSessions(): void {
-  if (chatSessionsPersistTimer !== null) return;
-  chatSessionsPersistTimer = setTimeout(() => {
-    chatSessionsPersistTimer = null;
-    const sessions = snapshotChatSessionsForStorage();
-    void browser.storage.local
-      .set({ [CHAT_SESSIONS_STORAGE_KEY]: { sessions } })
-      .catch(() => {
-        // ignore
-      });
-  }, 250);
-}
-
-async function ensureChatSessionsLoaded(): Promise<void> {
-  if (chatSessionsLoaded) return;
-  if (chatSessionsLoadPromise) return chatSessionsLoadPromise;
-
-  chatSessionsLoadPromise = (async () => {
     try {
-      const raw = await browser.storage.local.get(CHAT_SESSIONS_STORAGE_KEY);
-      const parsed = StoredChatSessionsSchema.safeParse(raw[CHAT_SESSIONS_STORAGE_KEY]);
+      const already = await storageService.getMeta('migration_chat_v1');
+      if (already) return;
+    } catch {
+      // ignore
+    }
+
+    try {
+      const raw = await browser.storage.local.get(CHAT_SESSIONS_LEGACY_STORAGE_KEY);
+      const parsed = LegacyStoredChatSessionsSchema.safeParse(raw[CHAT_SESSIONS_LEGACY_STORAGE_KEY]);
       if (parsed.success) {
         for (const session of parsed.data.sessions) {
-          chatSessions.set(session.id, session);
+          await storageService.upsertSession({
+            sessionId: session.id,
+            keyword: '',
+            conversationIndex: 0,
+            createdAt: session.createdAt,
+            lastAccessedAt: session.lastAccessedAt,
+          });
+
+          const baseTimestamp = session.createdAt || Date.now();
+          for (const [idx, msg] of session.messages.entries()) {
+            await storageService.addMessageWithoutTouchingSession({
+              sessionId: session.id,
+              role: msg.role,
+              content: msg.content,
+              timestamp: baseTimestamp + idx,
+            });
+          }
         }
       }
     } catch {
       // ignore
-    } finally {
-      cleanupExpiredSessions();
-      chatSessionsLoaded = true;
-      schedulePersistChatSessions();
     }
-  })();
 
-  return chatSessionsLoadPromise;
+    try {
+      await browser.storage.local.remove(CHAT_SESSIONS_LEGACY_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+
+    try {
+      await storageService.setMeta('migration_chat_v1', true);
+    } catch {
+      // ignore
+    }
+  })().finally(() => {
+    chatMigrationPromise = null;
+  });
+
+  return chatMigrationPromise;
 }
 
-type ChatHistoryMessage = { role: 'user' | 'assistant'; content: string };
+function generateSessionId(): string {
+  return `chat-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+}
 type StructuredStreamError = { code: string; message: string };
 
 function toStructuredStreamError(error: unknown): StructuredStreamError {
@@ -1489,8 +1473,7 @@ async function runChatStream(
   payload: { message: string; conversationId?: string },
   options: { onDelta: (delta: string) => void; signal?: AbortSignal }
 ): Promise<{ reply: string; conversationId: string }> {
-  await ensureChatSessionsLoaded();
-  cleanupExpiredSessions();
+  await ensureChatMigrated();
 
   const settings = await getSettings();
   const chatRoute = resolveChannelRoute('chat', settings);
@@ -1504,24 +1487,28 @@ async function runChatStream(
   }
 
   const sessionId = payload.conversationId ?? generateSessionId();
-  let session = chatSessions.get(sessionId);
+  const storageService = getStorageService();
+  const now = Date.now();
 
-  if (!session) {
-    session = {
-      id: sessionId,
-      messages: [],
-      createdAt: Date.now(),
-      lastAccessedAt: Date.now(),
-    };
-    chatSessions.set(sessionId, session);
-    schedulePersistChatSessions();
+  const existing = await storageService.getSession(sessionId);
+  if (!existing) {
+    await storageService.upsertSession({
+      sessionId,
+      keyword: '',
+      conversationIndex: 0,
+      createdAt: now,
+      lastAccessedAt: now,
+    });
   }
 
-  session.messages.push({ role: 'user', content: payload.message });
-  session.messages = truncateHistory(session.messages);
-  schedulePersistChatSessions();
+  const userMessageId = await storageService.addMessage({
+    sessionId,
+    role: 'user',
+    content: payload.message,
+    timestamp: now,
+  });
 
-  const truncatedHistory: ChatHistoryMessage[] = truncateHistory(session.messages);
+  const history = await storageService.getMessages(sessionId, { limit: CHAT_MAX_HISTORY_MESSAGES });
 
   const systemMessage = {
     role: 'system' as const,
@@ -1531,7 +1518,7 @@ async function runChatStream(
   try {
     const limit = getChannelConcurrencyLimit(chatChannel, chatRoute.kind);
     const reply = await runWithChannelConcurrency(routeKey(chatRoute), limit, () => {
-      const messages = [systemMessage, ...truncatedHistory] as Array<{
+      const messages = [systemMessage, ...history.map((m) => ({ role: m.role, content: m.content }))] as Array<{
         role: 'system' | 'user' | 'assistant';
         content: string;
       }>;
@@ -1575,15 +1562,20 @@ async function runChatStream(
       });
     }
 
-    session.messages.push({ role: 'assistant', content: assistantReply });
-    session.messages = truncateHistory(session.messages);
-    session.lastAccessedAt = Date.now();
-    schedulePersistChatSessions();
+    await storageService.addMessage({
+      sessionId,
+      role: 'assistant',
+      content: assistantReply,
+      timestamp: Date.now(),
+    });
 
     return { reply: assistantReply, conversationId: sessionId };
   } catch (error) {
-    session.messages.pop();
-    schedulePersistChatSessions();
+    try {
+      await storageService.deleteMessage(userMessageId);
+    } catch {
+      // ignore
+    }
     throw error;
   }
 }
