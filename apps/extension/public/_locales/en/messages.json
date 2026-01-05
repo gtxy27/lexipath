@@ -43,6 +43,38 @@
     "message": "Error loading definition",
     "description": "Word card: unexpected error"
   },
+  "englishCorrection_tagEncouragement": {
+    "message": "Encouragement",
+    "description": "English correction: card tag (encouragement)"
+  },
+  "englishCorrection_tagCorrected": {
+    "message": "Corrected",
+    "description": "English correction: card tag (corrected)"
+  },
+  "englishCorrection_tagError": {
+    "message": "Error",
+    "description": "English correction: card tag (error)"
+  },
+  "englishCorrection_undo": {
+    "message": "Undo",
+    "description": "English correction: undo button"
+  },
+  "englishCorrection_close": {
+    "message": "Close",
+    "description": "English correction: close button"
+  },
+  "englishCorrection_ok": {
+    "message": "Looks great!",
+    "description": "English correction: fallback encouragement when no error"
+  },
+  "englishCorrection_corrected": {
+    "message": "Corrected.",
+    "description": "English correction: fallback message when corrected but empty message"
+  },
+  "englishCorrection_error": {
+    "message": "Correction failed. Please try again.",
+    "description": "English correction: fallback when request fails"
+  },
   "error_unknown": {
     "message": "Unknown error",
     "description": "Generic unknown error message"
@@ -471,6 +503,46 @@
     "message": "Configure your native/target languages and proficiency.",
     "description": "Language section description"
   },
+  "optionsEnglishCorrectionTitle": {
+    "message": "English Correction",
+    "description": "Language section: English correction title"
+  },
+  "optionsEnglishCorrectionDesc": {
+    "message": "In editable inputs, press Space 3 times within the time window to trigger correction and feedback.",
+    "description": "Language section: English correction description"
+  },
+  "optionsEnglishCorrectionEnabled": {
+    "message": "Enable English correction",
+    "description": "Language section: enable English correction toggle"
+  },
+  "optionsEnglishCorrectionEnabledDesc": {
+    "message": "Only works in editable text inputs; password and non-text inputs are skipped.",
+    "description": "Language section: enable English correction description"
+  },
+  "optionsEnglishCorrectionTriggerTimeout": {
+    "message": "Trigger window (ms)",
+    "description": "Language section: trigger timeout label"
+  },
+  "optionsEnglishCorrectionTriggerTimeoutDesc": {
+    "message": "The 3 Space presses must occur within this window; slower input won't trigger.",
+    "description": "Language section: trigger timeout description"
+  },
+  "optionsEnglishCorrectionAutoCloseDelay": {
+    "message": "Auto-close encouragement (ms)",
+    "description": "Language section: auto close label"
+  },
+  "optionsEnglishCorrectionAutoCloseDelayDesc": {
+    "message": "Only applies to encouragement cards; correction cards do not auto-close by default.",
+    "description": "Language section: auto close description"
+  },
+  "optionsEnglishCorrectionShowUndo": {
+    "message": "Show undo button",
+    "description": "Language section: show undo label"
+  },
+  "optionsEnglishCorrectionShowUndoDesc": {
+    "message": "Show an undo button after correction; Ctrl+Z is also supported.",
+    "description": "Language section: show undo description"
+  },
   "optionsAppearanceTitle": {
     "message": "Appearance",
     "description": "Appearance section title"
@@ -538,6 +610,14 @@
   "optionsBehaviorDesc_adapt_subtitle": {
     "message": "Convert native language subtitles to learning language adapted to your level (LLM Channel only).",
     "description": "Behavior description: adapt_subtitle"
+  },
+  "optionsBehavior_english_correction": {
+    "message": "English Correction",
+    "description": "Behavior label: english_correction"
+  },
+  "optionsBehaviorDesc_english_correction": {
+    "message": "Trigger English correction by pressing Space 3 times in inputs (LLM Channel only).",
+    "description": "Behavior description: english_correction"
   },
   "optionsBehavior_chat": {
     "message": "Deep Learning",

@@ -7,6 +7,7 @@ describe('buildTranslateKeywordsPrompt', () => {
       keywords: ['hello', 'world'],
       sourceLang: 'en',
       targetLang: 'zh-CN',
+      userLevel: 'B1',
     });
 
     expect(prompt).toContain('en');
@@ -35,4 +36,3 @@ describe('parseTranslateKeywordsResponse', () => {
     expect(result.translations).toEqual(['你好', '世界']);
   });
 });
-

@@ -24,6 +24,7 @@ const { browserMock, sendMessageMock, defaultSettings } = vi.hoisted(() => {
     nativeLanguage: "zh-CN",
     targetLanguage: "en",
     proficiencyLevel: "B1",
+    theme: "system",
     channels: [
       {
         channelId: 1,
@@ -45,6 +46,14 @@ const { browserMock, sendMessageMock, defaultSettings } = vi.hoisted(() => {
     },
     enabled: true,
     autoEnhance: true,
+    englishCorrection: {
+      enabled: false,
+      triggerKey: "space",
+      triggerTimes: 3,
+      triggerTimeout: 500,
+      autoCloseDelay: 3000,
+      showUndoButton: true,
+    },
     siteMode: "all",
     excludedSites: [],
     allowedSites: [],

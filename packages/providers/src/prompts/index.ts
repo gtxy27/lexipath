@@ -48,3 +48,10 @@ export {
   parseTranslateKeywordsResponse,
   type TranslateKeywordsPromptOptions,
 } from './translate-keywords-prompt';
+
+export { renderPromptTemplate } from './prompt-template-renderer';
+
+export {
+  buildEnglishCorrectionPrompt,
+  type EnglishCorrectionPromptOptions,
+} from './english-correction-prompt';

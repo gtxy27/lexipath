@@ -16,7 +16,7 @@ export function buildProficiencyReferenceLine(options: {
   if (!options.proficiencyPreference) return '';
   const standard = options.proficiencyPreference.standard;
   const value = formatProficiencyPreferenceValue(options.proficiencyPreference);
-  return `参考：${standard} ${value}（≈ CEFR ${options.userLevel}）`;
+  return `（参考 ${standard} ${value}）`;
 }
 
 export function buildProficiencyRangeReferenceLine(options: {

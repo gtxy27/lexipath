@@ -17,12 +17,16 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
+    expect(prompt).toContain('<用户信息>');
+    expect(prompt).toContain('<用户输入>');
+    expect(prompt).toContain('<输出格式>');
+    expect(prompt).toContain('<输出说明>');
     expect(prompt).toContain('CEFR B1');
-    expect(prompt).toContain('英语 字幕');
+    expect(prompt).toContain('英语字幕');
     expect(prompt).toContain('This is a complex sentence');
     expect(prompt).toContain('"line1_final"');
     expect(prompt).not.toContain('"line2_final"');
-    expect(prompt).toContain('只返回增强后的 英语 字幕内容');
+    expect(prompt).toContain('只返回增强后的英语字幕内容');
     expect(prompt).toContain('输出约束');
   });
 
@@ -37,11 +41,12 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
+    expect(prompt).toContain('<输出说明>');
     expect(prompt).toContain('CEFR A2');
     expect(prompt).toContain('双语展示');
     expect(prompt).toContain('"line1_final"');
     expect(prompt).toContain('"line2_final"');
-    expect(prompt).toContain('简体中文 翻译');
+    expect(prompt).toContain('简体中文');
   });
 
   it('should handle different difficulty levels', () => {
@@ -69,8 +74,8 @@ describe('buildSubtitleEnhancePrompt', () => {
 
     const prompt = buildSubtitleEnhancePrompt(options);
 
-    expect(prompt).toContain('法语 字幕');
-    expect(prompt).toContain('英语 翻译');
+    expect(prompt).toContain('法语字幕');
+    expect(prompt).toContain('英语');
   });
 
   it('should include subtitle length constraints', () => {

@@ -1,6 +1,7 @@
-import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage, PromptTemplateInput } from '@lexipath/core';
 import { buildProficiencyRangeReferenceLine } from './proficiency-reference';
 import { buildCefrOutputGuidance } from './cefr-guidance';
+import { renderPromptTemplate } from './prompt-template-renderer';
 
 export interface WebEnhancePromptOptions {
   content: string;
@@ -47,41 +48,45 @@ export function buildWebEnhancePrompt(options: WebEnhancePromptOptions): string 
       ? { proficiencyPreference: options.proficiencyPreference }
       : {}),
   });
-  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
   const cefrGuidance = buildCefrOutputGuidance({
     sourceLang,
     targetLang,
     level: difficultyMax,
   });
 
-  return `你是词汇学习助手。请分析下面这段 ${sourceLanguageName} 文本，为语言学习者挑选最多 ${maxWords} 个值得学习的词汇并翻译。${referenceSection}
-${cefrGuidance}
-
-规则：
-1. 只选择 CEFR 难度范围在 ${difficultyLabel} 内的词汇
-2. 优先选择教育价值高、常见且有代表性的词
-3. 避免：专有名词、人名地名、纯数字、URL、代码片段、单个字母、明显的虚词/停用词
-4. 对每个入选词输出：
-   - original：原文中出现的形式（保留大小写）
-   - converted：翻译成 ${targetLanguageName}
-   - difficulty：CEFR 等级（A1/A2/B1/B2/C1/C2）
-5. content_result 必须返回原文，不做改写
-6. convert_word 可为空数组；若没有合适词汇也可以返回空
-7. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
-
-待分析文本：
-"""
-${content}
-"""
-
-请输出 JSON：
-{
-  "content_result": "原文",
+  const template: PromptTemplateInput = {
+    role: '你是词汇学习助手。',
+    scene: '当前环境：网页内容增强（词汇挑选与翻译）。',
+    style: '风格：面向语言学习者，优先教育价值高且常见的词汇，不做无关发挥。',
+    task: `任务：分析<用户输入>中的${sourceLanguageName}文本，为语言学习者挑选最多 ${maxWords} 个值得学习的词汇/短语并翻译为${targetLanguageName}。只选择 CEFR 难度范围在 ${difficultyLabel} 内的词汇。`,
+    userInfo: {
+      motherTongue: targetLang,
+      targetLearningLanguage: sourceLang,
+      cefrLevel: difficultyMax,
+      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+    },
+    userInput: content,
+    outputFormat: `{
+  "content_result": "",
   "convert_word": [
-    { "original": "example", "converted": "例子", "difficulty": "B1" },
-    { "original": "significant", "converted": "重要的", "difficulty": "B2" }
+    { "original": "", "converted": "", "difficulty": "" }
   ]
-}`;
+}`,
+    outputNotes: [
+      cefrGuidance,
+      '',
+      '规则：',
+      `1. 只选择 CEFR 难度范围在 ${difficultyLabel} 内的词汇`,
+      '2. 优先选择教育价值高、常见且有代表性的词/短语（短语优先）',
+      '3. 避免：专有名词、人名地名、纯数字、URL、代码片段、单个字母、明显的虚词/停用词',
+      `4. 对每个入选词输出：original（原文形式，保留大小写）、converted（翻译为${targetLanguageName}）、difficulty（CEFR 等级）`,
+      '5. content_result 必须返回原文，不做改写',
+      '6. convert_word 可为空数组；若没有合适词汇也可以返回空数组',
+      '7. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
+    ].join('\n'),
+  };
+
+  return renderPromptTemplate(template);
 }
 
 /**

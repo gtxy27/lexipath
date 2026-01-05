@@ -1,22 +1,57 @@
+import type {
+  CEFRLevel,
+  ProficiencyPreference,
+  PromptTemplateInput,
+  SupportedLanguage,
+  NativeLanguage,
+} from '@lexipath/core';
+import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { renderPromptTemplate } from './prompt-template-renderer';
+
 export interface TermTranslatePromptOptions {
   terms: string[];
-  sourceLang: string;
-  targetLang: string;
+  sourceLang: SupportedLanguage;
+  targetLang: NativeLanguage;
+  userLevel: CEFRLevel;
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 export function buildTermTranslatePrompt(options: TermTranslatePromptOptions): string {
   const terms = options.terms.map((term) => term.trim()).filter(Boolean);
 
-  return `你是一个翻译助手。请把给定的术语从 ${options.sourceLang} 翻译为 ${options.targetLang}。
+  const referenceLine = buildProficiencyReferenceLine({
+    sourceLang: options.sourceLang,
+    targetLang: options.targetLang,
+    userLevel: options.userLevel,
+    ...(options.proficiencyPreference ? { proficiencyPreference: options.proficiencyPreference } : {}),
+  });
 
-规则（非常重要）：
-- 只输出 JSON，不要输出 Markdown，不要输出代码块，不要输出任何解释文字
-- 输出必须是一个 JSON 对象，key 为原术语（与输入完全一致），value 为翻译结果
-- 不要添加或删除术语；必须对每个术语给出一个翻译
+  const userInput = terms.join('\n');
 
-术语列表：
-${terms.map((term) => `- ${term}`).join('\n')}
-`;
+  const template: PromptTemplateInput = {
+    role: '你是翻译助手。',
+    scene: '当前环境：术语列表翻译场景。',
+    style: '风格：稳定一致，不输出多义列表，不添加或删除术语。',
+    task: `任务：把<用户输入>中的术语从${options.sourceLang}翻译为${options.targetLang}，输出一个 JSON 对象：key 为原术语（与输入完全一致），value 为翻译结果。`,
+    userInfo: {
+      motherTongue: options.targetLang,
+      targetLearningLanguage: options.sourceLang,
+      cefrLevel: options.userLevel,
+      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+    },
+    userInput,
+    outputFormat: `{
+  "term": "translation"
+}`,
+    outputNotes: [
+      '规则（非常重要）：',
+      '1. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
+      '2. key 必须与输入术语完全一致；value 为翻译结果',
+      '3. 不要添加或删除术语；必须对每个术语给出一个翻译',
+    ].join('\n'),
+  };
+
+  return renderPromptTemplate(template);
 }
 
 function stripCodeFences(input: string): string {
@@ -71,4 +106,3 @@ export function parseTermTranslateResponse(response: string): { translations: Re
 
   return { translations: {}, ok: false };
 }
-

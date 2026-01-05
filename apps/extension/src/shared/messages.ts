@@ -5,6 +5,8 @@ import {
   CEFRLevelSchema,
   ChatPayloadSchema,
   ChatResponseSchema,
+  EnglishCorrectionOutputSchema,
+  EnglishCorrectionPayloadSchema,
   EnhanceSubtitlePayloadSchema,
   EnhanceWebPayloadSchema,
   ErrorResponseSchema,
@@ -120,6 +122,10 @@ const messageDefinitions = {
   ENHANCE_SUBTITLE: {
     payloadSchema: EnhanceSubtitlePayloadSchema,
     valueSchema: SubtitleEnhanceOutputSchema,
+  },
+  ENGLISH_CORRECTION: {
+    payloadSchema: EnglishCorrectionPayloadSchema,
+    valueSchema: EnglishCorrectionOutputSchema,
   },
   EXPLAIN_WORD: {
     payloadSchema: ExplainWordPayloadSchema,

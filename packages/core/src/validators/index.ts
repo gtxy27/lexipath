@@ -3,4 +3,4 @@ export { fail, ok } from './result';
 
 export { validateWebEnhanceOutput } from './web-enhance';
 export { validateSubtitleEnhanceOutput } from './subtitle-enhance';
-
+export { validateEnglishCorrectionOutput } from './english-correction';

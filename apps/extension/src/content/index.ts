@@ -25,8 +25,10 @@ import {
 import { createEnhancedElement, type WordRenderMode } from "./enhanced-text";
 import { getI18nMessage } from "./i18n";
 import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
+import { EnglishCorrectionController } from "./english-correction";
 
 let subtitleController: SubtitleController | null = null;
+let englishCorrectionController: EnglishCorrectionController | null = null;
 let currentSettings: Settings | null = null;
 let observer: MutationObserver | null = null;
 let urlPollTimer: number | null = null;
@@ -880,6 +882,7 @@ async function initForUrl(url: string, token: number): Promise<void> {
 
   if (!currentSettings?.enabled) {
     console.log("[LexiPath] Extension is disabled");
+    englishCorrectionController?.setSettings(null);
     return;
   }
 
@@ -895,10 +898,17 @@ async function initForUrl(url: string, token: number): Promise<void> {
     console.log(
       `[LexiPath] Site gate blocked processing reason=${siteDecision.reason}${siteDecision.matchedRule ? ` rule=${siteDecision.matchedRule}` : ""}`,
     );
+    englishCorrectionController?.setSettings(null);
     return;
   }
 
   console.log("[LexiPath] Content script initialized");
+
+  if (!englishCorrectionController) {
+    englishCorrectionController = new EnglishCorrectionController();
+    englishCorrectionController.start();
+  }
+  englishCorrectionController.setSettings(currentSettings);
 
   const platform = detectPlatform(url);
   if (platform !== "unknown") {
@@ -957,12 +967,18 @@ async function init(): Promise<void> {
   browser.storage?.onChanged?.addListener?.((changes: any, area: string) => {
     if (area !== "local") return;
     const nextSettings = changes?.settings?.newValue;
-    if (!nextSettings || nextSettings?.theme === currentSettings?.theme) return;
+    if (!nextSettings) return;
+    const prevTheme = currentSettings?.theme;
     currentSettings = nextSettings;
-    const resolvedTheme = getResolvedTheme();
-    if (webOverlay) webOverlay.setTheme(resolvedTheme);
-    if (subtitleController) subtitleController.setTheme(nextSettings.theme);
-    ensureStylesInjected();
+
+    englishCorrectionController?.setSettings(nextSettings);
+
+    if (prevTheme !== nextSettings?.theme) {
+      const resolvedTheme = getResolvedTheme();
+      if (webOverlay) webOverlay.setTheme(resolvedTheme);
+      if (subtitleController) subtitleController.setTheme(nextSettings.theme);
+      ensureStylesInjected();
+    }
   });
 }
 
@@ -975,6 +991,8 @@ function cleanup(): void {
     urlPollTimer = null;
   }
   resetAllState();
+  englishCorrectionController?.destroy();
+  englishCorrectionController = null;
 }
 
 // Initialize when DOM is ready

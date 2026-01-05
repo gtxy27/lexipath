@@ -18,6 +18,10 @@ describe('buildWebEnhancePrompt', () => {
 
     const prompt = buildWebEnhancePrompt(options);
 
+    expect(prompt).toContain('<用户信息>');
+    expect(prompt).toContain('<用户输入>');
+    expect(prompt).toContain('<输出格式>');
+    expect(prompt).toContain('<输出说明>');
     expect(prompt).toContain('CEFR');
     expect(prompt).toContain('B1');
     expect(prompt).toContain('英语');
@@ -26,7 +30,6 @@ describe('buildWebEnhancePrompt', () => {
     expect(prompt).toContain('This is a test sentence');
     expect(prompt).toContain('"content_result"');
     expect(prompt).toContain('"convert_word"');
-    expect(prompt).toContain('输出约束');
   });
 
   it('should build prompt with difficulty range', () => {
@@ -41,6 +44,7 @@ describe('buildWebEnhancePrompt', () => {
 
     const prompt = buildWebEnhancePrompt(options);
 
+    expect(prompt).toContain('<输出说明>');
     expect(prompt).toContain('CEFR');
     expect(prompt).toContain('B2-C2');
     expect(prompt).toContain('最多 15');

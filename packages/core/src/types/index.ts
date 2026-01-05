@@ -59,6 +59,7 @@ export const MessageTypeSchema = z.enum([
   'TRANSLATE_KEYWORDS',
   'ENHANCE_WEB',
   'ENHANCE_SUBTITLE',
+  'ENGLISH_CORRECTION',
   'EXPLAIN_WORD',
   'CHAT',
   'GET_CHAT_SESSIONS',
@@ -206,6 +207,7 @@ export const BehaviorRoutesSchema = z
     translate_keywords: { kind: 1, channelId: 1, extra: {} },
     dictionary: { kind: 1, channelId: 1, extra: {} },
     adapt_subtitle: { kind: 1, channelId: 1, extra: {} },
+    english_correction: { kind: 1, channelId: 1, extra: {} },
     chat: { kind: 1, channelId: 1, extra: {} },
   });
 export type BehaviorRoutes = z.infer<typeof BehaviorRoutesSchema>;
@@ -257,6 +259,26 @@ export const WebDAVConfigSchema = z.object({
 });
 export type WebDAVConfig = z.infer<typeof WebDAVConfigSchema>;
 
+export const EnglishCorrectionConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    triggerKey: z.string().min(1).default('space'),
+    triggerTimes: z.number().int().min(1).max(5).default(3),
+    triggerTimeout: z.number().int().min(100).max(2000).default(500),
+    autoCloseDelay: z.number().int().min(0).max(10000).default(3000),
+    showUndoButton: z.boolean().default(true),
+  })
+  .strict()
+  .default({
+    enabled: false,
+    triggerKey: 'space',
+    triggerTimes: 3,
+    triggerTimeout: 500,
+    autoCloseDelay: 3000,
+    showUndoButton: true,
+  });
+export type EnglishCorrectionConfig = z.infer<typeof EnglishCorrectionConfigSchema>;
+
 export const SettingsSchema = z.object({
   // Language
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
@@ -277,6 +299,9 @@ export const SettingsSchema = z.object({
   // Behavior
   enabled: z.boolean().default(true),
   autoEnhance: z.boolean().default(true),
+
+  // English correction (3x space)
+  englishCorrection: EnglishCorrectionConfigSchema,
 
   // Site rules
   siteMode: z.enum(['all', 'whitelist']).default('all'),
@@ -364,6 +389,42 @@ export const EnhanceSubtitlePayloadSchema = z
   })
   .strict();
 export type EnhanceSubtitlePayload = z.infer<typeof EnhanceSubtitlePayloadSchema>;
+
+// =============================================================================
+// English Correction Output / Payload
+// =============================================================================
+
+export const EnglishCorrectionOutputSchema = z
+  .object({
+    hasError: z.boolean(),
+    corrected: z.string().nullable(),
+    message: z.string().max(50),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (!value.hasError && value.corrected !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'corrected must be null when hasError=false',
+        path: ['corrected'],
+      });
+    }
+    if (value.hasError && (!value.corrected || !value.corrected.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'corrected is required when hasError=true',
+        path: ['corrected'],
+      });
+    }
+  });
+export type EnglishCorrectionOutput = z.infer<typeof EnglishCorrectionOutputSchema>;
+
+export const EnglishCorrectionPayloadSchema = z
+  .object({
+    text: z.string().min(1),
+  })
+  .strict();
+export type EnglishCorrectionPayload = z.infer<typeof EnglishCorrectionPayloadSchema>;
 
 // =============================================================================
 // Keyword Batch Translation Payload

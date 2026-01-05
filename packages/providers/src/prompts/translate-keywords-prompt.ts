@@ -1,24 +1,64 @@
+import type {
+  CEFRLevel,
+  ProficiencyPreference,
+  PromptTemplateInput,
+  SupportedLanguage,
+  NativeLanguage,
+} from '@lexipath/core';
+import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { renderPromptTemplate } from './prompt-template-renderer';
+
 export interface TranslateKeywordsPromptOptions {
   keywords: string[];
   context?: string;
-  sourceLang: string;
-  targetLang: string;
+  sourceLang: SupportedLanguage;
+  targetLang: NativeLanguage;
+  userLevel: CEFRLevel;
+  proficiencyPreference?: ProficiencyPreference;
 }
 
 export function buildTranslateKeywordsPrompt(options: TranslateKeywordsPromptOptions): string {
   const keywords = options.keywords.map((term) => term.trim()).filter(Boolean);
   const context = options.context?.trim();
 
-  return `你是一个专业的翻译助手。请将给定的单词列表从 ${options.sourceLang} 翻译为 ${options.targetLang}。
+  const referenceLine = buildProficiencyReferenceLine({
+    sourceLang: options.sourceLang,
+    targetLang: options.targetLang,
+    userLevel: options.userLevel,
+    ...(options.proficiencyPreference ? { proficiencyPreference: options.proficiencyPreference } : {}),
+  });
 
-规则（非常重要）：
-- 严格按输入顺序输出
-- 每行只输出一个翻译结果
-- 不要输出序号、项目符号、解释、JSON、Markdown 或代码块
-- 只输出最常见、最基础的译法（不要多个释义）
-${context ? '- 如提供上下文，请结合上下文选择最合适的译法\n' : ''}输入（每行一个词）：
-${keywords.join('\n')}
-${context ? `\n上下文：\n${context}\n` : ''}`;
+  const userInput = [
+    '词汇列表（每行一个）：',
+    keywords.join('\n'),
+    ...(context ? ['', '上下文：', context] : []),
+  ].join('\n');
+
+  const template: PromptTemplateInput = {
+    role: '你是专业翻译助手。',
+    scene: '当前环境：词汇列表翻译场景。',
+    style: '风格：只给出最常见、最基础的译法；不输出多义列表。',
+    task: `任务：将<用户输入>中的词汇列表从 ${options.sourceLang} 翻译为 ${options.targetLang}。`,
+    userInfo: {
+      motherTongue: options.targetLang,
+      targetLearningLanguage: options.sourceLang,
+      cefrLevel: options.userLevel,
+      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+    },
+    userInput,
+    outputFormat: `translation_1
+translation_2`,
+    outputNotes: [
+      '规则（非常重要）：',
+      '1. 严格按输入顺序输出',
+      '2. 每行只输出一个翻译结果',
+      '3. 不要输出序号、项目符号、解释、JSON、Markdown 或代码块',
+      '4. 只输出最常见、最基础的译法（不要多个释义）',
+      ...(context ? ['5. 如提供上下文，请结合上下文选择最合适的译法'] : []),
+    ].join('\n'),
+  };
+
+  return renderPromptTemplate(template);
 }
 
 function stripCodeFences(input: string): string {
@@ -61,4 +101,3 @@ export function parseTranslateKeywordsResponse(
 
   return { translations, ok: translations.length > 0 };
 }
-

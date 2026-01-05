@@ -1,6 +1,7 @@
-import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage, PromptTemplateInput } from '@lexipath/core';
 import { buildProficiencyReferenceLine } from './proficiency-reference';
 import { buildCefrOutputGuidance } from './cefr-guidance';
+import { renderPromptTemplate } from './prompt-template-renderer';
 
 export interface SubtitleEnhancePromptOptions {
   subtitle: string;
@@ -42,57 +43,67 @@ export function buildSubtitleEnhancePrompt(options: SubtitleEnhancePromptOptions
       ? { proficiencyPreference: options.proficiencyPreference }
       : {}),
   });
-  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
   const cefrGuidance = buildCefrOutputGuidance({
     sourceLang,
     targetLang,
     level: difficultyLevel,
   });
 
+  const templateBase: Omit<PromptTemplateInput, 'outputFormat' | 'outputNotes'> = {
+    role: '你是字幕增强助手。',
+    scene: '当前环境：视频字幕增强场景。',
+    style: '风格：适合字幕显示，表达自然清晰，不添加原文没有的信息。',
+    task:
+      mode === 'single'
+        ? `任务：将<用户输入>中的${sourceLanguageName}字幕改写到符合 CEFR ${difficultyLevel} 水平，同时保持口语自然、适合字幕显示。只返回增强后的${sourceLanguageName}字幕内容。`
+        : `任务：将<用户输入>中的${sourceLanguageName}字幕处理为双语展示：line1_final 为符合 CEFR ${difficultyLevel} 的增强${sourceLanguageName}字幕，line2_final 为${targetLanguageName}对照翻译。`,
+    userInfo: {
+      motherTongue: targetLang,
+      targetLearningLanguage: sourceLang,
+      cefrLevel: difficultyLevel,
+      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+    },
+    userInput: subtitle,
+  };
+
   if (mode === 'single') {
-    return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平，同时保持口语自然、适合字幕显示。${referenceSection}
-${cefrGuidance}
-
-规则：
-1. 词汇与语法难度适配 ${difficultyLevel}
-2. 保持核心含义不变
-3. 保持字幕长度合理（最多 2 行，每行约 40 个字符以内）
-4. 使用自然、口语化表达
-5. 只返回增强后的 ${sourceLanguageName} 字幕内容
-6. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
-
-待处理字幕：
-"""
-${subtitle}
-"""
-
-请输出 JSON：
-{
-  "line1_final": "增强后的字幕文本"
-}`;
+    return renderPromptTemplate({
+      ...templateBase,
+      outputFormat: `{
+  "line1_final": ""
+}`,
+      outputNotes: [
+        cefrGuidance,
+        '',
+        '规则：',
+        `1. 词汇与语法难度适配 CEFR ${difficultyLevel}`,
+        '2. 保持核心含义不变',
+        '3. 字幕长度合理（最多 2 行，每行约 40 个字符以内）',
+        '4. 使用自然、口语化表达',
+        `5. 只返回增强后的${sourceLanguageName}字幕内容`,
+        '6. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
+      ].join('\n'),
+    });
   }
 
-  return `你是字幕增强助手，服务于语言学习者。请把下面的 ${sourceLanguageName} 字幕处理为双语展示。${referenceSection}
-${cefrGuidance}
-
-规则：
-1. line1_final：将 ${sourceLanguageName} 字幕改写到符合 CEFR ${difficultyLevel} 水平
-2. line2_final：提供 ${targetLanguageName} 翻译用于对照
-3. 每行尽量控制在约 40 个字符以内，便于阅读
-4. 两行都要保持核心含义一致
-5. 使用自然、口语化表达
-6. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
-
-待处理字幕：
-"""
-${subtitle}
-"""
-
-请输出 JSON：
-{
-  "line1_final": "增强后的 ${sourceLanguageName} 字幕",
-  "line2_final": "${targetLanguageName} 翻译"
-}`;
+  return renderPromptTemplate({
+    ...templateBase,
+    outputFormat: `{
+  "line1_final": "",
+  "line2_final": ""
+}`,
+    outputNotes: [
+      cefrGuidance,
+      '',
+      '规则：',
+      `1. line1_final：将${sourceLanguageName}字幕改写到符合 CEFR ${difficultyLevel} 水平`,
+      `2. line2_final：提供${targetLanguageName}翻译用于对照`,
+      '3. 每行尽量控制在约 40 个字符以内，便于阅读',
+      '4. 两行都要保持核心含义一致',
+      '5. 使用自然、口语化表达',
+      '6. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
+    ].join('\n'),
+  });
 }
 
 /**

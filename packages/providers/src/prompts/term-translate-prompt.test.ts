@@ -7,12 +7,13 @@ describe('buildTermTranslatePrompt', () => {
       terms: ['hello', 'world'],
       sourceLang: 'en',
       targetLang: 'zh-CN',
+      userLevel: 'B1',
     });
 
     expect(prompt).toContain('en');
     expect(prompt).toContain('zh-CN');
-    expect(prompt).toContain('- hello');
-    expect(prompt).toContain('- world');
+    expect(prompt).toContain('hello');
+    expect(prompt).toContain('world');
   });
 });
 
@@ -36,4 +37,3 @@ describe('parseTermTranslateResponse', () => {
     expect(result.translations.hello).toBe('你好');
   });
 });
-

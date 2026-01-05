@@ -51,6 +51,7 @@ import {
 import { Badge } from "../components/ui/badge";
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
+import { Switch } from "../components/ui/switch";
 import {
   AlertCircle,
   CheckCircle2,
@@ -76,6 +77,7 @@ type BehaviorKey =
   | "translate_keywords"
   | "dictionary"
   | "adapt_subtitle"
+  | "english_correction"
   | "chat";
 
 const BEHAVIOR_KEYS: BehaviorKey[] = [
@@ -84,6 +86,7 @@ const BEHAVIOR_KEYS: BehaviorKey[] = [
   "translate_keywords",
   "dictionary",
   "adapt_subtitle",
+  "english_correction",
   "chat",
 ];
 
@@ -93,6 +96,7 @@ const BEHAVIOR_KIND_ALLOWLIST: Record<BehaviorKey, RouteKind[]> = {
   dictionary: [1, 2, 3],
   translate_keywords: [1, 2, 3],
   adapt_subtitle: [1],
+  english_correction: [1],
   chat: [1],
 };
 
@@ -126,6 +130,7 @@ type FormState = {
   theme: Settings["theme"];
   enabled: boolean;
   autoEnhance: boolean;
+  englishCorrection: Settings["englishCorrection"];
   siteMode: SiteMode;
   excludedSites: string[];
   allowedSites: string[];
@@ -390,6 +395,7 @@ function settingsToFormState(settings: Settings): FormState {
     theme: settings.theme,
     enabled: settings.enabled,
     autoEnhance: settings.autoEnhance,
+    englishCorrection: settings.englishCorrection,
     siteMode: settings.siteMode,
     excludedSites: settings.excludedSites,
     allowedSites: settings.allowedSites,
@@ -749,6 +755,7 @@ function buildSettingsPatch(form: FormState):
     theme: form.theme,
     enabled: form.enabled,
     autoEnhance: form.autoEnhance,
+    englishCorrection: form.englishCorrection,
     siteMode: form.siteMode,
     excludedSites: form.excludedSites,
     allowedSites: form.allowedSites,
@@ -1826,7 +1833,95 @@ export function Options(): React.ReactElement {
                          <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
                            {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
                          </p>
-                      </div>
+                     </div>
+                    </div>
+                 </div>
+
+                  <div className="md:col-span-2 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+                     <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsEnglishCorrectionTitle")}</h4>
+
+                     <div className="space-y-5">
+                       <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                         {t("optionsEnglishCorrectionDesc")}
+                       </p>
+
+                       <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
+                         <div className="space-y-1">
+                           <div className="text-sm font-bold text-gray-900 dark:text-white">{t("optionsEnglishCorrectionEnabled")}</div>
+                           <div className="text-xs text-gray-500 dark:text-gray-400">{t("optionsEnglishCorrectionEnabledDesc")}</div>
+                         </div>
+                         <Switch
+                           checked={form.englishCorrection.enabled}
+                           onCheckedChange={(checked) =>
+                             setForm({
+                               ...form,
+                               englishCorrection: { ...form.englishCorrection, enabled: checked },
+                             })
+                           }
+                         />
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                         <div className="space-y-2.5">
+                           <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                             {t("optionsEnglishCorrectionTriggerTimeout")}
+                           </Label>
+                           <Input
+                             type="number"
+                             min={100}
+                             max={2000}
+                             value={String(form.englishCorrection.triggerTimeout)}
+                             onChange={(e) => {
+                               const next = Number(e.target.value);
+                               if (!Number.isFinite(next)) return;
+                               setForm({
+                                 ...form,
+                                 englishCorrection: { ...form.englishCorrection, triggerTimeout: next },
+                               });
+                             }}
+                             className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                           />
+                           <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("optionsEnglishCorrectionTriggerTimeoutDesc")}</p>
+                         </div>
+
+                         <div className="space-y-2.5">
+                           <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                             {t("optionsEnglishCorrectionAutoCloseDelay")}
+                           </Label>
+                           <Input
+                             type="number"
+                             min={0}
+                             max={10000}
+                             value={String(form.englishCorrection.autoCloseDelay)}
+                             onChange={(e) => {
+                               const next = Number(e.target.value);
+                               if (!Number.isFinite(next)) return;
+                               setForm({
+                                 ...form,
+                                 englishCorrection: { ...form.englishCorrection, autoCloseDelay: next },
+                               });
+                             }}
+                             className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                           />
+                           <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("optionsEnglishCorrectionAutoCloseDelayDesc")}</p>
+                         </div>
+                       </div>
+
+                       <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
+                         <div className="space-y-1">
+                           <div className="text-sm font-bold text-gray-900 dark:text-white">{t("optionsEnglishCorrectionShowUndo")}</div>
+                           <div className="text-xs text-gray-500 dark:text-gray-400">{t("optionsEnglishCorrectionShowUndoDesc")}</div>
+                         </div>
+                         <Switch
+                           checked={form.englishCorrection.showUndoButton}
+                           onCheckedChange={(checked) =>
+                             setForm({
+                               ...form,
+                               englishCorrection: { ...form.englishCorrection, showUndoButton: checked },
+                             })
+                           }
+                         />
+                       </div>
                      </div>
                   </div>
 

@@ -43,6 +43,38 @@
     "message": "加载释义出错",
     "description": "单词卡：发生未知错误"
   },
+  "englishCorrection_tagEncouragement": {
+    "message": "鼓励",
+    "description": "英文纠错：卡片标签（鼓励）"
+  },
+  "englishCorrection_tagCorrected": {
+    "message": "已纠正",
+    "description": "英文纠错：卡片标签（已纠正）"
+  },
+  "englishCorrection_tagError": {
+    "message": "错误",
+    "description": "英文纠错：卡片标签（错误）"
+  },
+  "englishCorrection_undo": {
+    "message": "撤销",
+    "description": "英文纠错：撤销按钮"
+  },
+  "englishCorrection_close": {
+    "message": "关闭",
+    "description": "英文纠错：关闭按钮"
+  },
+  "englishCorrection_ok": {
+    "message": "你的表达很正确！",
+    "description": "英文纠错：无错误时兜底鼓励"
+  },
+  "englishCorrection_corrected": {
+    "message": "已为你做了纠正。",
+    "description": "英文纠错：有错误但无提示时兜底"
+  },
+  "englishCorrection_error": {
+    "message": "纠错失败，请稍后重试。",
+    "description": "英文纠错：请求失败兜底"
+  },
   "error_unknown": {
     "message": "未知错误",
     "description": "通用未知错误"
@@ -471,6 +503,46 @@
     "message": "配置母语/目标语言与水平。",
     "description": "语言设置描述"
   },
+  "optionsEnglishCorrectionTitle": {
+    "message": "英文纠错",
+    "description": "语言设置：英文纠错标题"
+  },
+  "optionsEnglishCorrectionDesc": {
+    "message": "在网页输入框中，限定时间窗口内连续按 3 次空格可触发英文纠错与反馈。",
+    "description": "语言设置：英文纠错描述"
+  },
+  "optionsEnglishCorrectionEnabled": {
+    "message": "启用英文纠错",
+    "description": "语言设置：启用英文纠错开关"
+  },
+  "optionsEnglishCorrectionEnabledDesc": {
+    "message": "仅在可编辑文本输入中生效；密码框与非文本输入会自动跳过。",
+    "description": "语言设置：启用英文纠错描述"
+  },
+  "optionsEnglishCorrectionTriggerTimeout": {
+    "message": "触发窗口（ms）",
+    "description": "语言设置：三连空格触发窗口标签"
+  },
+  "optionsEnglishCorrectionTriggerTimeoutDesc": {
+    "message": "三次空格需在该时间窗口内完成；过慢将不会触发。",
+    "description": "语言设置：三连空格触发窗口说明"
+  },
+  "optionsEnglishCorrectionAutoCloseDelay": {
+    "message": "鼓励卡片自动关闭（ms）",
+    "description": "语言设置：鼓励卡片自动关闭标签"
+  },
+  "optionsEnglishCorrectionAutoCloseDelayDesc": {
+    "message": "仅用于无错误时的鼓励卡片；纠正卡片默认不自动关闭。",
+    "description": "语言设置：鼓励卡片自动关闭说明"
+  },
+  "optionsEnglishCorrectionShowUndo": {
+    "message": "显示撤销按钮",
+    "description": "语言设置：显示撤销按钮标签"
+  },
+  "optionsEnglishCorrectionShowUndoDesc": {
+    "message": "纠正后在卡片中显示撤销按钮；同时支持 Ctrl+Z 撤销。",
+    "description": "语言设置：显示撤销按钮说明"
+  },
   "optionsAppearanceTitle": {
     "message": "外观",
     "description": "外观设置标题"
@@ -538,6 +610,14 @@
   "optionsBehaviorDesc_adapt_subtitle": {
     "message": "将母语字幕转换为适合你水平的学习语言（仅支持 LLM Channel）。",
     "description": "行为描述：adapt_subtitle"
+  },
+  "optionsBehavior_english_correction": {
+    "message": "英文纠错",
+    "description": "行为标签：english_correction"
+  },
+  "optionsBehaviorDesc_english_correction": {
+    "message": "输入框连续按 3 次空格触发英文纠错（仅支持 LLM Channel）。",
+    "description": "行为描述：english_correction"
   },
   "optionsBehavior_chat": {
     "message": "深度学习",

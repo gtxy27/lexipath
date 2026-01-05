@@ -27,7 +27,7 @@ describe('buildExplainWordPrompt', () => {
     expect(prompt).toContain('"definition"');
     expect(prompt).toContain('"example"');
     expect(prompt).toContain('输出约束');
-    expect(prompt).not.toContain('出现语境');
+    expect(prompt).not.toContain('<上下文信息>');
   });
 
   it('should build prompt with context', () => {
@@ -42,7 +42,8 @@ describe('buildExplainWordPrompt', () => {
     const prompt = buildExplainWordPrompt(options);
 
     expect(prompt).toContain('bank');
-    expect(prompt).toContain('出现语境');
+    expect(prompt).toContain('<上下文信息>');
+    expect(prompt).toContain('上文：');
     expect(prompt).toContain('I walked along the river bank');
     expect(prompt).toContain('与语境最相关');
   });
@@ -123,7 +124,7 @@ describe('buildExplainWordPrompt', () => {
     const prompt = buildExplainWordPrompt(options);
 
     expect(prompt).toContain('C1');
-    expect(prompt).toContain('难度适配 C1');
+    expect(prompt).toContain('难度适配 CEFR C1');
   });
 });
 

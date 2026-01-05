@@ -12,5 +12,6 @@ export * from './types';
 export * from './qualify';
 export * from './strategy';
 export * from './proficiency';
+export * from './prompting';
 // export * from './validators';
 // export * from './cache-key';

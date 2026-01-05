@@ -1,6 +1,7 @@
-import type { CEFRLevel, ProficiencyPreference, SupportedLanguage } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, PromptTemplateInput } from '@lexipath/core';
 import { buildCefrOutputGuidance } from './cefr-guidance';
 import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { renderPromptTemplate } from './prompt-template-renderer';
 
 export interface SubtitleAdaptPromptOptions {
   subtitle: string;
@@ -27,28 +28,35 @@ export function buildSubtitleAdaptPrompt(options: SubtitleAdaptPromptOptions): s
       ? { proficiencyPreference: options.proficiencyPreference }
       : {}),
   });
-  const referenceSection = referenceLine ? `\n${referenceLine}\n` : '\n';
 
-  return `你是字幕学习翻译助手，服务于语言学习者。请将下面的 ${sourceName} 字幕翻译为 ${targetName}，并将 ${targetName} 的难度调整到 CEFR ${options.difficultyLevel} 水平，同时保持口语自然、适合字幕显示。
+  const template: PromptTemplateInput = {
+    role: '你是字幕学习翻译助手。',
+    scene: '当前环境：视频字幕学习场景。',
+    style: '风格：自然清晰、适合字幕显示；不要添加原文没有的信息。',
+    task: `任务：将<用户输入>中的${sourceName}字幕翻译为${targetName}，并将表达难度调整到 CEFR ${options.difficultyLevel} 水平；保持核心含义不变；字幕长度合理（最多 2 行，每行约 40 个字符以内）。`,
+    userInfo: {
+      motherTongue: options.targetLang,
+      targetLearningLanguage: options.sourceLang,
+      cefrLevel: options.difficultyLevel,
+      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+    },
+    userInput: subtitle,
+    outputFormat: `{
+  "line1_final": ""
+}`,
+    outputNotes: [
+      cefrGuidance,
+      '',
+      '规则：',
+      '1. 保持核心含义不变',
+      `2. 输出必须是${targetName}`,
+      `3. 难度适配 CEFR ${options.difficultyLevel}（词汇与句式尽量符合该水平）`,
+      '4. 字幕长度合理（最多 2 行，每行约 40 个字符以内）',
+      '5. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
+    ].join('\n'),
+  };
 
-${referenceSection}${cefrGuidance}
-
-规则：
-1. 保持核心含义不变
-2. 输出必须是 ${targetName}
-3. 难度适配 CEFR ${options.difficultyLevel}（词汇与句式尽量符合该水平）
-4. 字幕长度合理（最多 2 行，每行约 40 个字符以内）
-5. 只输出 JSON，不要 Markdown，不要代码块，不要任何额外文字
-
-待处理字幕：
-"""
-${subtitle}
-"""
-
-请输出 JSON：
-{
-  "line1_final": "${targetName} 字幕"
-}`;
+  return renderPromptTemplate(template);
 }
 
 function getLanguageName(lang: SupportedLanguage): string {

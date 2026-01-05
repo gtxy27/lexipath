@@ -14,7 +14,9 @@ import { z } from 'zod';
 import {
   ClaudeProviderConfigSchema,
   GeminiProviderConfigSchema,
+  NativeLanguageSchema,
   ProviderConfigSchema,
+  SupportedLanguageSchema,
   type EnhanceSubtitlePayload,
   type EnhanceWebPayload,
   type CEFRLevel,
@@ -27,12 +29,14 @@ import {
   type RouteKind,
   type ExplainWordOutput,
   type ExplainWordPayload,
+  type EnglishCorrectionOutput,
+  type EnglishCorrectionPayload,
   type Settings,
   type SubtitleEnhanceOutput,
   type WebEnhanceOutput,
   type TranslateKeywordsPayload,
 } from '@lexipath/core';
-import { validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
+import { validateEnglishCorrectionOutput, validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
 import {
   BingTranslateProvider,
   ClaudeProvider,
@@ -43,6 +47,7 @@ import {
 } from '@lexipath/providers';
 import {
   buildExplainWordPrompt,
+  buildEnglishCorrectionPrompt,
   buildKeywordSelectPrompt,
   buildSubtitleAdaptPrompt,
   buildSubtitleEnhancePrompt,
@@ -331,11 +336,13 @@ const subtitleEnhanceCache = createExpiringLruCache<SubtitleEnhanceOutput>(CACHE
 const keywordSelectCache = createExpiringLruCache<string[]>(CACHE_MAX_ENTRIES);
 const translateKeywordsCache = createExpiringLruCache<Record<string, string>>(CACHE_MAX_ENTRIES);
 const explainWordCache = createExpiringLruCache<ExplainWordOutput>(CACHE_MAX_ENTRIES);
+const englishCorrectionCache = createExpiringLruCache<EnglishCorrectionOutput>(CACHE_MAX_ENTRIES);
 const webEnhanceInFlight = new Map<string, Promise<WebEnhanceOutput>>();
 const subtitleEnhanceInFlight = new Map<string, Promise<SubtitleEnhanceOutput>>();
 const keywordSelectInFlight = new Map<string, Promise<string[]>>();
 const translateKeywordsInFlight = new Map<string, Promise<Record<string, string>>>();
 const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
+const englishCorrectionInFlight = new Map<string, Promise<EnglishCorrectionOutput>>();
 const dictionaryService = new DictionaryService();
 
 async function getKeywordsForText(options: {
@@ -467,11 +474,19 @@ async function translateKeywords(options: {
             if (!providerInfo) return { value: {}, ok: false };
             const provider = getChatProvider(providerInfo.type, providerInfo.config);
 
+            const parsedSourceLang = SupportedLanguageSchema.safeParse(options.sourceLang);
+            const parsedTargetLang = NativeLanguageSchema.safeParse(options.targetLang);
+            if (!parsedSourceLang.success || !parsedTargetLang.success) {
+              return { value: {}, ok: false };
+            }
+
             const prompt = buildTranslateKeywordsPrompt({
               keywords: normalizedKeywords,
               ...(options.context ? { context: options.context } : {}),
-              sourceLang: options.sourceLang,
-              targetLang: options.targetLang,
+              sourceLang: parsedSourceLang.data,
+              targetLang: parsedTargetLang.data,
+              userLevel: settings.proficiencyLevel,
+              ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
             });
 
             const limit = getChannelConcurrencyLimit(channel, route.kind);
@@ -577,10 +592,16 @@ async function translateTerms(options: {
   if (!providerInfo) return terms;
   const provider = getChatProvider(providerInfo.type, providerInfo.config);
 
+  const parsedSourceLang = SupportedLanguageSchema.safeParse(options.sourceLang);
+  const parsedTargetLang = NativeLanguageSchema.safeParse(options.targetLang);
+  if (!parsedSourceLang.success || !parsedTargetLang.success) return terms;
+
   const prompt = buildTermTranslatePrompt({
     terms,
-    sourceLang: options.sourceLang,
-    targetLang: options.targetLang,
+    sourceLang: parsedSourceLang.data,
+    targetLang: parsedTargetLang.data,
+    userLevel: settings.proficiencyLevel,
+    ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
   });
 
   try {
@@ -973,6 +994,67 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
         const fallbackResult = validateSubtitleEnhanceOutput(undefined);
         const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
         return { value, ok: false };
+      }
+    },
+  });
+});
+
+registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload) => {
+  const text = payload.text.trim();
+  if (!text) {
+    throw new MessageError({ code: 'INVALID_PAYLOAD', message: 'Expected payload { text: string }' });
+  }
+
+  const settings = await getSettings();
+  const userLevel = settings.proficiencyLevel;
+
+  const route = resolveChannelRoute('english_correction', settings);
+  const channel = resolveChannel(route.channelId, settings);
+  if (!channel) {
+    throw new MessageError({ code: 'PROVIDER_NOT_CONFIGURED', message: t('error_providerNotConfigured') });
+  }
+
+  const providerInfo = getChatProviderByChannel(channel);
+  if (!providerInfo) {
+    throw new MessageError({ code: 'PROVIDER_NOT_CONFIGURED', message: t('error_providerNotConfigured') });
+  }
+
+  const provider = getChatProvider(providerInfo.type, providerInfo.config);
+
+  const cacheKey = makeCacheKey('ENGLISH_CORRECTION', {
+    v: 1,
+    provider: routeIdentity(route, settings),
+    motherTongue: settings.nativeLanguage,
+    targetLearningLanguage: settings.targetLanguage,
+    userLevel,
+    proficiencyPreference: settings.proficiencyPreference ?? null,
+    text,
+  });
+
+  return getOrRunCachedTask(englishCorrectionCache, englishCorrectionInFlight, cacheKey, {
+    ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
+    ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
+    run: async () => {
+      try {
+        const prompt = buildEnglishCorrectionPrompt({
+          text,
+          motherTongue: settings.nativeLanguage,
+          targetLearningLanguage: settings.targetLanguage,
+          userLevel,
+          ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+        });
+
+        const limit = getChannelConcurrencyLimit(channel, route.kind);
+        const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
+          provider.chat([{ role: 'user', content: prompt }], { temperature: 0.1, maxTokens: 180 })
+        );
+
+        const responseText = response.choices?.[0]?.message?.content ?? '';
+        const validated = validateEnglishCorrectionOutput(responseText);
+        return { value: validated.ok ? validated.value : validated.fallback, ok: validated.ok };
+      } catch {
+        const validated = validateEnglishCorrectionOutput(undefined);
+        return { value: validated.ok ? validated.value : validated.fallback, ok: false };
       }
     },
   });

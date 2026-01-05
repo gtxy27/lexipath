@@ -13,12 +13,13 @@
 
 ## 核心思路
 
-**配置驱动的平台特定翻译策略：**
+**配置驱动的平台特定翻译策略 + 统一提示词工程模板：**
 
-- 不同视频平台（YouTube、Coursera、Bilibili）使用不同的翻译配置
-- 不同内容类型（娱乐、学术、动漫）使用不同的 Prompt 模板
-- 通过配置注入的方式构造最终的提示词
-- 保持灵活性，便于扩展和调整
+- 通过配置识别“场景（scene）”，并在此基础上选择“风格（style）”；**scene 与 style 解耦**
+- 不同平台/内容类型并不意味着要维护多套完整 Prompt；我们维护一套**统一的提示词工程模板（Blueprint）**，并用 scene/style 注入差异化约束
+- 所有行为（字幕增强/网页增强/关键词/词卡解释/英文纠错等）都迁移到模板体系：**模板重构 ≠ 行为重构**
+- 只使用 `user` 消息承载完整 prompt（不依赖 `system`），并保持输出“可校验 + 可回退”
+- 遵循 `docs/DEVELOPMENT.md`：不替用户选模型；输出可疑时保守回退（不渲染/降级）
 
 ---
 
@@ -27,18 +28,30 @@
 ### 1. 平台配置结构
 
 ```typescript
-interface PlatformConfig {
-  // 平台识别
-  platform: string;
+type SceneKey = string;
+type StyleKey = string;
+
+interface SceneConfig {
+  // 场景识别（客观事实/信号）
+  scene: {
+    platform: 'youtube' | 'bilibili' | 'web' | 'generic';
+    surface: 'subtitle' | 'web' | 'input';
+    contentType?: string; // e.g. anime/academic/casual/... (string for extensibility)
+  };
   matches: string[];
 
-  // 翻译策略
-  translationConfig: {
-    promptScenario: "casual" | "academic" | "entertainment" | "anime";
-    batchSize: number; // 批量翻译大小
-    useContext: boolean; // 是否保持字幕上下文（高级功能）
-    preferredModel?: string; // 优先使用的模型
-    specialRules?: string[]; // 特殊规则（如保留二次元用语）
+  // 风格策略（表达策略/可被覆盖）
+  style: {
+    defaultStyle: StyleKey;
+    // 可选：按需追加规则片段（纯文本），用于注入模板中的“风格”段落
+    styleRules?: string[];
+  };
+
+  // 字幕策略（仅 subtitle 场景）
+  subtitlePolicy?: {
+    // 是否提供上下文：通过 contextInfo 的有无控制；窗口默认 2
+    contextWindow: { before: number; after: number }; // default {2,2}; set {0,0} to disable
+    // 其他策略（例如 batchSize）属于运行时行为策略，避免塞进 prompt 结构体
   };
 
   // UI 配置
@@ -55,26 +68,26 @@ interface PlatformConfig {
 **YouTube 娱乐视频：**
 
 - Prompt: 口语化、幽默感、保持轻松氛围
-- 批量: 10 条字幕
+- 运行策略：可配置批处理大小（例如 10 条字幕；属于运行时策略而非 prompt 结构体字段）
 - 上下文: 可选（高级功能）
 
 **Coursera 学术课程：**
 
 - Prompt: 专业术语准确、逻辑严谨、学术风格
-- 批量: 5 条字幕（更精细）
+- 运行策略：可配置批处理大小（例如 5 条字幕；属于运行时策略）
 - 上下文: 可选（高级功能）
-- 优先模型: GPT-4（质量优先）
+- 模型：由用户配置的 channel 决定（不替用户选模型）
 
 **Bilibili 动漫：**
 
 - Prompt: 保留二次元用语、网络梗、角色称谓
-- 批量: 10 条字幕
+- 运行策略：可配置批处理大小（例如 10 条字幕；属于运行时策略）
 - 特殊规则: 保留日语拟声词、敬语系统
 
 **TED 演讲：**
 
 - Prompt: 演讲风格、激励性语气、保持感染力
-- 批量: 8 条字幕
+- 运行策略：可配置批处理大小（例如 8 条字幕；属于运行时策略）
 - 上下文: 可选（高级功能）
 
 ### 3. 实现流程
@@ -82,43 +95,91 @@ interface PlatformConfig {
 ```
 用户访问视频网站
     ↓
-detectPlatform(url)
+detectScene(url, signals)
     ↓
-加载对应的 PlatformConfig
+加载对应的 SceneConfig（scene + defaultStyle + styleRules）
     ↓
-createSubtitleProvider(config.platform)
+createSubtitleProvider(scene.platform)
     ↓
 获取字幕
     ↓
-buildPromptWithConfig(config.translationConfig)
+构造 PromptTemplateInput（role/scene/style/task + userInfo/contextInfo/userInput/output...）
     ↓
-调用 LLM 翻译
+渲染为最终 user prompt，并调用 LLM
 ```
 
 ### 4. Prompt 构造方式
 
-**当前实现：**
+**原则：只有“标识性标签”，没有“结构性标签”。**
+
+- 固定段落（无标签，按顺序）：**角色 → 场景 → 风格 → 任务**
+- 信息块（全标签化）：`<用户信息>`（必有）、`<上下文信息>`（可选）、`<用户输入>`（必有）、`<输出格式>`（必有）、`<输出说明>`（必有）
+- 标签规则：**标签文字中文 + 标签符号英文**（示例：`<用户信息>...</用户信息>`）
+- `userInfo/contextInfo` 使用结构体承载（类型严格），其余字段使用 string（灵活）
+- `<输出格式>` 块内只放“格式本体/示例”，不写中文说明；中文说明统一放 `<输出说明>`
+
+**结构体（按渲染顺序）：**
 
 ```typescript
-buildSubtitleAdaptPrompt({
-  subtitle: "...",
-  sourceLang: "en",
-  targetLang: "zh",
-  difficultyLevel: "B1",
-});
+type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+type UserInfo = {
+  motherTongue: string;
+  targetLearningLanguage: string;
+  cefrLevel: CEFRLevel;
+  levelReferenceLine?: string; // e.g. "（参考 IELTS 6.5）" / "（≈ CEFR B2）"
+};
+
+type ContextInfo = {
+  before: string[];
+  after: string[];
+};
+
+type PromptTemplateInput = {
+  // 顶部固定必备内容（无标签）
+  role: string;
+  scene: string;
+  style: string;
+  task: string;
+
+  // 信息块（标签化）
+  userInfo: UserInfo;
+  contextInfo?: ContextInfo;
+  userInput: string;
+  outputFormat: string;
+  outputNotes: string;
+};
 ```
 
-**扩展后：**
+**渲染出的最终 prompt（示例；仅说明结构）：**
 
-```typescript
-buildSubtitleAdaptPrompt({
-  subtitle: "...",
-  sourceLang: "en",
-  targetLang: "zh",
-  difficultyLevel: "B1",
-  scenario: "academic", // 新增：场景标识
-  specialRules: ["保留专业术语"], // 新增：特殊规则
-});
+```text
+你是字幕学习翻译助手。当前环境：YouTube 动漫字幕场景。
+风格：自然清晰、适合字幕显示；保留敬称体系（例：琳奈ちゃん → 琳奈酱）；不要添加原文没有的信息。
+任务：根据用户信息，将下方用户输入处理为目标学习语言版本，并将表达难度调整到用户水平；保持核心含义不变；字幕约束：最多 2 行...
+
+<用户信息>
+- 母语：...
+- 目标学习语言：...
+- 用户水平：CEFR B1（参考 IELTS 6.5）
+</用户信息>
+
+<上下文信息>
+上文：...
+下文：...
+</上下文信息>
+
+<用户输入>
+...
+</用户输入>
+
+<输出格式>
+{ "line1_final": string, "line2_final"?: string }
+</输出格式>
+
+<输出说明>
+- 只输出一个 JSON 对象...
+</输出说明>
 ```
 
 ---
@@ -128,118 +189,87 @@ buildSubtitleAdaptPrompt({
 ### 1. 配置存储位置
 
 ```
-apps/extension/src/content/platform-configs.ts  // 平台配置
-packages/providers/src/prompts/scenarios/       // Prompt 模板
+packages/core/src/prompting/                     // PromptTemplateInput + Zod schema（纯逻辑）
+packages/core/src/scenes/                        // SceneConfig + 匹配逻辑（纯逻辑）
+packages/providers/src/prompts/                  // renderer + 各行为 prompt 生成（保持对外 API 稳定）
+apps/extension/src/content/                      // 采集上下文/用户输入/触发器（字幕与三连空格）
+apps/extension/src/background/                   // 消息路由 + provider 调用 + 校验与回退
 ```
 
 ### 2. 配置格式
 
 ```typescript
-// platform-configs.ts
-export const PLATFORM_CONFIGS: Record<string, PlatformConfig> = {
-  "youtube-entertainment": {
-    platform: "youtube",
-    matches: ["https://www.youtube.com/watch*"],
-    translationConfig: {
-      promptScenario: "casual",
-      batchSize: 10,
-      useContext: false, // 默认关闭（高级功能）
+export const SCENE_CONFIGS: Record<SceneKey, SceneConfig> = {
+  youtube_anime_subtitle: {
+    scene: { platform: 'youtube', surface: 'subtitle', contentType: 'anime' },
+    matches: ['https://www.youtube.com/watch*'],
+    style: {
+      defaultStyle: 'anime',
+      styleRules: [
+        '保留角色称谓与敬称体系（例：琳奈ちゃん → 琳奈酱）',
+        '语气词允许保留（吧/呢/呀/啊/哦），但不要无意义堆叠',
+      ],
     },
-    uiConfig: {
-      overlayPosition: "bottom",
-      fontSize: 18,
-      hideNativeSubtitles: true,
-    },
+    subtitlePolicy: { contextWindow: { before: 2, after: 2 } },
+    uiConfig: { overlayPosition: 'bottom', fontSize: 18, hideNativeSubtitles: true },
   },
 
-  "coursera-academic": {
-    platform: "generic",
-    matches: ["https://www.coursera.org/learn/*"],
-    translationConfig: {
-      promptScenario: "academic",
-      batchSize: 5,
-      useContext: false, // 默认关闭
-      preferredModel: "gpt-4",
+  coursera_academic_subtitle: {
+    scene: { platform: 'web', surface: 'subtitle', contentType: 'academic' },
+    matches: ['https://www.coursera.org/learn/*'],
+    style: {
+      defaultStyle: 'academic',
+      styleRules: ['术语准确、逻辑严谨、风格正式'],
     },
-    uiConfig: {
-      overlayPosition: "bottom",
-      fontSize: 20,
-      hideNativeSubtitles: true,
-    },
+    subtitlePolicy: { contextWindow: { before: 2, after: 2 } },
+    uiConfig: { overlayPosition: 'bottom', fontSize: 20, hideNativeSubtitles: true },
   },
 };
 ```
 
-### 3. Prompt 模板
+### 3. Prompt 模板（统一 Blueprint）
 
-```typescript
-// prompts/scenarios/casual-subtitle.ts
-export const CASUAL_SUBTITLE_PROMPT = `
-你是字幕翻译助手，正在翻译娱乐视频。
-请保持：
-- 口语化、自然流畅
-- 幽默感和轻松氛围
-- 网络流行语的传达
-...
-`;
+不再为每个场景维护一整段完整 Prompt；改为维护一套统一模板（Blueprint）：
 
-// prompts/scenarios/academic-subtitle.ts
-export const ACADEMIC_SUBTITLE_PROMPT = `
-你是学术字幕翻译助手，正在翻译教育课程。
-请保持：
-- 专业术语的准确性
-- 逻辑的严谨性
-- 学术风格和正式语气
-...
-`;
-```
+- 行为（task/outputFormat/outputNotes）由各 `build*Prompt` 提供
+- 场景（scene）与风格（style/styleRules）由配置/识别提供
+- 结构体 `PromptTemplateInput` 负责承载并渲染成最终 `user` prompt
 
 ---
 
 ## 实施计划
 
-### MVP 阶段（先验证效果）
+### 一次交付（完整落地）
 
-**阶段 1：硬编码 2-3 个场景**
+**Step 1：确定模板与结构体（契约优先）**
 
-- YouTube 娱乐 vs Coursera 学术
-- 直接在 `buildSubtitleAdaptPrompt` 中添加场景判断
-- 不抽象配置系统
-- **目标**：验证不同 Prompt 是否有明显效果差异
+- 定义 `UserInfo` / `ContextInfo` / `PromptTemplateInput`（按顺序）并提供 Zod 校验
+- 明确统一标签结构：`<用户信息>`、`<上下文信息>`（可选）、`<用户输入>`、`<输出格式>`、`<输出说明>`
+- 约束：只用 `user` 消息；`<输出格式>` 内不写中文说明
 
-**阶段 2：效果评估**
+**Step 2：实现统一 renderer，并迁移全部 Prompt 构造器**
 
-- 对比翻译质量
-- 收集用户反馈
-- 决定是否继续
+- renderer：输入 `PromptTemplateInput`，输出最终 prompt string（固定段落 + 标签信息块）
+- 迁移所有 `build*Prompt`：保持对外 API 稳定，但内部改为组装 `PromptTemplateInput` 并渲染
+- 场景与风格：由 SceneConfig 提供 `scene/style/styleRules` 文案片段注入模板
 
-**阶段 3：抽象配置系统**
+**Step 3：用户水平参考行（与 CEFR 并列展示）**
 
-- 如果效果明显，实施完整的平台配置系统
-- 如果效果不明显，保持简单统一的 Prompt
+- 内部仍以 CEFR 为唯一可计算值
+- 若用户选择了具体标准（IELTS/JLPT/TOPIK...）：提示词中显示 `CEFR X（参考 ...）` 的参考行
+- 修正当前“按语言自动推参考”行为：改为“用户选择了哪个标准，就只显示哪个”（用于提示词与 UI）
 
-### 完整实施（如果 MVP 验证成功）
+**Step 4：英文三连空格纠错（一次交付纳入）**
 
-**Step 1：创建配置文件**
+- 触发：在可编辑文本输入（input/textarea/contenteditable）中，限定时间窗口内连续 3 次空格触发
+- 排除：密码框与非文本输入；内容主要为 URL/链接或几乎不含英文句子时不触发
+- LLM 输出：严格 JSON（见“英语输入纠正功能”章节），失败则保守回退（不替换输入）
+- 撤销：兼容 Ctrl+Z，并提供 UI 撤销入口（文案走 i18n key）
 
-- `platform-configs.ts` - 平台配置
-- `prompts/scenarios/*.ts` - Prompt 模板
+**Step 5：手工验收与回退规则**
 
-**Step 2：扩展 Prompt 构造函数**
-
-- 在 `buildSubtitleAdaptPrompt` 中添加 `scenario` 参数
-- 根据场景返回不同的 Prompt 模板
-
-**Step 3：集成到现有流程**
-
-- 在 `subtitle-controller.ts` 中检测平台
-- 加载对应配置
-- 传递给翻译函数
-
-**Step 4：UI 暴露（可选）**
-
-- 在设置页面允许用户选择/自定义场景
-- 提供 Prompt 预览和编辑功能
+- 所有 LLM 输出必须校验；可疑则回退（不渲染/不替换/降级）
+- Chrome/Firefox：字幕与三连空格均需验证
 
 ---
 
@@ -1378,35 +1408,35 @@ onCueIndexChange: (index) => {
 
 - 配置系统可能过于复杂
 - 场景太多导致难以维护
-- **缓解**：从 MVP 开始，逐步验证
+- **缓解**：一次交付时先约束“SceneConfig 数量与字段”，以统一 Blueprint 为核心，后续只增量追加 scene/styleRules
 
 ### 2. 效果验证困难
 
 - 不同 Prompt 的效果差异可能不明显
 - 主观评价标准不统一
-- **缓解**：选择对比度大的场景（娱乐 vs 学术）
+- **缓解**：保留少量高对比场景作为对照样本（例如学术 vs 动漫），并记录手工验收用例与截图/录屏（可选）
 
 ### 3. 维护成本
 
-- 每个平台需要单独优化 Prompt
+- 每个平台/内容类型可能需要追加 styleRules（规则片段）
 - 配置文件可能快速增长
-- **缓解**：抽象通用模板，减少重复
+- **缓解**：统一 Blueprint + 规则片段复用，避免“每场景一整段 Prompt”的复制粘贴
 
 ### 4. 上下文功能的控制
 
-- `useContext` 作为高级功能，应默认关闭
-- 需要在设置页面让用户选择是否启用
-- 或根据用户的订阅等级决定是否可用
+- 上下文通过 `contextInfo` 的有无控制（无上下文则不输出 `<上下文信息>`）
+- 窗口默认 `{ before: 2, after: 2 }`；可通过配置调整为 `{0,0}` 关闭
+- 注意隐私：上下文仅用于一致性与指代，不应注入无关的页面敏感信息
 
 ---
 
 ## 下一步行动
 
-1. **立即实施：** 硬编码 2 个场景（YouTube 娱乐 + Coursera 学术）
-2. **验证效果：** 对比翻译质量差异
-3. **根据反馈决定：** 是否继续抽象配置系统
-4. **高优先级功能：** Bilibili 弹幕处理、YouTube Shorts 适配
-5. **字幕格式解析器：** 实现 WebVTT、SRT、TTML Parser
+1. **立即实施：** 完成 PromptTemplateInput + renderer，并迁移全部 `build*Prompt`
+2. **同步实施：** scene/style 解耦并落入 SceneConfig（不替用户选模型）
+3. **立即实施：** 英文三连空格纠错（触发/排除/校验/撤销/i18n）
+4. **并行推进：** Bilibili 弹幕处理、YouTube Shorts 适配
+5. **字幕格式解析器：** WebVTT、SRT、TTML Parser（与 cue 模型对齐）
 
 ---
 
@@ -1443,15 +1473,43 @@ onCueIndexChange: (index) => {
 
 ### 提示词模板
 
-```markdown
-你是一个英语写作助手，分析用户输入的英文文本。
+遵循本计划的统一提示词工程模板（Blueprint）：
 
-返回 JSON 格式：
+- 顶部固定段落（无标签，按顺序）：角色 → 场景 → 风格 → 任务
+- 信息块（全标签化）：`<用户信息>`（必有）、`<用户输入>`（必有）、`<输出格式>`、`<输出说明>`
+- 注意：不在 prompt 中出现产品名（避免影响判断）
+
+**最终渲染出的 prompt 示例（仅演示结构；不是结构性标签）：**
+
+```text
+你是英文写作纠错助手。
+当前环境：用户在网页输入框中输入英文文本并触发快速纠错。
+风格：保持原意与主要语气，尽量少改；不编造不存在的信息。
+任务：检查<用户输入>是否存在语法/拼写/用词错误；若<用户输入>主要为 URL/链接或几乎不包含英文句子，则直接判定无错误。
+
+<用户信息>
+- 母语：zh-CN
+- 目标学习语言：en
+- 用户水平：CEFR B1（参考 IELTS 6.5）
+</用户信息>
+
+<用户输入>
+I have went to the store yesterday.
+</用户输入>
+
+<输出格式>
 {
-"hasError": boolean, // 是否有错误
-"corrected": string | null, // 纠正后的文本
-"message": string // 中文反馈（鼓励或说明，50字以内）
+  "hasError": boolean,
+  "corrected": string | null,
+  "message": string
 }
+</输出格式>
+
+<输出说明>
+- 只输出一个 JSON 对象。
+- 不要输出 Markdown，不要输出代码块，不要输出任何额外文字。
+- message 必须为中文，且 ≤ 50 字。
+</输出说明>
 ```
 
 ### 技术实现
@@ -1484,12 +1542,19 @@ document.addEventListener("keyup", (e) => {
 });
 ```
 
+补充约束：
+
+- 只对可编辑文本输入触发：`input/textarea/contenteditable`
+- 排除：密码框与非文本输入
+- 不需要冷却时间；但需要 in-flight 防重入（上一次纠错未完成时忽略再次触发），避免并发覆盖用户输入
+
 **2. AI 调用**
 
 ```javascript
 async function triggerCorrection() {
   const userText = getInputText(activeElement);
-  const prompt = template.replace("{{USER_INPUT}}", userText);
+  if (looksLikeUrlOnly(userText) || !containsEnglishSentence(userText)) return;
+  const prompt = renderPrompt(/* PromptTemplateInput */);
   const result = await callAI(prompt);
 
   if (result.hasError) {
@@ -1524,28 +1589,28 @@ async function triggerCorrection() {
 }
 ```
 
+补充约束：
+
+- 卡片文案必须走 i18n key（避免硬编码中文/英文到 UI 代码）
+- 撤销：兼容 Ctrl+Z，同时卡片提供“撤销”按钮（该按钮文案也走 i18n）
+- 行为：无错误时显示鼓励卡片并自动关闭；有错误时显示纠正卡片，不自动关闭（用户撤销或关闭）
+
 ### 开发优先级
 
-**Phase 1: MVP（2-3天）**
+一次交付内完成：
 
-- [ ] 按键检测机制（3次空格）
-- [ ] AI 调用集成
-- [ ] 基础卡片 UI
-- [ ] 自动文本替换
-- [ ] 撤销功能
+- [ ] 触发窗口（3 次空格 + `triggerTimeout`）
+- [ ] 排除规则（密码框/非文本/URL-only/非英文句）
+- [ ] PromptTemplateInput 渲染并调用 LLM
+- [ ] 严格输出校验 + 失败回退（不替换用户输入）
+- [ ] 自动替换 + 撤销（Ctrl+Z + UI 撤销按钮）
+- [ ] i18n 文案接入
 
-**Phase 2: 增强（2-3天）**
+可选增强（后续迭代）：
 
-- [ ] 卡片智能定位
-- [ ] 动画效果
+- [ ] 卡片智能定位/动画效果
 - [ ] 快捷键支持（Enter/Esc）
-- [ ] 移动端适配
-
-**Phase 3: 高级（可选）**
-
-- [ ] 学习统计
-- [ ] 个性化建议
-- [ ] 错误分类分析
+- [ ] 统计与错误分类分析
 
 ### 配置项
 
@@ -1554,7 +1619,7 @@ interface CorrectionConfig {
   enabled: boolean;
   triggerKey: string; // "space"
   triggerTimes: number; // 3
-  triggerTimeout: number; // 500
+  triggerTimeout: number; // 500 (ms)
   autoCloseDelay: number; // 3000
   showUndoButton: boolean;
 }
@@ -1563,14 +1628,12 @@ interface CorrectionConfig {
 ### 文件结构
 
 ```
-packages/core/src/correction/
-  ├── prompt-template.md
-  ├── types.ts
-  └── index.ts
-
+packages/core/src/prompting/               # PromptTemplateInput（与字幕等复用）
+packages/providers/src/prompts/            # renderer + 英文纠错 prompt builder
 apps/extension/src/content/
-  ├── correction-handler.ts    # 按键检测
-  └── correction-card.ts        # 卡片 UI
+  ├── english-correction/trigger.ts        # 3 次空格触发 + 排除规则
+  ├── english-correction/card.ts           # 卡片 UI（i18n）
+  └── english-correction/index.ts          # 入口与状态管理（in-flight、撤销）
 ```
 
 ### 风险与应对
@@ -1578,12 +1641,11 @@ apps/extension/src/content/
 | 风险      | 应对                           |
 | --------- | ------------------------------ |
 | 误触发    | 提高时间窗口精度、手动禁用选项 |
-| AI 不稳定 | 重试机制、降级方案、错误日志   |
+| AI 不稳定 | 严格输出校验、降级回退、错误日志 |
 | 卡片遮挡  | 智能定位、手动拖拽             |
-| 性能影响  | 防抖机制、缓存、轻量级模型     |
+| 性能影响  | in-flight 防重入、跳过 URL-only/非英文句、并发控制 |
 
 ### 相关文档
 
-- 完整设计总结：`docs/english_correction_discussion_summary.md`
-- 提示词模板：`docs/english_correction_prompt_template.md`
 - 沉浸式翻译参考：`content_script.js:7448`
+- 说明：英文纠错的交互/提示词结构已合并进本计划，不再维护单独文档
