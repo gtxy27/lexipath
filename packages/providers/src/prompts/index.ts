@@ -55,3 +55,5 @@ export {
   buildEnglishCorrectionPrompt,
   type EnglishCorrectionPromptOptions,
 } from './english-correction-prompt';
+
+export { PromptBuilder } from './prompt-builder';

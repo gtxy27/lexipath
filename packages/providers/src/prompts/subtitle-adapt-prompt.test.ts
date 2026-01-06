@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BEHAVIORS, resolvePromptScene, resolvePromptStyleValue } from '@lexipath/core';
 import { buildSubtitleAdaptPrompt } from './subtitle-adapt-prompt';
 
 describe('buildSubtitleAdaptPrompt', () => {
@@ -7,8 +8,11 @@ describe('buildSubtitleAdaptPrompt', () => {
       subtitle: '你好，欢迎回来。',
       sourceLang: 'zh',
       targetLang: 'en',
-      motherTongue: 'zh-CN',
       difficultyLevel: 'B1',
+      sceneValue: resolvePromptScene('video_subtitle'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.subtitle_adapt,
     });
 
     expect(prompt).toContain('中文');

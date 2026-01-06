@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BEHAVIORS, resolvePromptScene, resolvePromptStyleValue } from '@lexipath/core';
 import { buildKeywordSelectPrompt, parseKeywordSelectResponse } from './keyword-select-prompt';
 
 describe('buildKeywordSelectPrompt', () => {
@@ -8,7 +9,10 @@ describe('buildKeywordSelectPrompt', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
       userLevel: 'B1',
-      scene: 'subtitle',
+      sceneValue: resolvePromptScene('keyword_select_subtitle'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.keyword_select,
     });
 
     expect(prompt).toContain('挑选对学习者最有价值');

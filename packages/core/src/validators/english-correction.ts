@@ -7,6 +7,16 @@ const ENGLISH_CORRECTION_FALLBACK: EnglishCorrectionOutput = {
   message: '',
 };
 
+export type EnglishCorrectionValidationFailureReason =
+  | 'EMPTY'
+  | 'INVALID_JSON'
+  | 'INVALID_SCHEMA'
+  | 'INVALID_TYPE';
+
+export type EnglishCorrectionValidationDetailedResult =
+  | { ok: true; value: EnglishCorrectionOutput }
+  | { ok: false; fallback: EnglishCorrectionOutput; reason: EnglishCorrectionValidationFailureReason };
+
 function extractJsonFromCodeFence(text: string): string {
   const match = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const fenced = match?.[1];
@@ -67,13 +77,43 @@ function normalizeOutput(raw: unknown): unknown {
   return normalized;
 }
 
-export function validateEnglishCorrectionOutput(raw: unknown): Result<EnglishCorrectionOutput> {
-  const parsedUnknown = typeof raw === 'string' ? tryParseJson(raw) : raw;
-  if (parsedUnknown == null) return fail(ENGLISH_CORRECTION_FALLBACK);
+export function validateEnglishCorrectionOutputDetailed(raw: unknown): EnglishCorrectionValidationDetailedResult {
+  if (raw === undefined || raw === null) {
+    return { ok: false, fallback: ENGLISH_CORRECTION_FALLBACK, reason: 'EMPTY' };
+  }
 
-  const normalized = normalizeOutput(parsedUnknown);
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return { ok: false, fallback: ENGLISH_CORRECTION_FALLBACK, reason: 'EMPTY' };
+
+    const parsedUnknown = tryParseJson(trimmed);
+    if (parsedUnknown == null) {
+      return { ok: false, fallback: ENGLISH_CORRECTION_FALLBACK, reason: 'INVALID_JSON' };
+    }
+
+    const normalized = normalizeOutput(parsedUnknown);
+    const parsed = EnglishCorrectionOutputSchema.safeParse(normalized);
+    if (!parsed.success) {
+      return { ok: false, fallback: ENGLISH_CORRECTION_FALLBACK, reason: 'INVALID_SCHEMA' };
+    }
+
+    return { ok: true, value: parsed.data };
+  }
+
+  if (typeof raw !== 'object') {
+    return { ok: false, fallback: ENGLISH_CORRECTION_FALLBACK, reason: 'INVALID_TYPE' };
+  }
+
+  const normalized = normalizeOutput(raw);
   const parsed = EnglishCorrectionOutputSchema.safeParse(normalized);
-  if (!parsed.success) return fail(ENGLISH_CORRECTION_FALLBACK);
+  if (!parsed.success) {
+    return { ok: false, fallback: ENGLISH_CORRECTION_FALLBACK, reason: 'INVALID_SCHEMA' };
+  }
 
-  return ok(parsed.data);
+  return { ok: true, value: parsed.data };
+}
+
+export function validateEnglishCorrectionOutput(raw: unknown): Result<EnglishCorrectionOutput> {
+  const detailed = validateEnglishCorrectionOutputDetailed(raw);
+  return detailed.ok ? ok(detailed.value) : fail(detailed.fallback);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateEnglishCorrectionOutput } from './english-correction';
+import { validateEnglishCorrectionOutput, validateEnglishCorrectionOutputDetailed } from './english-correction';
 
 describe('validateEnglishCorrectionOutput', () => {
   it('returns ok for valid JSON', () => {
@@ -33,5 +33,25 @@ describe('validateEnglishCorrectionOutput', () => {
     if (result.ok) return;
     expect(result.fallback).toEqual({ hasError: false, corrected: null, message: '' });
   });
-});
 
+  it('classifies empty output as EMPTY', () => {
+    const result = validateEnglishCorrectionOutputDetailed('');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('EMPTY');
+  });
+
+  it('classifies non-json text as INVALID_JSON', () => {
+    const result = validateEnglishCorrectionOutputDetailed('not json');
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('INVALID_JSON');
+  });
+
+  it('classifies schema mismatch as INVALID_SCHEMA', () => {
+    const result = validateEnglishCorrectionOutputDetailed(JSON.stringify({ hasError: 'nope' }));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('INVALID_SCHEMA');
+  });
+});

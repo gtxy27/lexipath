@@ -7,6 +7,7 @@ import {
   ClaudeProviderConfigSchema,
   GeminiProviderConfigSchema,
   JLPTLevelSchema,
+  PromptStyleKeySchema,
   ProviderConfigSchema,
   RouteKindSchema,
   SettingsSchema,
@@ -80,6 +81,8 @@ type BehaviorKey =
   | "english_correction"
   | "chat";
 
+const NATIVE_LANGUAGE_OPTIONS = ["en", "zh-CN", "zh-TW"] as const;
+
 const BEHAVIOR_KEYS: BehaviorKey[] = [
   "select_keywords",
   "translate",
@@ -128,6 +131,7 @@ type FormState = {
   proficiencyLevel: CEFRLevel;
   proficiencyPreference?: Settings["proficiencyPreference"];
   theme: Settings["theme"];
+  promptStyle: Settings["promptStyle"];
   enabled: boolean;
   autoEnhance: boolean;
   englishCorrection: Settings["englishCorrection"];
@@ -393,6 +397,7 @@ function settingsToFormState(settings: Settings): FormState {
     proficiencyLevel: settings.proficiencyLevel,
     proficiencyPreference,
     theme: settings.theme,
+    promptStyle: settings.promptStyle,
     enabled: settings.enabled,
     autoEnhance: settings.autoEnhance,
     englishCorrection: settings.englishCorrection,
@@ -753,6 +758,7 @@ function buildSettingsPatch(form: FormState):
     proficiencyLevel: form.proficiencyLevel,
     proficiencyPreference: form.proficiencyPreference,
     theme: form.theme,
+    promptStyle: form.promptStyle,
     enabled: form.enabled,
     autoEnhance: form.autoEnhance,
     englishCorrection: form.englishCorrection,
@@ -1642,15 +1648,19 @@ export function Options(): React.ReactElement {
                                ...(nextScaleApplicable ? {} : { proficiencyPreference: undefined }),
                              });
                            }}
-                         >
-                            <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
-                               <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
-                               {SupportedLanguageSchema.options.map(lang => <SelectItem key={lang} value={lang}>{lang}</SelectItem>)}
-                            </SelectContent>
-                         </Select>
-                      </div>
+                          >
+                             <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                                <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                               {NATIVE_LANGUAGE_OPTIONS.map((lang) => (
+                                 <SelectItem key={lang} value={lang}>
+                                   {t(`languageNative_${lang.replace("-", "_")}`)}
+                                 </SelectItem>
+                               ))}
+                             </SelectContent>
+                          </Select>
+                       </div>
                       
                       <div className="space-y-2.5">
                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("targetLanguage")}</Label>
@@ -1720,14 +1730,17 @@ export function Options(): React.ReactElement {
                           </Select>
                        </div>
 
-                       {form.proficiencyPreference ? (
-                         <div className="space-y-2.5">
-                           <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsProficiencyScaleValueLabel")}</Label>
+                        {form.proficiencyPreference ? (
+                          <div className="space-y-2.5">
+                            {form.proficiencyPreference.standard !== "CET-4" &&
+                            form.proficiencyPreference.standard !== "CET-6" ? (
+                              <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsProficiencyScaleValueLabel")}</Label>
+                            ) : null}
 
-                           {form.proficiencyPreference.standard === "IELTS" ? (
-                             <Select
-                               value={form.proficiencyPreference.value}
-                               onValueChange={(v) => {
+                            {form.proficiencyPreference.standard === "IELTS" ? (
+                              <Select
+                                value={form.proficiencyPreference.value}
+                                onValueChange={(v) => {
                                  const next: ProficiencyPreference = { standard: "IELTS", value: v };
                                  setForm({
                                    ...form,
@@ -1746,8 +1759,8 @@ export function Options(): React.ReactElement {
                                    </SelectItem>
                                  ))}
                                </SelectContent>
-                             </Select>
-                           ) : null}
+                              </Select>
+                            ) : null}
 
                            {form.proficiencyPreference.standard === "JLPT" ? (
                              <Select
@@ -1774,10 +1787,10 @@ export function Options(): React.ReactElement {
                              </Select>
                            ) : null}
 
-                           {form.proficiencyPreference.standard === "TOPIK" ? (
-                             <Select
-                               value={form.proficiencyPreference.value}
-                               onValueChange={(v) => {
+                            {form.proficiencyPreference.standard === "TOPIK" ? (
+                              <Select
+                                value={form.proficiencyPreference.value}
+                                onValueChange={(v) => {
                                  const next: ProficiencyPreference = { standard: "TOPIK", value: v };
                                  setForm({
                                    ...form,
@@ -1796,24 +1809,15 @@ export function Options(): React.ReactElement {
                                    </SelectItem>
                                  ))}
                                </SelectContent>
-                             </Select>
-                           ) : null}
+                              </Select>
+                            ) : null}
 
-                           {form.proficiencyPreference.standard === "CET-4" || form.proficiencyPreference.standard === "CET-6" ? (
-                             <Select value="pass" onValueChange={() => {}}>
-                               <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
-                                 <SelectValue />
-                               </SelectTrigger>
-                               <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-                                 <SelectItem value="pass">{t("optionsProficiencyValuePass")}</SelectItem>
-                               </SelectContent>
-                             </Select>
-                           ) : null}
+                            {/* CET-4/CET-6 are fixed standards: no value input, implicit conversion to CEFR. */}
 
-                            <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
-                              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
-                                {t("optionsProficiencyDerivedCefr", [form.proficiencyLevel])}
-                              </p>
+                             <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
+                               <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                                 {t("optionsProficiencyDerivedCefr", [form.proficiencyLevel])}
+                               </p>
                               <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1">
                                 {t(`proficiencyRequirement_${form.proficiencyLevel}`)}
                               </p>
@@ -1842,6 +1846,30 @@ export function Options(): React.ReactElement {
                            {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
                          </p>
                      </div>
+
+                      <div className="space-y-2.5">
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                          {t("optionsPromptStyleLabel")}
+                        </Label>
+                        <Select
+                          value={form.promptStyle}
+                          onValueChange={(v) => setForm({ ...form, promptStyle: v as Settings["promptStyle"] })}
+                        >
+                          <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                            {PromptStyleKeySchema.options.map((styleKey) => (
+                              <SelectItem key={styleKey} value={styleKey}>
+                                {t(`promptStyle_${styleKey}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium ml-1">
+                          {t("optionsPromptStyleDesc")}
+                        </p>
+                      </div>
                     </div>
                  </div>
 

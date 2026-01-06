@@ -4,17 +4,34 @@ export type CorrectionCardKind = 'encouragement' | 'corrected' | 'error';
 
 type CardHandle = { close: () => void };
 
+let activeCard: CardHandle | null = null;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
 function computeCardPosition(anchorRect: DOMRect, cardWidth: number, cardHeight: number): { top: number; left: number } {
   const margin = 10;
-  const preferredLeft = anchorRect.left;
-  const preferredTop = anchorRect.bottom + 10;
+  const gap = 10;
 
-  const left = clamp(preferredLeft, margin, window.innerWidth - cardWidth - margin);
-  const top = clamp(preferredTop, margin, window.innerHeight - cardHeight - margin);
+  const leftAlign = anchorRect.left;
+  const rightAlign = anchorRect.right - cardWidth;
+
+  const maxLeft = window.innerWidth - cardWidth - margin;
+  const leftCandidate = clamp(leftAlign, margin, maxLeft);
+  const rightCandidate = clamp(rightAlign, margin, maxLeft);
+  const leftOverflow = Math.abs(leftAlign - leftCandidate);
+  const rightOverflow = Math.abs(rightAlign - rightCandidate);
+  const left = leftOverflow <= rightOverflow ? leftCandidate : rightCandidate;
+
+  const belowTop = anchorRect.bottom + gap;
+  const aboveTop = anchorRect.top - gap - cardHeight;
+  const maxTop = window.innerHeight - cardHeight - margin;
+
+  const hasRoomBelow = belowTop + cardHeight + margin <= window.innerHeight;
+  const hasRoomAbove = aboveTop >= margin;
+  const preferredTop = hasRoomBelow || !hasRoomAbove ? belowTop : aboveTop;
+  const top = clamp(preferredTop, margin, maxTop);
   return { top, left };
 }
 
@@ -27,6 +44,15 @@ export function showCorrectionCard(options: {
   onUndo?: () => void;
   theme?: 'light' | 'dark' | 'system';
 }): CardHandle {
+  if (activeCard) {
+    try {
+      activeCard.close();
+    } catch {
+      // ignore
+    }
+    activeCard = null;
+  }
+
   const existing = document.getElementById('lexipath-english-correction-card');
   if (existing) existing.remove();
 
@@ -43,6 +69,9 @@ export function showCorrectionCard(options: {
   container.style.maxWidth = 'calc(100vw - 20px)';
   container.style.width = '320px';
   container.style.boxSizing = 'border-box';
+  container.style.opacity = '0';
+  container.style.transform = 'translateY(8px)';
+  container.style.transition = 'opacity 140ms ease, transform 140ms ease';
 
   const shadow = container.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
@@ -220,18 +249,55 @@ export function showCorrectionCard(options: {
   container.style.left = `${pos.left}px`;
   container.style.top = `${pos.top}px`;
 
+  requestAnimationFrame(() => {
+    container.style.opacity = '1';
+    container.style.transform = 'translateY(0px)';
+  });
+
   let autoCloseTimer: number | null = null;
   if (typeof options.autoCloseDelayMs === 'number' && options.autoCloseDelayMs > 0) {
     autoCloseTimer = window.setTimeout(() => close(), options.autoCloseDelayMs);
   }
 
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.isComposing) return;
+    if (event.key === 'Escape') {
+      if (options.kind === 'corrected' && options.showUndo && options.onUndo) {
+        options.onUndo();
+      }
+      close();
+      return;
+    }
+    if (event.key === 'Enter') {
+      close();
+    }
+  };
+  document.addEventListener('keydown', onKeyDown, true);
+
+  let closing = false;
   function close() {
+    if (closing) return;
+    closing = true;
+
     if (autoCloseTimer !== null) {
       window.clearTimeout(autoCloseTimer);
       autoCloseTimer = null;
     }
-    container.remove();
+
+    document.removeEventListener('keydown', onKeyDown, true);
+    if (activeCard && activeCard.close === close) {
+      activeCard = null;
+    }
+
+    container.style.opacity = '0';
+    container.style.transform = 'translateY(8px)';
+
+    window.setTimeout(() => {
+      container.remove();
+    }, 180);
   }
 
-  return { close };
+  const handle = { close };
+  activeCard = handle;
+  return handle;
 }

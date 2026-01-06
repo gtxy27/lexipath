@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BEHAVIORS, resolvePromptScene, resolvePromptStyleValue } from '@lexipath/core';
 import { buildTranslateKeywordsPrompt, parseTranslateKeywordsResponse } from './translate-keywords-prompt';
 
 describe('buildTranslateKeywordsPrompt', () => {
@@ -8,6 +9,10 @@ describe('buildTranslateKeywordsPrompt', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
       userLevel: 'B1',
+      sceneValue: resolvePromptScene('keyword_translate'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.translate_keywords,
     });
 
     expect(prompt).toContain('en');

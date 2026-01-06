@@ -36,7 +36,7 @@ import {
   type WebEnhanceOutput,
   type TranslateKeywordsPayload,
 } from '@lexipath/core';
-import { validateEnglishCorrectionOutput, validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
+import { validateEnglishCorrectionOutput, validateEnglishCorrectionOutputDetailed, validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
 import {
   BingTranslateProvider,
   ClaudeProvider,
@@ -46,14 +46,7 @@ import {
   WebDAVProvider,
 } from '@lexipath/providers';
 import {
-  buildExplainWordPrompt,
-  buildEnglishCorrectionPrompt,
-  buildKeywordSelectPrompt,
-  buildSubtitleAdaptPrompt,
-  buildSubtitleEnhancePrompt,
-  buildTermTranslatePrompt,
-  buildTranslateKeywordsPrompt,
-  buildWebEnhancePrompt,
+  PromptBuilder,
   parseExplainWordResponse,
   parseKeywordSelectResponse,
   parseTermTranslateResponse,
@@ -344,6 +337,29 @@ const translateKeywordsInFlight = new Map<string, Promise<Record<string, string>
 const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
 const englishCorrectionInFlight = new Map<string, Promise<EnglishCorrectionOutput>>();
 const dictionaryService = new DictionaryService();
+const promptBuilder = new PromptBuilder({ getSettings });
+
+type EnglishCorrectionStats = {
+  requestsTotal: number;
+  providerFailures: number;
+  validatedOk: number;
+  validatedFallback: number;
+  fallbackReasons: Record<string, number>;
+  hasErrorTrue: number;
+  hasErrorFalse: number;
+};
+
+const englishCorrectionStats: EnglishCorrectionStats = {
+  requestsTotal: 0,
+  providerFailures: 0,
+  validatedOk: 0,
+  validatedFallback: 0,
+  fallbackReasons: {},
+  hasErrorTrue: 0,
+  hasErrorFalse: 0,
+};
+
+(globalThis as any).__lexipathEnglishCorrectionStats = englishCorrectionStats;
 
 async function getKeywordsForText(options: {
   settings: Settings;
@@ -382,16 +398,13 @@ async function getKeywordsForText(options: {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-         const prompt = buildKeywordSelectPrompt({
-           text,
-           sourceLang: sourceLang ?? settings.targetLanguage,
-           targetLang: targetLang ?? settings.nativeLanguage,
-           userLevel,
-           scene,
-           ...(settings.proficiencyPreference
-             ? { proficiencyPreference: settings.proficiencyPreference }
-             : {}),
-         });
+        const prompt = await promptBuilder.buildKeywordSelectPrompt({
+          text,
+          sourceLang: sourceLang ?? settings.targetLanguage,
+          targetLang: targetLang ?? settings.nativeLanguage,
+          userLevel,
+          scene,
+        });
 
         const limit = getChannelConcurrencyLimit(channel, route.kind);
         const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
@@ -480,13 +493,12 @@ async function translateKeywords(options: {
               return { value: {}, ok: false };
             }
 
-            const prompt = buildTranslateKeywordsPrompt({
+            const prompt = await promptBuilder.buildTranslateKeywordsPrompt({
               keywords: normalizedKeywords,
               ...(options.context ? { context: options.context } : {}),
               sourceLang: parsedSourceLang.data,
               targetLang: parsedTargetLang.data,
               userLevel: settings.proficiencyLevel,
-              ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
             });
 
             const limit = getChannelConcurrencyLimit(channel, route.kind);
@@ -596,12 +608,11 @@ async function translateTerms(options: {
   const parsedTargetLang = NativeLanguageSchema.safeParse(options.targetLang);
   if (!parsedSourceLang.success || !parsedTargetLang.success) return terms;
 
-  const prompt = buildTermTranslatePrompt({
+  const prompt = await promptBuilder.buildTermTranslatePrompt({
     terms,
     sourceLang: parsedSourceLang.data,
     targetLang: parsedTargetLang.data,
     userLevel: settings.proficiencyLevel,
-    ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
   });
 
   try {
@@ -964,16 +975,12 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
 
         const provider = getChatProvider(adaptProviderInfo.type, adaptProviderInfo.config);
 
-         const prompt = buildSubtitleAdaptPrompt({
-           subtitle,
-           sourceLang,
-           difficultyLevel,
-           targetLang: settings.targetLanguage,
-           motherTongue: settings.nativeLanguage,
-           ...(settings.proficiencyPreference
-             ? { proficiencyPreference: settings.proficiencyPreference }
-             : {}),
-         });
+        const prompt = await promptBuilder.buildSubtitleAdaptPrompt({
+          subtitle,
+          sourceLang,
+          targetLang: settings.targetLanguage,
+          difficultyLevel,
+        });
 
         const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute!.kind);
         const response = await runWithChannelConcurrency(routeKey(adaptRoute!), adaptLimit, () =>
@@ -1006,6 +1013,8 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
     throw new MessageError({ code: 'INVALID_PAYLOAD', message: 'Expected payload { text: string }' });
   }
 
+  englishCorrectionStats.requestsTotal += 1;
+
   const settings = await getSettings();
   const userLevel = settings.proficiencyLevel;
 
@@ -1037,13 +1046,7 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        const prompt = buildEnglishCorrectionPrompt({
-          text,
-          motherTongue: settings.nativeLanguage,
-          targetLearningLanguage: settings.targetLanguage,
-          userLevel,
-          ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
-        });
+        const prompt = await promptBuilder.buildEnglishCorrectionPrompt({ text });
 
         const limit = getChannelConcurrencyLimit(channel, route.kind);
         const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
@@ -1051,9 +1054,25 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
         );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
-        const validated = validateEnglishCorrectionOutput(responseText);
-        return { value: validated.ok ? validated.value : validated.fallback, ok: validated.ok };
+        const validated = validateEnglishCorrectionOutputDetailed(responseText);
+        if (validated.ok) {
+          englishCorrectionStats.validatedOk += 1;
+        } else {
+          englishCorrectionStats.validatedFallback += 1;
+          englishCorrectionStats.fallbackReasons[validated.reason] =
+            (englishCorrectionStats.fallbackReasons[validated.reason] ?? 0) + 1;
+        }
+
+        const value = validated.ok ? validated.value : validated.fallback;
+        if (value.hasError) {
+          englishCorrectionStats.hasErrorTrue += 1;
+        } else {
+          englishCorrectionStats.hasErrorFalse += 1;
+        }
+
+        return { value, ok: validated.ok };
       } catch {
+        englishCorrectionStats.providerFailures += 1;
         const validated = validateEnglishCorrectionOutput(undefined);
         return { value: validated.ok ? validated.value : validated.fallback, ok: false };
       }
@@ -1148,15 +1167,12 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     try {
       const provider = getChatProvider(dictionaryProviderInfo.type, dictionaryProviderInfo.config);
 
-      const prompt = buildExplainWordPrompt({
+      const prompt = await promptBuilder.buildExplainWordPrompt({
         word,
         ...(context ? { context } : {}),
         sourceLang,
         targetLang,
         userLevel,
-        ...(settings.proficiencyPreference
-          ? { proficiencyPreference: settings.proficiencyPreference }
-          : {}),
       });
 
       const limit = getChannelConcurrencyLimit(dictionaryChannel, dictionaryRoute.kind);

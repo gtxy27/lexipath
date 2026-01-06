@@ -148,6 +148,7 @@ describe('SubtitleController', () => {
       targetLanguage: 'en',
       proficiencyLevel: 'B1',
       theme: 'system',
+      promptStyle: 'default',
       channels: [
         {
           channelId: 1,

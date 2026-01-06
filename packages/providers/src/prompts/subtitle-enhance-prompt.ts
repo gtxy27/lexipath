@@ -1,5 +1,4 @@
-import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage, PromptTemplateInput } from '@lexipath/core';
-import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { BEHAVIORS, type CEFRLevel, type NativeLanguage, type PromptTemplateInput, type PromptUserInfo, type SupportedLanguage } from '@lexipath/core';
 import { buildCefrOutputGuidance } from './cefr-guidance';
 import { renderPromptTemplate } from './prompt-template-renderer';
 
@@ -9,7 +8,10 @@ export interface SubtitleEnhancePromptOptions {
   targetLang: NativeLanguage;
   difficultyLevel: CEFRLevel;
   mode: 'single' | 'bilingual';
-  proficiencyPreference?: ProficiencyPreference;
+  sceneValue: string;
+  styleValue: string;
+  userInfo: PromptUserInfo;
+  behavior: typeof BEHAVIORS.subtitle_enhance;
 }
 
 /**
@@ -31,18 +33,12 @@ export function buildSubtitleEnhancePrompt(options: SubtitleEnhancePromptOptions
     targetLang,
     difficultyLevel,
     mode,
+    sceneValue,
+    styleValue,
+    userInfo,
+    behavior,
   } = options;
 
-  const sourceLanguageName = getLanguageName(sourceLang);
-  const targetLanguageName = getLanguageName(targetLang);
-  const referenceLine = buildProficiencyReferenceLine({
-    sourceLang,
-    targetLang,
-    userLevel: difficultyLevel,
-    ...(options.proficiencyPreference
-      ? { proficiencyPreference: options.proficiencyPreference }
-      : {}),
-  });
   const cefrGuidance = buildCefrOutputGuidance({
     sourceLang,
     targetLang,
@@ -50,77 +46,19 @@ export function buildSubtitleEnhancePrompt(options: SubtitleEnhancePromptOptions
   });
 
   const templateBase: Omit<PromptTemplateInput, 'outputFormat' | 'outputNotes'> = {
-    role: '你是字幕增强助手。',
-    scene: '当前环境：视频字幕增强场景。',
-    style: '风格：适合字幕显示，表达自然清晰，不添加原文没有的信息。',
-    task:
-      mode === 'single'
-        ? `任务：将<用户输入>中的${sourceLanguageName}字幕改写到符合 CEFR ${difficultyLevel} 水平，同时保持口语自然、适合字幕显示。只返回增强后的${sourceLanguageName}字幕内容。`
-        : `任务：将<用户输入>中的${sourceLanguageName}字幕处理为双语展示：line1_final 为符合 CEFR ${difficultyLevel} 的增强${sourceLanguageName}字幕，line2_final 为${targetLanguageName}对照翻译。`,
-    userInfo: {
-      motherTongue: targetLang,
-      targetLearningLanguage: sourceLang,
-      cefrLevel: difficultyLevel,
-      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
-    },
+    role: behavior.role,
+    scene: sceneValue,
+    style: styleValue,
+    task: behavior.task({ sourceLang, targetLang, difficultyLevel, mode }),
+    userInfo,
     userInput: subtitle,
   };
 
-  if (mode === 'single') {
-    return renderPromptTemplate({
-      ...templateBase,
-      outputFormat: `{
-  "line1_final": ""
-}`,
-      outputNotes: [
-        cefrGuidance,
-        '',
-        '规则：',
-        `1. 词汇与语法难度适配 CEFR ${difficultyLevel}`,
-        '2. 保持核心含义不变',
-        '3. 字幕长度合理（最多 2 行，每行约 40 个字符以内）',
-        '4. 使用自然、口语化表达',
-        `5. 只返回增强后的${sourceLanguageName}字幕内容`,
-        '6. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
-      ].join('\n'),
-    });
-  }
-
   return renderPromptTemplate({
     ...templateBase,
-    outputFormat: `{
-  "line1_final": "",
-  "line2_final": ""
-}`,
-    outputNotes: [
-      cefrGuidance,
-      '',
-      '规则：',
-      `1. line1_final：将${sourceLanguageName}字幕改写到符合 CEFR ${difficultyLevel} 水平`,
-      `2. line2_final：提供${targetLanguageName}翻译用于对照`,
-      '3. 每行尽量控制在约 40 个字符以内，便于阅读',
-      '4. 两行都要保持核心含义一致',
-      '5. 使用自然、口语化表达',
-      '6. 只输出一个 JSON 对象；不要 Markdown、不要代码块、不要任何额外文字',
-    ].join('\n'),
+    outputFormat: behavior.outputFormat({ mode }),
+    outputNotes: behavior.outputNotes({ cefrGuidance, sourceLang, targetLang, difficultyLevel, mode }),
   });
-}
-
-/**
- * Get human-readable language name.
- */
-function getLanguageName(lang: SupportedLanguage | NativeLanguage): string {
-  const names: Record<string, string> = {
-    'en': '英语',
-    'ja': '日语',
-    'ko': '韩语',
-    'fr': '法语',
-    'de': '德语',
-    'zh': '中文',
-    'zh-CN': '简体中文',
-    'zh-TW': '繁体中文',
-  };
-  return names[lang] || lang;
 }
 
 /**

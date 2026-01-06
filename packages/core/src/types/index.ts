@@ -251,6 +251,15 @@ export type TestProviderConnectionPayload = z.infer<typeof TestProviderConnectio
 export const ThemeSchema = z.enum(['light', 'dark', 'system']);
 export type Theme = z.infer<typeof ThemeSchema>;
 
+export const PromptStyleKeySchema = z.enum([
+  'default',
+  'anime',
+  'academic',
+  'casual',
+  'concise',
+]);
+export type PromptStyleKey = z.infer<typeof PromptStyleKeySchema>;
+
 export const WebDAVConfigSchema = z.object({
   url: z.string().url(),
   username: z.string(),
@@ -289,6 +298,8 @@ export const SettingsSchema = z.object({
 
   // Appearance
   theme: ThemeSchema.default('system'),
+  // Prompt style selection (applies when prompt builder supports styles).
+  promptStyle: PromptStyleKeySchema.default('default'),
 
   // Provider channels (multi-channel, one model per channel)
   channels: ProviderChannelsSchema,

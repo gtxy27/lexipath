@@ -7,6 +7,9 @@
 
 export type { Cue, CueSource } from '@lexipath/core';
 
+// Generic subtitle parsers (string -> Cue[])
+export { parseSrt, parseTtml, parseWebVtt } from './parsers';
+
 // YouTube
 export {
   YouTubeAdapter,

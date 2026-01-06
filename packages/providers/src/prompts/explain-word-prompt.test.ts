@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { BEHAVIORS, resolvePromptScene, resolvePromptStyleValue } from '@lexipath/core';
 import {
   buildExplainWordPrompt,
   parseExplainWordResponse,
@@ -12,6 +13,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
       userLevel: 'B2',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B2' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -37,6 +42,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
       userLevel: 'A2',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'A2' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -54,6 +63,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
       userLevel: 'B1',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -67,6 +80,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'zh',
       targetLang: 'en',
       userLevel: 'B1',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'en', targetLearningLanguage: 'zh', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -80,6 +97,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'ja',
       targetLang: 'en',
       userLevel: 'B1',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'en', targetLearningLanguage: 'ja', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -93,6 +114,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'ko',
       targetLang: 'en',
       userLevel: 'B1',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'en', targetLearningLanguage: 'ko', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -106,6 +131,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'fr',
       targetLang: 'en',
       userLevel: 'A1',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'en', targetLearningLanguage: 'fr', cefrLevel: 'A1' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);
@@ -119,6 +148,10 @@ describe('buildExplainWordPrompt', () => {
       sourceLang: 'en',
       targetLang: 'zh-CN',
       userLevel: 'C1',
+      sceneValue: resolvePromptScene('word_card'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'C1' },
+      behavior: BEHAVIORS.explain_word,
     };
 
     const prompt = buildExplainWordPrompt(options);

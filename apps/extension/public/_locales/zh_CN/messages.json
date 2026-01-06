@@ -159,8 +159,12 @@
     "message": "关",
     "description": "关闭状态"
   },
+  "nativeLanguage": {
+    "message": "母语",
+    "description": "母语标签"
+  },
   "targetLanguage": {
-    "message": "目标语言",
+    "message": "目标学习语言",
     "description": "目标语言标签"
   },
   "proficiencyLevel": {
@@ -1330,6 +1334,34 @@
   "optionsTestGoogleTranslate": {
     "message": "测试 Google 翻译",
     "description": "Test Google Translate button"
+  },
+  "optionsPromptStyleLabel": {
+    "message": "提示词风格",
+    "description": "Options: prompt style label"
+  },
+  "optionsPromptStyleDesc": {
+    "message": "影响字幕/网页/词卡等提示词的整体表达风格。",
+    "description": "Options: prompt style description"
+  },
+  "promptStyle_default": {
+    "message": "默认",
+    "description": "Prompt style option: default"
+  },
+  "promptStyle_anime": {
+    "message": "动漫/二次元",
+    "description": "Prompt style option: anime"
+  },
+  "promptStyle_academic": {
+    "message": "学术/严谨",
+    "description": "Prompt style option: academic"
+  },
+  "promptStyle_casual": {
+    "message": "轻松口语",
+    "description": "Prompt style option: casual"
+  },
+  "promptStyle_concise": {
+    "message": "简洁直给",
+    "description": "Prompt style option: concise"
   },
   "optionsTestBingTranslate": {
     "message": "测试 Bing 翻译",

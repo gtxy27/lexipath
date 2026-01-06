@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { BEHAVIORS, resolvePromptScene, resolvePromptStyleValue } from '@lexipath/core';
 import {
   buildWebEnhancePrompt,
   parseWebEnhanceResponse,
@@ -14,6 +15,10 @@ describe('buildWebEnhancePrompt', () => {
       difficultyMin: 'B1',
       difficultyMax: 'B1',
       maxWords: 10,
+      sceneValue: resolvePromptScene('web_content'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.web_enhance,
     };
 
     const prompt = buildWebEnhancePrompt(options);
@@ -40,6 +45,10 @@ describe('buildWebEnhancePrompt', () => {
       difficultyMin: 'B2',
       difficultyMax: 'C2',
       maxWords: 15,
+      sceneValue: resolvePromptScene('web_content'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'C2' },
+      behavior: BEHAVIORS.web_enhance,
     };
 
     const prompt = buildWebEnhancePrompt(options);
@@ -57,6 +66,10 @@ describe('buildWebEnhancePrompt', () => {
       targetLang: 'zh-CN',
       difficultyMin: 'B1',
       difficultyMax: 'B1',
+      sceneValue: resolvePromptScene('web_content'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.web_enhance,
     };
 
     const prompt = buildWebEnhancePrompt(options);
@@ -71,6 +84,10 @@ describe('buildWebEnhancePrompt', () => {
       targetLang: 'en',
       difficultyMin: 'A1',
       difficultyMax: 'A2',
+      sceneValue: resolvePromptScene('web_content'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'en', targetLearningLanguage: 'fr', cefrLevel: 'A2' },
+      behavior: BEHAVIORS.web_enhance,
     };
 
     const prompt = buildWebEnhancePrompt(options);

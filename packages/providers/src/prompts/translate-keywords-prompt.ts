@@ -1,11 +1,4 @@
-import type {
-  CEFRLevel,
-  ProficiencyPreference,
-  PromptTemplateInput,
-  SupportedLanguage,
-  NativeLanguage,
-} from '@lexipath/core';
-import { buildProficiencyReferenceLine } from './proficiency-reference';
+import { BEHAVIORS, type CEFRLevel, type NativeLanguage, type PromptTemplateInput, type PromptUserInfo, type SupportedLanguage } from '@lexipath/core';
 import { renderPromptTemplate } from './prompt-template-renderer';
 
 export interface TranslateKeywordsPromptOptions {
@@ -14,19 +7,15 @@ export interface TranslateKeywordsPromptOptions {
   sourceLang: SupportedLanguage;
   targetLang: NativeLanguage;
   userLevel: CEFRLevel;
-  proficiencyPreference?: ProficiencyPreference;
+  sceneValue: string;
+  styleValue: string;
+  userInfo: PromptUserInfo;
+  behavior: typeof BEHAVIORS.translate_keywords;
 }
 
 export function buildTranslateKeywordsPrompt(options: TranslateKeywordsPromptOptions): string {
   const keywords = options.keywords.map((term) => term.trim()).filter(Boolean);
   const context = options.context?.trim();
-
-  const referenceLine = buildProficiencyReferenceLine({
-    sourceLang: options.sourceLang,
-    targetLang: options.targetLang,
-    userLevel: options.userLevel,
-    ...(options.proficiencyPreference ? { proficiencyPreference: options.proficiencyPreference } : {}),
-  });
 
   const userInput = [
     '词汇列表（每行一个）：',
@@ -35,27 +24,14 @@ export function buildTranslateKeywordsPrompt(options: TranslateKeywordsPromptOpt
   ].join('\n');
 
   const template: PromptTemplateInput = {
-    role: '你是专业翻译助手。',
-    scene: '当前环境：词汇列表翻译场景。',
-    style: '风格：只给出最常见、最基础的译法；不输出多义列表。',
-    task: `任务：将<用户输入>中的词汇列表从 ${options.sourceLang} 翻译为 ${options.targetLang}。`,
-    userInfo: {
-      motherTongue: options.targetLang,
-      targetLearningLanguage: options.sourceLang,
-      cefrLevel: options.userLevel,
-      ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
-    },
+    role: options.behavior.role,
+    scene: options.sceneValue,
+    style: options.styleValue,
+    task: options.behavior.task({ sourceLang: options.sourceLang, targetLang: options.targetLang }),
+    userInfo: options.userInfo,
     userInput,
-    outputFormat: `translation_1
-translation_2`,
-    outputNotes: [
-      '规则（非常重要）：',
-      '1. 严格按输入顺序输出',
-      '2. 每行只输出一个翻译结果',
-      '3. 不要输出序号、项目符号、解释、JSON、Markdown 或代码块',
-      '4. 只输出最常见、最基础的译法（不要多个释义）',
-      ...(context ? ['5. 如提供上下文，请结合上下文选择最合适的译法'] : []),
-    ].join('\n'),
+    outputFormat: options.behavior.outputFormat({ sourceLang: options.sourceLang, targetLang: options.targetLang, hasContext: Boolean(context) }),
+    outputNotes: options.behavior.outputNotes({ hasContext: Boolean(context) }),
   };
 
   return renderPromptTemplate(template);

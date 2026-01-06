@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { BEHAVIORS, resolvePromptScene, resolvePromptStyleValue } from '@lexipath/core';
 import {
   buildSubtitleEnhancePrompt,
   parseSubtitleEnhanceResponse,
@@ -13,6 +14,10 @@ describe('buildSubtitleEnhancePrompt', () => {
       targetLang: 'zh-CN',
       difficultyLevel: 'B1',
       mode: 'single',
+      sceneValue: resolvePromptScene('video_subtitle_enhance'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.subtitle_enhance,
     };
 
     const prompt = buildSubtitleEnhancePrompt(options);
@@ -37,6 +42,10 @@ describe('buildSubtitleEnhancePrompt', () => {
       targetLang: 'zh-CN',
       difficultyLevel: 'A2',
       mode: 'bilingual',
+      sceneValue: resolvePromptScene('video_subtitle_enhance'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'A2' },
+      behavior: BEHAVIORS.subtitle_enhance,
     };
 
     const prompt = buildSubtitleEnhancePrompt(options);
@@ -56,6 +65,10 @@ describe('buildSubtitleEnhancePrompt', () => {
       targetLang: 'zh-CN',
       difficultyLevel: 'C2',
       mode: 'single',
+      sceneValue: resolvePromptScene('video_subtitle_enhance'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'C2' },
+      behavior: BEHAVIORS.subtitle_enhance,
     };
 
     const prompt = buildSubtitleEnhancePrompt(options);
@@ -70,6 +83,10 @@ describe('buildSubtitleEnhancePrompt', () => {
       targetLang: 'en',
       difficultyLevel: 'B1',
       mode: 'bilingual',
+      sceneValue: resolvePromptScene('video_subtitle_enhance'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'en', targetLearningLanguage: 'fr', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.subtitle_enhance,
     };
 
     const prompt = buildSubtitleEnhancePrompt(options);
@@ -85,6 +102,10 @@ describe('buildSubtitleEnhancePrompt', () => {
       targetLang: 'zh-CN',
       difficultyLevel: 'B1',
       mode: 'single',
+      sceneValue: resolvePromptScene('video_subtitle_enhance'),
+      styleValue: resolvePromptStyleValue('default'),
+      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1' },
+      behavior: BEHAVIORS.subtitle_enhance,
     };
 
     const prompt = buildSubtitleEnhancePrompt(options);
