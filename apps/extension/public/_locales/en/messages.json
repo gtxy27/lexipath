@@ -727,6 +727,14 @@
     "message": "Default: https://api.openai.com/v1",
     "description": "Provider baseUrl placeholder"
   },
+  "optionsConcurrencyLimitLabel": {
+    "message": "Concurrency Limit",
+    "description": "Per-channel concurrency limit label"
+  },
+  "optionsConcurrencyLimitDesc": {
+    "message": "Maximum concurrent requests for this channel (1-500). Default: 15.",
+    "description": "Per-channel concurrency limit description"
+  },
   "optionsProviderModelLabel": {
     "message": "Model",
     "description": "Provider model label"
