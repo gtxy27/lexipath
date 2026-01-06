@@ -1,4 +1,7 @@
 import { getI18nMessage } from '../i18n';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
+
+const log = createLogger('english-correction:card');
 
 export type CorrectionCardKind = 'encouragement' | 'corrected' | 'error';
 
@@ -47,8 +50,8 @@ export function showCorrectionCard(options: {
   if (activeCard) {
     try {
       activeCard.close();
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.debug('Failed to close existing correction card; continuing', { message: getErrorMessage(error) });
     }
     activeCard = null;
   }

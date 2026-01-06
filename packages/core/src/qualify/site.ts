@@ -22,7 +22,7 @@ export type MatchSiteRuleOutput = z.infer<typeof MatchSiteRuleOutputSchema>;
 function normalizeUrl(url: string): URL | null {
   try {
     return new URL(url);
-  } catch {
+  } catch (error: unknown) {
     return null;
   }
 }
@@ -146,4 +146,3 @@ export function qualifySite(input: QualifySiteInput): QualifySiteDecision {
 
   return { qualified: true, reason: 'allowed' };
 }
-

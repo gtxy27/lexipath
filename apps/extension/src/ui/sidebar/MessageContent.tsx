@@ -1,11 +1,15 @@
 import React from "react";
 import Markdown from "markdown-to-jsx";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
+
+const log = createLogger("ui:MessageContent");
 
 function isExternalHref(href: string): boolean {
   try {
     const url = new URL(href);
     return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
+  } catch (error: unknown) {
+    log.debug("Failed to parse href as URL; treating as non-external", { href, message: getErrorMessage(error) });
     return false;
   }
 }

@@ -1,5 +1,8 @@
 import type { ProviderConfig } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { classifyError, type ProviderError } from '../errors';
+
+const log = createLogger('providers:openai-compatible');
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -106,8 +109,8 @@ export class OpenAICompatibleProvider {
     try {
       const url = new URL(this.resolveBaseUrl());
       if (url.hostname === 'api.openai.com') return false;
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.debug('Could not parse baseUrl while checking thinking support; defaulting to enabled', { message: getErrorMessage(error) });
     }
     return true;
   }
@@ -262,8 +265,8 @@ export class OpenAICompatibleProvider {
               this.supportsThinkingControl = false;
               return await response.json();
             }
-          } catch {
-            // ignore and proceed with normal retry flow
+          } catch (fallbackError: unknown) {
+            log.debug('Retry without thinking failed; proceeding with normal retry flow', { message: getErrorMessage(fallbackError) });
           }
         }
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import browser from "webextension-polyfill";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { speak, stop } from "@lexipath/dictionary";
 import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
 import { Button } from "./ui/button";
@@ -7,6 +8,8 @@ import { Badge } from "./ui/badge";
 import { Volume2, Star, Check, X, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+
+const log = createLogger("ui:WordCard");
 
 function t(key: string): string {
   return browser.i18n.getMessage(key) || key;
@@ -53,7 +56,7 @@ export function WordCard({
       setIsPlayingAudio(true);
       await speak(data.word, ttsLang ?? "en-US");
     } catch (error) {
-      console.error("[WordCard] TTS error:", error);
+      log.error("TTS error", { message: getErrorMessage(error) });
     } finally {
       setIsPlayingAudio(false);
     }

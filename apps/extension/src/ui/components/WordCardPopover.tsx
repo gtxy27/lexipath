@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import browser from "webextension-polyfill";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { WordCard, type WordCardData } from "./WordCard";
 import { sendMessage } from "../../shared/messages";
 
@@ -16,6 +17,8 @@ interface Position {
   top: number;
   left: number;
 }
+
+const log = createLogger("ui:WordCardPopover");
 
 function resolveTtsLang(options: {
   targetLanguage?: string;
@@ -46,7 +49,8 @@ function t(key: string, substitutions?: string | string[]): string {
         ? browser.i18n.getMessage(key)
         : browser.i18n.getMessage(key, substitutions as any);
     return message || key;
-  } catch {
+  } catch (error: unknown) {
+    log.debug("i18n.getMessage threw; falling back to key", { key, message: getErrorMessage(error) });
     return key;
   }
 }
@@ -75,8 +79,8 @@ export function WordCardPopover({
         const response = await sendMessage("GET_SETTINGS", undefined);
         if (!response.ok || cancelled) return;
         setTtsLang(resolveTtsLang(response.value));
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.warn("Failed to load settings for TTS language; using default", { message: getErrorMessage(error) });
       }
     }
 
@@ -110,10 +114,7 @@ export function WordCardPopover({
             ...(data.difficulty ? { difficulty: data.difficulty } : {}),
           });
         } else {
-          console.error(
-            "[WordCardPopover] Failed to fetch word data:",
-            response.error,
-          );
+          log.error("Failed to fetch word data", response.error);
           setCardData({
             word,
             definition: t("wordCard_definitionFailed"),
@@ -121,7 +122,7 @@ export function WordCardPopover({
         }
       } catch (error) {
         if (cancelled) return;
-        console.error("[WordCardPopover] Error fetching word data:", error);
+        log.error("Error fetching word data", { message: getErrorMessage(error) });
         setCardData({
           word,
           definition: t("wordCard_definitionError"),

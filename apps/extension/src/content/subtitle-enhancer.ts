@@ -1,7 +1,9 @@
 import type { Cue, EnhanceSubtitlePayload, Response, SubtitleEnhanceOutput, SupportedLanguage } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 
 const SLOW_LOG_THRESHOLD_MS = 800;
 const BILINGUAL_RETRY_MIN_INTERVAL_MS = 10_000;
+const log = createLogger('subtitle-enhancer');
 
 export class SubtitleEnhancer {
   private destroyed = false;
@@ -100,8 +102,8 @@ export class SubtitleEnhancer {
       this.inFlight++;
       const token = this.cuesToken;
       void this.enhanceCue(cue, token)
-        .catch(() => {
-          // enhanceCue logs; keep pipeline moving
+        .catch((error: unknown) => {
+          log.warn('enhanceCue threw; keeping pipeline moving', { cueId: cue.id, message: getErrorMessage(error) });
         })
         .finally(() => {
           this.inFlight--;
@@ -165,7 +167,7 @@ export class SubtitleEnhancer {
       });
 
       if (!response.ok) {
-        console.warn(`[SubtitleEnhancer] Failed to enhance cue ${cue.id}:`, response.error);
+        log.warn(`Failed to enhance cue ${cue.id}`, response.error);
         return;
       }
 
@@ -180,7 +182,7 @@ export class SubtitleEnhancer {
     } finally {
       const elapsedMs = Math.round(performance.now() - startMs);
       if (elapsedMs >= SLOW_LOG_THRESHOLD_MS || this.enhancedCueCount % 20 === 0) {
-        console.log(`[SubtitleEnhancer] Enhanced ${this.enhancedCueCount}/${this.cues.length} cues (lastMs=${elapsedMs})`);
+        log.info(`Enhanced ${this.enhancedCueCount}/${this.cues.length} cues (lastMs=${elapsedMs})`);
       }
     }
   }

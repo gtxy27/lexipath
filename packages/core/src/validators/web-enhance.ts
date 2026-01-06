@@ -24,8 +24,8 @@ function tryParseJson(text: string): unknown | null {
   for (const candidate of candidates) {
     try {
       return JSON.parse(candidate);
-    } catch {
-      // continue
+    } catch (error: unknown) {
+      // ignore parse error; try next candidate
     }
   }
 

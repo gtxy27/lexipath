@@ -11,6 +11,7 @@ import {
   type SupportedLanguage,
   type Theme,
 } from "@lexipath/core";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
 import {
   Card,
@@ -36,6 +37,8 @@ import {
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
+
+const log = createLogger("ui:Onboarding");
 
 type ProficiencyLevel = CEFRLevel | JLPTLevel | TOPIKLevel;
 
@@ -136,8 +139,8 @@ export function Onboarding(): React.ReactElement {
         if (response.ok) {
           setTheme(response.value.theme);
         }
-      } catch {
-        // Ignore; fall back to system theme.
+      } catch (error: unknown) {
+        log.warn("Failed to load onboarding theme; falling back to system", { message: getErrorMessage(error) });
       }
     }
     loadTheme();
@@ -210,7 +213,7 @@ export function Onboarding(): React.ReactElement {
 
       globalThis.close?.();
     } catch (error) {
-      console.error("[LexiPath] Failed to save onboarding settings:", error);
+      log.error("Failed to save onboarding settings", { message: getErrorMessage(error) });
     } finally {
       setSaving(false);
     }

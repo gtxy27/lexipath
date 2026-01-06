@@ -7,6 +7,7 @@
 
 import browser from 'webextension-polyfill';
 import type { Cue, Settings, SupportedLanguage } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { sendMessage } from '../shared/messages';
 import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './ui/SubtitleOverlay';
 import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
@@ -21,6 +22,7 @@ export type { Platform } from './subtitle-platform';
 
 const SLOW_LOG_THRESHOLD_MS = 800;
 const DEBUG_LOG_THROTTLE_MS = 1500;
+const log = createLogger('subtitle-controller');
 
 /**
  * Subtitle Controller
@@ -116,14 +118,14 @@ export class SubtitleController {
     });
 
     if (!this.provider) {
-      console.log('[SubtitleController] Unsupported platform or invalid URL');
+      log.info('Unsupported platform or invalid URL');
       return false;
     }
 
     try {
       await this.provider.init(url, this.settings);
     } catch (error) {
-      console.error('[SubtitleController] Provider init failed:', error);
+      log.error('Provider init failed', { message: getErrorMessage(error) });
       this.provider.destroy();
       this.provider = null;
       return false;
@@ -132,7 +134,7 @@ export class SubtitleController {
     // Find video element
     this.videoElement = this.findVideoElement();
     if (!this.videoElement) {
-      console.error('[SubtitleController] Video element not found');
+      log.error('Video element not found');
       this.provider.destroy();
       this.provider = null;
       return false;
@@ -188,7 +190,7 @@ export class SubtitleController {
     // Mount overlay
     const mounted = this.overlay.mount();
     if (!mounted) {
-      console.error('[SubtitleController] Failed to mount overlay');
+      log.error('Failed to mount overlay');
       this.overlay = null;
       this.enhancer?.destroy();
       this.enhancer = null;
@@ -215,7 +217,7 @@ export class SubtitleController {
     // Setup keyboard listener for temporary bilingual mode
     this.setupKeyboardListener();
 
-    console.log('[SubtitleController] Initialized successfully');
+    log.info('Initialized successfully');
     return true;
   }
 
@@ -282,9 +284,9 @@ export class SubtitleController {
       if (!this.appendCuesIfPossible(result.cues, result.lang)) {
         this.setCues(result.cues, result.lang);
       }
-      console.log(`[SubtitleController] Fetched ${result.cues.length} subtitle cues`);
+      log.info(`Fetched ${result.cues.length} subtitle cues`);
     } catch (error) {
-      console.error('[SubtitleController] Failed to fetch subtitles:', error);
+      log.error('Failed to fetch subtitles', { message: getErrorMessage(error) });
     }
   }
 
@@ -335,9 +337,9 @@ export class SubtitleController {
       const cueLang = this.getCueSourceLanguage(cues[0]!, this.subtitleLanguage);
       if (this.shouldAdaptSubtitle(cueLang)) {
         this.enhancer?.start();
-        console.log('[SubtitleController] Enhancer started (adapt mode)');
+        log.info('Enhancer started (adapt mode)');
       } else {
-        console.log('[SubtitleController] Enhancer disabled (direct mode)');
+        log.info('Enhancer disabled (direct mode)');
       }
     } else {
       this.provider?.showNativeCaptions?.();
@@ -696,7 +698,8 @@ export class SubtitleController {
     const uiLang = (() => {
       try {
         return browser.i18n.getUILanguage?.() ?? navigator.language ?? 'en';
-      } catch {
+      } catch (error: unknown) {
+        log.debug('browser.i18n.getUILanguage threw; falling back to navigator.language', { message: getErrorMessage(error) });
         return navigator.language ?? 'en';
       }
     })();
@@ -781,7 +784,7 @@ export class SubtitleController {
       const response = await sendMessage('SELECT_KEYWORDS', { text: trimmed, scene: 'subtitle' });
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (elapsedMs >= SLOW_LOG_THRESHOLD_MS) {
-        console.debug(`[SubtitleController] SELECT_KEYWORDS slow cueId=${cueId} ms=${elapsedMs}`);
+        log.debug(`SELECT_KEYWORDS slow cueId=${cueId} ms=${elapsedMs}`);
       }
       if (!response.ok) return [];
       return response.value;
@@ -798,8 +801,9 @@ export class SubtitleController {
         }
         return keywords;
       })
-      .catch(() => {
-        return [];
+      .catch((error: unknown) => {
+        log.warn('Failed to fetch keywords for cue; returning empty list', { cueId, message: getErrorMessage(error) });
+        return [] as string[];
       })
       .finally(() => {
         this.cueKeywordsInFlight.delete(inFlightKey);
@@ -865,8 +869,9 @@ export class SubtitleController {
         }
         return mapping;
       })
-      .catch(() => {
-        return {};
+      .catch((error: unknown) => {
+        log.warn('Failed to translate cue keywords; returning empty mapping', { cueId, message: getErrorMessage(error) });
+        return {} as Record<string, string>;
       })
       .finally(() => {
         this.cueKeywordTranslationsInFlight.delete(inFlightKey);
@@ -922,8 +927,8 @@ export class SubtitleController {
     const summaryNow = Date.now();
     if (summaryNow - this.debugLastPrefetchSummaryAt >= DEBUG_LOG_THROTTLE_MS) {
       this.debugLastPrefetchSummaryAt = summaryNow;
-      console.debug(
-        `[SubtitleController] Prefetch window cues=${cuesInWindow.length} nowMs=${Math.round(nowMs)} lookaheadMs=${this.keywordPrefetchLookaheadMs}`
+      log.debug(
+        `Prefetch window cues=${cuesInWindow.length} nowMs=${Math.round(nowMs)} lookaheadMs=${this.keywordPrefetchLookaheadMs}`
       );
     }
 
@@ -941,8 +946,8 @@ export class SubtitleController {
     );
     if (this.destroyed) return;
     if (token !== this.prefetchToken) {
-      console.debug(
-        `[SubtitleController] Prefetch aborted (token changed) cues=${cuesInWindow.length} waitedMs=${Math.round(performance.now() - prefetchStartedAt)}`
+      log.debug(
+        `Prefetch aborted (token changed) cues=${cuesInWindow.length} waitedMs=${Math.round(performance.now() - prefetchStartedAt)}`
       );
       return;
     }
@@ -970,7 +975,7 @@ export class SubtitleController {
 
     const prefetchElapsedMs = Math.round(performance.now() - prefetchStartedAt);
     if (prefetchElapsedMs >= SLOW_LOG_THRESHOLD_MS) {
-      console.debug(`[SubtitleController] Prefetch keywords ready ms=${prefetchElapsedMs} terms=${termContexts.size}`);
+      log.debug(`Prefetch keywords ready ms=${prefetchElapsedMs} terms=${termContexts.size}`);
     }
   }
 
@@ -1000,8 +1005,8 @@ export class SubtitleController {
       Date.now() - this.debugLastPrefetchSaturationAt >= DEBUG_LOG_THROTTLE_MS
     ) {
       this.debugLastPrefetchSaturationAt = Date.now();
-      console.debug(
-        `[SubtitleController] Prefetch queue saturated inFlight=${this.prefetchInFlight}/${this.maxPrefetchInFlight} queued=${this.prefetchQueue.length}`
+      log.debug(
+        `Prefetch queue saturated inFlight=${this.prefetchInFlight}/${this.maxPrefetchInFlight} queued=${this.prefetchQueue.length}`
       );
     }
 
@@ -1017,8 +1022,8 @@ export class SubtitleController {
 
       this.prefetchInFlight++;
       void this.getWordCardData(term, context)
-        .catch(() => {
-          // ignore
+        .catch((error: unknown) => {
+          log.debug('Prefetch getWordCardData failed; ignoring', { term, message: getErrorMessage(error) });
         })
         .finally(() => {
           this.prefetchInFlight--;
@@ -1074,9 +1079,7 @@ export class SubtitleController {
       });
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (elapsedMs >= SLOW_LOG_THRESHOLD_MS) {
-        console.debug(
-          `[SubtitleController] EXPLAIN_WORD slow word=${normalizedWord} ms=${elapsedMs} ok=${response.ok}`
-        );
+        log.debug(`EXPLAIN_WORD slow word=${normalizedWord} ms=${elapsedMs} ok=${response.ok}`);
       }
 
       if (!response.ok) {

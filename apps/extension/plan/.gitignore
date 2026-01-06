@@ -1,0 +1,3 @@
+# Ignore plan files from 12 onwards
+plan1[2-9].md
+plan2*.md

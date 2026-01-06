@@ -1,3 +1,7 @@
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
+
+const log = createLogger('background:origin');
+
 export class InvalidOriginError extends Error {
   constructor() {
     super('Invalid origin');
@@ -53,7 +57,8 @@ export function normalizeOriginToHostPattern(origin: string): string {
   let url: URL;
   try {
     url = new URL(trimmed);
-  } catch {
+  } catch (error: unknown) {
+    log.debug('Invalid origin URL; URL() parse failed', { origin: trimmed, message: getErrorMessage(error) });
     throw new InvalidOriginError();
   }
 

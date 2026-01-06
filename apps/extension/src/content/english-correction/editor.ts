@@ -1,3 +1,7 @@
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
+
+const log = createLogger('english-correction:editor');
+
 type EditableTarget = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
 
 const TEXT_INPUT_TYPES = new Set([
@@ -46,7 +50,8 @@ export function setEditableText(target: EditableTarget, nextText: string): void 
     target.focus();
     try {
       target.setRangeText(text, start, end, 'end');
-    } catch {
+    } catch (error: unknown) {
+      log.debug('setRangeText failed; falling back to direct assignment', { message: getErrorMessage(error) });
       target.value = text;
     }
     target.dispatchEvent(new Event('input', { bubbles: true }));
@@ -72,9 +77,9 @@ export function setEditableText(target: EditableTarget, nextText: string): void 
       target.textContent = text;
       target.dispatchEvent(new Event('input', { bubbles: true }));
     }
-  } catch {
+  } catch (error: unknown) {
+    log.debug('execCommand insertText failed; falling back to direct textContent assignment', { message: getErrorMessage(error) });
     target.textContent = text;
     target.dispatchEvent(new Event('input', { bubbles: true }));
   }
 }
-

@@ -6,10 +6,12 @@ import {
   SettingsSchema,
   type Settings,
 } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { getStorageService } from './storage-service';
 
 const SETTINGS_KEY = 'settings';
 const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
+const log = createLogger('shared:storage');
 
 let cachedSettings: Settings | null = null;
 let mirroredTheme: Settings['theme'] | null = null;
@@ -23,8 +25,8 @@ async function ensureLocalSettingsMirror(settings: Settings): Promise<void> {
   try {
     await browser.storage.local.set({ [SETTINGS_KEY]: buildLocalSettingsMirror(settings) });
     mirroredTheme = settings.theme;
-  } catch {
-    // ignore
+  } catch (error: unknown) {
+    log.warn('Failed to update local settings mirror; continuing without mirror', { message: getErrorMessage(error) });
   }
 }
 
@@ -254,7 +256,7 @@ export async function getSettings(): Promise<Settings> {
     return normalized.settings;
   }
 
-  console.warn('[LexiPath] Invalid settings in storage, resetting to defaults');
+  log.warn('Invalid settings in storage; resetting to defaults');
   cachedSettings = DEFAULT_SETTINGS;
   await storageService.setSettings(DEFAULT_SETTINGS);
   await ensureLocalSettingsMirror(DEFAULT_SETTINGS);

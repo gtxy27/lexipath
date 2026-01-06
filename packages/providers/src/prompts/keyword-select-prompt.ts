@@ -42,7 +42,7 @@ function tryParseJsonArray(input: string): string[] | null {
     if (!Array.isArray(parsed)) return null;
     const strings = parsed.filter((item) => typeof item === 'string') as string[];
     return strings;
-  } catch {
+  } catch (error: unknown) {
     return null;
   }
 }

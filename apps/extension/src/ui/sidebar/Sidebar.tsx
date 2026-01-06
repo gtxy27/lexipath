@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
 import type { ChatResponse, Theme } from "@lexipath/core";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
 import { chatStream } from "../../shared/chat-stream";
 import { makeKeywordSessionId, normalizeChatKeyword } from "../../shared/chat-session-id";
@@ -14,6 +15,8 @@ import { Send, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, Me
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApplyTheme } from "../lib/theme";
+
+const log = createLogger("ui:sidebar");
 
 function t(key: string): string {
   return browser.i18n.getMessage(key) || key;
@@ -120,8 +123,8 @@ export function Sidebar(): React.ReactElement {
         if (response.ok) {
           setTheme(response.value.theme);
         }
-      } catch {
-        // Ignore
+      } catch (error: unknown) {
+        log.warn("Failed to load sidebar theme from settings; using default theme", { message: getErrorMessage(error) });
       }
       await loadLatestSession();
     }

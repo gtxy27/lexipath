@@ -2,9 +2,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import browser from 'webextension-polyfill';
 import { ThemeSchema, type Theme } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { Options } from './Options';
 import '../styles.css';
 import { applyThemeToDocument } from '../lib/theme';
+
+const log = createLogger('ui:options');
 
 function t(key: string): string {
   return browser.i18n.getMessage(key) || key;
@@ -20,7 +23,8 @@ function startThemeSync(): void {
       const stored = await browser.storage.local.get('settings');
       const parsed = ThemeSchema.safeParse((stored as any)?.settings?.theme);
       apply(parsed.success ? parsed.data : 'system');
-    } catch {
+    } catch (error: unknown) {
+      log.warn('Failed to load stored theme; using system', { message: getErrorMessage(error) });
       apply('system');
     }
   })();

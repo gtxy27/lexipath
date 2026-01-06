@@ -1,4 +1,7 @@
 import { type WebDAVConfig } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
+
+const log = createLogger('storage:webdav');
 
 type WebDAVErrorCode =
   | 'WEBDAV_INVALID_CONFIG'
@@ -114,6 +117,7 @@ export class WebDAVProvider {
       }
       return errorFromResponse(response);
     } catch (error) {
+      log.warn('MKCOL request failed', { url, message: getErrorMessage(error) });
       const message = error instanceof Error ? error.message : 'Network error';
       return { ok: false, error: { code: 'WEBDAV_NETWORK_ERROR', message } };
     }
@@ -162,6 +166,7 @@ export class WebDAVProvider {
 
       return errorFromResponse(response);
     } catch (error) {
+      log.warn('WebDAV testConnection request failed', { baseUrl: this.baseUrl, message: getErrorMessage(error) });
       const message = error instanceof Error ? error.message : 'Network error';
       return { ok: false, error: { code: 'WEBDAV_NETWORK_ERROR', message } };
     }
@@ -191,6 +196,7 @@ export class WebDAVProvider {
       if (response.ok) return { ok: true };
       return errorFromResponse(response);
     } catch (error) {
+      log.warn('WebDAV upload request failed', { fileUrl: this.fileUrl, message: getErrorMessage(error) });
       const message = error instanceof Error ? error.message : 'Network error';
       return { ok: false, error: { code: 'WEBDAV_NETWORK_ERROR', message } };
     }
@@ -215,10 +221,12 @@ export class WebDAVProvider {
         const value = await response.json();
         return { ok: true, value };
       } catch (error) {
+        log.warn('WebDAV download returned invalid JSON', { fileUrl: this.fileUrl, message: getErrorMessage(error) });
         const message = error instanceof Error ? error.message : 'Invalid JSON response';
         return { ok: false, error: { code: 'WEBDAV_INVALID_RESPONSE', message } };
       }
     } catch (error) {
+      log.warn('WebDAV download request failed', { fileUrl: this.fileUrl, message: getErrorMessage(error) });
       const message = error instanceof Error ? error.message : 'Network error';
       return { ok: false, error: { code: 'WEBDAV_NETWORK_ERROR', message } };
     }

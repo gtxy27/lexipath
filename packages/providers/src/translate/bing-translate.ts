@@ -47,8 +47,9 @@ function extractBingToken(html: string, responseUrl: string): BingTokenState {
   let params: unknown;
   try {
     params = JSON.parse(paramsRaw);
-  } catch {
-    throw new Error('Failed to parse Bing token params JSON');
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse Bing token params JSON: ${detail}`);
   }
   if (!Array.isArray(params)) {
     throw new Error('Failed to parse Bing token params (expected array)');

@@ -1,5 +1,6 @@
 import type { Cue, Settings } from '@lexipath/core';
 import browser from 'webextension-polyfill';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { fetchYouTubeSubtitles, getVideoId as getYouTubeVideoId, SubtitleHttpError } from '@lexipath/subtitles';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
 import { getI18nMessage } from '../i18n';
@@ -10,6 +11,7 @@ const ADDITIONAL_PARAMS_POLL_MAX_ATTEMPTS = 6;
 const ADDITIONAL_PARAMS_WATCH_DEADLINE_MS = 30_000;
 const ADDITIONAL_PARAMS_WATCH_INTERVAL_MS = 1000;
 const LIVE_POLL_INTERVAL_MS = 2000;
+const log = createLogger('subtitle-provider:youtube');
 
 function detectYouTubeRoute(url: string): { isShorts: boolean; isLive: boolean } {
   const raw = url.trim();
@@ -21,7 +23,8 @@ function detectYouTubeRoute(url: string): { isShorts: boolean; isLive: boolean }
       isShorts: pathname.startsWith('/shorts/'),
       isLive: pathname.startsWith('/live/'),
     };
-  } catch {
+  } catch (error: unknown) {
+    log.debug('detectYouTubeRoute URL parse failed; falling back to substring checks', { message: getErrorMessage(error) });
     // If URL isn't absolute, fall back to substring checks.
     const lower = raw.toLowerCase();
     return {
@@ -144,7 +147,7 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
     });
 
     if (!additionalParams) {
-      console.warn('[YouTubeSubtitleProvider] No intercepted timedtext params; YouTube subtitles may be unavailable');
+      log.warn('No intercepted timedtext params; YouTube subtitles may be unavailable');
     }
 
     try {
@@ -208,8 +211,8 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
         button.click();
         this.lastYouTubeCaptionsKickAt = now;
       }
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.debug('kickYouTubeCaptionsRequest failed; ignoring', { message: getErrorMessage(error) });
     }
   }
 
@@ -252,8 +255,8 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
             return record.data;
           }
         }
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.debug('GET_CAPTION_REQUEST_INFO sendMessage failed; ignoring', { attempt, message: getErrorMessage(error) });
       }
 
       if (attempt === 0) {
