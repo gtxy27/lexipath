@@ -1,86 +1,110 @@
 # LexiPath
 
-Immersive language learning browser extension - transform web pages and videos with intelligent i+1 enhancement.
+简体中文 | [English](README.en.md)
 
-## Features
+沉浸式语言学习浏览器扩展：用 **i+1** 增强网页与视频字幕，把“输入”变成更高密度、更可理解的“学习材料”。
 
-- **Web Enhancement**: Transform web pages with target language input (i+1)
-- **Video Subtitles**: YouTube + Bilibili subtitle enhancement with single/bilingual modes
-- **Subtitle Keywords**: Highlight key words/phrases and prefetch explanations for the next ~15 seconds
-- **Word Learning**: Word cards, familiarity tracking, TTS pronunciation
-- **AI-Powered**: OpenAI-compatible providers, user-configurable
-- **Cross-Browser**: Chrome/Edge + Firefox support
+[![GitHub stars](https://img.shields.io/github/stars/gtxy27/lexipath?style=social)](https://github.com/gtxy27/lexipath/stargazers)
 
-## Project Structure
+## Star 趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=gtxy27/lexipath&type=Date)](https://star-history.com/#gtxy27/lexipath&Date)
+
+## 项目特点
+
+- **Web Enhancement（网页 i+1 增强）**：把网页文本改写为更适合你当前水平的目标语言输入；可随时切回原文
+- **视频字幕增强**：支持 **YouTube + Bilibili**，单语/双语模式切换
+- **字幕关键字**：从字幕中挑选高价值词/短语，并对未来 ~15 秒的内容进行预取解释（更顺滑）
+- **单词学习**：单词卡片、熟悉度追踪、TTS 发音
+- **AI 可配置**：支持 OpenAI-compatible 网关；并提供 `Claude` / `Gemini` / `Google Translate` / `Bing Translate` 等适配
+- **跨浏览器**：Chrome/Edge + Firefox
+- **质量兜底**：Zod 校验 + 回退规则（宁可不渲染，也不展示“垃圾输出”）
+
+## 项目结构
 
 ```
 lexipath/
-├── apps/extension/         # Browser extension (React + Vite)
-├── packages/
-│   ├── core/              # Pure TS types, schemas, validators
-│   ├── providers/         # OpenAI-compatible adapter
-│   ├── subtitles/         # YouTube + Bilibili adapters
-│   └── dictionary/        # IndexedDB dictionary service
-└── docs/                  # Documentation
+  apps/extension/                # 浏览器扩展（React + Vite，MV3）
+  packages/
+    core/                        # 纯 TS：类型、schema、校验与策略
+    providers/                   # OpenAI-compatible providers + 翻译适配
+    subtitles/                   # YouTube/Bilibili 字幕适配（统一 Cue 模型）
+    dictionary/                  # IndexedDB 字典服务
+    storage/                     # 存储/同步（例如 WebDAV）
 ```
 
-## Development
+## 开发
 
-### Prerequisites
+### 前置条件
 
-- [Bun](https://bun.sh/) (package manager)
+- [Bun](https://bun.sh/)（包管理器 / 运行时）
 
-### Install dependencies
+### 安装依赖
 
 ```bash
 bun install
 ```
 
-### Build
+### 测试 / 类型检查
 
 ```bash
-# Build for Chrome
+bun run test
+bun run typecheck
+```
+
+### 构建
+
+```bash
+# Chrome
 bun run build:chrome
 
-# Build for Firefox
+# Firefox
 bun run build:firefox
 
-# Build for both
+# All
 bun run build
 ```
 
-### Development mode
+### 开发模式（watch 构建）
 
 ```bash
 bun run dev
 ```
 
-### Load extension
+## 本地加载扩展
 
-**Chrome/Edge:**
-1. Go to `chrome://extensions`
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select `apps/extension/dist/chrome`
+**Chrome/Edge**
+1. 打开 `chrome://extensions`
+2. 开启 Developer mode
+3. 点击 Load unpacked
+4. 选择 `apps/extension/dist/chrome`
 
-**Firefox:**
-1. Go to `about:debugging#/runtime/this-firefox`
-2. Click "Load Temporary Add-on"
-3. Select `apps/extension/dist/firefox/manifest.json`
+**Firefox**
+1. 打开 `about:debugging#/runtime/this-firefox`
+2. 点击 Load Temporary Add-on
+3. 选择 `apps/extension/dist/firefox/manifest.json`
 
-## Configuration
+## 配置
 
-### Advanced: Per-model concurrency limits
+### Provider（OpenAI-compatible）
 
-In the Options page, you can configure how many AI requests run in parallel per model (keyed by `baseUrl|model`).
+在 Options 页面配置 `baseUrl`、`apiKey`、`model` 等参数即可接入任意 OpenAI-compatible 网关。
 
-Example:
+### 高级：按模型限制并发
+
+可按 `baseUrl|model` 维度限制每个模型的并发请求数。
 
 ```json
 {
   "https://api.openai.com/v1|gpt-4o-mini": 20
 }
 ```
+
+## 文档索引
+
+- 扩展源码：`apps/extension/src`
+- Provider 适配层：`packages/providers/src`
+- 字幕适配层：`packages/subtitles/src`
 
 ## License
 
