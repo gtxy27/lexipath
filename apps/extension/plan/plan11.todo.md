@@ -4,11 +4,11 @@
 
 ## YouTube / Bilibili 特殊适配（缺失功能）
 
-- [ ] YouTube Live 直播字幕适配（live=1 + 增量获取/轮询）
-- [ ] YouTube Shorts 适配（Shorts UI 链路兼容：字幕按钮/参数拦截/字幕获取）
-- [ ] YouTube 会员字幕适配（登录态/权限字幕轨道获取与拦截）
-- [ ] Bilibili 弹幕干扰处理（弹幕暂停/恢复，与覆盖层联动）
-- [ ] Bilibili 会员字幕适配（登录态/轨道拉取与兼容）
+- [x] YouTube Live 直播字幕适配（live=1 + 增量获取/轮询）
+- [x] YouTube Shorts 适配（Shorts UI 链路兼容：字幕按钮/参数拦截/字幕获取）
+- [x] YouTube 会员字幕适配（登录态/权限字幕轨道获取与拦截）
+- [x] Bilibili 弹幕干扰处理（弹幕暂停/恢复，与覆盖层联动）
+- [x] Bilibili 会员字幕适配（登录态/轨道拉取与兼容）
 
 ## 流媒体平台扩展支持（Stage 2/3）
 
@@ -19,4 +19,3 @@
 
 - [ ] 多服务降级（OpenAI 失败 → Claude → Gemini → Google Translate）
 - [ ] 请求头修改（`declarativeNetRequest`，用于 CORS/防盗链等场景）
-
