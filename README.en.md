@@ -65,6 +65,27 @@ bun run build:firefox
 bun run build
 ```
 
+### Release (zip/xpi)
+
+After building, you can package `apps/extension/dist/*` into distributable archives.
+
+```bash
+# Run inside lexipath/ (one command: build + package)
+bun run release
+
+# If you've already built (package only)
+bun run release:skip-build
+```
+
+Artifacts are written to `lexipath/dist/`:
+- `lexipath-chrome-<version>.zip`
+- `lexipath-firefox-<version>.xpi`
+- plus matching `*.sha256`
+
+Notes:
+- `release` uses system `tar` to create zip containers (Windows 10+ ships `tar.exe`; macOS ships bsdtar; on Linux install `bsdtar`/`libarchive-tools`).
+- Optional flags: `bun scripts/release.mjs --skip-build`, `bun scripts/release.mjs --no-sha256`.
+
 ### Development mode (watch build)
 
 ```bash

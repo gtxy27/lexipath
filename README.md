@@ -65,6 +65,27 @@ bun run build:firefox
 bun run build
 ```
 
+### 打包（zip/xpi）
+
+构建完成后，可将 `apps/extension/dist/*` 打包为可分发文件（`zip`/`xpi` 本质都是 zip 容器）。
+
+```bash
+# 在 lexipath/ 目录执行（一条命令：build + package）
+bun run release
+
+# 如果你已经 build 过（只打包）
+bun run release:skip-build
+```
+
+产物输出到 `lexipath/dist/`：
+- `lexipath-chrome-<version>.zip`
+- `lexipath-firefox-<version>.xpi`
+- 以及对应的 `*.sha256`
+
+说明：
+- `release` 内部会调用系统 `tar` 生成 zip 容器（Windows 10+ 自带 `tar.exe`；macOS 自带；Linux 建议安装 `bsdtar`/`libarchive-tools`）。
+- 可选参数：`bun scripts/release.mjs --skip-build`（不构建只打包）、`bun scripts/release.mjs --no-sha256`（不写校验文件）。
+
 ### 开发模式（watch 构建）
 
 ```bash

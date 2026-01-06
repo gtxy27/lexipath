@@ -12,6 +12,8 @@
     "build": "bun run --filter @lexipath/extension build",
     "build:chrome": "bun run --filter @lexipath/extension build:chrome",
     "build:firefox": "bun run --filter @lexipath/extension build:firefox",
+    "release": "bun scripts/release.mjs",
+    "release:skip-build": "bun scripts/release.mjs --skip-build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p apps/extension/tsconfig.json --noEmit && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/dictionary/tsconfig.json --noEmit && tsc -p packages/providers/tsconfig.json --noEmit && tsc -p packages/storage/tsconfig.json --noEmit && tsc -p packages/subtitles/tsconfig.json --noEmit"
