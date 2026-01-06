@@ -891,6 +891,30 @@
     "message": "C2",
     "description": "CEFR C2"
   },
+  "proficiencyRequirement_A1": {
+    "message": "能理解并使用非常基础的日常表达；可进行简单互动。",
+    "description": "CEFR A1 requirement"
+  },
+  "proficiencyRequirement_A2": {
+    "message": "能理解与日常生活相关的常用句子；能完成简单交流。",
+    "description": "CEFR A2 requirement"
+  },
+  "proficiencyRequirement_B1": {
+    "message": "能应对常见情境并就熟悉话题进行连贯表达。",
+    "description": "CEFR B1 requirement"
+  },
+  "proficiencyRequirement_B2": {
+    "message": "能理解抽象主题要点；能较流利交流并写出清晰文本。",
+    "description": "CEFR B2 requirement"
+  },
+  "proficiencyRequirement_C1": {
+    "message": "能理解复杂长文并灵活表达；用词自然、结构清晰。",
+    "description": "CEFR C1 requirement"
+  },
+  "proficiencyRequirement_C2": {
+    "message": "接近母语者水平；能理解几乎所有内容并精准表达。",
+    "description": "CEFR C2 requirement"
+  },
   "optionsSiteModeLabel": {
     "message": "模式",
     "description": "站点规则模式标签"

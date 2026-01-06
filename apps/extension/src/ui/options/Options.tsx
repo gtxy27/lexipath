@@ -1810,25 +1810,33 @@ export function Options(): React.ReactElement {
                              </Select>
                            ) : null}
 
-                           <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
-                             <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
-                               {t("optionsProficiencyDerivedCefr", [form.proficiencyLevel])}
-                             </p>
-                           </div>
-                         </div>
-                       ) : (
-                         <div className="space-y-2.5">
-                          <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("proficiencyLevel")}</Label>
-                          <Select value={form.proficiencyLevel} onValueChange={v => setForm({...form, proficiencyLevel: v as CEFRLevel})}>
+                            <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                                {t("optionsProficiencyDerivedCefr", [form.proficiencyLevel])}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1">
+                                {t(`proficiencyRequirement_${form.proficiencyLevel}`)}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2.5">
+                           <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("proficiencyLevel")}</Label>
+                           <Select value={form.proficiencyLevel} onValueChange={v => setForm({...form, proficiencyLevel: v as CEFRLevel})}>
                              <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
                                 <SelectValue />
                              </SelectTrigger>
                              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-                                {CEFRLevelSchema.options.map(level => <SelectItem key={level} value={level}>{t(`proficiency_${level}`)}</SelectItem>)}
-                             </SelectContent>
-                          </Select>
-                         </div>
-                       )}
+                                 {CEFRLevelSchema.options.map(level => <SelectItem key={level} value={level}>{t(`proficiency_${level}`)}</SelectItem>)}
+                              </SelectContent>
+                           </Select>
+                           <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
+                             <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                               {t(`proficiencyRequirement_${form.proficiencyLevel}`)}
+                             </p>
+                           </div>
+                          </div>
+                        )}
                        <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
                          <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
                            {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}

@@ -891,6 +891,30 @@
     "message": "C2",
     "description": "CEFR C2"
   },
+  "proficiencyRequirement_A1": {
+    "message": "Understands and uses very basic everyday expressions; can interact simply.",
+    "description": "CEFR A1 requirement"
+  },
+  "proficiencyRequirement_A2": {
+    "message": "Understands common everyday phrases; can handle simple exchanges.",
+    "description": "CEFR A2 requirement"
+  },
+  "proficiencyRequirement_B1": {
+    "message": "Can deal with common situations and express ideas on familiar topics.",
+    "description": "CEFR B1 requirement"
+  },
+  "proficiencyRequirement_B2": {
+    "message": "Understands main ideas of complex texts; communicates fairly fluently and clearly.",
+    "description": "CEFR B2 requirement"
+  },
+  "proficiencyRequirement_C1": {
+    "message": "Understands demanding texts and expresses ideas flexibly with clear structure.",
+    "description": "CEFR C1 requirement"
+  },
+  "proficiencyRequirement_C2": {
+    "message": "Near-native proficiency; understands almost everything and expresses precisely.",
+    "description": "CEFR C2 requirement"
+  },
   "optionsSiteModeLabel": {
     "message": "Mode",
     "description": "Site rules mode label"
