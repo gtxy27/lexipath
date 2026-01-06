@@ -17,11 +17,9 @@ export function buildTranslateKeywordsPrompt(options: TranslateKeywordsPromptOpt
   const keywords = options.keywords.map((term) => term.trim()).filter(Boolean);
   const context = options.context?.trim();
 
-  const userInput = [
-    '词汇列表（每行一个）：',
-    keywords.join('\n'),
-    ...(context ? ['', '上下文：', context] : []),
-  ].join('\n');
+  const userInput = context
+    ? `${keywords.join('\n')}\n\n${context}`
+    : keywords.join('\n');
 
   const template: PromptTemplateInput = {
     role: options.behavior.role,

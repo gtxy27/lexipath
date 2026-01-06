@@ -252,12 +252,17 @@ export const BEHAVIORS = {
     outputFormat: (_params) => `translation_1\ntranslation_2`,
     outputNotes: (params: { hasContext: boolean }) =>
       [
+        '输入格式：',
+        params.hasContext
+          ? '- 前面若干行：待翻译的词汇列表（每行一个）\n- 后面部分（空行后）：上下文信息'
+          : '- 每行一个待翻译的词汇',
+        '',
         '规则（非常重要）：',
         '1. 严格按输入顺序输出',
         '2. 每行只输出一个翻译结果',
         '3. 不要输出序号、项目符号、解释、JSON、Markdown 或代码块',
         '4. 只输出最常见、最基础的译法（不要多个释义）',
-        ...(params.hasContext ? ['5. 如提供上下文，请结合上下文选择最合适的译法'] : []),
+        ...(params.hasContext ? ['5. 结合上下文选择最合适的译法'] : []),
       ].join('\n'),
   } satisfies PromptBehavior<{ sourceLang: SupportedLanguage; targetLang: NativeLanguage; hasContext: boolean }>,
 
