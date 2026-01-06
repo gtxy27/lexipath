@@ -5,6 +5,7 @@
 
 import type { Cue } from '@lexipath/core';
 import { z } from 'zod';
+import { SubtitleHttpError } from '../http-error';
 
 export interface YouTubeSubtitleTrack {
   languageCode: string;
@@ -254,10 +255,15 @@ async function fetchYouTubeWatchHtml(videoId: string): Promise<string> {
   const response = await fetch(url, {
     method: 'GET',
     headers: { Accept: 'text/html,*/*' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error(`YouTube watch fetch failed: HTTP ${response.status} ${response.statusText}`);
+    throw new SubtitleHttpError('YouTube watch fetch failed', {
+      status: response.status,
+      statusText: response.statusText,
+      url,
+    });
   }
 
   return response.text();
@@ -559,7 +565,7 @@ export async function getAvailableTracks(videoId: string): Promise<YouTubeSubtit
 export async function fetchSubtitles(
   videoId: string,
   lang: string,
-  options?: { additionalParams?: string }
+  options?: { additionalParams?: string; live?: boolean }
 ): Promise<Cue[]> {
   const tracks = await getCaptionTracks(videoId);
   const selected = pickCaptionTrack(tracks, lang);
@@ -571,15 +577,21 @@ export async function fetchSubtitles(
 
   const url = new URL(selected.baseUrl);
   applyAdditionalParams(url, options?.additionalParams);
+  if (options?.live && !url.searchParams.has('live')) url.searchParams.set('live', '1');
   if (!url.searchParams.has('fmt')) url.searchParams.set('fmt', 'json3');
 
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: { Accept: 'application/json,text/xml,*/*' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error(`YouTube timedtext fetch failed: HTTP ${response.status} ${response.statusText}`);
+    throw new SubtitleHttpError('YouTube timedtext fetch failed', {
+      status: response.status,
+      statusText: response.statusText,
+      url: url.toString(),
+    });
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -615,18 +627,20 @@ function applyAdditionalParams(url: URL, additionalParams: string | undefined): 
 async function fetchTimedTextFallback(
   videoId: string,
   lang: string,
-  options?: { additionalParams?: string }
+  options?: { additionalParams?: string; live?: boolean }
 ): Promise<Cue[]> {
   const base = new URL('https://www.youtube.com/api/timedtext');
   base.searchParams.set('v', videoId);
   base.searchParams.set('lang', lang);
   applyAdditionalParams(base, options?.additionalParams);
+  if (options?.live && !base.searchParams.has('live')) base.searchParams.set('live', '1');
   if (!base.searchParams.has('fmt')) base.searchParams.set('fmt', 'json3');
 
   const tryFetch = async (url: URL): Promise<Cue[]> => {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: { Accept: 'application/json,text/xml,*/*' },
+      credentials: 'include',
     });
     if (!response.ok) return [];
 

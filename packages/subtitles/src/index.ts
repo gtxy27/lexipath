@@ -7,6 +7,8 @@
 
 export type { Cue, CueSource } from '@lexipath/core';
 
+export { SubtitleHttpError } from './http-error';
+
 // Generic subtitle parsers (string -> Cue[])
 export { parseSrt, parseTtml, parseWebVtt } from './parsers';
 

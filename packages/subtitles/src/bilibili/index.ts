@@ -5,6 +5,7 @@
 
 import type { Cue } from '@lexipath/core';
 import { z } from 'zod';
+import { SubtitleHttpError } from '../http-error';
 
 export interface BilibiliSubtitleTrack {
   languageCode: string;
@@ -289,10 +290,15 @@ export async function fetchSubtitles(subtitleUrl: string): Promise<Cue[]> {
   const response = await fetch(url, {
     method: 'GET',
     headers: { Accept: 'application/json' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
-    throw new Error(`Bilibili subtitle fetch failed: HTTP ${response.status} ${response.statusText}`);
+    throw new SubtitleHttpError('Bilibili subtitle fetch failed', {
+      status: response.status,
+      statusText: response.statusText,
+      url,
+    });
   }
 
   const json = (await response.json()) as unknown;
