@@ -43,8 +43,8 @@ import {
   GeminiProvider,
   GoogleTranslateProvider,
   OpenAICompatibleProvider,
-  WebDAVProvider,
 } from '@lexipath/providers';
+import { WebDAVProvider } from '@lexipath/storage';
 import {
   PromptBuilder,
   parseExplainWordResponse,

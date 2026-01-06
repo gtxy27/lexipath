@@ -5,13 +5,12 @@
  * Handles API requests, error classification, and response parsing.
  */
 
-export { OpenAICompatibleProvider } from './openai-compatible';
-export type { ChatMessage, ChatCompletionRequest, ChatCompletionResponse } from './openai-compatible';
-export { ClaudeProvider } from './claude';
-export { GeminiProvider } from './gemini';
-export { GoogleTranslateProvider } from './google-translate';
-export { BingTranslateProvider } from './bing-translate';
-export { WebDAVProvider } from './webdav';
+export { OpenAICompatibleProvider } from './llm/openai-compatible';
+export type { ChatMessage, ChatCompletionRequest, ChatCompletionResponse } from './llm/openai-compatible';
+export { ClaudeProvider } from './llm/claude';
+export { GeminiProvider } from './llm/gemini';
+export { GoogleTranslateProvider } from './translate/google-translate';
+export { BingTranslateProvider } from './translate/bing-translate';
 export { classifyError } from './errors';
 export type { ProviderError, ProviderErrorCode } from './errors';
 
