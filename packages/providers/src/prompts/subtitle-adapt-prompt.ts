@@ -1,4 +1,4 @@
-import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, PromptTemplateInput } from '@lexipath/core';
+import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage, PromptTemplateInput } from '@lexipath/core';
 import { buildCefrOutputGuidance } from './cefr-guidance';
 import { buildProficiencyReferenceLine } from './proficiency-reference';
 import { renderPromptTemplate } from './prompt-template-renderer';
@@ -7,6 +7,7 @@ export interface SubtitleAdaptPromptOptions {
   subtitle: string;
   sourceLang: SupportedLanguage;
   targetLang: SupportedLanguage;
+  motherTongue: NativeLanguage;
   difficultyLevel: CEFRLevel;
   proficiencyPreference?: ProficiencyPreference;
 }
@@ -21,8 +22,8 @@ export function buildSubtitleAdaptPrompt(options: SubtitleAdaptPromptOptions): s
     level: options.difficultyLevel,
   });
   const referenceLine = buildProficiencyReferenceLine({
-    sourceLang: options.sourceLang,
-    targetLang: 'zh-CN',
+    sourceLang: options.targetLang,
+    targetLang: options.motherTongue,
     userLevel: options.difficultyLevel,
     ...(options.proficiencyPreference
       ? { proficiencyPreference: options.proficiencyPreference }
@@ -35,8 +36,8 @@ export function buildSubtitleAdaptPrompt(options: SubtitleAdaptPromptOptions): s
     style: '风格：自然清晰、适合字幕显示；不要添加原文没有的信息。',
     task: `任务：将<用户输入>中的${sourceName}字幕翻译为${targetName}，并将表达难度调整到 CEFR ${options.difficultyLevel} 水平；保持核心含义不变；字幕长度合理（最多 2 行，每行约 40 个字符以内）。`,
     userInfo: {
-      motherTongue: options.targetLang,
-      targetLearningLanguage: options.sourceLang,
+      motherTongue: options.motherTongue,
+      targetLearningLanguage: options.targetLang,
       cefrLevel: options.difficultyLevel,
       ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
     },

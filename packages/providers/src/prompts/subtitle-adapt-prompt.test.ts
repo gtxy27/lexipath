@@ -7,6 +7,7 @@ describe('buildSubtitleAdaptPrompt', () => {
       subtitle: '你好，欢迎回来。',
       sourceLang: 'zh',
       targetLang: 'en',
+      motherTongue: 'zh-CN',
       difficultyLevel: 'B1',
     });
 

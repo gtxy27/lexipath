@@ -964,15 +964,16 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
 
         const provider = getChatProvider(adaptProviderInfo.type, adaptProviderInfo.config);
 
-        const prompt = buildSubtitleAdaptPrompt({
-          subtitle,
-          sourceLang,
-          difficultyLevel,
-          targetLang: settings.targetLanguage,
-          ...(settings.proficiencyPreference
-            ? { proficiencyPreference: settings.proficiencyPreference }
-            : {}),
-        });
+         const prompt = buildSubtitleAdaptPrompt({
+           subtitle,
+           sourceLang,
+           difficultyLevel,
+           targetLang: settings.targetLanguage,
+           motherTongue: settings.nativeLanguage,
+           ...(settings.proficiencyPreference
+             ? { proficiencyPreference: settings.proficiencyPreference }
+             : {}),
+         });
 
         const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute!.kind);
         const response = await runWithChannelConcurrency(routeKey(adaptRoute!), adaptLimit, () =>
