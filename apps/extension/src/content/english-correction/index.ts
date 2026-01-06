@@ -7,6 +7,11 @@ import { getEditableText, isSupportedEditableTarget, setEditableText } from './e
 
 type EditableTarget = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
 
+type AppliedCorrection = {
+  originalText: string;
+  correctedText: string;
+};
+
 export class EnglishCorrectionController {
   private settings: Settings | null = null;
   private enabled = false;
@@ -16,6 +21,7 @@ export class EnglishCorrectionController {
   private lastPressAt = 0;
 
   private inFlight = new WeakMap<EditableTarget, Promise<void>>();
+  private lastApplied = new WeakMap<EditableTarget, AppliedCorrection>();
 
   setSettings(settings: Settings | null): void {
     this.settings = settings;
@@ -25,15 +31,40 @@ export class EnglishCorrectionController {
   start(): void {
     if (this.started) return;
     this.started = true;
+    document.addEventListener('keydown', this.onKeyDown, true);
     document.addEventListener('keyup', this.onKeyUp, true);
   }
 
   destroy(): void {
     if (!this.started) return;
     this.started = false;
+    document.removeEventListener('keydown', this.onKeyDown, true);
     document.removeEventListener('keyup', this.onKeyUp, true);
     this.inFlight = new WeakMap();
+    this.lastApplied = new WeakMap();
   }
+
+  private onKeyDown = (event: KeyboardEvent): void => {
+    if (!this.enabled) return;
+    if (!this.settings) return;
+
+    const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && (event.key === 'z' || event.key === 'Z');
+    if (!isUndo) return;
+
+    const target = (() => {
+      const direct = event.target;
+      if (isSupportedEditableTarget(direct)) return direct;
+      const active = document.activeElement;
+      if (isSupportedEditableTarget(active)) return active;
+      return null;
+    })();
+
+    if (!target) return;
+    if (!this.tryUndo(target)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   private onKeyUp = (event: KeyboardEvent): void => {
     if (!this.enabled) return;
@@ -63,6 +94,18 @@ export class EnglishCorrectionController {
     void this.triggerCorrection(target);
   };
 
+  private tryUndo(target: EditableTarget): boolean {
+    const last = this.lastApplied.get(target);
+    if (!last) return false;
+
+    const current = getEditableText(target);
+    if (current !== last.correctedText) return false;
+
+    setEditableText(target, last.originalText);
+    this.lastApplied.delete(target);
+    return true;
+  }
+
   private async triggerCorrection(target: EditableTarget): Promise<void> {
     if (!this.enabled || !this.settings) return;
 
@@ -81,16 +124,17 @@ export class EnglishCorrectionController {
     if (!this.settings) return;
     const config = this.settings.englishCorrection;
 
-    const original = getEditableText(target).trim();
-    if (!original) return;
-    if (looksLikeUrlOnly(original)) return;
-    if (!containsEnglishSentence(original)) return;
+    const originalText = getEditableText(target);
+    const trimmed = originalText.trim();
+    if (!trimmed) return;
+    if (looksLikeUrlOnly(trimmed)) return;
+    if (!containsEnglishSentence(trimmed)) return;
 
     const anchorRect = (target instanceof Element && typeof target.getBoundingClientRect === 'function')
       ? target.getBoundingClientRect()
       : new DOMRect(10, 10, 10, 10);
 
-    const response = await sendMessage<EnglishCorrectionOutput>('ENGLISH_CORRECTION', { text: original });
+    const response = await sendMessage<EnglishCorrectionOutput>('ENGLISH_CORRECTION', { text: trimmed });
 
     if (!response.ok) {
       showCorrectionCard({
@@ -98,6 +142,7 @@ export class EnglishCorrectionController {
         message: getI18nMessage('englishCorrection_error'),
         anchorRect,
         autoCloseDelayMs: config.autoCloseDelay,
+        theme: this.settings.theme,
       });
       return;
     }
@@ -110,23 +155,30 @@ export class EnglishCorrectionController {
         message,
         anchorRect,
         autoCloseDelayMs: config.autoCloseDelay,
+        theme: this.settings.theme,
       });
       return;
     }
 
     const corrected = result.corrected?.trim();
-    if (!corrected || corrected === original) {
+    if (!corrected || corrected === trimmed) {
       const message = result.message?.trim() || getI18nMessage('englishCorrection_ok');
       showCorrectionCard({
         kind: 'encouragement',
         message,
         anchorRect,
         autoCloseDelayMs: config.autoCloseDelay,
+        theme: this.settings.theme,
       });
       return;
     }
 
-    setEditableText(target, corrected);
+    const leading = originalText.match(/^\s*/)?.[0] ?? '';
+    const trailing = originalText.match(/\s*$/)?.[0] ?? '';
+    const correctedText = `${leading}${corrected}${trailing}`;
+
+    setEditableText(target, correctedText);
+    this.lastApplied.set(target, { originalText, correctedText });
     const message = result.message?.trim() || getI18nMessage('englishCorrection_corrected');
 
     showCorrectionCard({
@@ -134,8 +186,11 @@ export class EnglishCorrectionController {
       message,
       anchorRect,
       showUndo: config.showUndoButton,
-      onUndo: () => setEditableText(target, original),
+      onUndo: () => {
+        setEditableText(target, originalText);
+        this.lastApplied.delete(target);
+      },
+      theme: this.settings.theme,
     });
   }
 }
-

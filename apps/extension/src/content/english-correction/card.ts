@@ -25,12 +25,18 @@ export function showCorrectionCard(options: {
   autoCloseDelayMs?: number;
   showUndo?: boolean;
   onUndo?: () => void;
+  theme?: 'light' | 'dark' | 'system';
 }): CardHandle {
   const existing = document.getElementById('lexipath-english-correction-card');
   if (existing) existing.remove();
 
   const container = document.createElement('div');
   container.id = 'lexipath-english-correction-card';
+  if (options.theme && options.theme !== 'system') {
+    container.dataset.theme = options.theme;
+  } else {
+    delete container.dataset.theme;
+  }
   container.style.position = 'fixed';
   container.style.zIndex = '2147483647';
   container.style.pointerEvents = 'auto';
@@ -41,14 +47,72 @@ export function showCorrectionCard(options: {
   const shadow = container.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = `
+    :host {
+      --lp-ec-bg: rgba(255, 255, 255, 0.96);
+      --lp-ec-fg: rgba(15, 23, 42, 0.92);
+      --lp-ec-muted: rgba(71, 85, 105, 0.9);
+      --lp-ec-border: rgba(148, 163, 184, 0.45);
+      --lp-ec-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+      --lp-ec-btn-bg: rgba(248, 250, 252, 0.9);
+      --lp-ec-btn-bg-hover: rgba(241, 245, 249, 0.95);
+      --lp-ec-btn-border: rgba(148, 163, 184, 0.5);
+      --lp-ec-primary-border: rgba(99, 102, 241, 0.5);
+      --lp-ec-primary-bg: rgba(99, 102, 241, 0.12);
+      --lp-ec-primary-bg-hover: rgba(99, 102, 241, 0.18);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :host {
+        --lp-ec-bg: rgba(15, 23, 42, 0.92);
+        --lp-ec-fg: rgba(241, 245, 249, 0.96);
+        --lp-ec-muted: rgba(226, 232, 240, 0.75);
+        --lp-ec-border: rgba(148, 163, 184, 0.35);
+        --lp-ec-shadow: 0 10px 30px rgba(0,0,0,0.35);
+        --lp-ec-btn-bg: rgba(30, 41, 59, 0.7);
+        --lp-ec-btn-bg-hover: rgba(30, 41, 59, 0.9);
+        --lp-ec-btn-border: rgba(148, 163, 184, 0.35);
+        --lp-ec-primary-border: rgba(99, 102, 241, 0.45);
+        --lp-ec-primary-bg: rgba(99, 102, 241, 0.18);
+        --lp-ec-primary-bg-hover: rgba(99, 102, 241, 0.26);
+      }
+    }
+
+    :host([data-theme="light"]) {
+      --lp-ec-bg: rgba(255, 255, 255, 0.96);
+      --lp-ec-fg: rgba(15, 23, 42, 0.92);
+      --lp-ec-muted: rgba(71, 85, 105, 0.9);
+      --lp-ec-border: rgba(148, 163, 184, 0.45);
+      --lp-ec-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+      --lp-ec-btn-bg: rgba(248, 250, 252, 0.9);
+      --lp-ec-btn-bg-hover: rgba(241, 245, 249, 0.95);
+      --lp-ec-btn-border: rgba(148, 163, 184, 0.5);
+      --lp-ec-primary-border: rgba(99, 102, 241, 0.5);
+      --lp-ec-primary-bg: rgba(99, 102, 241, 0.12);
+      --lp-ec-primary-bg-hover: rgba(99, 102, 241, 0.18);
+    }
+
+    :host([data-theme="dark"]) {
+      --lp-ec-bg: rgba(15, 23, 42, 0.92);
+      --lp-ec-fg: rgba(241, 245, 249, 0.96);
+      --lp-ec-muted: rgba(226, 232, 240, 0.75);
+      --lp-ec-border: rgba(148, 163, 184, 0.35);
+      --lp-ec-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --lp-ec-btn-bg: rgba(30, 41, 59, 0.7);
+      --lp-ec-btn-bg-hover: rgba(30, 41, 59, 0.9);
+      --lp-ec-btn-border: rgba(148, 163, 184, 0.35);
+      --lp-ec-primary-border: rgba(99, 102, 241, 0.45);
+      --lp-ec-primary-bg: rgba(99, 102, 241, 0.18);
+      --lp-ec-primary-bg-hover: rgba(99, 102, 241, 0.26);
+    }
+
     .card {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 12px 12px 10px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      background: rgba(15, 23, 42, 0.95);
-      color: rgba(241, 245, 249, 0.96);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      border: 1px solid var(--lp-ec-border);
+      background: var(--lp-ec-bg);
+      color: var(--lp-ec-fg);
+      box-shadow: var(--lp-ec-shadow);
       backdrop-filter: blur(8px);
     }
     .message {
@@ -65,21 +129,21 @@ export function showCorrectionCard(options: {
     }
     button {
       appearance: none;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      background: rgba(30, 41, 59, 0.7);
-      color: rgba(241, 245, 249, 0.95);
+      border: 1px solid var(--lp-ec-btn-border);
+      background: var(--lp-ec-btn-bg);
+      color: var(--lp-ec-fg);
       border-radius: 10px;
       padding: 6px 10px;
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
     }
-    button:hover { background: rgba(30, 41, 59, 0.9); }
+    button:hover { background: var(--lp-ec-btn-bg-hover); }
     .primary {
-      border-color: rgba(99, 102, 241, 0.45);
-      background: rgba(99, 102, 241, 0.18);
+      border-color: var(--lp-ec-primary-border);
+      background: var(--lp-ec-primary-bg);
     }
-    .primary:hover { background: rgba(99, 102, 241, 0.26); }
+    .primary:hover { background: var(--lp-ec-primary-bg-hover); }
     .tone {
       display: inline-flex;
       align-items: center;
@@ -89,7 +153,7 @@ export function showCorrectionCard(options: {
       font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: rgba(226, 232, 240, 0.75);
+      color: var(--lp-ec-muted);
     }
     .dot {
       width: 8px;
@@ -111,10 +175,10 @@ export function showCorrectionCard(options: {
   const toneText = document.createElement('span');
   toneText.textContent =
     options.kind === 'corrected'
-      ? getI18nMessage('englishCorrection_tagCorrected')
+      ? getI18nMessage('englishCorrection_tagCorrected', undefined, 'englishCorrection_tagCorrected')
       : options.kind === 'error'
-        ? getI18nMessage('englishCorrection_tagError')
-        : getI18nMessage('englishCorrection_tagEncouragement');
+        ? getI18nMessage('englishCorrection_tagError', undefined, 'englishCorrection_tagError')
+        : getI18nMessage('englishCorrection_tagEncouragement', undefined, 'englishCorrection_tagEncouragement');
   tone.appendChild(dot);
   tone.appendChild(toneText);
   card.appendChild(tone);
@@ -131,7 +195,7 @@ export function showCorrectionCard(options: {
     const undo = document.createElement('button');
     undo.className = 'primary';
     undo.type = 'button';
-    undo.textContent = getI18nMessage('englishCorrection_undo');
+    undo.textContent = getI18nMessage('englishCorrection_undo', undefined, 'englishCorrection_undo');
     undo.addEventListener('click', () => {
       options.onUndo?.();
       close();
@@ -141,7 +205,7 @@ export function showCorrectionCard(options: {
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
-  closeBtn.textContent = getI18nMessage('englishCorrection_close');
+  closeBtn.textContent = getI18nMessage('englishCorrection_close', undefined, 'englishCorrection_close');
   closeBtn.addEventListener('click', () => close());
   footer.appendChild(closeBtn);
 
@@ -171,4 +235,3 @@ export function showCorrectionCard(options: {
 
   return { close };
 }
-
