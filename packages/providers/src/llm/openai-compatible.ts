@@ -1,5 +1,5 @@
 import type { ProviderConfig } from '@lexipath/core';
-import { classifyError, type ProviderError } from './errors';
+import { classifyError, type ProviderError } from '../errors';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';

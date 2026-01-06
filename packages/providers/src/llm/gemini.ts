@@ -1,5 +1,5 @@
 import type { GeminiProviderConfig } from '@lexipath/core';
-import { classifyError, type ProviderError } from './errors';
+import { classifyError, type ProviderError } from '../errors';
 import type { ChatCompletionResponse, ChatMessage, ChatOptions } from './openai-compatible';
 
 interface InFlightRequest {
@@ -264,4 +264,3 @@ export class GeminiProvider {
     this.inFlightRequests.clear();
   }
 }
-

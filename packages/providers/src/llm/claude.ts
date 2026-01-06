@@ -1,5 +1,5 @@
 import type { ClaudeProviderConfig } from '@lexipath/core';
-import { classifyError, type ProviderError } from './errors';
+import { classifyError, type ProviderError } from '../errors';
 import type { ChatCompletionResponse, ChatMessage, ChatOptions } from './openai-compatible';
 
 interface InFlightRequest {
@@ -228,4 +228,3 @@ export class ClaudeProvider {
     this.inFlightRequests.clear();
   }
 }
-
