@@ -1,10 +1,13 @@
 const DANMU_RESTORE_DELAY_MS = 3000;
+const DEFAULT_HIDE_BOTTOM_RATIO = 0.2;
 
 export class BilibiliDanmuManager {
   private readonly styleId = 'lexipath-hide-bilibili-danmu';
   private restoreTimer: number | null = null;
   private styleEl: HTMLStyleElement | null = null;
   private destroyed = false;
+
+  private hideBottomRatio = DEFAULT_HIDE_BOTTOM_RATIO;
 
   destroy(): void {
     this.destroyed = true;
@@ -38,16 +41,14 @@ export class BilibiliDanmuManager {
 
     const style = document.createElement('style');
     style.id = this.styleId;
+    const bottomPercent = Math.round(this.hideBottomRatio * 100);
     style.textContent = `
-      /* Hide Bilibili danmu (bullet comments) while LexiPath subtitles are visible */
+      /* Hide only the bottom region of Bilibili danmu to avoid covering subtitles. */
       .bilibili-player-video-danmaku,
-      .bilibili-player-video-danmaku-item,
       .bpx-player-video-danmaku,
-      .bpx-player-video-danmaku-item,
       .bpx-player-dm-wrap {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
+        clip-path: inset(0 0 ${bottomPercent}% 0) !important;
+        -webkit-clip-path: inset(0 0 ${bottomPercent}% 0) !important;
       }
     `;
 
@@ -64,4 +65,3 @@ export class BilibiliDanmuManager {
     }
   }
 }
-
