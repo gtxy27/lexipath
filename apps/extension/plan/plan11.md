@@ -241,17 +241,116 @@ export const SCENE_CONFIGS: Record<SceneKey, SceneConfig> = {
 
 ### 一次交付（完整落地）
 
-**Step 1：确定模板与结构体（契约优先）**
+**Step 1：确定模板与结构体（契约优先）** ✅ 已完成
 
 - 定义 `UserInfo` / `ContextInfo` / `PromptTemplateInput`（按顺序）并提供 Zod 校验
 - 明确统一标签结构：`<用户信息>`、`<上下文信息>`（可选）、`<用户输入>`、`<输出格式>`、`<输出说明>`
 - 约束：只用 `user` 消息；`<输出格式>` 内不写中文说明
 
-**Step 2：实现统一 renderer，并迁移全部 Prompt 构造器**
+**Step 2：实现提示词工厂系统（详细展开）** 待实施
 
-- renderer：输入 `PromptTemplateInput`，输出最终 prompt string（固定段落 + 标签信息块）
-- 迁移所有 `build*Prompt`：保持对外 API 稳定，但内部改为组装 `PromptTemplateInput` 并渲染
-- 场景与风格：由 SceneConfig 提供 `scene/style/styleRules` 文案片段注入模板
+**当前状态**：
+- 各 `build*Prompt` 函数（如 `buildSubtitleEnhancePrompt`）中硬编码了 `role/scene/style/task`
+- 每个函数内部直接写死字符串，无法动态调整风格
+- 调用者需要手动构建 `userInfo` 并传入
+- 场景和风格绑定在一起，无法灵活组合
+
+**改造目标**：
+- 通过 BEHAVIORS/SCENES/STYLES 三个字典统一管理提示词组件
+- PromptBuilder 负责查找组件、自动构建 userInfo、调用底层函数
+- 用户在 Settings 中选择风格，保存到 `Settings.promptStyle`
+- 场景和风格解耦，可以任意组合
+
+**Step 2.1：定义配置和字典** 待实施
+
+**文件位置**：
+- `packages/core/src/prompting/behaviors.ts` - BEHAVIORS 配置
+- `packages/core/src/prompting/scenes.ts` - PROMPT_SCENES 字典
+- `packages/core/src/prompting/styles.ts` - PROMPT_STYLES 字典
+
+**BEHAVIORS 配置**（行为完整定义）：
+- role 与 behavior 绑定（一对一）
+- task 与 behavior 绑定，但支持动态参数（level, mode 等）
+- outputFormat 根据业务参数动态生成
+- outputNotes 可根据参数定制
+
+**PROMPT_SCENES 字典**（类型级场景，支持 fallback）：
+- 默认提供类型级场景（video_subtitle, news_reading 等）
+- 允许具体平台：如传入 'bilibili' / 'youtube' 等字典里没有的值，直接使用
+- Fallback 机制：`PROMPT_SCENES[key] || key`
+
+**PROMPT_STYLES 字典**（完整风格定义，用户单选）：
+- 完整风格定义：每个 style 是完整的风格描述（包含"风格："前缀）
+- 用户选择：用户在 Settings UI 中选择一个风格
+- 单选而非组合：用户选择 'anime' / 'academic' / 'casual' 其中一个
+
+**Step 2.2：实现 PromptBuilder 类** 待实施
+
+**文件位置**：`packages/providers/src/prompts/prompt-builder.ts`
+
+**职责**：
+- 注入 getSettings getter（动态获取最新配置）
+- 从组件库查找 scene/style
+- 自动构建 userInfo
+- 调用底层 `build*Prompt` 函数
+
+**设计要点**：
+- 全异步方案（所有 build 方法都是 async）
+- 不需要 init/refresh（利用 getSettings 的缓存机制）
+- 职责单一（只负责查找和组装）
+- style 优先级：参数 > Settings.promptStyle > 'default'
+
+**Step 2.3：调整现有 build*Prompt 函数** 待实施
+
+**影响文件**：
+- `packages/providers/src/prompts/subtitle-enhance-prompt.ts`
+- `packages/providers/src/prompts/explain-word-prompt.ts`
+- `packages/providers/src/prompts/english-correction-prompt.ts`
+- `packages/providers/src/prompts/keyword-select-prompt.ts`
+- `packages/providers/src/prompts/web-enhance-prompt.ts`
+- `packages/providers/src/prompts/translate-keywords-prompt.ts`
+
+**改动点**：
+- 参数改为 `sceneValue: string`, `styleValue: string`（单个值）
+- 新增 `userInfo: PromptUserInfo` 参数
+- 新增 `behavior: typeof BEHAVIORS[xxx]` 参数
+- 从 behavior 获取 role/task/outputFormat/outputNotes
+- style 已经是完整定义，直接使用
+
+**Step 2.4：集成到 background** 待实施
+
+**文件**：`apps/extension/src/background/index.ts`
+
+**内容**：
+- 创建 `PromptBuilder` 实例
+- 替换现有的 `build*Prompt` 直接调用
+- 所有调用改为 `await`
+
+**Step 2.5：Settings 新增字段** 待实施
+
+**文件**：
+- `packages/core/src/types/index.ts` - Settings 类型定义
+- `apps/extension/src/ui/options/Options.tsx` - UI 选项
+
+**新增字段**：`promptStyle?: StyleKey` （用户选择的风格）
+
+**UI 选项**：
+- 在 Settings UI 添加"提示词风格"下拉选项
+- 选项：默认 / 动漫 / 学术 / 轻松 / 简洁
+
+**Step 2.6：测试验证** 待实施
+
+- 单元测试（各 `build*Prompt` 函数）
+- 集成测试（PromptBuilder）
+- 手工验证（不同场景和风格组合）
+- 运行 `bun run typecheck` 与 `bun run test`
+
+**关键设计决策**：
+1. 全异步方案：利用现有 getSettings 缓存机制
+2. BEHAVIORS 配置统一管理：role/task/outputFormat/outputNotes 与 behavior 绑定
+3. SCENES 为类型级而非平台级：更通用、可复用
+4. STYLES 是完整风格定义：用户单选一个
+5. outputFormat 不强校验 JSON：根据 behavior 选择解析策略
 
 **Step 3：用户水平参考行（与 CEFR 并列展示）**
 
@@ -1599,18 +1698,18 @@ async function triggerCorrection() {
 
 一次交付内完成：
 
-- [ ] 触发窗口（3 次空格 + `triggerTimeout`）
-- [ ] 排除规则（密码框/非文本/URL-only/非英文句）
-- [ ] PromptTemplateInput 渲染并调用 LLM
-- [ ] 严格输出校验 + 失败回退（不替换用户输入）
-- [ ] 自动替换 + 撤销（Ctrl+Z + UI 撤销按钮）
-- [ ] i18n 文案接入
+- [x] 触发窗口（3 次空格 + `triggerTimeout`）
+- [x] 排除规则（密码框/非文本/URL-only/非英文句）
+- [x] PromptTemplateInput 渲染并调用 LLM
+- [x] 严格输出校验 + 失败回退（不替换用户输入）
+- [x] 自动替换 + 撤销（Ctrl+Z + UI 撤销按钮）
+- [x] i18n 文案接入
 
 可选增强（后续迭代）：
 
-- [ ] 卡片智能定位/动画效果
-- [ ] 快捷键支持（Enter/Esc）
-- [ ] 统计与错误分类分析
+- [x] 卡片智能定位/动画效果
+- [x] 快捷键支持（Enter/Esc）
+- [x] 统计与错误分类分析
 
 ### 配置项
 
