@@ -67,6 +67,7 @@ export class SubtitleOverlay {
   private onModeChange?: (mode: SubtitleMode) => void;
   private onWordClick?: (word: string, anchorRect: DOMRect) => void;
   private onWordHover?: (word: string, anchorRect: DOMRect) => void;
+  private layout: 'default' | 'youtube-shorts' = 'default';
   private documentClickListenerAttached = false;
   public wordCardVisible = false;
   private wordCardPinned = false;
@@ -85,6 +86,7 @@ export class SubtitleOverlay {
     platform: 'youtube' | 'bilibili',
     options?: {
       theme?: 'light' | 'dark';
+      layout?: 'default' | 'youtube-shorts';
       onModeChange?: (mode: SubtitleMode) => void;
       onWordClick?: (word: string, anchorRect: DOMRect) => void;
       onWordHover?: (word: string, anchorRect: DOMRect) => void;
@@ -92,6 +94,7 @@ export class SubtitleOverlay {
   ) {
     this.platform = platform;
     this.theme = options?.theme === 'light' ? 'light' : 'dark';
+    this.layout = options?.layout === 'youtube-shorts' ? 'youtube-shorts' : 'default';
     if (options?.onModeChange) {
       this.onModeChange = options.onModeChange;
     }
@@ -120,12 +123,16 @@ export class SubtitleOverlay {
     this.videoContainer = videoContainer;
     this.ensureVideoContainerPositioned();
 
+    const layout = this.layout;
+    const containerBottomPx = layout === 'youtube-shorts' ? 110 : 60;
+    const containerPaddingX = layout === 'youtube-shorts' ? 10 : 0;
+
     // Create container
     this.container = document.createElement('div');
     this.container.id = 'lexipath-subtitle-overlay';
     this.container.style.cssText = `
       position: absolute;
-      bottom: 60px;
+      bottom: ${containerBottomPx}px;
       left: 0;
       right: 0;
       pointer-events: none;
@@ -133,6 +140,7 @@ export class SubtitleOverlay {
       display: flex;
       justify-content: center;
       align-items: flex-end;
+      padding: 0 ${containerPaddingX}px;
     `;
 
     // Create Shadow DOM

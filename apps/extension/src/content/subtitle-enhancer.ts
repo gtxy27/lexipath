@@ -67,6 +67,16 @@ export class SubtitleEnhancer {
     this.bilingualCueLastAttemptAt.clear();
   }
 
+  appendCues(cues: Cue[], options: { subtitleLanguage: string }): void {
+    this.cues = cues;
+    this.subtitleLanguage = options.subtitleLanguage;
+
+    // Do not reset enhanced results; allow the pipeline to keep running and
+    // continue from the current queueIndex.
+    this.queueIndex = Math.min(this.queueIndex, cues.length);
+    this.pump();
+  }
+
   start(): void {
     if (this.destroyed) return;
     if (!this.started) {

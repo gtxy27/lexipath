@@ -1,6 +1,6 @@
 import type { Cue, Settings } from '@lexipath/core';
 import browser from 'webextension-polyfill';
-import { fetchYouTubeSubtitles, getVideoId as getYouTubeVideoId } from '@lexipath/subtitles';
+import { fetchYouTubeSubtitles, getVideoId as getYouTubeVideoId, SubtitleHttpError } from '@lexipath/subtitles';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
 import { getI18nMessage } from '../i18n';
 
@@ -9,6 +9,35 @@ const ADDITIONAL_PARAMS_POLL_DELAY_MS = 500;
 const ADDITIONAL_PARAMS_POLL_MAX_ATTEMPTS = 6;
 const ADDITIONAL_PARAMS_WATCH_DEADLINE_MS = 30_000;
 const ADDITIONAL_PARAMS_WATCH_INTERVAL_MS = 1000;
+const LIVE_POLL_INTERVAL_MS = 2000;
+
+function detectYouTubeRoute(url: string): { isShorts: boolean; isLive: boolean } {
+  const raw = url.trim();
+  if (!raw) return { isShorts: false, isLive: false };
+  try {
+    const parsed = new URL(raw);
+    const pathname = parsed.pathname.toLowerCase();
+    return {
+      isShorts: pathname.startsWith('/shorts/'),
+      isLive: pathname.startsWith('/live/'),
+    };
+  } catch {
+    // If URL isn't absolute, fall back to substring checks.
+    const lower = raw.toLowerCase();
+    return {
+      isShorts: lower.includes('/shorts/'),
+      isLive: lower.includes('/live/'),
+    };
+  }
+}
+
+function hashString(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 33) ^ input.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
 
 export class YouTubeSubtitleProvider implements SubtitleProvider {
   readonly platform = 'youtube' as const;
@@ -16,6 +45,13 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
   private destroyed = false;
   private settings: Settings | null = null;
   private videoId: string | null = null;
+
+  private isShorts = false;
+  private isLive = false;
+  private livePollTimer: number | null = null;
+  private liveCues: Cue[] = [];
+  private liveCueKeys = new Set<string>();
+  private liveLastEndMs = 0;
 
   private youtubeAdditionalParams = '';
   private youtubeParamsWatchToken = 0;
@@ -35,20 +71,34 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
       throw new Error('[YouTubeSubtitleProvider] Invalid YouTube URL');
     }
 
+    const route = detectYouTubeRoute(url);
+    this.isShorts = route.isShorts;
+    this.isLive = route.isLive;
+
     this.settings = settings;
     this.videoId = videoId;
 
     this.attachRuntimeMessageListener();
+
+    if (this.isLive) {
+      this.startLivePolling();
+    }
   }
 
   destroy(): void {
     this.destroyed = true;
     this.youtubeParamsWatchToken++;
+    this.stopLivePolling();
     this.detachRuntimeMessageListener();
     this.showNativeCaptions?.();
 
     this.settings = null;
     this.videoId = null;
+    this.isShorts = false;
+    this.isLive = false;
+    this.liveCues = [];
+    this.liveCueKeys.clear();
+    this.liveLastEndMs = 0;
   }
 
   hideNativeCaptions(): void {
@@ -97,10 +147,26 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
       console.warn('[YouTubeSubtitleProvider] No intercepted timedtext params; YouTube subtitles may be unavailable');
     }
 
-    const cues = await fetchYouTubeSubtitles(videoId, this.settings.targetLanguage, { additionalParams });
+    try {
+      const cues = await fetchYouTubeSubtitles(videoId, this.settings.targetLanguage, {
+        additionalParams,
+        ...(this.isLive ? { live: true } : {}),
+      });
 
-    if (cues.length === 0 && !additionalParams) {
-      this.startYouTubeParamsWatch(videoId);
+      if (this.isLive) {
+        const merged = this.mergeLiveCues(cues, { videoId });
+        if (merged.length === 0) {
+          return {
+            cues: [],
+            lang: this.settings.targetLanguage,
+            statusMessage: getI18nMessage('subtitle_liveWaiting'),
+          };
+        }
+        return { cues: merged, lang: merged[0]?.lang ?? this.settings.targetLanguage };
+      }
+
+      if (cues.length === 0 && !additionalParams) {
+        this.startYouTubeParamsWatch(videoId);
         return {
           cues,
           lang: this.settings.targetLanguage,
@@ -108,7 +174,17 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
         };
       }
 
-    return { cues, lang: cues[0]?.lang ?? this.settings.targetLanguage };
+      return { cues, lang: cues[0]?.lang ?? this.settings.targetLanguage };
+    } catch (error) {
+      if (error instanceof SubtitleHttpError && (error.status === 401 || error.status === 403)) {
+        return {
+          cues: [],
+          lang: this.settings.targetLanguage,
+          statusMessage: getI18nMessage('subtitle_requiresPremium'),
+        };
+      }
+      throw error;
+    }
   }
 
   private kickYouTubeCaptionsRequest(options?: { forceRefreshIfAlreadyEnabled?: boolean }): void {
@@ -116,7 +192,7 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
       const now = Date.now();
       if (now - this.lastYouTubeCaptionsKickAt < CAPTIONS_KICK_DEBOUNCE_MS) return;
 
-      const button = document.querySelector('.ytp-subtitles-button');
+      const button = this.findYouTubeCaptionsButton();
       if (!(button instanceof HTMLElement)) return;
       const pressed = button.getAttribute('aria-pressed') === 'true';
       const forceRefreshIfAlreadyEnabled = options?.forceRefreshIfAlreadyEnabled ?? false;
@@ -135,6 +211,24 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
     } catch {
       // ignore
     }
+  }
+
+  private findYouTubeCaptionsButton(): HTMLElement | null {
+    const selectors = [
+      '.ytp-subtitles-button',
+      // Shorts often renders a different button surface with aria labels.
+      'ytd-reel-player-overlay-renderer button[aria-label*="字幕"]',
+      'ytd-reel-player-overlay-renderer button[aria-label*="Subtitles"]',
+      'button[aria-label*="字幕"]',
+      'button[aria-label*="Subtitles"]',
+      'button[aria-label*="captions"]',
+      'button[aria-label*="Captions"]',
+    ];
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (el instanceof HTMLElement) return el;
+    }
+    return null;
   }
 
   private async tryGetYouTubeAdditionalParams(
@@ -224,5 +318,56 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
 
       this.onSubtitlesMayBeAvailable?.();
     })();
+  }
+
+  private startLivePolling(): void {
+    if (this.livePollTimer !== null) return;
+
+    const tick = () => {
+      if (this.destroyed) return;
+      this.onSubtitlesMayBeAvailable?.();
+      this.livePollTimer = window.setTimeout(tick, LIVE_POLL_INTERVAL_MS);
+    };
+
+    this.livePollTimer = window.setTimeout(tick, LIVE_POLL_INTERVAL_MS);
+  }
+
+  private stopLivePolling(): void {
+    if (this.livePollTimer === null) return;
+    window.clearTimeout(this.livePollTimer);
+    this.livePollTimer = null;
+  }
+
+  private mergeLiveCues(cues: Cue[], options: { videoId: string }): Cue[] {
+    for (const cue of cues) {
+      if (!cue || !Number.isFinite(cue.startMs) || !Number.isFinite(cue.endMs)) continue;
+      if (cue.endMs <= cue.startMs) continue;
+      if (!cue.text || !cue.text.trim()) continue;
+
+      // Avoid unbounded growth due to overlapping polling windows.
+      if (cue.endMs <= this.liveLastEndMs - 2500) continue;
+
+      const key = `${cue.startMs}-${cue.endMs}-${cue.text.trim()}`;
+      if (this.liveCueKeys.has(key)) continue;
+      this.liveCueKeys.add(key);
+
+      const stableId = `youtube-live:${options.videoId}:${cue.startMs}-${cue.endMs}:${hashString(key)}`;
+      this.liveCues.push({ ...cue, id: stableId, source: 'youtube' });
+      this.liveLastEndMs = Math.max(this.liveLastEndMs, cue.endMs);
+    }
+
+    this.liveCues.sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+
+    // Trim old cues to cap memory for long livestreams (~30 minutes).
+    const cutoffMs = this.liveLastEndMs - 30 * 60 * 1000;
+    if (cutoffMs > 0) {
+      const keep = this.liveCues.filter((cue) => cue.endMs >= cutoffMs);
+      if (keep.length !== this.liveCues.length) {
+        this.liveCues = keep;
+        this.liveCueKeys = new Set(this.liveCues.map((cue) => `${cue.startMs}-${cue.endMs}-${cue.text.trim()}`));
+      }
+    }
+
+    return this.liveCues;
   }
 }

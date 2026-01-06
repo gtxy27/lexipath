@@ -14,6 +14,7 @@ import type { SubtitleProvider } from './subtitle-providers/subtitle-provider';
 import { getI18nMessage } from './i18n';
 import { SubtitleVideoSync } from './subtitle-video-sync';
 import { SubtitleEnhancer } from './subtitle-enhancer';
+import { BilibiliDanmuManager } from './bilibili-danmu-manager';
 
 export { detectPlatform } from './subtitle-platform';
 export type { Platform } from './subtitle-platform';
@@ -64,6 +65,7 @@ export class SubtitleController {
   private platformCaptionsObserver: MutationObserver | null = null;
   private platformCaptionsPollTimer: number | null = null;
   private platformCaptionsButton: HTMLElement | null = null;
+  private danmuManager: BilibiliDanmuManager | null = null;
 
   constructor(private settings: Settings) {}
 
@@ -160,9 +162,17 @@ export class SubtitleController {
       },
     });
 
+    if (this.provider.platform === 'bilibili') {
+      this.danmuManager = new BilibiliDanmuManager();
+    }
+
+    const isYouTubeShorts =
+      this.provider.platform === 'youtube' && url.toLowerCase().includes('youtube.com/shorts/');
+
     // Create overlay
     this.overlay = new SubtitleOverlay(this.provider.platform, {
       theme: this.getResolvedTheme(),
+      ...(isYouTubeShorts ? { layout: 'youtube-shorts' } : {}),
       onModeChange: (mode) => {
         this.mode = mode;
         this.updateSubtitleDisplay();
@@ -226,6 +236,8 @@ export class SubtitleController {
     this.overlay = null;
     this.provider?.destroy();
     this.provider = null;
+    this.danmuManager?.destroy();
+    this.danmuManager = null;
     this.videoElement?.removeEventListener('play', this.handleVideoPlay);
     this.videoElement?.removeEventListener('pause', this.handleVideoPause);
     this.videoElement = null;
@@ -267,11 +279,34 @@ export class SubtitleController {
       const result = await provider.fetchSubtitles();
       this.statusMessage = result.statusMessage ?? '';
 
-      this.setCues(result.cues, result.lang);
+      if (!this.appendCuesIfPossible(result.cues, result.lang)) {
+        this.setCues(result.cues, result.lang);
+      }
       console.log(`[SubtitleController] Fetched ${result.cues.length} subtitle cues`);
     } catch (error) {
       console.error('[SubtitleController] Failed to fetch subtitles:', error);
     }
+  }
+
+  private appendCuesIfPossible(nextCues: Cue[], lang?: string): boolean {
+    if (this.cues.length === 0) return false;
+    if (nextCues.length <= this.cues.length) return false;
+
+    for (let i = 0; i < this.cues.length; i++) {
+      const prev = this.cues[i];
+      const next = nextCues[i];
+      if (!prev || !next || prev.id !== next.id) {
+        return false;
+      }
+    }
+
+    this.cues = nextCues;
+    this.subtitleLanguage = typeof lang === 'string' ? lang : nextCues[0]?.lang ?? this.subtitleLanguage;
+    this.videoSync?.setCues(nextCues);
+    this.enhancer?.appendCues(nextCues, { subtitleLanguage: this.subtitleLanguage });
+    this.updateModeLabels();
+    this.updateSubtitleDisplay();
+    return true;
   }
 
   private setCues(cues: Cue[], lang?: string): void {
@@ -307,6 +342,7 @@ export class SubtitleController {
     } else {
       this.provider?.showNativeCaptions?.();
       this.renderStatusMessage();
+      this.danmuManager?.onSubtitleHidden();
     }
   }
 
@@ -339,23 +375,27 @@ export class SubtitleController {
     if (this.platformCaptionsEnabled === false) {
       this.provider?.showNativeCaptions?.();
       this.overlay.clear();
+      this.danmuManager?.onSubtitleHidden();
       return;
     }
 
     if (this.cues.length === 0) {
       this.renderStatusMessage();
+      this.danmuManager?.onSubtitleHidden();
       return;
     }
 
     // Clear if no current cue
     if (this.currentCueIndex < 0 || this.currentCueIndex >= this.cues.length) {
       this.overlay.clear();
+      this.danmuManager?.onSubtitleHidden();
       return;
     }
 
     const cue = this.cues[this.currentCueIndex];
     if (!cue) {
       this.overlay.clear();
+      this.danmuManager?.onSubtitleHidden();
       return;
     }
 
@@ -461,6 +501,7 @@ export class SubtitleController {
       ...(keywordTranslations ? { keywordTranslations } : {}),
     };
     this.overlay.display(displayOptions);
+    this.danmuManager?.onSubtitleVisible();
   }
 
   private startPlatformCaptionsWatch(): void {

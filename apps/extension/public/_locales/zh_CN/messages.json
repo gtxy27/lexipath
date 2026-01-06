@@ -147,6 +147,18 @@
     "message": "LexiPath：请先在 YouTube 打开字幕（CC），我才能读取并增强字幕。",
     "description": "字幕：提示用户开启 YouTube 原生字幕"
   },
+  "subtitle_liveWaiting": {
+    "message": "LexiPath：正在等待直播字幕…",
+    "description": "字幕：直播场景等待字幕提示"
+  },
+  "subtitle_requiresPremium": {
+    "message": "LexiPath：该视频字幕可能需要登录或 YouTube Premium 才能读取。",
+    "description": "字幕：YouTube 会员/登录字幕提示"
+  },
+  "subtitle_requiresVip": {
+    "message": "LexiPath：该视频字幕可能需要登录或 B 站大会员才能读取。",
+    "description": "字幕：Bilibili 会员/登录字幕提示"
+  },
   "enabled": {
     "message": "已启用",
     "description": "启用标签"
