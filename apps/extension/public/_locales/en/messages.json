@@ -483,6 +483,10 @@
     "message": "Select a model",
     "description": "Behavior route channel placeholder"
   },
+  "optionsRouteFollowTranslate": {
+    "message": "Follow translation",
+    "description": "Behavior route option: follow translation route"
+  },
   "optionsTestInvalidConfig": {
     "message": "Please fill a valid configuration first.",
     "description": "Test connection: invalid config"
@@ -596,7 +600,7 @@
     "description": "Behavior description: translate_keywords"
   },
   "optionsBehavior_dictionary": {
-    "message": "Word Lookup",
+    "message": "Word Definition",
     "description": "Behavior label: dictionary"
   },
   "optionsBehaviorDesc_dictionary": {
@@ -1310,6 +1314,38 @@
   "optionsRoutingDesc": {
     "message": "Keyword selection and translation can use different models.",
     "description": "Routing section description"
+  },
+  "optionsRoutingGroupCoreTitle": {
+    "message": "Core",
+    "description": "Routing group title: core"
+  },
+  "optionsRoutingGroupCoreDesc": {
+    "message": "Translation and chat are the core features.",
+    "description": "Routing group description: core"
+  },
+  "optionsRoutingGroupLearningTitle": {
+    "message": "Learning Enhancements",
+    "description": "Routing group title: learning"
+  },
+  "optionsRoutingGroupLearningDesc": {
+    "message": "Keywords, word definition, English correction, and more. Defaults to following translation; can be customized.",
+    "description": "Routing group description: learning"
+  },
+  "optionsRoutingGroupSubtitleTitle": {
+    "message": "Subtitle/Video",
+    "description": "Routing group title: subtitle"
+  },
+  "optionsRoutingGroupSubtitleDesc": {
+    "message": "Subtitle adaptation and related behaviors.",
+    "description": "Routing group description: subtitle"
+  },
+  "optionsRoutingGroupExpand": {
+    "message": "Expand",
+    "description": "Routing group expand label"
+  },
+  "optionsRoutingGroupCollapse": {
+    "message": "Collapse",
+    "description": "Routing group collapse label"
   },
   "optionsKeywordProviderLabel": {
     "message": "Keyword model",

@@ -499,6 +499,10 @@
     "message": "选择一个模型",
     "description": "行为路由 Channel 占位符"
   },
+  "optionsRouteFollowTranslate": {
+    "message": "跟随翻译",
+    "description": "Behavior route option: follow translation route"
+  },
   "optionsTestInvalidConfig": {
     "message": "请先填写有效配置。",
     "description": "测试连接：配置无效"
@@ -612,7 +616,7 @@
     "description": "行为描述：translate_keywords"
   },
   "optionsBehavior_dictionary": {
-    "message": "查找单词",
+    "message": "单词释义",
     "description": "行为标签：dictionary"
   },
   "optionsBehaviorDesc_dictionary": {
@@ -1326,6 +1330,38 @@
   "optionsRoutingDesc": {
     "message": "选词与翻译可以使用不同模型。",
     "description": "Routing section description"
+  },
+  "optionsRoutingGroupCoreTitle": {
+    "message": "核心",
+    "description": "Routing group title: core"
+  },
+  "optionsRoutingGroupCoreDesc": {
+    "message": "翻译与对话是最常用的核心能力。",
+    "description": "Routing group description: core"
+  },
+  "optionsRoutingGroupLearningTitle": {
+    "message": "增强学习",
+    "description": "Routing group title: learning"
+  },
+  "optionsRoutingGroupLearningDesc": {
+    "message": "关键词、单词释义、英文纠错等。默认跟随翻译，可按需自定义。",
+    "description": "Routing group description: learning"
+  },
+  "optionsRoutingGroupSubtitleTitle": {
+    "message": "字幕/视频",
+    "description": "Routing group title: subtitle"
+  },
+  "optionsRoutingGroupSubtitleDesc": {
+    "message": "与字幕来源语言适配相关的能力。",
+    "description": "Routing group description: subtitle"
+  },
+  "optionsRoutingGroupExpand": {
+    "message": "展开",
+    "description": "Routing group expand label"
+  },
+  "optionsRoutingGroupCollapse": {
+    "message": "收起",
+    "description": "Routing group collapse label"
   },
   "optionsKeywordProviderLabel": {
     "message": "选词模型",

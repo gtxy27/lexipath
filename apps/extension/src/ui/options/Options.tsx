@@ -81,6 +81,11 @@ type BehaviorKey =
   | "english_correction"
   | "chat";
 
+const FOLLOW_TRANSLATE_BEHAVIOR_KEYS: readonly BehaviorKey[] = [
+  "translate_keywords",
+  "dictionary",
+];
+
 const NATIVE_LANGUAGE_OPTIONS = ["en", "zh-CN", "zh-TW"] as const;
 
 const BEHAVIOR_KEYS: BehaviorKey[] = [
@@ -121,6 +126,7 @@ type RouteFormState = {
   kind: RouteKind;
   channelId: number | null;
   extra: Record<string, unknown>;
+  followTranslate: boolean;
 };
 
 type FormState = {
@@ -343,6 +349,29 @@ function ensureBehaviorRoutesComplete(
       channelId: kind === 1 ? (channelId ?? fallbackChannelId) : null,
       extra:
         raw?.extra && typeof raw.extra === "object" ? (raw.extra as any) : {},
+      followTranslate: false,
+    };
+  }
+
+  const translateRoute = routes.translate;
+  for (const key of FOLLOW_TRANSLATE_BEHAVIOR_KEYS) {
+    const raw = settings.behaviorRoutes?.[key];
+    const inferredFollow =
+      !raw ||
+      (routes[key].kind === translateRoute.kind &&
+        (routes[key].kind !== 1 ||
+          routes[key].channelId === translateRoute.channelId));
+
+    routes[key] = {
+      ...routes[key],
+      followTranslate: inferredFollow,
+      ...(inferredFollow
+        ? {
+            kind: translateRoute.kind,
+            channelId:
+              translateRoute.kind === 1 ? translateRoute.channelId : null,
+          }
+        : {}),
     };
   }
   return routes;
@@ -864,6 +893,8 @@ export function Options(): React.ReactElement {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
+  const [routingLearningOpen, setRoutingLearningOpen] = useState(false);
+  const [routingSubtitleOpen, setRoutingSubtitleOpen] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1183,6 +1214,178 @@ export function Options(): React.ReactElement {
         {routeKindLabel(kind)}
       </SelectItem>
     ));
+
+  const currentForm = form;
+
+  const coreRoutingKeys: readonly BehaviorKey[] = ["translate", "chat"];
+  const learningRoutingKeys: readonly BehaviorKey[] = [
+    "select_keywords",
+    "translate_keywords",
+    "dictionary",
+    "english_correction",
+  ];
+  const subtitleRoutingKeys: readonly BehaviorKey[] = ["adapt_subtitle"];
+
+  function isFollowTranslateBehavior(key: BehaviorKey): boolean {
+    return FOLLOW_TRANSLATE_BEHAVIOR_KEYS.includes(key);
+  }
+
+  function applyTranslateFollowers(
+    routes: Record<BehaviorKey, RouteFormState>,
+    translateRoute: RouteFormState,
+  ): Record<BehaviorKey, RouteFormState> {
+    const next = { ...routes };
+    for (const key of FOLLOW_TRANSLATE_BEHAVIOR_KEYS) {
+      const route = next[key];
+      if (!route.followTranslate) continue;
+      next[key] = {
+        ...route,
+        kind: translateRoute.kind,
+        channelId: translateRoute.kind === 1 ? translateRoute.channelId : null,
+      };
+    }
+    return next;
+  }
+
+  function updateBehaviorRoute(key: BehaviorKey, nextRoute: RouteFormState) {
+    setForm((current) => {
+      if (!current) return current;
+      const nextRoutes: Record<BehaviorKey, RouteFormState> = {
+        ...current.behaviorRoutes,
+        [key]: nextRoute,
+      };
+
+      if (key === "translate") {
+        return {
+          ...current,
+          behaviorRoutes: applyTranslateFollowers(nextRoutes, nextRoute),
+        };
+      }
+
+      return { ...current, behaviorRoutes: nextRoutes };
+    });
+  }
+
+  function renderRoutingRow(key: BehaviorKey) {
+    const route = currentForm.behaviorRoutes[key];
+    const allowedKinds = BEHAVIOR_KIND_ALLOWLIST[key];
+    const routeError = errors.routes?.[key];
+
+    const translateRoute = currentForm.behaviorRoutes.translate;
+    const followSupported = isFollowTranslateBehavior(key);
+
+    const kindValue =
+      followSupported && route.followTranslate ? "follow" : String(route.kind);
+
+    return (
+      <div
+        key={key}
+        className="relative bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all hover:shadow-md"
+      >
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5 flex items-center justify-center shadow-sm">
+            <Zap className="h-6 w-6 text-indigo-500 dark:text-indigo-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-bold text-gray-900 dark:text-white text-base">
+                {behaviorLabel(key)}
+              </h4>
+              {followSupported && route.followTranslate && (
+                <Badge className="bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20">
+                  {t("optionsRouteFollowTranslate")}
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+              {behaviorDesc(key)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <Select
+              value={kindValue}
+              onValueChange={(v) => {
+                if (followSupported && v === "follow") {
+                  updateBehaviorRoute(key, {
+                    ...route,
+                    followTranslate: true,
+                    kind: translateRoute.kind,
+                    channelId:
+                      translateRoute.kind === 1
+                        ? translateRoute.channelId
+                        : null,
+                  });
+                  return;
+                }
+
+                const kind = Number(v) as RouteKind;
+                updateBehaviorRoute(key, {
+                  ...route,
+                  followTranslate: false,
+                  kind,
+                  channelId:
+                    kind === 1
+                      ? (route.channelId ??
+                          (currentForm.channels[0]?.channelId ?? null))
+                      : null,
+                });
+              }}
+            >
+              <SelectTrigger
+                data-testid={`route-kind-${key}`}
+                className="w-40 bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                {followSupported && (
+                  <SelectItem value="follow">
+                    {t("optionsRouteFollowTranslate")}
+                  </SelectItem>
+                )}
+                {routeKindOptions(allowedKinds)}
+              </SelectContent>
+            </Select>
+
+            {route.kind === 1 && !(followSupported && route.followTranslate) && (
+              <Select
+                value={
+                  route.channelId === null ? "null" : String(route.channelId)
+                }
+                onValueChange={(v) =>
+                  updateBehaviorRoute(key, {
+                    ...route,
+                    channelId: v === "null" ? null : Number(v),
+                  })
+                }
+              >
+                <SelectTrigger className="w-48 bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl h-10 font-bold text-xs">
+                  <SelectValue
+                    placeholder={t("optionsRouteChannelPlaceholder")}
+                  />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                  {currentForm.channels.map((ch) => (
+                    <SelectItem key={ch.channelId} value={String(ch.channelId)}>
+                      {ch.name || `#${ch.channelId}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          {routeError && (
+            <p className="text-[10px] text-rose-500 font-bold ml-1">
+              {t(routeError)}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0d0e14] text-gray-900 dark:text-white relative overflow-hidden font-sans transition-colors duration-500">
@@ -1528,77 +1731,92 @@ export function Options(): React.ReactElement {
                 <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">{t("optionsRoutingDesc")}</p>
              </header>
 
-             <div className="grid gap-4">
-                {BEHAVIOR_KEYS.map((key) => {
-                  const route = form.behaviorRoutes[key];
-                  const allowedKinds = BEHAVIOR_KIND_ALLOWLIST[key];
-                  const routeError = errors.routes?.[key];
+             <div className="space-y-8">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+                    {t("optionsRoutingGroupCoreTitle")}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t("optionsRoutingGroupCoreDesc")}
+                  </p>
+                </div>
+                <div className="grid gap-4">
+                  {coreRoutingKeys.map(renderRoutingRow)}
+                </div>
+              </div>
 
-                  return (
-                    <div key={key} className="relative bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all hover:shadow-md">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5 flex items-center justify-center shadow-sm">
-                          <Zap className="h-6 w-6 text-indigo-500 dark:text-indigo-400" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-gray-900 dark:text-white text-base">{behaviorLabel(key)}</h4>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">{behaviorDesc(key)}</p>
-                        </div>
-                      </div>
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setRoutingLearningOpen(!routingLearningOpen)}
+                  className="w-full flex items-center justify-between bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 hover:shadow-sm transition-all"
+                >
+                  <div className="text-left space-y-1">
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                      {t("optionsRoutingGroupLearningTitle")}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t("optionsRoutingGroupLearningDesc")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      {routingLearningOpen
+                        ? t("optionsRoutingGroupCollapse")
+                        : t("optionsRoutingGroupExpand")}
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 text-gray-400 transition-transform",
+                        routingLearningOpen ? "rotate-90" : "rotate-0",
+                      )}
+                    />
+                  </div>
+                </button>
 
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-3">
-                          <Select
-                            value={String(route.kind)}
-                            onValueChange={v => {
-                              const kind = Number(v) as RouteKind;
-                              setForm({
-                                ...form,
-                                behaviorRoutes: {
-                                  ...form.behaviorRoutes,
-                                  [key]: { ...route, kind, channelId: kind === 1 ? (form.channels[0]?.channelId ?? null) : null }
-                                }
-                              });
-                            }}
-                          >
-                            <SelectTrigger 
-                              data-testid={`route-kind-${key}`}
-                              className="w-40 bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs"
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-                              {routeKindOptions(allowedKinds)}
-                            </SelectContent>
-                          </Select>
+                {routingLearningOpen && (
+                  <div className="grid gap-4">
+                    {learningRoutingKeys.map(renderRoutingRow)}
+                  </div>
+                )}
+              </div>
 
-                          {route.kind === 1 && (
-                            <Select
-                              value={route.channelId === null ? "null" : String(route.channelId)}
-                              onValueChange={v => setForm({
-                                ...form,
-                                behaviorRoutes: {
-                                  ...form.behaviorRoutes,
-                                  [key]: { ...route, channelId: v === "null" ? null : Number(v) }
-                                }
-                              })}
-                            >
-                              <SelectTrigger className="w-48 bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl h-10 font-bold text-xs">
-                                <SelectValue placeholder={t("optionsRouteChannelPlaceholder")} />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-                                {form.channels.map(ch => (
-                                  <SelectItem key={ch.channelId} value={String(ch.channelId)}>{ch.name || `#${ch.channelId}`}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </div>
-                        {routeError && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(routeError)}</p>}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setRoutingSubtitleOpen(!routingSubtitleOpen)}
+                  className="w-full flex items-center justify-between bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 hover:shadow-sm transition-all"
+                >
+                  <div className="text-left space-y-1">
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                      {t("optionsRoutingGroupSubtitleTitle")}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t("optionsRoutingGroupSubtitleDesc")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                      {routingSubtitleOpen
+                        ? t("optionsRoutingGroupCollapse")
+                        : t("optionsRoutingGroupExpand")}
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        "h-4 w-4 text-gray-400 transition-transform",
+                        routingSubtitleOpen ? "rotate-90" : "rotate-0",
+                      )}
+                    />
+                  </div>
+                </button>
+
+                {routingSubtitleOpen && (
+                  <div className="grid gap-4">
+                    {subtitleRoutingKeys.map(renderRoutingRow)}
+                  </div>
+                )}
+              </div>
              </div>
 
              <div className="flex flex-wrap gap-3 pt-6">
