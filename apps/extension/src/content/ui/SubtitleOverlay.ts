@@ -1018,6 +1018,42 @@ export class SubtitleOverlay {
           display: block;
         }
 
+        @media (pointer: coarse) {
+          .lexipath-wordcard {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            top: auto !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-radius: 20px 20px 0 0 !important;
+            padding: 24px 20px 40px 20px !important;
+            border-left: none !important;
+            border-right: none !important;
+            border-bottom: none !important;
+            transform: translateY(0) !important;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.4) !important;
+            animation: slideUp 0.3s ease-out;
+          }
+
+          .lexipath-wordcard__chat-button {
+            width: 100%;
+            height: 48px;
+            justify-content: center;
+            font-size: 13px;
+          }
+
+          .lexipath-subtitle-word {
+            padding: 2px 4px !important;
+            border-bottom-width: 3px !important;
+          }
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+
         .lexipath-wordcard__header {
           display: flex;
           flex-direction: column;

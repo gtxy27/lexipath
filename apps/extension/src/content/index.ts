@@ -26,9 +26,11 @@ import { createEnhancedElement, type WordRenderMode } from "./enhanced-text";
 import { getI18nMessage } from "./i18n";
 import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
 import { EnglishCorrectionController } from "./english-correction";
+import { FloatingButtonController } from "../ui/components/ui/floating-button-controller";
 
 let subtitleController: SubtitleController | null = null;
 let englishCorrectionController: EnglishCorrectionController | null = null;
+let floatingButtonController: FloatingButtonController | null = null;
 let currentSettings: Settings | null = null;
 let observer: MutationObserver | null = null;
 let urlPollTimer: number | null = null;
@@ -964,6 +966,12 @@ async function init(): Promise<void> {
   resetAllState();
   await initForUrl(lastKnownUrl, token);
   startUrlWatcher();
+
+  if (!floatingButtonController) {
+    floatingButtonController = new FloatingButtonController(currentSettings);
+    floatingButtonController.mount();
+  }
+
   browser.storage?.onChanged?.addListener?.((changes: any, area: string) => {
     if (area !== "local") return;
     const nextSettings = changes?.settings?.newValue;
@@ -972,6 +980,7 @@ async function init(): Promise<void> {
     currentSettings = nextSettings;
 
     englishCorrectionController?.setSettings(nextSettings);
+    floatingButtonController?.updateSettings(nextSettings);
 
     if (prevTheme !== nextSettings?.theme) {
       const resolvedTheme = getResolvedTheme();

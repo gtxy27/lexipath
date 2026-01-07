@@ -53,6 +53,7 @@ import { Badge } from "../components/ui/badge";
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import { Switch } from "../components/ui/switch";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertCircle,
   CheckCircle2,
@@ -1266,7 +1267,7 @@ export function Options(): React.ReactElement {
     });
   }
 
-  function renderRoutingRow(key: BehaviorKey) {
+  function renderRoutingRow(key: BehaviorKey, isNested = false) {
     const route = currentForm.behaviorRoutes[key];
     const allowedKinds = BEHAVIOR_KIND_ALLOWLIST[key];
     const routeError = errors.routes?.[key];
@@ -1280,15 +1281,39 @@ export function Options(): React.ReactElement {
     return (
       <div
         key={key}
-        className="relative bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all hover:shadow-md"
+        className={cn(
+          "relative flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all",
+          isNested
+            ? "bg-transparent py-5 px-2 border-b border-gray-100 dark:border-white/5 last:border-0"
+            : "bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-5 hover:shadow-md",
+        )}
       >
         <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5 flex items-center justify-center shadow-sm">
-            <Zap className="h-6 w-6 text-indigo-500 dark:text-indigo-400" />
+          <div
+            className={cn(
+              "h-12 w-12 rounded-xl flex items-center justify-center shadow-sm transition-colors",
+              isNested
+                ? "bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5"
+                : "bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5",
+            )}
+          >
+            <Zap
+              className={cn(
+                "h-6 w-6",
+                isNested
+                  ? "text-gray-400 dark:text-gray-500"
+                  : "text-indigo-500 dark:text-indigo-400",
+              )}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="font-bold text-gray-900 dark:text-white text-base">
+              <h4
+                className={cn(
+                  "font-bold text-gray-900 dark:text-white",
+                  isNested ? "text-sm" : "text-base",
+                )}
+              >
                 {behaviorLabel(key)}
               </h4>
               {followSupported && route.followTranslate && (
@@ -1411,7 +1436,7 @@ export function Options(): React.ReactElement {
             </h1>
           </div>
 
-          <TabsList className="flex flex-row lg:flex-col h-auto bg-transparent border-0 space-x-1 lg:space-x-0 lg:space-y-1.5 p-0 overflow-x-auto lg:overflow-x-visible no-scrollbar">
+          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
             {[
               { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
               { value: "routing", label: t("optionsRoutingTitle"), icon: ChevronRight },
@@ -1422,7 +1447,7 @@ export function Options(): React.ReactElement {
               <TabsTrigger 
                 key={tab.value}
                 value={tab.value}
-                className="flex-1 lg:flex-none justify-center lg:justify-start gap-2.5 px-4 py-3 rounded-xl data-[state=active]:bg-indigo-600 dark:data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all border-0 shadow-none"
+                className="justify-start gap-2.5 px-4 py-3 rounded-xl data-[state=active]:bg-indigo-600 dark:data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all border-0 shadow-none"
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
                 <span className="font-bold whitespace-nowrap">{tab.label}</span>
@@ -1453,8 +1478,12 @@ export function Options(): React.ReactElement {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col p-5 md:p-8 lg:p-12 xl:p-16 max-w-5xl mx-auto w-full overflow-y-auto h-screen custom-scrollbar relative">
-          <div className="lg:hidden flex justify-end mb-6">
+        <div className="flex-1 flex flex-col p-5 md:p-8 lg:p-12 xl:p-16 pb-32 lg:pb-16 max-w-5xl mx-auto w-full overflow-y-auto h-screen custom-scrollbar relative">
+          <div className="lg:hidden flex justify-between items-center mb-6">
+            <div className="flex items-center gap-3">
+              <img src="../../icons/icon.svg" className="h-6 w-6" alt={t("extensionName")} />
+              <h1 className="font-black text-lg tracking-tight">{t("extensionName")}</h1>
+            </div>
             <Button 
               size="sm"
               className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-6 h-10 shadow-lg shadow-indigo-600/20"
@@ -1742,7 +1771,7 @@ export function Options(): React.ReactElement {
                   </p>
                 </div>
                 <div className="grid gap-4">
-                  {coreRoutingKeys.map(renderRoutingRow)}
+                  {coreRoutingKeys.map((key) => renderRoutingRow(key))}
                 </div>
               </div>
 
@@ -1775,11 +1804,19 @@ export function Options(): React.ReactElement {
                   </div>
                 </button>
 
-                {routingLearningOpen && (
-                  <div className="grid gap-4">
-                    {learningRoutingKeys.map(renderRoutingRow)}
-                  </div>
-                )}
+                <AnimatePresence>
+                  {routingLearningOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden bg-gray-50/30 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl px-4"
+                    >
+                      {learningRoutingKeys.map((key) => renderRoutingRow(key, true))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div className="space-y-4">
@@ -1811,11 +1848,19 @@ export function Options(): React.ReactElement {
                   </div>
                 </button>
 
-                {routingSubtitleOpen && (
-                  <div className="grid gap-4">
-                    {subtitleRoutingKeys.map(renderRoutingRow)}
-                  </div>
-                )}
+                <AnimatePresence>
+                  {routingSubtitleOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden bg-gray-50/30 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl px-4"
+                    >
+                      {subtitleRoutingKeys.map((key) => renderRoutingRow(key, true))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
              </div>
 
@@ -2383,6 +2428,28 @@ export function Options(): React.ReactElement {
                 </div>
              </div>
           </TabsContent>
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-[#0d0e14]/80 backdrop-blur-xl border-t border-gray-200 dark:border-white/5 px-2 pb-safe pt-2 z-50">
+          <TabsList className="flex h-auto bg-transparent border-0 p-0">
+            {[
+              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
+              { value: "routing", label: t("optionsRoutingTitle"), icon: ChevronRight },
+              { value: "language", label: t("optionsTab_language"), icon: Languages },
+              { value: "sites", label: t("optionsTab_sites"), icon: AlertCircle },
+              { value: "backup", label: t("optionsTab_backup"), icon: Copy },
+            ].map((tab) => (
+              <TabsTrigger 
+                key={tab.value}
+                value={tab.value}
+                className="flex-1 flex-col gap-1 py-3 rounded-xl data-[state=active]:bg-indigo-600/10 data-[state=active]:text-indigo-600 dark:data-[state=active]:bg-white/10 dark:data-[state=active]:text-white text-gray-500 dark:text-gray-400 border-0 shadow-none transition-all"
+              >
+                <tab.icon className="h-5 w-5" />
+                <span className="text-[10px] font-black">{tab.label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </div>
       </Tabs>
       
