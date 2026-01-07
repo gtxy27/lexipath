@@ -11,6 +11,7 @@ export { ClaudeProvider } from './llm/claude';
 export { GeminiProvider } from './llm/gemini';
 export { GoogleTranslateProvider } from './translate/google-translate';
 export { BingTranslateProvider } from './translate/bing-translate';
+export * from './dictionary';
 export { classifyError } from './errors';
 export type { ProviderError, ProviderErrorCode } from './errors';
 

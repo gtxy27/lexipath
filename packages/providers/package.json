@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./prompts": "./src/prompts/index.ts",
-    "./openai-compatible": "./src/openai-compatible.ts",
+    "./dictionary": "./src/dictionary/index.ts",
+    "./openai-compatible": "./src/llm/openai-compatible.ts",
     "./errors": "./src/errors.ts"
   },
   "scripts": {
