@@ -15,6 +15,7 @@ import { Switch } from "../components/ui/switch";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { useApplyTheme } from "../lib/theme";
+import { ICON_URL } from "../lib/assets";
 import {
   Loader2,
   Settings2,
@@ -93,7 +94,7 @@ export function Popup(): React.ReactElement {
         >
           <div className="h-12 w-12 rounded-2xl bg-gradient-premium p-[1px]">
              <div className="flex h-full w-full items-center justify-center rounded-[15px] bg-white dark:bg-[#0d0e14]">
-                <img src="../../icons/icon.svg" className="h-6 w-6" alt="loading" />
+                <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
              </div>
           </div>
         </motion.div>
@@ -131,7 +132,7 @@ export function Popup(): React.ReactElement {
                 <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/10">
                   <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
                     <img
-                      src="../../icons/icon.svg"
+                      src={ICON_URL}
                       className="h-6 w-6"
                       alt={t("extensionName")}
                     />

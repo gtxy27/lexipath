@@ -37,6 +37,7 @@ import {
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
+import { ICON_URL } from "../lib/assets";
 
 const log = createLogger("ui:Onboarding");
 
@@ -244,7 +245,7 @@ export function Onboarding(): React.ReactElement {
               className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-premium p-[1px] shadow-2xl shadow-indigo-500/10 dark:shadow-indigo-500/20"
             >
               <div className="flex h-full w-full items-center justify-center rounded-[15px] bg-white dark:bg-[#0d0e14]">
-                <img src="../../icons/icon.svg" className="h-9 w-9" alt={t("extensionName")} />
+                <img src={ICON_URL} className="h-9 w-9" alt={t("extensionName")} />
               </div>
             </motion.div>
             

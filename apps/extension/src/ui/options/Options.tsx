@@ -73,6 +73,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
+import { ICON_URL } from "../lib/assets";
 
 type SiteMode = "all" | "whitelist";
 
@@ -1438,7 +1439,7 @@ export function Options(): React.ReactElement {
           <div className="flex items-center gap-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/20">
               <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
-                <img src="../../icons/icon.svg" className="h-6 w-6" alt={t("extensionName")} />
+                <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
               </div>
             </div>
             <h1 className="font-black text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/70">
@@ -1491,7 +1492,7 @@ export function Options(): React.ReactElement {
         <div className="flex-1 flex flex-col p-5 md:p-8 lg:p-12 xl:p-16 pb-32 lg:pb-16 max-w-5xl mx-auto w-full overflow-y-auto h-screen custom-scrollbar relative">
           <div className="lg:hidden flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
-              <img src="../../icons/icon.svg" className="h-6 w-6" alt={t("extensionName")} />
+              <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
               <h1 className="font-black text-lg tracking-tight">{t("extensionName")}</h1>
             </div>
             <Button 
