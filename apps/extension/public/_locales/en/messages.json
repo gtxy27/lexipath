@@ -175,6 +175,14 @@
     "message": "Theme: $1",
     "description": "Theme button label ($1: System/Light/Dark)"
   },
+  "floatingCommandCenterOpen": {
+    "message": "Open command center",
+    "description": "Floating button: open command center"
+  },
+  "floatingCommandCenterClose": {
+    "message": "Close command center",
+    "description": "Floating button: close command center"
+  },
   "themeSystem": {
     "message": "System",
     "description": "Theme: system"

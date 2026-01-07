@@ -191,6 +191,14 @@
     "message": "主题：$1",
     "description": "主题按钮文案（$1: 系统/浅色/深色）"
   },
+  "floatingCommandCenterOpen": {
+    "message": "打开悬浮菜单",
+    "description": "悬浮按钮：打开命令中心/菜单"
+  },
+  "floatingCommandCenterClose": {
+    "message": "关闭悬浮菜单",
+    "description": "悬浮按钮：关闭命令中心/菜单"
+  },
   "themeSystem": {
     "message": "跟随系统",
     "description": "主题：系统"

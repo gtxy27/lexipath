@@ -1,5 +1,6 @@
 import { createRoot, Root } from "react-dom/client";
 import React from "react";
+import browser from "webextension-polyfill";
 import { FloatingButton } from "./floating-button";
 import { Settings } from "@lexipath/core";
 import { sendMessage } from "../../../shared/messages";
@@ -19,21 +20,30 @@ export class FloatingButtonController {
 
     this.container = document.createElement("div");
     this.container.id = "lexipath-floating-button-container";
-    this.container.style.cssText = "position: fixed; z-index: 2147483647; pointer-events: none;";
-    
+    // Keep the host element non-invasive: no size, no blocking clicks.
+    // All visible UI is positioned via `position: fixed` inside the ShadowRoot.
+    this.container.style.cssText =
+      "position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 2147483647;";
+
     // Use Shadow DOM for style isolation
     this.shadow = this.container.attachShadow({ mode: "open" });
-    
-    // Inject Tailwind/Global styles into Shadow DOM
-    // Since we are using Tailwind classes in the React component, 
-    // we need to inject the compiled CSS here.
-    const styleLink = document.createElement("link");
-    styleLink.rel = "stylesheet";
-    styleLink.href = browser.runtime.getURL("dist/ui/styles.css"); 
-    this.shadow.appendChild(styleLink);
+
+    // Load the extension's Tailwind/theme CSS inside the ShadowRoot so shadcn/ui classes work.
+    const themeLink = document.createElement("link");
+    themeLink.rel = "stylesheet";
+    themeLink.href = browser.runtime.getURL("assets/theme.css");
+    this.shadow.appendChild(themeLink);
+
+    // Inject styles from the main document (lexipath-styles) into shadow DOM
+    const mainStyle = document.getElementById("lexipath-styles");
+    if (mainStyle) {
+      const styleEl = document.createElement("style");
+      styleEl.textContent = mainStyle.textContent;
+      this.shadow.appendChild(styleEl);
+    }
 
     const rootEl = document.createElement("div");
-    rootEl.style.cssText = "pointer-events: none;";
+    rootEl.style.cssText = "pointer-events: auto;";
     this.shadow.appendChild(rootEl);
 
     this.root = createRoot(rootEl);
@@ -55,9 +65,6 @@ export class FloatingButtonController {
         initialEnabled={this.settings?.enabled ?? true}
         onToggleEnabled={(enabled) => {
           sendMessage("SET_SETTINGS", { enabled });
-        }}
-        onOpenSettings={() => {
-          sendMessage("OPEN_OPTIONS_PAGE", undefined);
         }}
         onOpenSidebar={() => {
           sendMessage("OPEN_SIDEBAR", { isAutoSend: false });

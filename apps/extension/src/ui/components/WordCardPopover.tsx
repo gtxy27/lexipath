@@ -3,6 +3,9 @@ import browser from "webextension-polyfill";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { WordCard, type WordCardData } from "./WordCard";
 import { sendMessage } from "../../shared/messages";
+import { cn } from "../lib/utils";
+
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface WordCardPopoverProps {
   word: string;
@@ -19,6 +22,21 @@ interface Position {
 }
 
 const log = createLogger("ui:WordCardPopover");
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(
+        window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768
+      );
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+  return isMobile;
+};
 
 function resolveTtsLang(options: {
   targetLanguage?: string;
@@ -229,35 +247,57 @@ export function WordCardPopover({
     };
   }, []);
 
+  const isMobile = useIsMobile();
+
   return (
-    <div
-      ref={popoverRef}
-      className={`fixed z-[10000] transition-opacity duration-200 ${
-        isVisible ? "opacity-100" : "opacity-0"
-      }`}
-      style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-      }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {isLoading ? (
-        <div className="bg-white rounded-lg shadow-lg p-4 min-w-[280px]">
-          <div className="flex items-center justify-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+    <AnimatePresence>
+      <motion.div
+        ref={popoverRef}
+        initial={isMobile ? { y: "100%", opacity: 0 } : { opacity: 0 }}
+        animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1 }}
+        exit={isMobile ? { y: "100%", opacity: 0 } : { opacity: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className={cn(
+          "fixed z-[10000]",
+          isMobile 
+            ? "bottom-0 left-0 right-0 w-full" 
+            : "rounded-lg shadow-xl"
+        )}
+        style={isMobile ? {} : {
+          top: `${position.top}px`,
+          left: `${position.left}px`,
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {isLoading ? (
+          <div className={cn(
+            "bg-white dark:bg-[#1a1b23] border border-gray-200 dark:border-white/10 p-4 min-w-[280px]",
+            isMobile ? "rounded-t-2xl px-6 pb-12 pt-8" : "rounded-lg"
+          )}>
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+            </div>
           </div>
-        </div>
-      ) : cardData ? (
-        <WordCard
-          data={cardData}
-          mode={mode}
-          ttsLang={ttsLang}
-          {...(onFavoriteToggle ? { onFavoriteToggle } : {})}
-          {...(onLearnedToggle ? { onLearnedToggle } : {})}
-          onClose={onClose}
-        />
-      ) : null}
-    </div>
+        ) : cardData ? (
+          <div className={cn(
+            "bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 overflow-hidden",
+            isMobile ? "rounded-t-3xl border-t shadow-[0_-10px_40px_rgba(0,0,0,0.2)] px-2 pb-8 pt-4" : "rounded-lg border shadow-xl"
+          )}>
+            {isMobile && (
+              <div className="w-12 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full mx-auto mb-4" />
+            )}
+            <WordCard
+              data={cardData}
+              mode={isMobile ? "click" : mode}
+              ttsLang={ttsLang}
+              {...(onFavoriteToggle ? { onFavoriteToggle } : {})}
+              {...(onLearnedToggle ? { onLearnedToggle } : {})}
+              onClose={onClose}
+            />
+          </div>
+        ) : null}
+      </motion.div>
+    </AnimatePresence>
   );
 }

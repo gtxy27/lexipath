@@ -23,7 +23,11 @@ export default defineConfig(({ mode }) => {
           format: 'iife',
           entryFileNames: 'content.js',
           chunkFileNames: 'content-[hash].js',
-          assetFileNames: 'assets/[name]-[hash][extname]',
+          assetFileNames: (assetInfo) => {
+            const name = assetInfo.name ?? '';
+            if (name.endsWith('.css')) return 'assets/theme.css';
+            return 'assets/[name]-[hash][extname]';
+          },
           inlineDynamicImports: true,
         },
       },

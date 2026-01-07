@@ -87,12 +87,16 @@ export function createEnhancedElement(
       fragment.appendChild(document.createTextNode(currentText.slice(plainStart, cursor)));
     }
 
-    const matchedOriginal = currentText.slice(cursor, cursor + bestLength);
-
     const span = document.createElement('span');
     span.className = 'lexipath-word';
     const color = getWordColor(bestWord.partOfSpeech, isDarkMode);
-    span.style.cssText = `border-bottom: 2px dotted ${color}; cursor: pointer; position: relative;`;
+    const matchedOriginal = currentText.slice(cursor, cursor + bestLength);
+    
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    const borderStyle = isTouch ? `3px dotted ${color}` : `2px dotted ${color}`;
+    const paddingStyle = isTouch ? '2px 0' : '0';
+    
+    span.style.cssText = `border-bottom: ${borderStyle}; padding: ${paddingStyle}; cursor: pointer; position: relative;`;
     span.dataset.original = matchedOriginal;
     span.dataset.converted = bestWord.converted;
     span.dataset.difficulty = bestWord.difficulty || '';

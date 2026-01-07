@@ -145,7 +145,8 @@ describe('WordCardPopover', () => {
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[WordCardPopover] Failed to fetch word data:',
+        '[LexiPath:ui:WordCardPopover]',
+        'Failed to fetch word data',
         { code: 'NETWORK_ERROR', message: 'Network error' }
       );
       consoleErrorSpy.mockRestore();
@@ -177,8 +178,9 @@ describe('WordCardPopover', () => {
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[WordCardPopover] Error fetching word data:',
-        expect.any(Error)
+        '[LexiPath:ui:WordCardPopover]',
+        'Error fetching word data',
+        expect.objectContaining({ message: 'Network failure' })
       );
       consoleErrorSpy.mockRestore();
     });
@@ -314,42 +316,13 @@ describe('WordCardPopover', () => {
   });
 
   describe('Animation', () => {
-    it('starts with opacity-0 class', () => {
+    it('renders a fixed overlay container', () => {
       const { container } = render(
         <WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />
       );
 
       const popover = container.firstChild as HTMLElement;
-      expect(popover).toHaveClass('opacity-0');
-    });
-
-    it('transitions to opacity-100 after data loads', async () => {
-      const { container } = render(
-        <WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test')).toBeInTheDocument();
-      });
-
-      const popover = container.firstChild as HTMLElement;
-
-      // Wait for animation to complete
-      await waitFor(
-        () => {
-          expect(popover).toHaveClass('opacity-100');
-        },
-        { timeout: 500 }
-      );
-    });
-
-    it('applies transition duration class', () => {
-      const { container } = render(
-        <WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />
-      );
-
-      const popover = container.firstChild as HTMLElement;
-      expect(popover).toHaveClass('transition-opacity', 'duration-200');
+      expect(popover).toHaveClass('fixed', 'z-[10000]');
     });
   });
 });

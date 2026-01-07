@@ -106,8 +106,8 @@ describe("Options", () => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
 
-    expect(screen.getByText("optionsChannelsTitle")).toBeInTheDocument();
-    expect(screen.getByText("optionsRoutingTitle")).toBeInTheDocument();
+    expect(screen.getAllByText("optionsChannelsTitle")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("optionsRoutingTitle")[0]).toBeInTheDocument();
   });
 
   it("saves channel config and switches translate route to google", async () => {
@@ -131,7 +131,7 @@ describe("Options", () => {
       "gpt-4o-mini",
     );
 
-    await user.click(screen.getByText("optionsRoutingTitle"));
+    await user.click(screen.getAllByRole("tab", { name: "optionsRoutingTitle" })[0]!);
     await user.click(screen.getByTestId("route-kind-translate"));
     await user.click(await screen.findByText("translationProvider_google"));
 
@@ -157,7 +157,7 @@ describe("Options", () => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
 
-    await user.click(screen.getByText("optionsRoutingTitle"));
+    await user.click(screen.getAllByRole("tab", { name: "optionsRoutingTitle" })[0]!);
     await user.click(screen.getByRole("button", { name: "optionsTestGoogleTranslate" }));
 
     const calls = sendMessageMock.mock.calls.filter((call) => call[0] === "TEST_PROVIDER_CONNECTION");

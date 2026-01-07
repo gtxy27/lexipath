@@ -40,7 +40,11 @@ export default defineConfig(({ mode }) => {
           format: 'es',
           entryFileNames: '[name].js',
           chunkFileNames: 'chunks/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash][extname]',
+          assetFileNames: (assetInfo) => {
+            const name = assetInfo.name ?? '';
+            if (name.endsWith('.css')) return 'assets/theme.css';
+            return 'assets/[name]-[hash][extname]';
+          },
         },
       },
       minify: process.env.NODE_ENV === 'production',

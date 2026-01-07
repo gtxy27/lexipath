@@ -525,8 +525,9 @@ describe('Onboarding', () => {
 
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[LexiPath] Failed to save onboarding settings:',
-          expect.any(Error)
+          '[LexiPath:ui:Onboarding]',
+          'Failed to save onboarding settings',
+          expect.objectContaining({ message: 'Save failed' })
         );
       });
 
