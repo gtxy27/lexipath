@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { WordFamiliaritySchema, type WordFamiliarity } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import {
   createInitialWordFamiliarity,
   normalizeWordForFamiliarity,
@@ -11,6 +12,7 @@ import {
 import { getStorageService } from './storage-service';
 
 const WORD_FAMILIARITY_PREFIX = 'wordFamiliarity:';
+const log = createLogger('shared:familiarity');
 
 function storageKeyForWord(normalizedWord: string): string {
   return `${WORD_FAMILIARITY_PREFIX}${normalizedWord}`;
@@ -52,14 +54,17 @@ async function ensureFamiliarityMigrated(): Promise<void> {
         familiarityMigrated = true;
         return;
       }
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn('Familiarity migration meta read failed; continuing with migration', { message: getErrorMessage(error) });
     }
 
     let stored: Record<string, unknown> = {};
     try {
       stored = (await browser.storage.local.get(null)) as Record<string, unknown>;
-    } catch {
+    } catch (error: unknown) {
+      log.warn('Failed to read legacy familiarity records from browser.storage.local; continuing', {
+        message: getErrorMessage(error),
+      });
       stored = {};
     }
 
@@ -83,15 +88,18 @@ async function ensureFamiliarityMigrated(): Promise<void> {
     if (keysToRemove.length > 0) {
       try {
         await browser.storage.local.remove(keysToRemove);
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.warn('Failed to remove legacy familiarity keys from browser.storage.local; continuing', {
+          count: keysToRemove.length,
+          message: getErrorMessage(error),
+        });
       }
     }
 
     try {
       await storageService.setMeta('migration_familiarity_v1', true);
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn('Failed to persist familiarity migration meta flag; migration may rerun', { message: getErrorMessage(error) });
     }
 
     familiarityMigrated = true;
@@ -117,8 +125,11 @@ async function readWordRecord(normalizedWord: string): Promise<WordFamiliarity |
 
     const parsed = WordFamiliaritySchema.safeParse(raw);
     if (parsed.success) return parsed.data;
-  } catch {
-    // ignore
+  } catch (error: unknown) {
+    log.warn('Failed to read legacy familiarity record from browser.storage.local; ignoring record', {
+      key,
+      message: getErrorMessage(error),
+    });
   }
 
   return null;

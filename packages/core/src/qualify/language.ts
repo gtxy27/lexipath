@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { countLanguageCharStats } from './unicode';
 
 export const DetectedLanguageSchema = z.enum(['en', 'ja', 'ko', 'fr', 'de', 'zh', 'unknown']);
 export type DetectedLanguage = z.infer<typeof DetectedLanguageSchema>;
@@ -25,46 +26,80 @@ export const DetectPrimaryLanguageOutputSchema = z.object({
 });
 export type DetectPrimaryLanguageOutput = z.infer<typeof DetectPrimaryLanguageOutputSchema>;
 
-const RE_HAN = /\p{Script=Han}/u;
-const RE_HIRAGANA = /\p{Script=Hiragana}/u;
-const RE_KATAKANA = /\p{Script=Katakana}/u;
-const RE_HANGUL = /\p{Script=Hangul}/u;
-const RE_LATIN = /\p{Script=Latin}/u;
-
 function countCharStats(text: string): LanguageCharStats {
-  let totalChars = 0;
-  let letterLikeChars = 0;
-  let han = 0;
-  let kana = 0;
-  let hangul = 0;
-  let latin = 0;
-
-  for (const char of text) {
-    totalChars += 1;
-    if (RE_HAN.test(char)) {
-      han += 1;
-      letterLikeChars += 1;
-      continue;
-    }
-    if (RE_HIRAGANA.test(char) || RE_KATAKANA.test(char)) {
-      kana += 1;
-      letterLikeChars += 1;
-      continue;
-    }
-    if (RE_HANGUL.test(char)) {
-      hangul += 1;
-      letterLikeChars += 1;
-      continue;
-    }
-    if (RE_LATIN.test(char)) {
-      latin += 1;
-      letterLikeChars += 1;
-      continue;
-    }
-  }
-
-  return { totalChars, letterLikeChars, han, kana, hangul, latin };
+  return countLanguageCharStats(text);
 }
+
+const STOPWORDS_EN = [
+  'the',
+  'and',
+  'to',
+  'of',
+  'in',
+  'is',
+  'that',
+  'for',
+  'on',
+  'with',
+  'as',
+  'are',
+  'was',
+  'be',
+] as const;
+const STOPWORDS_FR = [
+  'le',
+  'la',
+  'les',
+  'de',
+  'des',
+  'et',
+  'est',
+  'en',
+  'un',
+  'une',
+  'que',
+  'pour',
+  'dans',
+  'pas',
+  'sur',
+] as const;
+const STOPWORDS_DE = [
+  'der',
+  'die',
+  'das',
+  'und',
+  'ist',
+  'nicht',
+  'ein',
+  'eine',
+  'zu',
+  'mit',
+  'auf',
+  'im',
+  'den',
+  'von',
+  'für',
+] as const;
+
+const STOPWORD_LANG = {
+  en: 1 << 0,
+  fr: 1 << 1,
+  de: 1 << 2,
+} as const;
+
+const STOPWORD_MAP: ReadonlyMap<string, number> = (() => {
+  const map = new Map<string, number>();
+  const add = (token: string, flag: number) => {
+    const prev = map.get(token) ?? 0;
+    map.set(token, prev | flag);
+  };
+
+  for (const token of STOPWORDS_EN) add(token, STOPWORD_LANG.en);
+  for (const token of STOPWORDS_FR) add(token, STOPWORD_LANG.fr);
+  for (const token of STOPWORDS_DE) add(token, STOPWORD_LANG.de);
+
+  return map;
+})();
 
 function scoreLatinLanguage(text: string): Exclude<DetectedLanguage, 'unknown' | 'zh' | 'ja' | 'ko'> {
   const tokens = text
@@ -72,65 +107,16 @@ function scoreLatinLanguage(text: string): Exclude<DetectedLanguage, 'unknown' |
     .split(/[\s\p{P}\p{S}]+/u)
     .filter(Boolean);
 
-  const en = new Set([
-    'the',
-    'and',
-    'to',
-    'of',
-    'in',
-    'is',
-    'that',
-    'for',
-    'on',
-    'with',
-    'as',
-    'are',
-    'was',
-    'be',
-  ]);
-  const fr = new Set([
-    'le',
-    'la',
-    'les',
-    'de',
-    'des',
-    'et',
-    'est',
-    'en',
-    'un',
-    'une',
-    'que',
-    'pour',
-    'dans',
-    'pas',
-    'sur',
-  ]);
-  const de = new Set([
-    'der',
-    'die',
-    'das',
-    'und',
-    'ist',
-    'nicht',
-    'ein',
-    'eine',
-    'zu',
-    'mit',
-    'auf',
-    'im',
-    'den',
-    'von',
-    'für',
-  ]);
-
   let scoreEn = 0;
   let scoreFr = 0;
   let scoreDe = 0;
 
   for (const token of tokens) {
-    if (en.has(token)) scoreEn += 1;
-    if (fr.has(token)) scoreFr += 1;
-    if (de.has(token)) scoreDe += 1;
+    const flags = STOPWORD_MAP.get(token);
+    if (!flags) continue;
+    if (flags & STOPWORD_LANG.en) scoreEn += 1;
+    if (flags & STOPWORD_LANG.fr) scoreFr += 1;
+    if (flags & STOPWORD_LANG.de) scoreDe += 1;
   }
 
   if (scoreFr > scoreEn && scoreFr > scoreDe) return 'fr';

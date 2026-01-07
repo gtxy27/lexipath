@@ -1,7 +1,10 @@
 import type { Settings } from '@lexipath/core';
+import { createLogger } from '@lexipath/core/log';
 import { fetchBilibiliSubtitles, getBilibiliAvailableTracks, getCid, parseVideoInfo, SubtitleHttpError } from '@lexipath/subtitles';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
 import { getI18nMessage } from '../i18n';
+
+const log = createLogger('subtitle-provider:bilibili');
 
 function isBilibiliAuthLikeError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -73,7 +76,7 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
     try {
       const tracks = await getBilibiliAvailableTracks(this.bvid, this.cid);
       if (tracks.length === 0) {
-        console.log('[BilibiliSubtitleProvider] No subtitle tracks found');
+        log.info('No subtitle tracks found');
         return { cues: [] };
       }
 

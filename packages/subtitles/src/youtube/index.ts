@@ -4,8 +4,11 @@
  */
 
 import type { Cue } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { z } from 'zod';
 import { SubtitleHttpError } from '../http-error';
+
+const log = createLogger('subtitles:youtube');
 
 export interface YouTubeSubtitleTrack {
   languageCode: string;
@@ -71,11 +74,13 @@ export function getVideoId(url: string): string | null {
         const decoded = decodeURIComponent(u);
         const asUrl = decoded.startsWith('http') ? decoded : `https://www.youtube.com${decoded}`;
         return getVideoId(asUrl);
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.debug('Failed to decode nested YouTube URL parameter; falling back to regex parsing', {
+          message: getErrorMessage(error),
+        });
       }
     }
-  } catch {
+  } catch (error: unknown) {
     // Not an absolute URL; fall through to regex parsing.
   }
 
@@ -208,7 +213,8 @@ function parseCaptionTracksFromWatchHtml(html: string): YouTubeCaptionTrack[] {
   let parsedUnknown: unknown;
   try {
     parsedUnknown = JSON.parse(captionTracksJson) as unknown;
-  } catch {
+  } catch (error: unknown) {
+    log.warn('Failed to parse YouTube captionTracks JSON; returning no tracks', { message: getErrorMessage(error) });
     return [];
   }
 
@@ -357,13 +363,13 @@ function decodeHtmlEntities(input: string): string {
       const isHex = entity[1]?.toLowerCase() === 'x';
       const numeric = isHex ? entity.slice(2) : entity.slice(1);
       const codePoint = Number.parseInt(numeric, isHex ? 16 : 10);
-      if (Number.isFinite(codePoint) && codePoint >= 0) {
-        try {
-          return String.fromCodePoint(codePoint);
-        } catch {
-          return match;
+        if (Number.isFinite(codePoint) && codePoint >= 0) {
+          try {
+            return String.fromCodePoint(codePoint);
+          } catch (error: unknown) {
+            return match;
+          }
         }
-      }
       return match;
     }
 
@@ -605,7 +611,8 @@ export async function fetchSubtitles(
     let json: unknown;
     try {
       json = JSON.parse(bodyText) as unknown;
-    } catch {
+    } catch (error: unknown) {
+      log.debug('Failed to parse YouTube timedtext JSON; retrying via fallback', { message: getErrorMessage(error) });
       return fetchTimedTextFallback(videoId, lang, options);
     }
     return youtubeTimedTextToCues(json, { videoId, lang: selected.languageCode });
@@ -657,7 +664,8 @@ async function fetchTimedTextFallback(
     if (isJson) {
       try {
         return youtubeTimedTextToCues(JSON.parse(trimmed) as unknown, { videoId, lang });
-      } catch {
+      } catch (error: unknown) {
+        log.debug('Failed to parse YouTube timedtext JSON in fallback; returning empty cues', { message: getErrorMessage(error) });
         return [];
       }
     }

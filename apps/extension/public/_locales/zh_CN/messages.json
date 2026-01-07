@@ -743,6 +743,14 @@
     "message": "默认：https://api.openai.com/v1",
     "description": "服务商 baseUrl 占位符"
   },
+  "optionsConcurrencyLimitLabel": {
+    "message": "并发限制",
+    "description": "Channel 并发上限标签"
+  },
+  "optionsConcurrencyLimitDesc": {
+    "message": "该 Channel 的最大并发请求数（1-500），默认 15。",
+    "description": "Channel 并发上限说明"
+  },
   "optionsProviderModelLabel": {
     "message": "模型",
     "description": "服务商 model 标签"

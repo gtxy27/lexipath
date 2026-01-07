@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill';
 import { z } from 'zod';
 import { StorageExportSchema } from '@lexipath/storage';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import {
   CEFRLevelSchema,
   ChatPayloadSchema,
@@ -28,6 +29,8 @@ import {
   type Response,
   type Settings,
 } from '@lexipath/core';
+
+const log = createLogger('shared:messages');
 
 export type StructuredError = { code: string; message: string };
 
@@ -59,7 +62,8 @@ export function unknownToErrorResponse(error: unknown): ErrorResponse {
     try {
       const msg = browser.i18n?.getMessage?.('error_unknown');
       return typeof msg === 'string' && msg.trim() ? msg : 'error_unknown';
-    } catch {
+    } catch (i18nError: unknown) {
+      log.debug('i18n.getMessage threw while building unknown-error fallback', { message: getErrorMessage(i18nError) });
       return 'error_unknown';
     }
   })();
@@ -242,6 +246,7 @@ export async function sendMessage(
     });
     return parseResponse(typeKey, response);
   } catch (error) {
+    log.warn('browser.runtime.sendMessage threw', { type: typeKey, message: getErrorMessage(error) });
     return unknownToErrorResponse(error);
   }
 }
@@ -291,6 +296,7 @@ export function createMessageHandlerRegistry() {
       }
       return { ok: true, value: valueResult.data };
     } catch (error) {
+      log.error('Message handler threw', { type, message: getErrorMessage(error) });
       return unknownToErrorResponse(error);
     }
   }

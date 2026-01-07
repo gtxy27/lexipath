@@ -51,7 +51,7 @@ export function parseVideoInfo(
       const candidate = match?.[1];
       if (candidate) bvid = candidate;
     }
-  } catch {
+  } catch (error: unknown) {
     // Not a valid absolute URL; fall back to regex parsing.
   }
 
@@ -238,13 +238,13 @@ function decodeHtmlEntities(input: string): string {
       const isHex = entity[1]?.toLowerCase() === 'x';
       const numeric = isHex ? entity.slice(2) : entity.slice(1);
       const codePoint = Number.parseInt(numeric, isHex ? 16 : 10);
-      if (Number.isFinite(codePoint) && codePoint >= 0) {
-        try {
-          return String.fromCodePoint(codePoint);
-        } catch {
-          return match;
+        if (Number.isFinite(codePoint) && codePoint >= 0) {
+          try {
+            return String.fromCodePoint(codePoint);
+          } catch (error: unknown) {
+            return match;
+          }
         }
-      }
       return match;
     }
 

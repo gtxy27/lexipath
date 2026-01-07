@@ -1,3 +1,7 @@
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
+
+const log = createLogger('dictionary:tts');
+
 export interface TtsSpeakOptions {
   rate?: number;
   voiceURI?: string;
@@ -167,6 +171,11 @@ async function processQueue(): Promise<void> {
         await speakOnce(request.text, request.lang, request.options);
         request.resolve();
       } catch (error) {
+        if (error instanceof TtsStoppedError) {
+          log.debug('TTS stopped', { message: getErrorMessage(error) });
+        } else {
+          log.warn('TTS speakOnce failed', { message: getErrorMessage(error) });
+        }
         request.reject(error);
       }
     }

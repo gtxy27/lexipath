@@ -23,7 +23,10 @@ import {
   type Settings,
   type TestProviderConnectionPayload,
 } from "@lexipath/core";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
+
+const log = createLogger("ui:Options");
 
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -295,7 +298,8 @@ function parseCustomHeaders(
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
-  } catch {
+  } catch (error: unknown) {
+    log.debug("Failed to parse custom headers JSON", { message: getErrorMessage(error) });
     return { ok: false, errorKey: "optionsProviderCustomHeadersInvalidJson" };
   }
 
@@ -488,7 +492,8 @@ function iconOrigin(raw: string): string | null {
   if (!value.startsWith("https://")) return null;
   try {
     return new URL(value).origin;
-  } catch {
+  } catch (error: unknown) {
+    log.debug("Invalid icon URL; cannot extract origin", { value, message: getErrorMessage(error) });
     return null;
   }
 }
@@ -835,8 +840,11 @@ async function requestIconHostPermissions(origins: string[]): Promise<void> {
   for (const origin of origins) {
     try {
       await sendMessage("REQUEST_HOST_PERMISSION", { origin });
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn("REQUEST_HOST_PERMISSION threw while requesting icon host permission; continuing", {
+        origin,
+        message: getErrorMessage(error),
+      });
     }
   }
 }
@@ -911,7 +919,7 @@ export function Options(): React.ReactElement {
     async function load() {
       const response = await sendMessage("GET_SETTINGS", undefined);
       if (!response.ok) {
-        console.error("[LexiPath] Failed to load settings:", response.error);
+        log.error("Failed to load settings", response.error);
         setLoading(false);
         return;
       }
@@ -1024,7 +1032,8 @@ export function Options(): React.ReactElement {
         variant: "destructive",
       });
       return false;
-    } catch (error) {
+    } catch (error: unknown) {
+      log.error("WebDAV permission request failed", { message: getErrorMessage(error) });
       toast({
         title: t(
           "optionsWebDAVPermissionError",
@@ -1159,7 +1168,8 @@ export function Options(): React.ReactElement {
             variant: "destructive",
           });
         }
-      } catch (err) {
+      } catch (err: unknown) {
+        log.error("Import failed", { message: getErrorMessage(err) });
         toast({
           title: t(
             "optionsImportError",
@@ -1720,13 +1730,13 @@ export function Options(): React.ReactElement {
                                 </div>
 
                                 <div className="space-y-2.5">
-                                   <Label 
+                                   <Label
                                      htmlFor={`channel-${channel.channelId}-base-url`}
                                      className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
                                    >
                                      {t("optionsProviderBaseUrlLabel")}
                                    </Label>
-                                   <Input 
+                                   <Input
                                       id={`channel-${channel.channelId}-base-url`}
                                       value={channel.baseUrl}
                                       onChange={e => setForm({
@@ -1735,14 +1745,50 @@ export function Options(): React.ReactElement {
                                       })}
                                       className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
                                       placeholder={
-                                        channel.typeId === 1 
-                                          ? t("optionsProviderBaseUrlPlaceholder") 
-                                          : channel.typeId === 2 
-                                            ? t("optionsClaudeBaseUrlPlaceholder") 
+                                        channel.typeId === 1
+                                          ? t("optionsProviderBaseUrlPlaceholder")
+                                          : channel.typeId === 2
+                                            ? t("optionsClaudeBaseUrlPlaceholder")
                                             : t("optionsGeminiBaseUrlPlaceholder")
                                       }
                                    />
                                    {channelErrors.baseUrl && <p className="text-[10px] text-rose-500 font-bold ml-1">{t(channelErrors.baseUrl)}</p>}
+                                </div>
+
+                                <div className="space-y-2.5">
+                                   <Label
+                                     htmlFor={`channel-${channel.channelId}-concurrency-limit`}
+                                     className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                                   >
+                                     {t("optionsConcurrencyLimitLabel")}
+                                   </Label>
+                                   <Input
+                                      id={`channel-${channel.channelId}-concurrency-limit`}
+                                      type="number"
+                                      min="1"
+                                      max="500"
+                                      step="1"
+                                      value={channel.concurrencyLimit}
+                                      onChange={e => {
+                                        const next = e.target.valueAsNumber;
+                                        if (!Number.isFinite(next)) return;
+                                        const clamped = Math.min(500, Math.max(1, Math.trunc(next)));
+                                        setForm(prev => {
+                                          if (!prev) return prev;
+                                          return {
+                                            ...prev,
+                                            channels: prev.channels.map(ch =>
+                                              ch.channelId === channel.channelId
+                                                ? { ...ch, concurrencyLimit: clamped }
+                                                : ch
+                                            ),
+                                          };
+                                        });
+                                      }}
+                                      className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                                      placeholder="15"
+                                   />
+                                   <p className="text-[10px] text-gray-500 dark:text-gray-400 ml-1">{t("optionsConcurrencyLimitDesc")}</p>
                                 </div>
                               </CardContent>
                             </div>

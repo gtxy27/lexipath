@@ -1,5 +1,6 @@
 import browser from "webextension-polyfill";
 import type { ChatPayload } from "@lexipath/core";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "./messages";
 
 export type ChatStreamClientEvent =
@@ -10,6 +11,7 @@ export type ChatStreamClientEvent =
 export type ChatStreamServerMessage = { type: "START"; payload: ChatPayload };
 
 const CHAT_STREAM_PORT_NAME = "LEXIPATH_CHAT_STREAM";
+const log = createLogger("shared:chat-stream");
 
 export function chatStream(
   payload: ChatPayload,
@@ -38,6 +40,7 @@ export function chatStream(
           conversationId: response.value.conversationId,
         });
       } catch (error) {
+        log.error("CHAT fallback request failed", { message: getErrorMessage(error) });
         if (cancelled) return;
         handlers.onError({
           code: "INTERNAL_ERROR",
@@ -98,13 +101,13 @@ export function chatStream(
       try {
         port.onMessage.removeListener(handleMessage);
         port.onDisconnect.removeListener(handleDisconnect);
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.debug("Failed to remove chat stream listeners; ignoring", { message: getErrorMessage(error) });
       }
       try {
         port.disconnect();
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.debug("Failed to disconnect chat stream port; ignoring", { message: getErrorMessage(error) });
       }
     },
   };

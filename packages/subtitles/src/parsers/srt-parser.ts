@@ -9,31 +9,60 @@ export function parseSrt(input: string, options?: { lang?: string; source?: CueS
   const normalized = input.replace(/\r/g, '').trim();
   if (!normalized) return [];
 
-  const blocks = normalized.split(/\n\s*\n/).filter(Boolean);
+  const lines = normalized.split('\n');
   const cues: Cue[] = [];
   const lang = options?.lang ?? 'und';
   const source = options?.source ?? 'generic';
 
-  for (const block of blocks) {
-    const lines = block.split('\n');
-    if (lines.length < 2) continue;
+  let i = 0;
+  while (i < lines.length) {
+    const line = (lines[i] ?? '').trim();
+    if (!line) {
+      i += 1;
+      continue;
+    }
 
-    const timeLineIndex = lines.findIndex((line) => line.includes('-->'));
-    if (timeLineIndex === -1) continue;
-    const timeLine = lines[timeLineIndex] ?? '';
+    // Optional numeric cue identifier line.
+    if (/^\d+$/.test(line)) {
+      i += 1;
+    }
+
+    const candidate = (lines[i] ?? '').trim();
+    const timeLine = candidate.includes('-->') ? candidate : (lines[i + 1] ?? '').trim();
+    const timeLineIndex = candidate.includes('-->') ? i : i + 1;
+    if (!timeLine.includes('-->')) {
+      i += 1;
+      continue;
+    }
 
     const match = timeLine.match(/^(.+?)\s+-->\s+(.+?)\s*$/);
-    if (!match?.[1] || !match[2]) continue;
+    if (!match?.[1] || !match[2]) {
+      i = timeLineIndex + 1;
+      continue;
+    }
 
     const startMs = parseSrtTime(match[1]);
     const endMs = parseSrtTime(match[2]);
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) continue;
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+      i = timeLineIndex + 1;
+      continue;
+    }
 
-    const text = lines
-      .slice(timeLineIndex + 1)
-      .join('\n')
-      .trim();
-    if (!text) continue;
+    i = timeLineIndex + 1;
+    const textLines: string[] = [];
+    while (i < lines.length) {
+      const textLine = lines[i];
+      if (textLine === undefined) break;
+      if (!textLine.trim()) break;
+      textLines.push(textLine);
+      i += 1;
+    }
+
+    const text = textLines.join('\n').trim();
+    if (!text) {
+      i += 1;
+      continue;
+    }
 
     cues.push({
       id: `srt:${startMs}-${endMs}:${cues.length}`,
@@ -43,8 +72,9 @@ export function parseSrt(input: string, options?: { lang?: string; source?: CueS
       lang,
       source,
     });
+
+    i += 1;
   }
 
   return cues;
 }
-

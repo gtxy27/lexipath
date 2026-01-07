@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import browser from "webextension-polyfill";
 import type { Settings } from "@lexipath/core";
+import { createLogger } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -27,6 +28,8 @@ import {
   Monitor,
 } from "lucide-react";
 
+const log = createLogger("ui:Popup");
+
 function t(key: string, substitutions?: string | string[]): string {
   const message = browser.i18n.getMessage(key, substitutions as any);
   return message || key;
@@ -44,7 +47,7 @@ export function Popup(): React.ReactElement {
       if (response.ok) {
         setSettings(response.value);
       } else {
-        console.error("[LexiPath] Failed to get settings:", response.error);
+        log.error("Failed to get settings", response.error);
       }
       setLoading(false);
     }
@@ -60,7 +63,7 @@ export function Popup(): React.ReactElement {
     if (response.ok) {
       setSettings({ ...settings, enabled: nextEnabled });
     } else {
-      console.error("[LexiPath] Failed to update settings:", response.error);
+      log.error("Failed to update settings", response.error);
     }
   }
 
@@ -74,7 +77,7 @@ export function Popup(): React.ReactElement {
     if (response.ok) {
       setSettings({ ...settings, theme: nextTheme });
     } else {
-      console.error("[LexiPath] Failed to update theme:", response.error);
+      log.error("Failed to update theme", response.error);
     }
   }
 

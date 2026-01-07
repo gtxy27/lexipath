@@ -7,6 +7,9 @@
 
 import { getI18nMessage } from '../i18n';
 import { sendMessage } from '../../shared/messages';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
+
+const log = createLogger('subtitle-overlay');
 
 export type SubtitleMode = 'enhanced' | 'bilingual' | 'bilingual-temp';
 
@@ -111,13 +114,13 @@ export class SubtitleOverlay {
    */
   mount(): boolean {
     if (this.container) {
-      console.warn('[SubtitleOverlay] Already mounted');
+      log.warn('Already mounted');
       return true;
     }
 
     const videoContainer = this.findVideoContainer();
     if (!videoContainer) {
-      console.error('[SubtitleOverlay] Video container not found');
+      log.error('Video container not found');
       return false;
     }
     this.videoContainer = videoContainer;
@@ -203,7 +206,7 @@ export class SubtitleOverlay {
     videoContainer.appendChild(this.container);
     this.setupAutoFontSizing();
 
-    console.log('[SubtitleOverlay] Mounted successfully');
+    log.info('Mounted successfully');
     return true;
   }
 
@@ -234,7 +237,8 @@ export class SubtitleOverlay {
     try {
       const computed = window.getComputedStyle(container);
       if (computed.position !== 'static') return;
-    } catch {
+    } catch (error: unknown) {
+      log.debug('getComputedStyle threw while positioning video container; skipping positioning', { message: getErrorMessage(error) });
       return;
     }
 
@@ -330,7 +334,7 @@ export class SubtitleOverlay {
    */
   display(options: SubtitleDisplayOptions): void {
     if (!this.subtitleElement || !this.subtitleLinesElement) {
-      console.warn('[SubtitleOverlay] Not mounted');
+      log.warn('Not mounted');
       return;
     }
 

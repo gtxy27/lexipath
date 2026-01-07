@@ -1,5 +1,8 @@
 import type { ProviderConfig } from '@lexipath/core';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { classifyError, type ProviderError } from '../errors';
+
+const log = createLogger('providers:openai-compatible');
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -83,14 +86,25 @@ export class OpenAICompatibleProvider {
     thinking?: ThinkingMode;
   }): string {
     const thinking = this.resolveThinkingMode(options);
-    const key = {
-      model: this.config.model,
-      messages,
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-      thinking,
-    };
-    return JSON.stringify(key);
+
+    // Length-prefixed serialization (no escaping needed, deterministic).
+    // This avoids allocating an intermediate object for `JSON.stringify` and keeps key generation cheap.
+    const parts: string[] = [];
+    const model = this.config.model ?? '';
+
+    parts.push('v1|');
+    parts.push('m', String(model.length), ':', model, '|');
+    parts.push('t', options.temperature == null ? 'u' : String(options.temperature), '|');
+    parts.push('x', options.maxTokens == null ? 'u' : String(options.maxTokens), '|');
+    parts.push('k', String(thinking.length), ':', thinking, '|');
+    parts.push('n', String(messages.length), '|');
+
+    for (const message of messages) {
+      parts.push('r', String(message.role.length), ':', message.role);
+      parts.push('c', String(message.content.length), ':', message.content, '|');
+    }
+
+    return parts.join('');
   }
 
   private createProviderError(status: number, errorText: string): Error {
@@ -106,8 +120,8 @@ export class OpenAICompatibleProvider {
     try {
       const url = new URL(this.resolveBaseUrl());
       if (url.hostname === 'api.openai.com') return false;
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.debug('Could not parse baseUrl while checking thinking support; defaulting to enabled', { message: getErrorMessage(error) });
     }
     return true;
   }
@@ -262,8 +276,8 @@ export class OpenAICompatibleProvider {
               this.supportsThinkingControl = false;
               return await response.json();
             }
-          } catch {
-            // ignore and proceed with normal retry flow
+          } catch (fallbackError: unknown) {
+            log.debug('Retry without thinking failed; proceeding with normal retry flow', { message: getErrorMessage(fallbackError) });
           }
         }
 

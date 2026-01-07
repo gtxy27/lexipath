@@ -16,6 +16,7 @@ import type {
   WebEnhanceOutput,
 } from "@lexipath/core";
 import { detectPrimaryLanguage, qualifySite } from "@lexipath/core/qualify";
+import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../shared/messages";
 import {
   SubtitleController,
@@ -27,6 +28,8 @@ import { getI18nMessage } from "./i18n";
 import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
 import { EnglishCorrectionController } from "./english-correction";
 import { FloatingButtonController } from "../ui/components/ui/floating-button-controller";
+
+const log = createLogger("content");
 
 let subtitleController: SubtitleController | null = null;
 let englishCorrectionController: EnglishCorrectionController | null = null;
@@ -200,7 +203,7 @@ async function getSettings(): Promise<Settings | null> {
   if (response.ok) {
     return response.value;
   }
-  console.error("[LexiPath] Failed to get settings:", response.error);
+  log.error("Failed to get settings", response.error);
   return null;
 }
 
@@ -213,7 +216,7 @@ async function initSubtitleController(
   token: number,
 ): Promise<void> {
   if (token !== navigationToken) return;
-  console.log(`[LexiPath] Detected video platform: ${platform}`);
+  log.info(`Detected video platform: ${platform}`);
 
   if (subtitleController) {
     subtitleController.destroy();
@@ -235,16 +238,16 @@ async function initSubtitleController(
       const success = await subtitleController.init(url);
 
       if (success) {
-        console.log("[LexiPath] Subtitle controller initialized");
+        log.info("Subtitle controller initialized");
       } else {
-        console.warn("[LexiPath] Subtitle controller initialization failed");
+        log.warn("Subtitle controller initialization failed");
       }
     } else if (retries < maxRetries) {
       // Retry after delay
       retries++;
       setTimeout(checkVideoElement, 500);
     } else {
-      console.warn("[LexiPath] Video element not found after retries");
+      log.warn("Video element not found after retries");
     }
   };
 
@@ -360,7 +363,7 @@ async function processTextElement(
     const response = await sendMessage("ENHANCE_WEB", enhancePayload);
 
     if (!response.ok) {
-      console.warn("[LexiPath] Enhancement failed:", response.error);
+      log.warn("Enhancement failed", response.error);
       return;
     }
 
@@ -399,12 +402,12 @@ async function processTextElement(
       }
 
       const elapsedMs = Math.round(performance.now() - startMs);
-      console.log(
-        `[LexiPath] Enhanced ${enhanced.convert_word.length} words (textNodes=${textNodes.length}, ms=${elapsedMs}, lang=${detected.language})`,
+      log.debug(
+        `Enhanced ${enhanced.convert_word.length} words (textNodes=${textNodes.length}, ms=${elapsedMs}, lang=${detected.language})`,
       );
     }
   } catch (error) {
-    console.error("[LexiPath] Processing error:", error);
+    log.error("Processing error", { message: getErrorMessage(error) });
   } finally {
     element.classList.remove("lexipath-processing");
   }
@@ -722,8 +725,8 @@ function pumpQueue(): void {
     inFlightCount++;
 
     void processTextElement(el, token)
-      .catch(() => {
-        // processTextElement already logs; keep queue moving
+      .catch((error: unknown) => {
+        log.debug("processTextElement failed; keeping queue moving", { message: getErrorMessage(error) });
       })
       .finally(() => {
         if (token !== pageProcessingToken) return;
@@ -809,8 +812,8 @@ function setupMutationObserver(): void {
               descendants.forEach((el) => {
                 if (shouldProcessElement(el)) newElements.push(el);
               });
-            } catch {
-              // ignore invalid selector / non-matching roots
+            } catch (error: unknown) {
+              log.debug("MutationObserver selector check failed; ignoring node", { message: getErrorMessage(error) });
             }
           }
         });
@@ -856,7 +859,7 @@ function resetPageProcessingState(): void {
  */
 async function initPageProcessing(): Promise<void> {
   resetPageProcessingState();
-  console.log("[LexiPath] Starting page processing...");
+  log.info("Starting page processing");
 
   // Initial processing of existing content
   const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(
@@ -867,7 +870,7 @@ async function initPageProcessing(): Promise<void> {
     const rb = (b as HTMLElement).getBoundingClientRect?.();
     return (ra?.top ?? 0) - (rb?.top ?? 0);
   });
-  console.log(`[LexiPath] Found ${elements.length} text elements to process`);
+  log.info(`Found ${elements.length} text elements to process`);
 
   queueElements(elements);
 
@@ -883,7 +886,7 @@ async function initForUrl(url: string, token: number): Promise<void> {
   if (token !== navigationToken) return;
 
   if (!currentSettings?.enabled) {
-    console.log("[LexiPath] Extension is disabled");
+    log.info("Extension is disabled");
     englishCorrectionController?.setSettings(null);
     return;
   }
@@ -897,14 +900,14 @@ async function initForUrl(url: string, token: number): Promise<void> {
     },
   });
   if (!siteDecision.qualified) {
-    console.log(
-      `[LexiPath] Site gate blocked processing reason=${siteDecision.reason}${siteDecision.matchedRule ? ` rule=${siteDecision.matchedRule}` : ""}`,
+    log.info(
+      `Site gate blocked processing reason=${siteDecision.reason}${siteDecision.matchedRule ? ` rule=${siteDecision.matchedRule}` : ""}`,
     );
     englishCorrectionController?.setSettings(null);
     return;
   }
 
-  console.log("[LexiPath] Content script initialized");
+  log.info("Content script initialized");
 
   if (!englishCorrectionController) {
     englishCorrectionController = new EnglishCorrectionController();
@@ -915,9 +918,7 @@ async function initForUrl(url: string, token: number): Promise<void> {
   const platform = detectPlatform(url);
   if (platform !== "unknown") {
     if (!isTranslationProviderConfigured(currentSettings)) {
-      console.log(
-        `[LexiPath] ${getI18nMessage("log_providerNotConfiguredSkipPageProcessing")}`,
-      );
+      log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
       return;
     }
     // Video sites: focus on subtitles only (avoid modifying page content).
@@ -929,9 +930,7 @@ async function initForUrl(url: string, token: number): Promise<void> {
     !isKeywordProviderConfigured(currentSettings) ||
     !isTranslationProviderConfigured(currentSettings)
   ) {
-    console.log(
-      `[LexiPath] ${getI18nMessage("log_providerNotConfiguredSkipPageProcessing")}`,
-    );
+    log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
     return;
   }
 

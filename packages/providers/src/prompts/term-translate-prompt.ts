@@ -76,8 +76,8 @@ export function parseTermTranslateResponse(response: string): { translations: Re
       const parsed = JSON.parse(candidate);
       const translations = parseTranslationObject(parsed);
       if (translations) return { translations, ok: true };
-    } catch {
-      // continue
+    } catch (error: unknown) {
+      // ignore parse error; try next candidate
     }
   }
 

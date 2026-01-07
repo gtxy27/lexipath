@@ -70,6 +70,41 @@ export class DictionaryService {
   }
 
   /**
+   * Look up multiple words in a single IndexedDB transaction.
+   * Returns results aligned to the input order.
+   */
+  async batchLookup(words: string[]): Promise<Array<WordEntry | null>> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    if (words.length === 0) return [];
+
+    const normalizedWords = words.map((word) => word.toLowerCase());
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(this.config.storeName, 'readonly');
+      const store = transaction.objectStore(this.config.storeName);
+      const results: Array<WordEntry | null> = new Array(normalizedWords.length).fill(null);
+
+      transaction.oncomplete = () => resolve(results);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+
+      for (let i = 0; i < normalizedWords.length; i += 1) {
+        const word = normalizedWords[i];
+        if (!word) continue;
+
+        const request = store.get(word);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          results[i] = request.result || null;
+        };
+      }
+    });
+  }
+
+  /**
    * Add or update a word entry.
    */
   async upsert(entry: WordEntry): Promise<void> {

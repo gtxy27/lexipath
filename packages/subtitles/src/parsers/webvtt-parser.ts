@@ -18,56 +18,82 @@ function parseVttTime(time: string): number {
 }
 
 export function parseWebVtt(input: string, options?: { lang?: string; source?: CueSource }): Cue[] {
-  const lines = input.replace(/\r/g, '').split('\n');
+  const normalized = input.replace(/\r/g, '');
   const cues: Cue[] = [];
   const lang = options?.lang ?? 'und';
   const source = options?.source ?? 'generic';
 
-  let i = 0;
-  while (i < lines.length) {
-    const line = (lines[i] ?? '').trim();
+  let offset = 0;
+  let bufferedLine: string | null = null;
+
+  const readNextLine = (): string | null => {
+    if (offset >= normalized.length) return null;
+    const nextNewline = normalized.indexOf('\n', offset);
+    if (nextNewline === -1) {
+      const last = normalized.slice(offset);
+      offset = normalized.length;
+      return last;
+    }
+    const line = normalized.slice(offset, nextNewline);
+    offset = nextNewline + 1;
+    return line;
+  };
+
+  const peekLine = (): string | null => {
+    if (bufferedLine === null) bufferedLine = readNextLine();
+    return bufferedLine;
+  };
+
+  const consumeLine = (): string | null => {
+    const line = peekLine();
+    bufferedLine = null;
+    return line;
+  };
+
+  while (true) {
+    const raw = consumeLine();
+    if (raw === null) break;
+    const line = raw.trim();
 
     if (!line || line === 'WEBVTT' || line.startsWith('NOTE')) {
-      i += 1;
       continue;
     }
 
     // Optional cue identifier line.
-    const timeLine = isTimeLine(line) ? line : (lines[i + 1] ?? '').trim();
+    const timeLine = isTimeLine(line) ? line : (peekLine() ?? '').trim();
     if (!isTimeLine(timeLine)) {
-      i += 1;
       continue;
+    }
+
+    if (!isTimeLine(line)) {
+      consumeLine();
     }
 
     const match = timeLine.match(/^(.+?)\s+-->\s+(.+?)(\s+.*)?$/);
     if (!match?.[1] || !match[2]) {
-      i += 1;
       continue;
     }
 
     const startMs = parseVttTime(match[1]);
     const endMs = parseVttTime(match[2]);
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
-      i += 1;
       continue;
     }
 
-    // Advance to the text line (skip id if present).
-    i = isTimeLine(line) ? i + 1 : i + 2;
-
     const textLines: string[] = [];
-    while (i < lines.length) {
-      const candidate = lines[i];
-      if (candidate === undefined) break;
-      if (!candidate.trim()) break;
-      textLines.push(candidate);
-      i += 1;
+    while (true) {
+      const candidate = peekLine();
+      if (candidate === null) break;
+      if (!candidate.trim()) {
+        consumeLine();
+        break;
+      }
+      textLines.push(consumeLine() ?? '');
     }
 
     const rawText = textLines.join('\n').trim();
     const text = stripWebVttTags(rawText);
     if (!text) {
-      i += 1;
       continue;
     }
 
@@ -79,10 +105,7 @@ export function parseWebVtt(input: string, options?: { lang?: string; source?: C
       lang,
       source,
     });
-
-    i += 1;
   }
 
   return cues;
 }
-

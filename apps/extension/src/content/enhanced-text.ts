@@ -21,6 +21,7 @@ export function createEnhancedElement(
 
   const currentText = original;
   const currentLower = currentText.toLowerCase();
+  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   const words = enhanced.convert_word
     .map((word) => ({
@@ -30,48 +31,67 @@ export function createEnhancedElement(
     }))
     .filter((word) => word.originalLower.trim().length > 0);
 
-  const isWordChar = (ch: string) => /[A-Za-z0-9_]/.test(ch);
+  const isWordCharCode = (code: number) => {
+    if (!Number.isFinite(code)) return false;
+    return (
+      (code >= 0x41 && code <= 0x5a) || // A-Z
+      (code >= 0x61 && code <= 0x7a) || // a-z
+      (code >= 0x30 && code <= 0x39) || // 0-9
+      code === 0x5f // _
+    );
+  };
   const hasWordBoundary = (start: number, length: number) => {
-    const before = start > 0 ? (currentText[start - 1] ?? '') : '';
-    const after = start + length < currentText.length ? (currentText[start + length] ?? '') : '';
-    return !isWordChar(before) && !isWordChar(after);
+    const beforeCode = start > 0 ? currentText.charCodeAt(start - 1) : Number.NaN;
+    const afterCode = start + length < currentText.length ? currentText.charCodeAt(start + length) : Number.NaN;
+    return !isWordCharCode(beforeCode) && !isWordCharCode(afterCode);
   };
 
+  const candidatesByFirstChar = new Map<string, (typeof words)[number][]>();
+  for (const word of words) {
+    const firstChar = word.originalLower[0];
+    if (!firstChar) continue;
+    const list = candidatesByFirstChar.get(firstChar);
+    if (list) list.push(word);
+    else candidatesByFirstChar.set(firstChar, [word]);
+  }
+  for (const list of candidatesByFirstChar.values()) {
+    list.sort((a, b) => b.originalLower.length - a.originalLower.length);
+  }
+
   let cursor = 0;
+  let plainStart = 0;
   while (cursor < currentText.length) {
-    let bestIndex = -1;
-    let bestLength = 0;
+    const candidates = candidatesByFirstChar.get(currentLower[cursor] ?? '');
     let bestWord: (typeof words)[number] | null = null;
+    let bestLength = 0;
 
-    for (const word of words) {
-      const needle = word.originalLower;
-      const length = needle.length;
-      if (!length) continue;
-
-      let idx = currentLower.indexOf(needle, cursor);
-      while (idx !== -1 && word.enforceWordBoundary && !hasWordBoundary(idx, length)) {
-        idx = currentLower.indexOf(needle, idx + 1);
-      }
-      if (idx === -1) continue;
-
-      if (bestIndex === -1 || idx < bestIndex || (idx === bestIndex && length > bestLength)) {
-        bestIndex = idx;
-        bestLength = length;
+    if (candidates) {
+      for (const word of candidates) {
+        const needle = word.originalLower;
+        const length = needle.length;
+        if (!length) continue;
+        if (!currentLower.startsWith(needle, cursor)) continue;
+        if (word.enforceWordBoundary && !hasWordBoundary(cursor, length)) continue;
         bestWord = word;
+        bestLength = length;
+        break;
       }
     }
 
-    if (!bestWord || bestIndex === -1 || bestLength <= 0) break;
-
-    if (bestIndex > cursor) {
-      fragment.appendChild(document.createTextNode(currentText.slice(cursor, bestIndex)));
+    if (!bestWord || bestLength <= 0) {
+      cursor += 1;
+      continue;
     }
 
-    const matchedOriginal = currentText.slice(bestIndex, bestIndex + bestLength);
+    if (plainStart < cursor) {
+      fragment.appendChild(document.createTextNode(currentText.slice(plainStart, cursor)));
+    }
+
+    const matchedOriginal = currentText.slice(cursor, cursor + bestLength);
 
     const span = document.createElement('span');
     span.className = 'lexipath-word';
-    const color = getWordColor(bestWord.partOfSpeech, window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const color = getWordColor(bestWord.partOfSpeech, isDarkMode);
     span.style.cssText = `border-bottom: 2px dotted ${color}; cursor: pointer; position: relative;`;
     span.dataset.original = matchedOriginal;
     span.dataset.converted = bestWord.converted;
@@ -89,11 +109,12 @@ export function createEnhancedElement(
     span.removeAttribute('title');
 
     fragment.appendChild(span);
-    cursor = bestIndex + bestLength;
+    cursor += bestLength;
+    plainStart = cursor;
   }
 
-  if (cursor < currentText.length) {
-    fragment.appendChild(document.createTextNode(currentText.slice(cursor)));
+  if (plainStart < currentText.length) {
+    fragment.appendChild(document.createTextNode(currentText.slice(plainStart)));
   }
 
   return fragment;

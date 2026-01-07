@@ -5,6 +5,7 @@ import {
   detectPrimaryLanguage,
   type DetectedLanguage,
 } from './language';
+import { countLetterLikeAndSuspiciousRepetition } from './unicode';
 
 export const TextKindSchema = z.enum(['page', 'paragraph']);
 export type TextKind = z.infer<typeof TextKindSchema>;
@@ -65,18 +66,8 @@ function normalizeText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-const RE_LETTER_LIKE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Latin}]/u;
-
-function countLetterLikeChars(text: string): number {
-  let count = 0;
-  for (const char of text) {
-    if (RE_LETTER_LIKE.test(char)) count += 1;
-  }
-  return count;
-}
-
-function hasSuspiciousRepetition(text: string): boolean {
-  return /(\S)\1{15,}/u.test(text);
+function getQualityStats(text: string): { letterLikeChars: number; hasSuspiciousRepetition: boolean } {
+  return countLetterLikeAndSuspiciousRepetition(text);
 }
 
 function getDefaultThresholds(kind: TextKind): { minNormalizedLength: number; minLetterLikeChars: number } {
@@ -110,7 +101,7 @@ export function analyzeTextQuality(input: AnalyzeTextQualityInput): AnalyzeTextQ
     };
   }
 
-  const letterLikeChars = countLetterLikeChars(normalizedText);
+  const { letterLikeChars, hasSuspiciousRepetition } = getQualityStats(normalizedText);
 
   if (normalizedLength < minNormalizedLength || letterLikeChars < minLetterLikeChars) {
     return {
@@ -123,7 +114,7 @@ export function analyzeTextQuality(input: AnalyzeTextQualityInput): AnalyzeTextQ
   }
 
   const letterRatio = normalizedLength > 0 ? letterLikeChars / normalizedLength : 0;
-  if (letterRatio < 0.25 || hasSuspiciousRepetition(normalizedText)) {
+  if (letterRatio < 0.25 || hasSuspiciousRepetition) {
     return {
       skippable: true,
       reason: 'junk',

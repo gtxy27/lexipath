@@ -37,6 +37,7 @@ import {
   type TranslateKeywordsPayload,
 } from '@lexipath/core';
 import { validateEnglishCorrectionOutput, validateEnglishCorrectionOutputDetailed, validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import {
   BingTranslateProvider,
   ClaudeProvider,
@@ -73,6 +74,7 @@ import {
 } from './origin';
 
 const registry = createMessageHandlerRegistry();
+const log = createLogger('background');
 
 const CACHE_MAX_ENTRIES = 200;
 const CACHE_SUCCESS_TTL_MS = 5 * 60 * 1000;
@@ -90,8 +92,8 @@ function t(key: string, substitutions?: string | string[], fallback = ''): strin
   try {
     const message = browser.i18n?.getMessage?.(key, substitutions as any);
     if (typeof message === 'string' && message.trim()) return message;
-  } catch {
-    // ignore
+  } catch (error: unknown) {
+    log.debug('i18n.getMessage threw; falling back to key', { key, error });
   }
   return fallback || key;
 }
@@ -123,7 +125,7 @@ async function acquireConcurrencySlot(key: string, limit: number): Promise<() =>
   const lastLoggedAt = lastSaturationLogAt.get(key) ?? 0;
   if (now - lastLoggedAt >= CONCURRENCY_SATURATION_LOG_THROTTLE_MS) {
     lastSaturationLogAt.set(key, now);
-    console.warn(
+    log.warn(
       `[LexiPath] Provider concurrency saturated (${key}) inFlight=${state.inFlight}/${normalizedLimit} queued=${state.waiters.length + 1}`
     );
   }
@@ -133,7 +135,7 @@ async function acquireConcurrencySlot(key: string, limit: number): Promise<() =>
     state.waiters.push(() => {
       const waitedMs = Date.now() - queuedAt;
       if (waitedMs >= 250) {
-        console.debug(`[LexiPath] Provider concurrency wait (${key}) waitedMs=${waitedMs}`);
+        log.debug(`[LexiPath] Provider concurrency wait (${key}) waitedMs=${waitedMs}`);
       }
       state.inFlight += 1;
       resolve(() => releaseConcurrencySlot(key));
@@ -422,7 +424,15 @@ async function getKeywordsForText(options: {
         }
         const filtered = filterSelectedKeywords(parsed.keywords, filterOptions);
         return { value: filtered, ok: parsed.ok };
-      } catch {
+      } catch (error: unknown) {
+        log.warn('SELECT_KEYWORDS failed; returning empty list', {
+          error,
+          sourceLang: sourceLang ?? settings.targetLanguage,
+          targetLang: targetLang ?? settings.nativeLanguage,
+          userLevel,
+          scene,
+          maxItems,
+        });
         return { value: [], ok: false };
       }
     },
@@ -528,7 +538,7 @@ async function translateKeywords(options: {
             );
             const lines = splitTranslatedLines(output);
             if (lines.length !== normalizedKeywords.length) {
-              console.warn(
+              log.warn(
                 `[LexiPath] TRANSLATE_KEYWORDS (google) line mismatch expected=${normalizedKeywords.length} got=${lines.length}`
               );
               return { value: {}, ok: false };
@@ -551,7 +561,7 @@ async function translateKeywords(options: {
             );
             const lines = splitTranslatedLines(output);
             if (lines.length !== normalizedKeywords.length) {
-              console.warn(
+              log.warn(
                 `[LexiPath] TRANSLATE_KEYWORDS (bing) line mismatch expected=${normalizedKeywords.length} got=${lines.length}`
               );
               return { value: {}, ok: false };
@@ -566,8 +576,8 @@ async function translateKeywords(options: {
             return { value: mapping, ok: true };
           }
         }
-      } catch {
-        // fallthrough
+      } catch (error: unknown) {
+        log.warn('TRANSLATE_KEYWORDS failed; falling back to empty mapping', error);
       }
       return { value: {}, ok: false };
     },
@@ -625,7 +635,8 @@ async function translateTerms(options: {
     const parsed = parseTermTranslateResponse(responseText);
     const translations = parsed.translations;
     return terms.map((term) => translations[term] ?? term);
-  } catch {
+  } catch (error: unknown) {
+    log.warn('TRANSLATE_TERMS failed; returning original terms', error);
     return terms;
   }
 }
@@ -743,7 +754,8 @@ registry.register('REQUEST_HOST_PERMISSION', async (payload) => {
   const originPattern = normalizeOriginToHostPattern(payload.origin);
   try {
     return await browser.permissions.request({ origins: [originPattern] });
-  } catch {
+  } catch (error: unknown) {
+    log.warn('REQUEST_HOST_PERMISSION threw; treating as denied', { originPattern, error });
     return false;
   }
 });
@@ -891,7 +903,8 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
         }));
 
         return { value: { content_result: content, convert_word }, ok: true };
-      } catch {
+      } catch (error: unknown) {
+        log.warn('ENHANCE_WEB failed; returning fallback output', { message: getErrorMessage(error) });
         return { value: { content_result: content, convert_word: [] }, ok: false };
       }
     },
@@ -998,7 +1011,8 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
             ? { ...baseValue, ...(subtitle.trim() ? { line2_final: subtitle } : {}) }
             : baseValue;
         return { value, ok: validated.ok };
-      } catch {
+      } catch (error: unknown) {
+        log.warn('ENHANCE_SUBTITLE failed; returning fallback output', { message: getErrorMessage(error) });
         const fallbackResult = validateSubtitleEnhanceOutput(undefined);
         const value = fallbackResult.ok ? fallbackResult.value : fallbackResult.fallback;
         return { value, ok: false };
@@ -1071,7 +1085,8 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
         }
 
         return { value, ok: validated.ok };
-      } catch {
+      } catch (error: unknown) {
+        log.warn('ENGLISH_CORRECTION provider call failed; returning fallback output', { message: getErrorMessage(error) });
         englishCorrectionStats.providerFailures += 1;
         const validated = validateEnglishCorrectionOutput(undefined);
         return { value: validated.ok ? validated.value : validated.fallback, ok: false };
@@ -1151,7 +1166,8 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
         };
         explainWordCache.set(cacheKey, value, translated?.trim() ? CACHE_SUCCESS_TTL_MS : CACHE_FALLBACK_TTL_MS);
         return value;
-      } catch {
+      } catch (error: unknown) {
+        log.warn('EXPLAIN_WORD translation fallback failed; returning unavailable definition', { message: getErrorMessage(error) });
         const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
         explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
         return value;
@@ -1211,13 +1227,17 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
           definitions: [{ partOfSpeech: 'AI', definition: value.definition }],
           ...(value.difficulty ? { difficulty: value.difficulty } : {}),
         });
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.warn('Explain-word dictionary cache upsert failed; continuing without persistence', {
+          word,
+          error,
+        });
       }
 
       explainWordCache.set(cacheKey, value, CACHE_SUCCESS_TTL_MS);
       return value;
-    } catch {
+    } catch (error: unknown) {
+      log.warn('EXPLAIN_WORD failed; returning fallback definition', { word, message: getErrorMessage(error) });
       const value: ExplainWordOutput = { word, definition: t('wordCard_definitionFailed') };
       explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
       return value;
@@ -1265,8 +1285,8 @@ async function ensureChatMigrated(): Promise<void> {
     try {
       const already = await storageService.getMeta('migration_chat_v1');
       if (already) return;
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn('Chat migration meta read failed; will attempt migration anyway', error);
     }
 
     try {
@@ -1293,20 +1313,20 @@ async function ensureChatMigrated(): Promise<void> {
           }
         }
       }
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn('Chat migration: failed to load legacy chat sessions; skipping migration', error);
     }
 
     try {
       await browser.storage.local.remove(CHAT_SESSIONS_LEGACY_STORAGE_KEY);
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn('Chat migration: failed to remove legacy storage key', error);
     }
 
     try {
       await storageService.setMeta('migration_chat_v1', true);
-    } catch {
-      // ignore
+    } catch (error: unknown) {
+      log.warn('Chat migration: failed to persist migration meta flag', error);
     }
   })().finally(() => {
     chatMigrationPromise = null;
@@ -1421,8 +1441,8 @@ async function streamOpenAICompatibleChat(options: {
           accumulated += delta;
           options.onDelta(delta);
         }
-      } catch {
-        // ignore malformed chunks
+      } catch (error: unknown) {
+        log.debug('OpenAI SSE chunk parse failed; ignoring chunk', { message: getErrorMessage(error) });
       }
     },
   });
@@ -1513,8 +1533,8 @@ async function streamClaudeChat(options: {
             options.onDelta(text);
           }
         }
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.debug('Claude SSE chunk parse failed; ignoring chunk', { message: getErrorMessage(error) });
       }
     },
   });
@@ -1620,8 +1640,8 @@ async function streamGeminiChat(options: {
         if (!delta) return;
         accumulated += delta;
         options.onDelta(delta);
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.debug('Gemini SSE chunk parse failed; ignoring chunk', { message: getErrorMessage(error) });
       }
     },
   });
@@ -1734,8 +1754,11 @@ async function runChatStream(
   } catch (error) {
     try {
       await storageService.deleteMessage(userMessageId);
-    } catch {
-      // ignore
+    } catch (deleteError: unknown) {
+      log.warn('Failed to roll back user message after chat error; message may remain in storage', {
+        userMessageId,
+        error: deleteError,
+      });
     }
     throw error;
   }
@@ -1784,8 +1807,8 @@ browser.runtime.onConnect.addListener((port) => {
               reply += delta;
               try {
                 port.postMessage({ type: 'CHUNK', delta });
-              } catch {
-                // ignore
+              } catch (postError: unknown) {
+                log.debug('Failed to post CHUNK to chat stream port; ignoring', { message: getErrorMessage(postError) });
               }
             },
           }
@@ -1797,21 +1820,21 @@ browser.runtime.onConnect.addListener((port) => {
             reply: result.reply || reply,
             conversationId: result.conversationId,
           });
-        } catch {
-          // ignore
+        } catch (postError: unknown) {
+          log.debug('Failed to post DONE to chat stream port; ignoring', { message: getErrorMessage(postError) });
         }
       } catch (error) {
         const structured = toStructuredStreamError(error);
         try {
           port.postMessage({ type: 'ERROR', error: structured });
-        } catch {
-          // ignore
+        } catch (postError: unknown) {
+          log.debug('Failed to post ERROR to chat stream port; ignoring', { message: getErrorMessage(postError) });
         }
       } finally {
         try {
           port.disconnect();
-        } catch {
-          // ignore
+        } catch (disconnectError: unknown) {
+          log.debug('Failed to disconnect chat stream port; ignoring', { message: getErrorMessage(disconnectError) });
         }
       }
     })();
@@ -1891,7 +1914,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
 // Capture YouTube timedtext requests to obtain additional required params (e.g. potc=...).
 // This follows src-extension's approach and avoids guessing YouTube's internal signing.
 if (browser.webRequest?.onBeforeRequest?.addListener) {
-  console.log('[LexiPath] webRequest available; enabling YouTube timedtext interception');
+  log.info('webRequest available; enabling YouTube timedtext interception');
   browser.webRequest.onBeforeRequest.addListener(
     (details) => {
       try {
@@ -1906,7 +1929,7 @@ if (browser.webRequest?.onBeforeRequest?.addListener) {
         if (!additionalParams) {
           // Useful for debugging: we saw a timedtext request, but it didn't include potc=...
           // Without potc, the content script may not be able to fetch captions reliably.
-          console.debug(`[LexiPath] Intercepted YouTube timedtext without potc (videoId=${videoId})`);
+          log.debug(`Intercepted YouTube timedtext without potc (videoId=${videoId})`);
           return;
         }
 
@@ -1917,7 +1940,7 @@ if (browser.webRequest?.onBeforeRequest?.addListener) {
         }
 
         youtubeCaptionRequestParams.set(videoId, { params: additionalParams, timestamp: Date.now() });
-        console.log(`[LexiPath] Captured YouTube timedtext params for ${videoId}`);
+        log.info(`Captured YouTube timedtext params for ${videoId}`);
 
         const tabId = typeof details.tabId === 'number' ? details.tabId : -1;
         if (tabId >= 0 && browser.tabs?.sendMessage) {
@@ -1926,12 +1949,18 @@ if (browser.webRequest?.onBeforeRequest?.addListener) {
               type: 'CAPTION_REQUEST_INTERCEPTED',
               data: { videoId, additionalParams },
             })
-            .catch(() => {
-              // ignore
+            .catch((error: unknown) => {
+              log.debug('Failed to notify tab about caption intercept; ignoring', {
+                tabId,
+                videoId,
+                message: getErrorMessage(error),
+              });
             });
         }
-      } catch {
-        // ignore
+      } catch (error: unknown) {
+        log.warn('Failed to process webRequest timedtext interception event; ignoring', {
+          message: getErrorMessage(error),
+        });
       }
     },
     { urls: ['*://www.youtube.com/api/timedtext*', '*://youtube.com/api/timedtext*', '*://*.youtube.com/api/timedtext*'] },
@@ -1940,8 +1969,8 @@ if (browser.webRequest?.onBeforeRequest?.addListener) {
     ['requestBody']
   );
 } else {
-  console.warn('[LexiPath] webRequest.onBeforeRequest is unavailable; YouTube subtitle interception disabled');
+  log.warn('webRequest.onBeforeRequest is unavailable; YouTube subtitle interception disabled');
 }
 
 // Log startup
-console.log('[LexiPath] Background service worker started');
+log.info('Background service worker started');
