@@ -87,3 +87,69 @@ describe('OpenAICompatibleProvider cancellation', () => {
   });
 });
 
+describe('OpenAICompatibleProvider thinking field', () => {
+  it('does not include `thinking` by default (disabled)', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string, options?: RequestInit) => {
+      const bodyRaw = options?.body as string | undefined;
+      const body = bodyRaw ? (JSON.parse(bodyRaw) as Record<string, unknown>) : {};
+      expect(body.thinking).toBeUndefined();
+
+      return new Response(
+        JSON.stringify({
+          id: 'test',
+          choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    globalThis.fetch = fetchMock as any;
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: 'https://example.com/v1',
+        model: 'gpt-test',
+      });
+
+      const result = await provider.chat([{ role: 'user', content: 'Hi' }], { maxTokens: 1, timeout: 10_000 });
+      expect(result.choices[0]?.message.content).toBe('ok');
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('includes `thinking` when explicitly enabled (non-OpenAI baseUrl)', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string, options?: RequestInit) => {
+      const bodyRaw = options?.body as string | undefined;
+      const body = bodyRaw ? (JSON.parse(bodyRaw) as any) : {};
+      expect(body.thinking).toEqual({ type: 'enabled' });
+
+      return new Response(
+        JSON.stringify({
+          id: 'test',
+          choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    globalThis.fetch = fetchMock as any;
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: 'https://example.com/v1',
+        model: 'gpt-test',
+      });
+
+      const result = await provider.chat(
+        [{ role: 'user', content: 'Hi' }],
+        { thinking: 'enabled', maxTokens: 1, timeout: 10_000 }
+      );
+      expect(result.choices[0]?.message.content).toBe('ok');
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

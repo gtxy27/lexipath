@@ -151,7 +151,8 @@ export class OpenAICompatibleProvider {
     if (!this.supportsThinkingByDefault()) return false;
     if (this.supportsThinkingControl === false) return false;
     // Only include when the caller expresses an intent (we default to disabled).
-    return Boolean(thinking);
+    // Note: `ThinkingMode` is a non-empty string union, so `Boolean(thinking)` is always true.
+    return thinking !== 'disabled';
   }
 
   private isThinkingLikelyUnsupported(error: unknown): boolean {
