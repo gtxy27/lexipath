@@ -59,13 +59,68 @@ export class DictionaryService {
       await this.init();
     }
 
+    const normalized = word.trim().toLowerCase();
+    const stripped = normalized.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
+
+    const candidates = (() => {
+      const list: string[] = [];
+      const push = (value: string) => {
+        const v = value.trim().toLowerCase();
+        if (!v) return;
+        if (v.length < 2) return;
+        if (!list.includes(v)) list.push(v);
+      };
+
+      push(normalized);
+      push(stripped);
+
+      const base = stripped || normalized;
+      if (base.endsWith("'s")) push(base.slice(0, -2));
+
+      if (base.endsWith('ies') && base.length > 4) push(`${base.slice(0, -3)}y`);
+      if (base.endsWith('es') && base.length > 3) push(base.slice(0, -2));
+      if (base.endsWith('s') && base.length > 3 && !base.endsWith('ss')) push(base.slice(0, -1));
+
+      if (base.endsWith('ed') && base.length > 3) {
+        const stem = base.slice(0, -2);
+        push(stem);
+        push(`${stem}e`);
+      }
+      if (base.endsWith('ing') && base.length > 4) {
+        const stem = base.slice(0, -3);
+        push(stem);
+        push(`${stem}e`);
+      }
+
+      return list;
+    })();
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(this.config.storeName, 'readonly');
       const store = transaction.objectStore(this.config.storeName);
-      const request = store.get(word.toLowerCase());
 
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result || null);
+      let idx = 0;
+      const tryNext = () => {
+        if (idx >= candidates.length) {
+          resolve(null);
+          return;
+        }
+
+        const key = candidates[idx++];
+        if (!key) {
+          tryNext();
+          return;
+        }
+        const request = store.get(key);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const found = request.result || null;
+          if (found) resolve(found);
+          else tryNext();
+        };
+      };
+
+      tryNext();
     });
   }
 
