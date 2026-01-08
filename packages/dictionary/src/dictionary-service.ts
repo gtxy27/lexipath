@@ -53,6 +53,7 @@ export class DictionaryService {
 
   /**
    * Look up a word in the dictionary.
+   * Optimized: parallel batch lookup instead of serial attempts.
    */
   async lookup(word: string): Promise<WordEntry | null> {
     if (!this.db) {
@@ -64,11 +65,14 @@ export class DictionaryService {
 
     const candidates = (() => {
       const list: string[] = [];
+      const seen = new Set<string>();
       const push = (value: string) => {
         const v = value.trim().toLowerCase();
         if (!v) return;
         if (v.length < 2) return;
-        if (!list.includes(v)) list.push(v);
+        if (seen.has(v)) return;
+        seen.add(v);
+        list.push(v);
       };
 
       push(normalized);
@@ -95,32 +99,61 @@ export class DictionaryService {
       return list;
     })();
 
+    // Parallel lookup in a single transaction
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(this.config.storeName, 'readonly');
       const store = transaction.objectStore(this.config.storeName);
+      const results: Array<WordEntry | null> = new Array(candidates.length).fill(null);
+      let completed = 0;
+      let resolved = false;
 
-      let idx = 0;
-      const tryNext = () => {
-        if (idx >= candidates.length) {
-          resolve(null);
-          return;
-        }
-
-        const key = candidates[idx++];
-        if (!key) {
-          tryNext();
-          return;
-        }
-        const request = store.get(key);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-          const found = request.result || null;
-          if (found) resolve(found);
-          else tryNext();
-        };
+      transaction.onerror = () => {
+        if (!resolved) reject(transaction.error);
+      };
+      transaction.onabort = () => {
+        if (!resolved) reject(transaction.error);
       };
 
-      tryNext();
+      for (let i = 0; i < candidates.length; i += 1) {
+        const key = candidates[i];
+        if (!key) {
+          completed += 1;
+          // Check if all completed after skipping empty key
+          if (!resolved && completed === candidates.length) {
+            resolved = true;
+            resolve(null);
+          }
+          continue;
+        }
+
+        const request = store.get(key);
+        request.onerror = () => {
+          if (!resolved) reject(request.error);
+        };
+        request.onsuccess = () => {
+          results[i] = request.result || null;
+          completed += 1;
+
+          // Return first found result immediately
+          const found = results[i];
+          if (!resolved && found) {
+            resolved = true;
+            resolve(found);
+          }
+
+          // All requests completed, no result found
+          if (!resolved && completed === candidates.length) {
+            resolved = true;
+            resolve(null);
+          }
+        };
+      }
+
+      // Handle empty candidates
+      if (candidates.length === 0) {
+        resolved = true;
+        resolve(null);
+      }
     });
   }
 

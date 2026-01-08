@@ -12,56 +12,59 @@ type LetterLikeAndSuspiciousStats = {
   hasSuspiciousRepetition: boolean;
 };
 
-function isInRange(codePoint: number, start: number, end: number): boolean {
-  return codePoint >= start && codePoint <= end;
+// Optimized range checking using categorization
+const enum CharType {
+  Other = 0,
+  Han = 1,
+  Kana = 2,
+  Hangul = 3,
+  Latin = 4,
 }
 
-function isHanCodePoint(codePoint: number): boolean {
-  return (
-    isInRange(codePoint, 0x3400, 0x4dbf) || // CJK Unified Ideographs Extension A
-    isInRange(codePoint, 0x4e00, 0x9fff) || // CJK Unified Ideographs
-    isInRange(codePoint, 0xf900, 0xfaff) || // CJK Compatibility Ideographs
-    isInRange(codePoint, 0x20000, 0x2a6df) || // Extension B
-    isInRange(codePoint, 0x2a700, 0x2b73f) || // Extension C
-    isInRange(codePoint, 0x2b740, 0x2b81f) || // Extension D
-    isInRange(codePoint, 0x2b820, 0x2ceaf) || // Extension E
-    isInRange(codePoint, 0x2ceb0, 0x2ebef) // Extension F
-  );
-}
-
-function isKanaCodePoint(codePoint: number): boolean {
-  return (
-    isInRange(codePoint, 0x3040, 0x309f) || // Hiragana
-    isInRange(codePoint, 0x30a0, 0x30ff) || // Katakana
-    isInRange(codePoint, 0x31f0, 0x31ff) || // Katakana Phonetic Extensions
-    isInRange(codePoint, 0xff66, 0xff9d) // Halfwidth Katakana
-  );
-}
-
-function isHangulCodePoint(codePoint: number): boolean {
-  return (
-    isInRange(codePoint, 0x1100, 0x11ff) || // Hangul Jamo
-    isInRange(codePoint, 0x3130, 0x318f) || // Hangul Compatibility Jamo
-    isInRange(codePoint, 0xa960, 0xa97f) || // Hangul Jamo Extended-A
-    isInRange(codePoint, 0xac00, 0xd7af) || // Hangul Syllables
-    isInRange(codePoint, 0xd7b0, 0xd7ff) // Hangul Jamo Extended-B
-  );
-}
-
-function isLatinCodePoint(codePoint: number): boolean {
-  // Fast approximation for Script=Latin letters used by our heuristics.
-  return (
-    isInRange(codePoint, 0x0041, 0x005a) || // A-Z
-    isInRange(codePoint, 0x0061, 0x007a) || // a-z
-    isInRange(codePoint, 0x00c0, 0x00d6) || // Latin-1 letters
-    isInRange(codePoint, 0x00d8, 0x00f6) ||
-    isInRange(codePoint, 0x00f8, 0x00ff) ||
-    isInRange(codePoint, 0x0100, 0x024f) || // Latin Extended-A/B
-    isInRange(codePoint, 0x1e00, 0x1eff) || // Latin Extended Additional
-    isInRange(codePoint, 0x2c60, 0x2c7f) || // Latin Extended-C
-    isInRange(codePoint, 0xa720, 0xa7ff) || // Latin Extended-D
-    isInRange(codePoint, 0xab30, 0xab6f) // Latin Extended-E
-  );
+// Categorize code point into character type (optimized with single pass)
+function categorizeCodePoint(codePoint: number): CharType {
+  // Han (CJK) ranges - most common first
+  if (codePoint >= 0x4e00 && codePoint <= 0x9fff) return CharType.Han;
+  if (codePoint >= 0x3400 && codePoint <= 0x4dbf) return CharType.Han;
+  
+  // Kana ranges - most common first
+  if (codePoint >= 0x3040 && codePoint <= 0x309f) return CharType.Kana; // Hiragana
+  if (codePoint >= 0x30a0 && codePoint <= 0x30ff) return CharType.Kana; // Katakana
+  
+  // Hangul - most common first
+  if (codePoint >= 0xac00 && codePoint <= 0xd7af) return CharType.Hangul; // Hangul Syllables
+  if (codePoint >= 0x1100 && codePoint <= 0x11ff) return CharType.Hangul;
+  
+  // Latin - most common ranges first
+  if (codePoint >= 0x0041 && codePoint <= 0x005a) return CharType.Latin; // A-Z
+  if (codePoint >= 0x0061 && codePoint <= 0x007a) return CharType.Latin; // a-z
+  if (codePoint >= 0x00c0 && codePoint <= 0x00ff) return CharType.Latin; // Latin-1 extended
+  if (codePoint >= 0x0100 && codePoint <= 0x024f) return CharType.Latin; // Latin Extended-A/B
+  
+  // Less common Han ranges
+  if (codePoint >= 0xf900 && codePoint <= 0xfaff) return CharType.Han;
+  if (codePoint >= 0x20000 && codePoint <= 0x2a6df) return CharType.Han;
+  if (codePoint >= 0x2a700 && codePoint <= 0x2b73f) return CharType.Han;
+  if (codePoint >= 0x2b740 && codePoint <= 0x2b81f) return CharType.Han;
+  if (codePoint >= 0x2b820 && codePoint <= 0x2ceaf) return CharType.Han;
+  if (codePoint >= 0x2ceb0 && codePoint <= 0x2ebef) return CharType.Han;
+  
+  // Less common Kana ranges
+  if (codePoint >= 0x31f0 && codePoint <= 0x31ff) return CharType.Kana;
+  if (codePoint >= 0xff66 && codePoint <= 0xff9d) return CharType.Kana;
+  
+  // Less common Hangul ranges
+  if (codePoint >= 0x3130 && codePoint <= 0x318f) return CharType.Hangul;
+  if (codePoint >= 0xa960 && codePoint <= 0xa97f) return CharType.Hangul;
+  if (codePoint >= 0xd7b0 && codePoint <= 0xd7ff) return CharType.Hangul;
+  
+  // More Latin extended ranges
+  if (codePoint >= 0x1e00 && codePoint <= 0x1eff) return CharType.Latin;
+  if (codePoint >= 0x2c60 && codePoint <= 0x2c7f) return CharType.Latin;
+  if (codePoint >= 0xa720 && codePoint <= 0xa7ff) return CharType.Latin;
+  if (codePoint >= 0xab30 && codePoint <= 0xab6f) return CharType.Latin;
+  
+  return CharType.Other;
 }
 
 export function countLanguageCharStats(text: string): LanguageCharStats {
@@ -78,18 +81,26 @@ export function countLanguageCharStats(text: string): LanguageCharStats {
 
     totalChars += 1;
 
-    if (isHanCodePoint(codePoint)) {
-      han += 1;
-      letterLikeChars += 1;
-    } else if (isKanaCodePoint(codePoint)) {
-      kana += 1;
-      letterLikeChars += 1;
-    } else if (isHangulCodePoint(codePoint)) {
-      hangul += 1;
-      letterLikeChars += 1;
-    } else if (isLatinCodePoint(codePoint)) {
-      latin += 1;
-      letterLikeChars += 1;
+    // Single categorization call instead of multiple checks
+    const category = categorizeCodePoint(codePoint);
+    
+    switch (category) {
+      case CharType.Han:
+        han += 1;
+        letterLikeChars += 1;
+        break;
+      case CharType.Kana:
+        kana += 1;
+        letterLikeChars += 1;
+        break;
+      case CharType.Hangul:
+        hangul += 1;
+        letterLikeChars += 1;
+        break;
+      case CharType.Latin:
+        latin += 1;
+        letterLikeChars += 1;
+        break;
     }
 
     index += codePoint > 0xffff ? 2 : 1;
@@ -109,12 +120,9 @@ export function countLetterLikeAndSuspiciousRepetition(text: string): LetterLike
     const codePoint = text.codePointAt(index);
     if (codePoint === undefined) break;
 
-    if (
-      isHanCodePoint(codePoint) ||
-      isKanaCodePoint(codePoint) ||
-      isHangulCodePoint(codePoint) ||
-      isLatinCodePoint(codePoint)
-    ) {
+    // Single categorization call
+    const category = categorizeCodePoint(codePoint);
+    if (category !== CharType.Other) {
       letterLikeChars += 1;
     }
 

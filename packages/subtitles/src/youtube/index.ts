@@ -96,7 +96,10 @@ function extractJsonValue(html: string, startIndex: number): string | null {
   let inString = false;
   let escaped = false;
 
-  for (let i = startIndex; i < html.length; i++) {
+  // Optimize: Use a reasonable max length to avoid scanning entire HTML
+  const maxLength = Math.min(html.length, startIndex + 500000); // 500KB limit
+
+  for (let i = startIndex; i < maxLength; i++) {
     const char = html[i];
     if (!char) continue;
 
@@ -144,10 +147,16 @@ function extractJsonValue(html: string, startIndex: number): string | null {
 }
 
 function findJsonValueAfterKey(html: string, key: string): string | null {
-  let index = html.indexOf(key);
-  while (index !== -1) {
-    const colonIndex = html.indexOf(':', index + key.length);
-    if (colonIndex === -1) return null;
+  // Optimize: Use regex to find key positions instead of indexOf loop
+  const keyPattern = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+  const matches = html.matchAll(keyPattern);
+  
+  for (const match of matches) {
+    const keyIndex = match.index;
+    if (keyIndex === undefined) continue;
+    
+    const colonIndex = html.indexOf(':', keyIndex + key.length);
+    if (colonIndex === -1) continue;
 
     for (let i = colonIndex + 1; i < html.length; i++) {
       const char = html[i];
@@ -156,8 +165,6 @@ function findJsonValueAfterKey(html: string, key: string): string | null {
       if (char !== '{' && char !== '[') break;
       return extractJsonValue(html, i);
     }
-
-    index = html.indexOf(key, index + key.length);
   }
 
   return null;

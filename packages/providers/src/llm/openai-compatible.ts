@@ -79,6 +79,7 @@ export class OpenAICompatibleProvider {
 
   /**
    * Generate cache key for request deduplication.
+   * Uses the standard stableStringify + FNV-1a hash approach.
    */
   private generateCacheKey(messages: ChatMessage[], options: {
     temperature?: number;
@@ -86,25 +87,45 @@ export class OpenAICompatibleProvider {
     thinking?: ThinkingMode;
   }): string {
     const thinking = this.resolveThinkingMode(options);
+    
+    // Use object-based approach for consistency with core cache-key module
+    const keyObject = {
+      model: this.config.model ?? '',
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      thinking,
+      messages: messages.map(m => ({ role: m.role, content: m.content })),
+    };
+    
+    // Stable stringify
+    const json = this.stableStringify(keyObject);
+    
+    // FNV-1a hash
+    return this.fnv1a32Hex(json);
+  }
 
-    // Length-prefixed serialization (no escaping needed, deterministic).
-    // This avoids allocating an intermediate object for `JSON.stringify` and keeps key generation cheap.
-    const parts: string[] = [];
-    const model = this.config.model ?? '';
+  private stableStringify(value: unknown): string {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value !== 'object') return JSON.stringify(value);
+    if (Array.isArray(value)) return `[${value.map(v => this.stableStringify(v)).join(',')}]`;
 
-    parts.push('v1|');
-    parts.push('m', String(model.length), ':', model, '|');
-    parts.push('t', options.temperature == null ? 'u' : String(options.temperature), '|');
-    parts.push('x', options.maxTokens == null ? 'u' : String(options.maxTokens), '|');
-    parts.push('k', String(thinking.length), ':', thinking, '|');
-    parts.push('n', String(messages.length), '|');
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record)
+      .filter((key) => record[key] !== undefined)
+      .sort();
 
-    for (const message of messages) {
-      parts.push('r', String(message.role.length), ':', message.role);
-      parts.push('c', String(message.content.length), ':', message.content, '|');
+    const parts = keys.map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`);
+    return `{${parts.join(',')}}`;
+  }
+
+  private fnv1a32Hex(input: string): string {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < input.length; i++) {
+      hash ^= input.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
     }
-
-    return parts.join('');
+    return (hash >>> 0).toString(16).padStart(8, '0');
   }
 
   private createProviderError(status: number, errorText: string): Error {

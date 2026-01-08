@@ -1,5 +1,6 @@
 import type { CEFRLevel, WebEnhanceMode, WebEnhanceOutput } from '@lexipath/core';
 import { getWordColor } from '../shared/word-colors';
+import { Trie } from './trie';
 
 export type WordRenderMode = 'target-to-native' | 'native-to-target';
 
@@ -127,16 +128,15 @@ export function createEnhancedElement(
     return !isWordCharCode(beforeCode) && !isWordCharCode(afterCode);
   };
 
-  const candidatesByFirstChar = new Map<string, (typeof words)[number][]>();
+  // Build Trie for O(n) matching instead of O(n*m)
+  const trie = new Trie();
+  const wordByLower = new Map<string, (typeof words)[number]>();
+  
   for (const word of words) {
-    const firstChar = word.originalLower[0];
-    if (!firstChar) continue;
-    const list = candidatesByFirstChar.get(firstChar);
-    if (list) list.push(word);
-    else candidatesByFirstChar.set(firstChar, [word]);
-  }
-  for (const list of candidatesByFirstChar.values()) {
-    list.sort((a, b) => b.originalLower.length - a.originalLower.length);
+    trie.insert(word.originalLower, word);
+    if (!wordByLower.has(word.originalLower)) {
+      wordByLower.set(word.originalLower, word);
+    }
   }
 
   let cursor = 0;
@@ -151,11 +151,6 @@ export function createEnhancedElement(
       : words.map((w) => w.original);
     return normalizeOffsets(buildOffsetsFromTerms(currentText, terms));
   })();
-
-  const wordByLower = new Map<string, (typeof words)[number]>();
-  for (const word of words) {
-    if (!wordByLower.has(word.originalLower)) wordByLower.set(word.originalLower, word);
-  }
 
   if (offsets.length > 0) {
     for (const off of offsets) {
@@ -251,22 +246,27 @@ export function createEnhancedElement(
     return fragment;
   }
 
+  // Use Trie for O(n) matching
   while (cursor < currentText.length) {
-    const candidates = candidatesByFirstChar.get(currentLower[cursor] ?? '');
+    const matches = trie.findMatchesAt(currentLower, cursor);
     let bestWord: (typeof words)[number] | null = null;
     let bestLength = 0;
 
-    if (candidates) {
-      for (const word of candidates) {
-        const needle = word.originalLower;
-        const length = needle.length;
-        if (!length) continue;
-        if (!currentLower.startsWith(needle, cursor)) continue;
-        if (word.enforceWordBoundary && !hasWordBoundary(cursor, length)) continue;
-        bestWord = word;
-        bestLength = length;
-        break;
+    // Find longest match that satisfies word boundary requirements
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const match = matches[i];
+      if (!match) continue;
+      
+      const wordData = match.wordData;
+      if (!wordData) continue;
+
+      if (wordData.enforceWordBoundary && !hasWordBoundary(cursor, match.length)) {
+        continue;
       }
+
+      bestWord = wordData;
+      bestLength = match.length;
+      break;
     }
 
     if (!bestWord || bestLength <= 0) {

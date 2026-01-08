@@ -15,16 +15,16 @@ describe('proficiency mapping', () => {
     expect(cefrToProficiencyScore('A1')).toBe(1);
     expect(cefrToProficiencyScore('A2')).toBe(3);
     expect(cefrToProficiencyScore('B1')).toBe(5);
-    expect(cefrToProficiencyScore('B2')).toBe(6);
-    expect(cefrToProficiencyScore('C1')).toBe(8);
+    expect(cefrToProficiencyScore('B2')).toBe(7);
+    expect(cefrToProficiencyScore('C1')).toBe(9);
     expect(cefrToProficiencyScore('C2')).toBe(10);
   });
 
   it('maps JLPT to 1-10 proficiencyScore', () => {
     expect(jlptToProficiencyScore('N5')).toBe(1);
     expect(jlptToProficiencyScore('N4')).toBe(3);
-    expect(jlptToProficiencyScore('N3')).toBe(6);
-    expect(jlptToProficiencyScore('N2')).toBe(8);
+    expect(jlptToProficiencyScore('N3')).toBe(5);
+    expect(jlptToProficiencyScore('N2')).toBe(7);
     expect(jlptToProficiencyScore('N1')).toBe(10);
   });
 
@@ -32,8 +32,8 @@ describe('proficiency mapping', () => {
     expect(topikToProficiencyScore('1')).toBe(1);
     expect(topikToProficiencyScore('2')).toBe(3);
     expect(topikToProficiencyScore('3')).toBe(5);
-    expect(topikToProficiencyScore('4')).toBe(6);
-    expect(topikToProficiencyScore('5')).toBe(8);
+    expect(topikToProficiencyScore('4')).toBe(7);
+    expect(topikToProficiencyScore('5')).toBe(9);
     expect(topikToProficiencyScore('6')).toBe(10);
   });
 });

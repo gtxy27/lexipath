@@ -45,6 +45,12 @@ const STOPWORDS_EN = [
   'are',
   'was',
   'be',
+  'this',
+  'from',
+  'or',
+  'by',
+  'at',
+  'not',
 ] as const;
 const STOPWORDS_FR = [
   'le',
@@ -62,6 +68,11 @@ const STOPWORDS_FR = [
   'dans',
   'pas',
   'sur',
+  'avec',
+  'il',
+  'ce',
+  'du',
+  'qui',
 ] as const;
 const STOPWORDS_DE = [
   'der',
@@ -79,6 +90,11 @@ const STOPWORDS_DE = [
   'den',
   'von',
   'für',
+  'sie',
+  'werden',
+  'ich',
+  'hat',
+  'dem',
 ] as const;
 
 const STOPWORD_LANG = {
@@ -102,8 +118,8 @@ const STOPWORD_MAP: ReadonlyMap<string, number> = (() => {
 })();
 
 function scoreLatinLanguage(text: string): Exclude<DetectedLanguage, 'unknown' | 'zh' | 'ja' | 'ko'> {
-  const tokens = text
-    .toLowerCase()
+  const normalized = text.toLowerCase();
+  const tokens = normalized
     .split(/[\s\p{P}\p{S}]+/u)
     .filter(Boolean);
 
@@ -111,13 +127,36 @@ function scoreLatinLanguage(text: string): Exclude<DetectedLanguage, 'unknown' |
   let scoreFr = 0;
   let scoreDe = 0;
 
+  // Stopword scoring (weighted higher)
   for (const token of tokens) {
     const flags = STOPWORD_MAP.get(token);
     if (!flags) continue;
-    if (flags & STOPWORD_LANG.en) scoreEn += 1;
-    if (flags & STOPWORD_LANG.fr) scoreFr += 1;
-    if (flags & STOPWORD_LANG.de) scoreDe += 1;
+    if (flags & STOPWORD_LANG.en) scoreEn += 2;
+    if (flags & STOPWORD_LANG.fr) scoreFr += 2;
+    if (flags & STOPWORD_LANG.de) scoreDe += 2;
   }
+
+  // Character bigram scoring for improved accuracy
+  // Common bigrams by language
+  const enBigrams = new Set(['th', 'he', 'in', 'er', 'an', 're', 'on', 'at', 'en', 'nd']);
+  const frBigrams = new Set(['es', 'le', 'de', 'en', 'on', 'nt', 're', 'ou', 'qu', 'au']);
+  const deBigrams = new Set(['en', 'er', 'ch', 'de', 'ei', 'te', 'nd', 'ie', 'ge', 'be']);
+
+  for (let i = 0; i < normalized.length - 1; i++) {
+    const bigram = normalized.slice(i, i + 2);
+    if (!/^[a-z]{2}$/.test(bigram)) continue;
+    
+    if (enBigrams.has(bigram)) scoreEn += 0.5;
+    if (frBigrams.has(bigram)) scoreFr += 0.5;
+    if (deBigrams.has(bigram)) scoreDe += 0.5;
+  }
+
+  // Language-specific character patterns
+  const hasFrenchAccents = /[àâçèéêëîïôùûüÿæœ]/.test(normalized);
+  const hasGermanUmlauts = /[äöüß]/.test(normalized);
+  
+  if (hasFrenchAccents) scoreFr += 3;
+  if (hasGermanUmlauts) scoreDe += 3;
 
   if (scoreFr > scoreEn && scoreFr > scoreDe) return 'fr';
   if (scoreDe > scoreEn && scoreDe > scoreFr) return 'de';

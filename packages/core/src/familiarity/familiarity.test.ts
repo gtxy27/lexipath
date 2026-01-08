@@ -30,7 +30,8 @@ describe('familiarity', () => {
     const updated = recordWordEncounter(record, 200);
     expect(updated.encounters).toBe(1);
     expect(updated.lastSeen).toBe(200);
-    expect(updated.familiarity).toBe(0);
+    // First encounter gives ~15 familiarity via Ebbinghaus model
+    expect(updated.familiarity).toBeCloseTo(15, 0);
   });
 
   it('clamps familiarity to 0-100', () => {

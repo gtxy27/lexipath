@@ -224,6 +224,7 @@ const BilibiliSubtitleFileSchema = z.object({
 function decodeHtmlEntities(input: string): string {
   const withBreaks = input.replace(/<br\s*\/?>/gi, '\n');
 
+  // Extended HTML entity map
   const named: Record<string, string> = {
     amp: '&',
     lt: '<',
@@ -231,6 +232,27 @@ function decodeHtmlEntities(input: string): string {
     quot: '"',
     apos: "'",
     nbsp: '\u00A0',
+    // Additional common entities
+    copy: '©',
+    reg: '®',
+    trade: '™',
+    euro: '€',
+    pound: '£',
+    yen: '¥',
+    cent: '¢',
+    deg: '°',
+    plusmn: '±',
+    times: '×',
+    divide: '÷',
+    mdash: '—',
+    ndash: '–',
+    hellip: '…',
+    lsquo: '\u2018',
+    rsquo: '\u2019',
+    ldquo: '\u201C',
+    rdquo: '\u201D',
+    bull: '•',
+    middot: '·',
   };
 
   return withBreaks.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, entity) => {
@@ -238,13 +260,13 @@ function decodeHtmlEntities(input: string): string {
       const isHex = entity[1]?.toLowerCase() === 'x';
       const numeric = isHex ? entity.slice(2) : entity.slice(1);
       const codePoint = Number.parseInt(numeric, isHex ? 16 : 10);
-        if (Number.isFinite(codePoint) && codePoint >= 0) {
-          try {
-            return String.fromCodePoint(codePoint);
-          } catch (error: unknown) {
-            return match;
-          }
+      if (Number.isFinite(codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF) {
+        try {
+          return String.fromCodePoint(codePoint);
+        } catch (error: unknown) {
+          return match;
         }
+      }
       return match;
     }
 

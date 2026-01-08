@@ -18,22 +18,27 @@ export function buildMasterWords(
 
   const familiar: string[] = [];
   const unfamiliar: string[] = [];
-  const seen = new Set<string>();
-
+  
+  // Optimize: normalize and dedupe in one pass, then classify
+  const uniqueWords = new Set<string>();
   for (const rawWord of words) {
     const word = normalizeWord(rawWord);
-    if (!word) continue;
-    if (seen.has(word)) continue;
-    seen.add(word);
+    if (word) uniqueWords.add(word);
+  }
 
+  // Single pass classification
+  for (const word of uniqueWords) {
     const rawFamiliarity = familiarityByWord[word];
     const familiarity =
       typeof rawFamiliarity === 'number' && Number.isFinite(rawFamiliarity)
         ? rawFamiliarity
         : 0;
 
-    if (familiarity >= familiarityThreshold) familiar.push(word);
-    else unfamiliar.push(word);
+    if (familiarity >= familiarityThreshold) {
+      familiar.push(word);
+    } else {
+      unfamiliar.push(word);
+    }
   }
 
   return { familiar, unfamiliar };
