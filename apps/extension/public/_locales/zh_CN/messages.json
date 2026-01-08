@@ -579,9 +579,17 @@
     "message": "服务器地址",
     "description": "WebDAV 地址标签"
   },
+  "optionsWebDAVUrlPlaceholder": {
+    "message": "https://dav.example.com/dav/",
+    "description": "WebDAV 地址占位符"
+  },
   "optionsWebDAVPath": {
     "message": "备份路径",
     "description": "WebDAV 备份路径标签"
+  },
+  "optionsWebDAVPathPlaceholder": {
+    "message": "/LexiPath/backup.json",
+    "description": "WebDAV 备份路径占位符"
   },
   "optionsWebDAVUser": {
     "message": "用户名",

@@ -563,9 +563,17 @@
     "message": "Server URL",
     "description": "WebDAV server URL label"
   },
+  "optionsWebDAVUrlPlaceholder": {
+    "message": "https://dav.example.com/dav/",
+    "description": "WebDAV server URL placeholder"
+  },
   "optionsWebDAVPath": {
     "message": "Backup Path",
     "description": "WebDAV backup path label"
+  },
+  "optionsWebDAVPathPlaceholder": {
+    "message": "/LexiPath/backup.json",
+    "description": "WebDAV backup path placeholder"
   },
   "optionsWebDAVUser": {
     "message": "Username",

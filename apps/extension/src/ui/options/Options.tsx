@@ -1059,7 +1059,7 @@ export function Options(): React.ReactElement {
       toast({
         title: t(
           "optionsWebDAVPermissionError",
-          error instanceof Error ? error.message : "Permission error",
+          error instanceof Error ? error.message : t("error_unknown"),
         ),
         variant: "destructive",
       });
@@ -2173,10 +2173,10 @@ export function Options(): React.ReactElement {
                           </div>
                         )}
                        <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
-                         <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
-                           {t("optionsProficiencyHint") || "Adjusting this will change which words are highlighted. Higher levels show fewer, more advanced words."}
-                         </p>
-                     </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
+                           {t("optionsProficiencyHint")}
+                        </p>
+                      </div>
 
                       <div className="space-y-2.5">
                         <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
@@ -2449,7 +2449,7 @@ export function Options(): React.ReactElement {
                                 }}
                                 rows={8}
                                 className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-indigo-500/30 font-medium transition-all"
-                                placeholder="example.com"
+                                placeholder={t("optionsSiteEntryPlaceholder")}
                               />
                             </div>
                           ) : (
@@ -2469,7 +2469,7 @@ export function Options(): React.ReactElement {
                                 }}
                                 rows={8}
                                 className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-rose-500/20 font-medium transition-all"
-                                placeholder="google.com"
+                                placeholder={t("optionsSiteEntryPlaceholder")}
                               />
                             </div>
                           )}
@@ -2691,7 +2691,7 @@ export function Options(): React.ReactElement {
                     <div className="space-y-2.5">
                       <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVUrl")}</Label>
                       <Input 
-                        placeholder="https://dav.jianguoyun.com/dav/"
+                        placeholder={t("optionsWebDAVUrlPlaceholder")}
                         className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
                         value={form.webdav.url}
                         onChange={e => setForm({ ...form, webdav: { ...form.webdav, url: e.target.value } })}
@@ -2701,7 +2701,7 @@ export function Options(): React.ReactElement {
                     <div className="space-y-2.5">
                       <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">{t("optionsWebDAVPath")}</Label>
                       <Input 
-                        placeholder="/LexiPath/backup.json"
+                        placeholder={t("optionsWebDAVPathPlaceholder")}
                         className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
                         value={form.webdav.path}
                         onChange={e => setForm({ ...form, webdav: { ...form.webdav, path: e.target.value } })}
