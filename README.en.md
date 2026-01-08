@@ -52,6 +52,18 @@ bun run test
 bun run typecheck
 ```
 
+### Local Dictionary Data Build (plan14)
+
+Build dictionary artifacts as `JSON + gzip` for offline IndexedDB import.
+
+```bash
+# Download sources (ECDICT + JMdict + Kaikki)
+bun run dict:download
+
+# One-shot build: parse -> merge -> gzip -> copy to apps/extension/public/data
+bun run dict:build
+```
+
 ### Build
 
 ```bash

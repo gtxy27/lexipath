@@ -1,0 +1,8 @@
+# JLPT N5-N3 wordlist (one per line)
+# Replace this placeholder with the real list you want to build against.
+私
+行く
+見る
+食べる
+ありがとう
+

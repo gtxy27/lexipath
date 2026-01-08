@@ -1,0 +1,8 @@
+# TOPIK I-II wordlist (one per line)
+# Replace this placeholder with the real list you want to build against.
+안녕하세요
+사람
+하다
+먹다
+보다
+

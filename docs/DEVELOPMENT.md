@@ -409,6 +409,7 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 
 提交粒度：
 - 一次提交只做一类事情，避免"功能 + 格式化 + 重构"混杂。
+- 必须要包含变更摘要（subject），不能只写"fix"或"feat"。 使用 - 来说明
 - 如必须大规模格式化，请单独提交，并在 subject 中标明 `format`。
 
 ### 14.4 禁止提交的内容
@@ -538,6 +539,26 @@ DoD：
 
 DoD：
 - 词卡查词/发音可用；离线可用（至少启动包）。
+
+#### 15.8.1 本地词典数据流水线（plan14）
+
+- 脚本目录：`scripts/dictionary/`（本地运行，建议使用 Bun）。
+- 输出目录：
+  - `data/raw/`（下载缓存，已 gitignore）
+  - `data/processed/`（中间 JSON，已 gitignore）
+  - `data/final/`（最终产物：`*.json.gz` + `manifest.json`）
+  - `apps/extension/public/data/`（用于随扩展打包的拷贝）
+- 推荐命令：
+  - `bun run dict:download`
+  - `bun run dict:build`
+  - `bun run dict:clean`
+- 词表（强烈建议，避免 Kaikki/JMdict 过大）：
+  - `data/wordlists/jlpt-n5-n3.txt`
+  - `data/wordlists/topik-1-2.txt`
+- 数据源：
+  - ECDICT（提供 EN→ZH 的双语/释义基础）
+  - Kaikki（提供 JA/KO→ZH 的 `translations` 映射）
+  - JMdict（用于补充日语词条信息：`reading`/`pos`；仅在启用 wordlist 时解析）
 
 ### 15.9 构建、打包与发布
 

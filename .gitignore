@@ -33,6 +33,10 @@ assets/*.jsonl
 assets/*.json
 !assets/.gitkeep
 
+# Local dictionary pipeline (plan14)
+data/raw/
+data/processed/
+
 # Temporary files
 *.tmp
 *.temp
