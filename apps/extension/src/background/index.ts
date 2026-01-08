@@ -772,6 +772,29 @@ async function translateKeywords(options: {
 
   const route = resolveRoute('translate_keywords', settings);
 
+  const fallbackViaTranslateRoute = async (): Promise<{ value: Record<string, string>; ok: boolean }> => {
+    try {
+      const translated = await translateTerms({
+        settings,
+        terms: normalizedKeywords,
+        sourceLang: options.sourceLang,
+        targetLang: options.targetLang,
+      });
+      if (translated.length !== normalizedKeywords.length) return { value: {}, ok: false };
+      const mapping: Record<string, string> = {};
+      for (let i = 0; i < normalizedKeywords.length; i++) {
+        const keyword = normalizedKeywords[i];
+        if (!keyword) continue;
+        const value = typeof translated[i] === 'string' && translated[i]!.trim() ? translated[i]!.trim() : keyword;
+        mapping[keyword] = value;
+      }
+      return { value: mapping, ok: true };
+    } catch (error: unknown) {
+      log.warn('TRANSLATE_KEYWORDS fallback via translate route failed', error);
+      return { value: {}, ok: false };
+    }
+  };
+
   const cacheKey = makeCacheKey('TRANSLATE_KEYWORDS', {
     v: 1,
     provider: routeIdentity(route, settings),
@@ -791,15 +814,15 @@ async function translateKeywords(options: {
         switch (route.kind) {
           case 1: {
             const channel = resolveChannel(route.channelId, settings);
-            if (!channel) return { value: {}, ok: false };
+            if (!channel) return fallbackViaTranslateRoute();
             const providerInfo = getChatProviderByChannel(channel);
-            if (!providerInfo) return { value: {}, ok: false };
+            if (!providerInfo) return fallbackViaTranslateRoute();
             const provider = getChatProvider(providerInfo.type, providerInfo.config);
 
             const parsedSourceLang = SupportedLanguageSchema.safeParse(options.sourceLang);
             const parsedTargetLang = NativeLanguageSchema.safeParse(options.targetLang);
             if (!parsedSourceLang.success || !parsedTargetLang.success) {
-              return { value: {}, ok: false };
+              return fallbackViaTranslateRoute();
             }
 
             const prompt = await promptBuilder.buildTranslateKeywordsPrompt({
@@ -817,7 +840,7 @@ async function translateKeywords(options: {
 
             const responseText = response.choices?.[0]?.message?.content ?? '';
             const parsed = parseTranslateKeywordsResponse(responseText, normalizedKeywords.length);
-            if (!parsed.ok) return { value: {}, ok: false };
+            if (!parsed.ok) return fallbackViaTranslateRoute();
 
             const mapping: Record<string, string> = {};
             for (let i = 0; i < normalizedKeywords.length; i++) {
@@ -840,7 +863,7 @@ async function translateKeywords(options: {
               log.warn(
                 `[LexiPath] TRANSLATE_KEYWORDS (google) line mismatch expected=${normalizedKeywords.length} got=${lines.length}`
               );
-              return { value: {}, ok: false };
+              return fallbackViaTranslateRoute();
             }
             const mapping: Record<string, string> = {};
             for (let i = 0; i < normalizedKeywords.length; i++) {
@@ -863,7 +886,7 @@ async function translateKeywords(options: {
               log.warn(
                 `[LexiPath] TRANSLATE_KEYWORDS (bing) line mismatch expected=${normalizedKeywords.length} got=${lines.length}`
               );
-              return { value: {}, ok: false };
+              return fallbackViaTranslateRoute();
             }
             const mapping: Record<string, string> = {};
             for (let i = 0; i < normalizedKeywords.length; i++) {
@@ -878,7 +901,7 @@ async function translateKeywords(options: {
       } catch (error: unknown) {
         log.warn('TRANSLATE_KEYWORDS failed; falling back to empty mapping', error);
       }
-      return { value: {}, ok: false };
+      return fallbackViaTranslateRoute();
     },
   });
 }
