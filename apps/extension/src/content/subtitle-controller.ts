@@ -330,11 +330,24 @@ export class SubtitleController {
     if (cues.length > 0) {
       this.statusMessage = '';
       if (this.platformCaptionsEnabled !== false) {
-        this.provider?.hideNativeCaptions?.();
+        const cueLang = this.getCueSourceLanguage(cues[0]!, this.subtitleLanguage);
+        if (this.isSubtitleSceneEnabled(cueLang)) {
+          this.provider?.hideNativeCaptions?.();
+        } else {
+          this.provider?.showNativeCaptions?.();
+        }
       }
       this.videoSync?.syncOnce();
 
       const cueLang = this.getCueSourceLanguage(cues[0]!, this.subtitleLanguage);
+      if (!this.isSubtitleSceneEnabled(cueLang)) {
+        this.enhancer?.stop();
+        this.overlay?.clear();
+        this.danmuManager?.onSubtitleHidden();
+        log.info('Subtitle scene disabled by settings', { cueLang });
+        return;
+      }
+
       if (this.shouldAdaptSubtitle(cueLang)) {
         this.enhancer?.start();
         log.info('Enhancer started (adapt mode)');
@@ -402,6 +415,13 @@ export class SubtitleController {
     }
 
     const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
+    if (!this.isSubtitleSceneEnabled(cueLang)) {
+      this.enhancer?.stop();
+      this.provider?.showNativeCaptions?.();
+      this.overlay.clear();
+      this.danmuManager?.onSubtitleHidden();
+      return;
+    }
     const shouldAdapt = this.shouldAdaptSubtitle(cueLang);
 
     const enhanced = this.enhancer?.getEnhanced(cue.id);
@@ -634,7 +654,14 @@ export class SubtitleController {
     if (!enabled) {
       this.provider?.showNativeCaptions?.();
     } else if (this.cues.length > 0) {
-      this.provider?.hideNativeCaptions?.();
+      const cue = (this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : this.cues[0]) ?? null;
+      const cueLang = cue ? this.getCueSourceLanguage(cue, this.subtitleLanguage) : null;
+      const sceneEnabled = cueLang ? this.isSubtitleSceneEnabled(cueLang) : true;
+      if (sceneEnabled) {
+        this.provider?.hideNativeCaptions?.();
+      } else {
+        this.provider?.showNativeCaptions?.();
+      }
     } else {
       // Subtitles were previously gated by the platform caption toggle (notably Bilibili).
       // Once the user enables captions, fetch cues so the overlay can start working.
@@ -679,6 +706,18 @@ export class SubtitleController {
       if (normalized) return normalized;
     }
     return this.settings.targetLanguage;
+  }
+
+  private isSubtitleSceneEnabled(subtitleLang: SupportedLanguage): boolean {
+    const scenes = this.settings.scenesEnabled;
+    if (!scenes) return true;
+
+    const nativeLang =
+      this.normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
+
+    if (subtitleLang === nativeLang) return scenes.videoNative !== false;
+    if (subtitleLang === this.settings.targetLanguage) return scenes.videoTarget !== false;
+    return true;
   }
 
   private shouldAdaptSubtitle(subtitleLang: SupportedLanguage): boolean {

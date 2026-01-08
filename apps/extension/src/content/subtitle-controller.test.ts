@@ -170,6 +170,13 @@ describe('SubtitleController', () => {
       },
       enabled: true,
       autoEnhance: true,
+      webEnhanceMode: 'i_plus_1',
+      floatingButtonEnabled: true,
+      webShowOriginal: false,
+      webStyleMapping: { within: 'dashedLine', out: 'border', forgotten: 'weakened' },
+      webCustomCss: '',
+      scenesEnabled: { webNative: true, webTarget: true, videoNative: true, videoTarget: true },
+      hasCompletedOnboarding: true,
       englishCorrection: {
         enabled: false,
         triggerKey: 'space',

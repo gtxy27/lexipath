@@ -22,6 +22,7 @@ import {
   SuccessResponseSchema,
   TestProviderConnectionPayloadSchema,
   TranslateKeywordsPayloadSchema,
+  WordFamiliaritySchema,
   WebDAVConfigSchema,
   WebEnhanceOutputSchema,
   type ErrorResponse,
@@ -134,6 +135,22 @@ const messageDefinitions = {
   EXPLAIN_WORD: {
     payloadSchema: ExplainWordPayloadSchema,
     valueSchema: ExplainWordOutputSchema,
+  },
+  BATCH_GET_WORD_FAMILIARITY: {
+    payloadSchema: z
+      .object({
+        words: z.array(z.string().min(1)).min(1),
+      })
+      .strict(),
+    valueSchema: z.array(WordFamiliaritySchema),
+  },
+  RECORD_EXPOSURE_VALID: {
+    payloadSchema: z
+      .object({
+        words: z.array(z.string().min(1)).min(1),
+      })
+      .strict(),
+    valueSchema: z.null(),
   },
   CHAT: {
     payloadSchema: ChatPayloadSchema,

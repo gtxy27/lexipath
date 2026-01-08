@@ -405,10 +405,20 @@ describe('Onboarding', () => {
       await user.click(screen.getByText('onboardingFinish'));
 
       await waitFor(() => {
-        expect(sendMessageMock).toHaveBeenCalledWith('SET_SETTINGS', {
-          targetLanguage: 'en',
-          proficiencyLevel: 'B1',
-        });
+        expect(sendMessageMock).toHaveBeenCalledWith(
+          'SET_SETTINGS',
+          expect.objectContaining({
+            targetLanguage: 'en',
+            proficiencyLevel: 'B1',
+            hasCompletedOnboarding: true,
+            scenesEnabled: {
+              webNative: true,
+              webTarget: true,
+              videoNative: true,
+              videoTarget: true,
+            },
+          }),
+        );
       });
     });
 
@@ -428,10 +438,20 @@ describe('Onboarding', () => {
       await user.click(screen.getByText('onboardingFinish'));
 
       await waitFor(() => {
-        expect(sendMessageMock).toHaveBeenCalledWith('SET_SETTINGS', {
-          targetLanguage: 'ja',
-          proficiencyLevel: 'B2', // N2 maps to B2
-        });
+        expect(sendMessageMock).toHaveBeenCalledWith(
+          'SET_SETTINGS',
+          expect.objectContaining({
+            targetLanguage: 'ja',
+            proficiencyLevel: 'B2', // N2 maps to B2
+            hasCompletedOnboarding: true,
+            scenesEnabled: {
+              webNative: true,
+              webTarget: true,
+              videoNative: true,
+              videoTarget: true,
+            },
+          }),
+        );
       });
     });
 
@@ -451,10 +471,20 @@ describe('Onboarding', () => {
       await user.click(screen.getByText('onboardingFinish'));
 
       await waitFor(() => {
-        expect(sendMessageMock).toHaveBeenCalledWith('SET_SETTINGS', {
-          targetLanguage: 'ko',
-          proficiencyLevel: 'C1', // TOPIK 5 maps to C1
-        });
+        expect(sendMessageMock).toHaveBeenCalledWith(
+          'SET_SETTINGS',
+          expect.objectContaining({
+            targetLanguage: 'ko',
+            proficiencyLevel: 'C1', // TOPIK 5 maps to C1
+            hasCompletedOnboarding: true,
+            scenesEnabled: {
+              webNative: true,
+              webTarget: true,
+              videoNative: true,
+              videoTarget: true,
+            },
+          }),
+        );
       });
     });
 

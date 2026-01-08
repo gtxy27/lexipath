@@ -24,6 +24,7 @@ import {
   GraduationCap,
   ChevronRight,
   Zap,
+  Sparkles,
   Moon,
   Sun,
   Monitor,
@@ -79,6 +80,19 @@ export function Popup(): React.ReactElement {
       setSettings({ ...settings, theme: nextTheme });
     } else {
       log.error("Failed to update theme", response.error);
+    }
+  }
+
+  async function toggleFloatingButton() {
+    if (!settings) return;
+    const nextFloatingEnabled = !(settings.floatingButtonEnabled ?? true);
+    const response = await sendMessage("SET_SETTINGS", {
+      floatingButtonEnabled: nextFloatingEnabled,
+    });
+    if (response.ok) {
+      setSettings({ ...settings, floatingButtonEnabled: nextFloatingEnabled });
+    } else {
+      log.error("Failed to update floating button setting", response.error);
     }
   }
 
@@ -227,20 +241,53 @@ export function Popup(): React.ReactElement {
                 </div>
               </div>
             </div>
+
+            <div className="bg-gray-50/50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 rounded-2xl p-3.5 flex items-center justify-between">
+              <div className="pr-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                  {t("popupFloatingButtonLabel")}
+                </div>
+                <div className="text-xs font-medium text-gray-600 dark:text-gray-300/90 mt-0.5 leading-snug">
+                  {t("popupFloatingButtonDesc")}
+                </div>
+              </div>
+              <Switch
+                checked={settings?.floatingButtonEnabled ?? true}
+                onCheckedChange={toggleFloatingButton}
+                className="data-[state=checked]:bg-indigo-600"
+              />
+            </div>
           </CardContent>
 
           <CardFooter className="px-6 pb-6 pt-0">
-            <Button
-              variant="outline"
-              className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
-              onClick={() => browser.runtime.openOptionsPage()}
-            >
-              <div className="flex items-center gap-2.5">
-                <Settings2 className="h-4 w-4 text-indigo-500 dark:text-indigo-400 group-hover:rotate-90 transition-transform duration-500" />
-                <span className="font-bold text-sm tracking-tight">{t("openSettings")}</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
-            </Button>
+            <div className="flex flex-col gap-3 w-full">
+              <Button
+                variant="outline"
+                className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
+                onClick={() => browser.runtime.openOptionsPage()}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Settings2 className="h-4 w-4 text-indigo-500 dark:text-indigo-400 group-hover:rotate-90 transition-transform duration-500" />
+                  <span className="font-bold text-sm tracking-tight">{t("openSettings")}</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
+                onClick={() => {
+                  const url = browser.runtime.getURL("src/ui/onboarding/index.html");
+                  globalThis.open?.(url, "_blank");
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="h-4 w-4 text-indigo-500 dark:text-indigo-400 transition-transform duration-500 group-hover:rotate-12" />
+                  <span className="font-bold text-sm tracking-tight">{t("openOnboarding")}</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </div>

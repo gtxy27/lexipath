@@ -187,6 +187,82 @@
     "message": "打开设置",
     "description": "打开设置链接"
   },
+  "openOnboarding": {
+    "message": "重新引导",
+    "description": "打开 onboarding 页面"
+  },
+  "optionsOpenOnboardingDesc": {
+    "message": "重置引导完成状态并打开入门向导。",
+    "description": "设置：打开 onboarding 描述"
+  },
+  "optionsWebShowOriginalLabel": {
+    "message": "默认显示原文",
+    "description": "设置：网页默认显示原文标签"
+  },
+  "optionsWebShowOriginalDesc": {
+    "message": "启用后默认显示原文；可在悬浮菜单里对单个 Tab 覆盖。",
+    "description": "设置：网页默认显示原文描述"
+  },
+  "optionsWebStyleLabel": {
+    "message": "网页样式映射",
+    "description": "设置：网页样式映射标签"
+  },
+  "optionsWebStyleDesc": {
+    "message": "将 within / out / forgotten 状态映射到视觉效果 preset。",
+    "description": "设置：网页样式映射描述"
+  },
+  "optionsWebStyleWithin": {
+    "message": "Within",
+    "description": "设置：within 样式映射标签"
+  },
+  "optionsWebStyleOut": {
+    "message": "Out",
+    "description": "设置：out-of-level 样式映射标签"
+  },
+  "optionsWebStyleForgotten": {
+    "message": "Forgotten",
+    "description": "设置：forgotten 样式映射标签"
+  },
+  "optionsWebStyleKey_border": {
+    "message": "border",
+    "description": "设置：网页样式 key border"
+  },
+  "optionsWebStyleKey_dashedLine": {
+    "message": "dashedLine",
+    "description": "设置：网页样式 key dashedLine"
+  },
+  "optionsWebStyleKey_weakened": {
+    "message": "weakened",
+    "description": "设置：网页样式 key weakened"
+  },
+  "optionsWebStyleKey_background": {
+    "message": "background",
+    "description": "设置：网页样式 key background"
+  },
+  "optionsWebStyleKey_textColor": {
+    "message": "textColor",
+    "description": "设置：网页样式 key textColor"
+  },
+  "optionsWebCustomCssLabel": {
+    "message": "自定义 CSS",
+    "description": "设置：自定义 CSS 标签"
+  },
+  "optionsWebCustomCssPlaceholder": {
+    "message": "/* 仅影响网页高亮样式（不影响页面原本 CSS） */",
+    "description": "设置：自定义 CSS 占位符"
+  },
+  "optionsWebCustomCssDesc": {
+    "message": "限长 2000 字符；建议只写与 [data-lx-style] / .lexipath-word 相关的规则。",
+    "description": "设置：自定义 CSS 描述"
+  },
+  "optionsScenesLabel": {
+    "message": "场景开关",
+    "description": "设置：场景开关标签"
+  },
+  "optionsScenesDesc": {
+    "message": "控制网页/视频在母语/目标语场景下是否启用增强。",
+    "description": "设置：场景开关描述"
+  },
   "toggleTheme": {
     "message": "主题：$1",
     "description": "主题按钮文案（$1: 系统/浅色/深色）"
@@ -198,6 +274,98 @@
   "floatingCommandCenterClose": {
     "message": "关闭悬浮菜单",
     "description": "悬浮按钮：关闭命令中心/菜单"
+  },
+  "floatingCommandCenterEnhanceOnce": {
+    "message": "增强本页",
+    "description": "悬浮按钮：手动触发一次网页增强"
+  },
+  "floatingCommandCenterEnhanceOnceDesc": {
+    "message": "即使在手动模式也可以点击触发一次。",
+    "description": "悬浮按钮：手动增强提示"
+  },
+  "floatingCommandCenterHide": {
+    "message": "隐藏悬浮菜单",
+    "description": "悬浮按钮：隐藏悬浮 UI"
+  },
+  "floatingCommandCenterHideDesc": {
+    "message": "可在弹窗或设置中恢复显示。",
+    "description": "悬浮按钮：隐藏后恢复入口提示"
+  },
+  "floatingCommandCenterHideOnce": {
+    "message": "本页隐藏悬浮菜单",
+    "description": "悬浮按钮：仅本页隐藏悬浮 UI"
+  },
+  "floatingCommandCenterHideOnceDesc": {
+    "message": "不会修改全局设置；刷新或在弹窗/设置中重新开启即可恢复。",
+    "description": "悬浮按钮：本页隐藏说明"
+  },
+  "floatingCommandCenterCycleEnhanceModeDesc": {
+    "message": "在 Light / i+1 / Full 之间切换网页增强风格。",
+    "description": "悬浮按钮：切换网页增强风格提示"
+  },
+  "floatingCommandCenterCycleSiteModeDesc": {
+    "message": "在手动 / 自动（黑名单） / 自动（白名单）之间切换运行方式。",
+    "description": "悬浮按钮：切换站点策略提示"
+  },
+  "floatingCommandCenterToggleSiteRuleDesc": {
+    "message": "将当前站点加入/移出列表（视当前模式而定）。",
+    "description": "悬浮按钮：切换当前站点规则提示"
+  },
+  "floatingCommandCenterCurrentSite": {
+    "message": "当前站点：$1",
+    "description": "悬浮按钮：当前站点占位符"
+  },
+  "floatingCommandCenterDisableThisSite": {
+    "message": "在 $1 上禁用自动增强",
+    "description": "悬浮按钮：将当前站点加入黑名单"
+  },
+  "floatingCommandCenterEnableThisSite": {
+    "message": "在 $1 上启用自动增强",
+    "description": "悬浮按钮：将当前站点移出黑名单"
+  },
+  "floatingCommandCenterAllowThisSite": {
+    "message": "允许 $1 自动增强",
+    "description": "悬浮按钮：将当前站点加入白名单"
+  },
+  "floatingCommandCenterRemoveThisSite": {
+    "message": "移出允许列表：$1",
+    "description": "悬浮按钮：将当前站点移出白名单"
+  },
+  "floatingCommandCenterToggleOriginalTab": {
+    "message": "本页：原文/增强切换",
+    "description": "悬浮按钮：本页原文/增强切换"
+  },
+  "floatingCommandCenterToggleOriginalTabDesc": {
+    "message": "只影响当前页面（Tab）。",
+    "description": "悬浮按钮：本页原文/增强切换说明"
+  },
+  "floatingCommandCenterToggleOriginalGlobal": {
+    "message": "全局原文显示：$1",
+    "description": "悬浮按钮：全局原文开关"
+  },
+  "floatingCommandCenterToggleOriginalGlobalDesc": {
+    "message": "对所有页面生效（可被本页开关覆盖）。",
+    "description": "悬浮按钮：全局原文开关说明"
+  },
+  "floatingCommandCenterOpenSettingsDesc": {
+    "message": "打开设置页以调整语言、模式与站点规则。",
+    "description": "悬浮按钮：打开设置页提示"
+  },
+  "floatingCommandCenterForgotten": {
+    "message": "遗忘词",
+    "description": "悬浮按钮：遗忘词入口"
+  },
+  "floatingCommandCenterForgottenDesc": {
+    "message": "查看本页命中的遗忘词列表。",
+    "description": "悬浮按钮：遗忘词入口提示"
+  },
+  "floatingCommandCenterForgottenEmpty": {
+    "message": "本页暂无遗忘词。",
+    "description": "悬浮按钮：遗忘词列表为空"
+  },
+  "floatingCommandCenterForgottenMeta": {
+    "message": "熟悉度 $1 · 暴露 $2",
+    "description": "悬浮按钮：遗忘词条目元信息"
   },
   "themeSystem": {
     "message": "跟随系统",
@@ -214,6 +382,14 @@
   "popupStatusLabel": {
     "message": "模式",
     "description": "弹窗：状态标签"
+  },
+  "popupFloatingButtonLabel": {
+    "message": "悬浮菜单",
+    "description": "弹窗：悬浮按钮开关标签"
+  },
+  "popupFloatingButtonDesc": {
+    "message": "在网页中显示悬浮按钮。",
+    "description": "弹窗：悬浮按钮开关描述"
   },
   "popupModeSmartLearning": {
     "message": "智能学习",
@@ -964,8 +1140,64 @@
     "description": "站点规则仅白名单模式"
   },
   "optionsSiteModeDesc": {
-    "message": "“全部站点”会在所有站点运行；“仅白名单”只在允许列表的站点运行。",
+    "message": "选择网页增强的运行方式：手动、自动（黑名单）或自动（白名单）。",
     "description": "站点规则模式描述"
+  },
+  "optionsEnhanceModeLabel": {
+    "message": "运行模式",
+    "description": "设置：增强运行模式标签"
+  },
+  "optionsEnhanceModeDesc": {
+    "message": "手动模式仅在你点击悬浮菜单时运行；自动模式会自动运行。",
+    "description": "设置：增强运行模式描述"
+  },
+  "optionsEnhanceModeManual": {
+    "message": "手动",
+    "description": "设置：手动模式"
+  },
+  "optionsEnhanceModeAutoBlacklist": {
+    "message": "自动（黑名单）",
+    "description": "设置：自动黑名单模式"
+  },
+  "optionsEnhanceModeAutoWhitelist": {
+    "message": "自动（白名单）",
+    "description": "设置：自动白名单模式"
+  },
+  "optionsEnhanceModeManualHintTitle": {
+    "message": "已开启手动模式",
+    "description": "设置：手动模式提示标题"
+  },
+  "optionsEnhanceModeManualHintDesc": {
+    "message": "打开网页上的悬浮菜单并点击“增强本页”，或切换到自动模式以自动运行。",
+    "description": "设置：手动模式提示描述"
+  },
+  "optionsFloatingButtonLabel": {
+    "message": "悬浮菜单",
+    "description": "设置：悬浮按钮开关标签"
+  },
+  "optionsFloatingButtonDesc": {
+    "message": "在网页中显示悬浮按钮；你也可以在悬浮菜单里选择隐藏。",
+    "description": "设置：悬浮按钮开关描述"
+  },
+  "optionsWebEnhanceModeLabel": {
+    "message": "增强风格",
+    "description": "设置：网页增强风格标签"
+  },
+  "optionsWebEnhanceModeDesc": {
+    "message": "Light 显示括号提示，i+1 正文不插母语，Full 在支持时整段改写。",
+    "description": "设置：网页增强风格描述"
+  },
+  "optionsWebEnhanceModeLight": {
+    "message": "Light",
+    "description": "设置：网页增强风格 Light"
+  },
+  "optionsWebEnhanceModeIPlus1": {
+    "message": "i+1",
+    "description": "设置：网页增强风格 i+1"
+  },
+  "optionsWebEnhanceModeFull": {
+    "message": "Full",
+    "description": "设置：网页增强风格 Full"
   },
   "optionsExcludedSitesLabel": {
     "message": "排除站点",

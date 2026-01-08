@@ -56,7 +56,7 @@ import {
 import { DictionaryService } from '@lexipath/dictionary';
 
 import { MessageError, createMessageHandlerRegistry } from '../shared/messages';
-import { recordLookup } from '../shared/familiarity';
+import { recordExposureValid, recordLookupManual } from '../shared/familiarity';
 import { getSettings, setSettings } from '../shared/storage';
 import { getStorageService } from '../shared/storage-service';
 import { parseKeywordSessionId } from '../shared/chat-session-id';
@@ -340,6 +340,305 @@ const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
 const englishCorrectionInFlight = new Map<string, Promise<EnglishCorrectionOutput>>();
 const dictionaryService = new DictionaryService();
 const promptBuilder = new PromptBuilder({ getSettings });
+
+function openOnboardingPage(): Promise<void> {
+  const url = browser.runtime.getURL('src/ui/onboarding/index.html');
+  try {
+    return browser.tabs.create({ url }).then(() => undefined);
+  } catch (error: unknown) {
+    void error;
+    try {
+      globalThis.open?.(url);
+    } catch (ignored: unknown) {
+      void ignored;
+    }
+    return Promise.resolve();
+  }
+}
+
+function isSettingsConfigured(settings: Settings): boolean {
+  return settings.channels.some((channel) => Boolean(channel.model?.trim()));
+}
+
+browser.runtime?.onInstalled?.addListener?.((details) => {
+  if (details?.reason !== 'install') return;
+  void (async () => {
+    try {
+      const settings = await getSettings();
+      if (settings.hasCompletedOnboarding && isSettingsConfigured(settings)) return;
+      await openOnboardingPage();
+    } catch (error: unknown) {
+      log.warn('Failed to auto-open onboarding on install; continuing', { message: getErrorMessage(error) });
+    }
+  })();
+});
+
+browser.commands?.onCommand?.addListener?.((command: string, tab?: browser.Tabs.Tab) => {
+  if (command !== 'toggle-original') return;
+  const tabId = tab?.id;
+  if (typeof tabId !== 'number') return;
+  void browser.tabs
+    .sendMessage(tabId, { type: 'LEXIPATH_TOGGLE_ORIGINAL_TAB' })
+    .catch((error: unknown) => {
+      log.debug('Failed to send toggle-original to content script; continuing', { message: getErrorMessage(error) });
+    });
+});
+
+function isAsciiWordBoundaryChar(code: number): boolean {
+  if (!Number.isFinite(code)) return false;
+  return (
+    (code >= 0x41 && code <= 0x5a) || // A-Z
+    (code >= 0x61 && code <= 0x7a) || // a-z
+    (code >= 0x30 && code <= 0x39) || // 0-9
+    code === 0x5f // _
+  );
+}
+
+function hasAsciiWordBoundary(text: string, start: number, length: number): boolean {
+  const beforeCode = start > 0 ? text.charCodeAt(start - 1) : Number.NaN;
+  const afterCode = start + length < text.length ? text.charCodeAt(start + length) : Number.NaN;
+  return !isAsciiWordBoundaryChar(beforeCode) && !isAsciiWordBoundaryChar(afterCode);
+}
+
+function buildHighlightOffsets(text: string, terms: string[]): Array<{ start: number; end: number; term: string }> {
+  const haystack = text.toLowerCase();
+  const uniqueTerms = Array.from(new Set(terms.map((t) => t.trim()).filter(Boolean)));
+  uniqueTerms.sort((a, b) => b.length - a.length);
+
+  const taken: Array<{ start: number; end: number }> = [];
+  const offsets: Array<{ start: number; end: number; term: string }> = [];
+
+  const overlaps = (start: number, end: number) =>
+    taken.some((range) => !(end <= range.start || start >= range.end));
+
+  for (const term of uniqueTerms) {
+    const needleLower = term.toLowerCase();
+    const len = needleLower.length;
+    if (!len) continue;
+
+    let idx = 0;
+    while (idx < haystack.length) {
+      const found = haystack.indexOf(needleLower, idx);
+      if (found === -1) break;
+      idx = found + len;
+
+      const enforceBoundary = /[A-Za-z]/.test(term);
+      if (enforceBoundary && !hasAsciiWordBoundary(text, found, len)) continue;
+      if (overlaps(found, found + len)) continue;
+
+      taken.push({ start: found, end: found + len });
+      offsets.push({ start: found, end: found + len, term });
+    }
+  }
+
+  offsets.sort((a, b) => a.start - b.start);
+  return offsets;
+}
+
+function countSentences(text: string): number {
+  const parts = text
+    .replace(/\s+/g, ' ')
+    .split(/[.!?。！？]+/g)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return parts.length;
+}
+
+function uniqueTokenRatio(text: string): number {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/g)
+    .filter(Boolean);
+  if (tokens.length === 0) return 1;
+  const unique = new Set(tokens);
+  return unique.size / tokens.length;
+}
+
+function hasRepeatedSentence(text: string): boolean {
+  const sentences = text
+    .replace(/\s+/g, ' ')
+    .split(/[.!?。！？]+/g)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (sentences.length < 4) return false;
+  let streak = 1;
+  for (let i = 1; i < sentences.length; i += 1) {
+    const current = sentences[i];
+    const prev = sentences[i - 1];
+    if (!current || !prev) continue;
+    if (current.toLowerCase() === prev.toLowerCase()) {
+      streak += 1;
+      if (streak > 2) return true;
+    } else {
+      streak = 1;
+    }
+  }
+  return false;
+}
+
+function cjkRatio(text: string): number {
+  let cjk = 0;
+  let total = 0;
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code <= 0) continue;
+    total += 1;
+    if (
+      (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
+      (code >= 0x3400 && code <= 0x4dbf) // CJK Unified Ideographs Extension A
+    ) {
+      cjk += 1;
+    }
+  }
+  return total > 0 ? cjk / total : 0;
+}
+
+function countScriptLetters(text: string): { latin: number; han: number; kana: number; hangul: number } {
+  let latin = 0;
+  let han = 0;
+  let kana = 0;
+  let hangul = 0;
+
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code <= 0) continue;
+
+    // Ignore whitespace, punctuation and digits for script ratio.
+    if (/\s/.test(ch)) continue;
+    if (code >= 0x30 && code <= 0x39) continue; // 0-9
+
+    if ((code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a)) {
+      latin += 1;
+      continue;
+    }
+
+    if (
+      (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
+      (code >= 0x3400 && code <= 0x4dbf) // CJK Unified Ideographs Extension A
+    ) {
+      han += 1;
+      continue;
+    }
+
+    if (
+      (code >= 0x3040 && code <= 0x30ff) || // Hiragana + Katakana
+      (code >= 0x31f0 && code <= 0x31ff) // Katakana Phonetic Extensions
+    ) {
+      kana += 1;
+      continue;
+    }
+
+    if (code >= 0xac00 && code <= 0xd7af) {
+      hangul += 1;
+      continue;
+    }
+  }
+
+  return { latin, han, kana, hangul };
+}
+
+function countNonWhitespaceChars(text: string): number {
+  return text.replace(/\s+/g, '').length;
+}
+
+function extractHardTokens(text: string): string[] {
+  const tokens: string[] = [];
+  const pushAll = (re: RegExp) => {
+    const matches = text.match(re);
+    if (matches) tokens.push(...matches);
+  };
+
+  pushAll(/\bhttps?:\/\/[^\s)"]+/gi);
+  pushAll(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi);
+  pushAll(/\b\d{2,}\b/g);
+  pushAll(/\b[vV]?\d+\.\d+(?:\.\d+)?\b/g);
+  pushAll(/\b[A-Za-z0-9_-]{6,}\b/g);
+
+  return Array.from(new Set(tokens.map((t) => t.trim()).filter(Boolean)));
+}
+
+function hardTokenFidelity(original: string, rewritten: string): { ok: boolean; missing: number; total: number } {
+  const tokens = extractHardTokens(original);
+  if (tokens.length === 0) return { ok: true, missing: 0, total: 0 };
+
+  const haystack = rewritten.toLowerCase();
+  let hit = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token.toLowerCase())) hit += 1;
+  }
+
+  const missing = tokens.length - hit;
+  // Allow small loss for noisy tokens, but require most to survive.
+  const ok = hit / tokens.length >= 0.7 || tokens.length <= 2;
+  return { ok, missing, total: tokens.length };
+}
+
+function hasBanPhrases(text: string): boolean {
+  const lowered = text.toLowerCase();
+  const bans = [
+    'as an ai',
+    "i can't",
+    'i cannot',
+    "i'm sorry",
+    'i am sorry',
+    'policy',
+    'openai',
+    'anthropic',
+    'system prompt',
+    'developer message',
+  ];
+  return bans.some((phrase) => lowered.includes(phrase));
+}
+
+function validateFullRewriteGuard(options: { original: string; rewritten: string }): { ok: boolean; reason: string } {
+  const original = options.original.trim();
+  const rewritten = options.rewritten.trim();
+  if (!rewritten) return { ok: false, reason: 'empty' };
+
+  // G1: target script ratio (English => Latin letters dominate among letter scripts).
+  const script = countScriptLetters(rewritten);
+  const scriptTotal = script.latin + script.han + script.kana + script.hangul;
+  if (scriptTotal > 0) {
+    const latinRatio = script.latin / scriptTotal;
+    const hanRatio = script.han / scriptTotal;
+    const nonLatinRatio = (script.han + script.kana + script.hangul) / scriptTotal;
+
+    if (latinRatio < 0.6) return { ok: false, reason: 'script_ratio_low' };
+    if (hanRatio > 0.1) return { ok: false, reason: 'contains_han' };
+    if (nonLatinRatio > 0.2) return { ok: false, reason: 'contains_non_latin' };
+  }
+
+  // G2: length ratio sanity (wide range, avoid extreme inflation/shrink).
+  const denom = Math.max(1, countNonWhitespaceChars(original));
+  const ratio = countNonWhitespaceChars(rewritten) / denom;
+  if (ratio > 2.5) return { ok: false, reason: 'length_inflation' };
+  if (countNonWhitespaceChars(original) >= 60 && ratio < 0.5) return { ok: false, reason: 'length_shrink' };
+
+  // Extra safeguard: rewritten-to-English should not be dominated by CJK.
+  if (cjkRatio(rewritten) > 0.08) return { ok: false, reason: 'contains_cjk' };
+
+  // G3: degeneration
+  if (hasRepeatedSentence(rewritten)) return { ok: false, reason: 'repeated_sentences' };
+  if (uniqueTokenRatio(rewritten) < 0.25 && rewritten.length > 160) return { ok: false, reason: 'low_unique_token_ratio' };
+
+  // G4: identifier fidelity
+  const fidelity = hardTokenFidelity(original, rewritten);
+  if (!fidelity.ok) return { ok: false, reason: 'hard_token_missing' };
+
+  // G5: ban phrases / prompt leak
+  if (hasBanPhrases(rewritten)) return { ok: false, reason: 'ban_phrases' };
+
+  // G6: structure sanity (avoid extreme sentence count drift).
+  const s1 = countSentences(original);
+  const s2 = countSentences(rewritten);
+  if (s1 >= 3 && (s2 < Math.floor(s1 * 0.5) || s2 > Math.ceil(s1 * 2.0))) {
+    return { ok: false, reason: 'sentence_count_drift' };
+  }
+
+  return { ok: true, reason: 'ok' };
+}
 
 type EnglishCorrectionStats = {
   requestsTotal: number;
@@ -845,6 +1144,7 @@ registry.register('TRANSLATE_KEYWORDS', async (payload: TranslateKeywordsPayload
   return keywords.map((term) => mapping[term] ?? term);
 });
 
+// plan15 [NOW][BE] DONE: mode-aware `ENHANCE_WEB` + cache key + TTL caching via `getOrRunCachedTask`.
 registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const settings = await getSettings();
   const content = payload.content;
@@ -852,12 +1152,13 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const targetLang = payload.targetLang ?? settings.nativeLanguage;
   const maxWords = payload.maxWords ?? 15;
   const userLevel = settings.proficiencyLevel;
+  const mode = payload.mode ?? settings.webEnhanceMode ?? 'i_plus_1';
 
   const keywordRoute = resolveChannelRoute('select_keywords', settings);
   const translateRoute = resolveRoute('translate', settings);
 
   const cacheKey = makeCacheKey('ENHANCE_WEB', {
-    v: 3,
+    v: 4,
     providers: {
       keyword: routeIdentity(keywordRoute, settings),
       translation: routeIdentity(translateRoute, settings),
@@ -868,6 +1169,7 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
       targetLang,
       userLevel,
       maxWords,
+      mode,
     },
   });
 
@@ -876,36 +1178,171 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        const keywords = await getKeywordsForText({
-          settings,
-          text: content,
-          sourceLang,
-          targetLang,
-          userLevel,
-          scene: 'web',
-          maxItems: maxWords,
-        });
+        const translateText = async (options: {
+          text: string;
+          sourceLang: EnhanceWebPayload['sourceLang'];
+          targetLang: EnhanceWebPayload['targetLang'];
+        }): Promise<string> => {
+          const text = options.text.trim();
+          if (!text) return '';
 
-        if (!keywords.length) {
-          return { value: { content_result: content, convert_word: [] }, ok: false };
+          if (translateRoute.kind === 2) {
+            const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
+            return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
+              googleTranslateProvider.translate(text, {
+                from: String(options.sourceLang ?? settings.targetLanguage),
+                to: String(options.targetLang ?? settings.nativeLanguage),
+              })
+            );
+          }
+
+          if (translateRoute.kind === 3) {
+            const limit = getChannelConcurrencyLimit(null, translateRoute.kind);
+            return runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
+              bingTranslateProvider.translate(text, {
+                from: String(options.sourceLang ?? settings.targetLanguage),
+                to: String(options.targetLang ?? settings.nativeLanguage),
+              })
+            );
+          }
+
+          const [translated] = await translateTerms({
+            settings,
+            terms: [text],
+            sourceLang: String(options.sourceLang ?? settings.targetLanguage),
+            targetLang: String(options.targetLang ?? settings.nativeLanguage),
+          });
+          return translated ?? '';
+        };
+
+        const filterConvertWordByHits = <T extends { original: string }>(text: string, words: T[]): T[] => {
+          const haystack = text.toLowerCase();
+          return words.filter((word) => {
+            const needle = word.original.trim().toLowerCase();
+            if (!needle) return false;
+            return haystack.includes(needle);
+          });
+        };
+
+        const runKeywordEnhance = async (options: {
+          text: string;
+          sourceLang: EnhanceWebPayload['sourceLang'];
+          targetLang: EnhanceWebPayload['targetLang'];
+          maxWords: number;
+        }) => {
+          const keywords = await getKeywordsForText({
+            settings,
+            text: options.text,
+            sourceLang: options.sourceLang,
+            targetLang: options.targetLang,
+            userLevel,
+            scene: 'web',
+            maxItems: options.maxWords,
+          });
+
+          if (!keywords.length) {
+            return {
+              content_result: options.text,
+              convert_word: [],
+              highlight_terms: [] as string[],
+              highlight_offsets: [] as Array<{ start: number; end: number; term: string }>,
+            };
+          }
+
+          const translations = await translateTerms({
+            settings,
+            terms: keywords,
+            sourceLang: String(options.sourceLang ?? settings.targetLanguage),
+            targetLang: String(options.targetLang ?? settings.nativeLanguage),
+          });
+
+          const dictEntries = await dictionaryService.batchLookup(keywords);
+          const convert_word = filterConvertWordByHits(
+            options.text,
+            keywords.map((original, idx) => {
+              const converted = translations[idx] ?? original;
+              const entry = dictEntries[idx];
+              const difficulty = typeof entry?.difficulty === 'string' ? entry.difficulty.trim() : '';
+              const normalizedDifficulty = difficulty.toUpperCase();
+              const difficultyLevel = (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const).includes(normalizedDifficulty as any)
+                ? (normalizedDifficulty as CEFRLevel)
+                : undefined;
+              const partOfSpeech =
+                typeof entry?.definitions?.[0]?.partOfSpeech === 'string' ? entry.definitions[0].partOfSpeech : undefined;
+
+              return {
+                original,
+                converted,
+                ...(difficulty ? { difficulty } : {}),
+                ...(difficultyLevel ? { difficultyLevel } : {}),
+                ...(typeof entry?.difficulty === 'string'
+                  ? { difficultyConfidence: difficultyLevel ? 0.9 : 0.4 }
+                  : { difficultyConfidence: 0.2 }),
+                ...(partOfSpeech ? { partOfSpeech } : {}),
+              };
+            })
+          );
+
+          const highlight_terms = convert_word.map((entry) => entry.original);
+          const highlight_offsets = buildHighlightOffsets(options.text, highlight_terms);
+          return { content_result: options.text, convert_word, highlight_terms, highlight_offsets };
+        };
+
+        if (mode !== 'full') {
+          const enhanced = await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
+          return { value: enhanced, ok: enhanced.convert_word.length > 0 };
         }
 
-        const translations = await translateTerms({
-          settings,
-          terms: keywords,
-          sourceLang: String(sourceLang ?? settings.targetLanguage),
-          targetLang: String(targetLang ?? settings.nativeLanguage),
+        const isLearningLanguageContent = sourceLang === settings.targetLanguage;
+        const canRewriteToLearningLanguage =
+          !isLearningLanguageContent && settings.targetLanguage === 'en' && targetLang === 'en';
+
+        if (!canRewriteToLearningLanguage) {
+          const enhanced = await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
+          return { value: enhanced, ok: enhanced.convert_word.length > 0 };
+        }
+
+        const rewritten = await translateText({ text: content, sourceLang, targetLang: 'en' });
+        if (!rewritten.trim()) {
+          const enhanced = await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
+          return { value: enhanced, ok: false };
+        }
+
+        const guard = validateFullRewriteGuard({ original: content, rewritten });
+        if (!guard.ok) {
+          log.debug('ENHANCE_WEB full guard failed; falling back to keyword enhance', { reason: guard.reason });
+          const fallbackEnhanced = await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
+          return { value: fallbackEnhanced, ok: false };
+        }
+
+        const enhanced = await runKeywordEnhance({
+          text: rewritten,
+          sourceLang: 'en',
+          targetLang: settings.nativeLanguage,
+          maxWords,
         });
 
-        const convert_word = keywords.map((original, idx) => ({
-          original,
-          converted: translations[idx] ?? original,
-        }));
+        const offsets = buildHighlightOffsets(rewritten, enhanced.highlight_terms ?? []);
+        if ((enhanced.convert_word?.length ?? 0) > 0 && offsets.length === 0) {
+          log.debug('ENHANCE_WEB full highlight usability guard failed; falling back to keyword enhance', {
+            terms: enhanced.highlight_terms?.length ?? 0,
+          });
+          const fallbackEnhanced = await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
+          return { value: fallbackEnhanced, ok: false };
+        }
 
-        return { value: { content_result: content, convert_word }, ok: true };
+        return {
+          value: {
+            content_result: rewritten,
+            convert_word: enhanced.convert_word,
+            highlight_terms: enhanced.highlight_terms,
+            highlight_offsets: offsets,
+          },
+          ok: enhanced.convert_word.length > 0,
+        };
       } catch (error: unknown) {
         log.warn('ENHANCE_WEB failed; returning fallback output', { message: getErrorMessage(error) });
-        return { value: { content_result: content, convert_word: [] }, ok: false };
+        return { value: { content_result: content, convert_word: [], highlight_terms: [], highlight_offsets: [] }, ok: false };
       }
     },
   });
@@ -1102,7 +1539,7 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     throw new MessageError({ code: 'INVALID_PAYLOAD', message: 'Expected payload { word: string }' });
   }
 
-  await recordLookup(word);
+  await recordLookupManual(word);
 
   const settings = await getSettings();
   const sourceLang = settings.targetLanguage;
@@ -1243,6 +1680,22 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
       return value;
     }
   });
+});
+
+registry.register('BATCH_GET_WORD_FAMILIARITY', async (payload: { words: string[] }) => {
+  const words = payload.words.map((w) => w.trim().toLowerCase()).filter(Boolean);
+  if (words.length === 0) return [];
+
+  const storageService = getStorageService();
+  const records = await storageService.batchGetWordFamiliarity(Array.from(new Set(words)));
+  return Array.from(records.values());
+});
+
+registry.register('RECORD_EXPOSURE_VALID', async (payload: { words: string[] }) => {
+  const words = payload.words.map((w) => w.trim()).filter(Boolean);
+  if (words.length === 0) return null;
+  await Promise.all(words.map((word) => recordExposureValid(word)));
+  return null;
 });
 
 // =============================================================================

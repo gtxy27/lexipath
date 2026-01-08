@@ -145,6 +145,13 @@ type FormState = {
   promptStyle: Settings["promptStyle"];
   enabled: boolean;
   autoEnhance: boolean;
+  webEnhanceMode: Settings["webEnhanceMode"];
+  webShowOriginal: Settings["webShowOriginal"];
+  webStyleMapping: Settings["webStyleMapping"];
+  webCustomCss: Settings["webCustomCss"];
+  scenesEnabled: Settings["scenesEnabled"];
+  hasCompletedOnboarding: Settings["hasCompletedOnboarding"];
+  floatingButtonEnabled: Settings["floatingButtonEnabled"];
   englishCorrection: Settings["englishCorrection"];
   siteMode: SiteMode;
   excludedSites: string[];
@@ -435,6 +442,13 @@ function settingsToFormState(settings: Settings): FormState {
     promptStyle: settings.promptStyle,
     enabled: settings.enabled,
     autoEnhance: settings.autoEnhance,
+    webEnhanceMode: settings.webEnhanceMode,
+    webShowOriginal: settings.webShowOriginal,
+    webStyleMapping: settings.webStyleMapping,
+    webCustomCss: settings.webCustomCss,
+    scenesEnabled: settings.scenesEnabled,
+    hasCompletedOnboarding: settings.hasCompletedOnboarding,
+    floatingButtonEnabled: settings.floatingButtonEnabled,
     englishCorrection: settings.englishCorrection,
     siteMode: settings.siteMode,
     excludedSites: settings.excludedSites,
@@ -797,6 +811,13 @@ function buildSettingsPatch(form: FormState):
     promptStyle: form.promptStyle,
     enabled: form.enabled,
     autoEnhance: form.autoEnhance,
+    webEnhanceMode: form.webEnhanceMode,
+    webShowOriginal: form.webShowOriginal,
+    webStyleMapping: form.webStyleMapping,
+    webCustomCss: form.webCustomCss,
+    scenesEnabled: form.scenesEnabled,
+    hasCompletedOnboarding: form.hasCompletedOnboarding,
+    floatingButtonEnabled: form.floatingButtonEnabled,
     englishCorrection: form.englishCorrection,
     siteMode: form.siteMode,
     excludedSites: form.excludedSites,
@@ -2310,52 +2331,307 @@ export function Options(): React.ReactElement {
              </header>
 
              <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-8 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">{t("optionsSiteModeLabel")}</h4>
-                   <Select value={form.siteMode} onValueChange={v => setForm({...form, siteMode: v as SiteMode})}>
-                      <SelectTrigger className="w-full sm:w-48 bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs">
-                         <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-                         <SelectItem value="all">{t("optionsSiteModeAll")}</SelectItem>
-                         <SelectItem value="whitelist">{t("optionsSiteModeWhitelist")}</SelectItem>
-                      </SelectContent>
-                   </Select>
+                {(() => {
+                  type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
+                  const enhanceSiteMode: EnhanceSiteMode = form.autoEnhance
+                    ? form.siteMode === "whitelist"
+                      ? "auto_whitelist"
+                      : "auto_blacklist"
+                    : "manual";
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-5">
+                          <div className="space-y-1">
+                            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                              {t("optionsEnhanceModeLabel")}
+                            </h4>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                              {t("optionsEnhanceModeDesc")}
+                            </p>
+                          </div>
+                          <Select
+                            value={enhanceSiteMode}
+                            onValueChange={(v) => {
+                              const next = v as EnhanceSiteMode;
+                              if (next === "manual") {
+                                setForm({ ...form, autoEnhance: false });
+                                return;
+                              }
+                              if (next === "auto_whitelist") {
+                                setForm({ ...form, autoEnhance: true, siteMode: "whitelist" });
+                                return;
+                              }
+                              setForm({ ...form, autoEnhance: true, siteMode: "all" });
+                            }}
+                          >
+                            <SelectTrigger className="w-full sm:w-52 bg-white/70 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                              <SelectItem value="manual">{t("optionsEnhanceModeManual")}</SelectItem>
+                              <SelectItem value="auto_blacklist">{t("optionsEnhanceModeAutoBlacklist")}</SelectItem>
+                              <SelectItem value="auto_whitelist">{t("optionsEnhanceModeAutoWhitelist")}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-6 rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-5">
+                          <div className="space-y-1">
+                            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                              {t("optionsFloatingButtonLabel")}
+                            </h4>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                              {t("optionsFloatingButtonDesc")}
+                            </p>
+                          </div>
+                          <Switch
+                            checked={form.floatingButtonEnabled ?? true}
+                            onCheckedChange={(checked) =>
+                              setForm({ ...form, floatingButtonEnabled: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-5">
+                        <div className="space-y-1">
+                          <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                            {t("optionsWebEnhanceModeLabel")}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                            {t("optionsWebEnhanceModeDesc")}
+                          </p>
+                        </div>
+                        <Select
+                          value={form.webEnhanceMode}
+                          onValueChange={(v) =>
+                            setForm({ ...form, webEnhanceMode: v as Settings["webEnhanceMode"] })
+                          }
+                        >
+                          <SelectTrigger className="w-full sm:w-52 bg-white/70 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                            <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
+                            <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
+                            <SelectItem value="full">{t("optionsWebEnhanceModeFull")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {enhanceSiteMode === "manual" ? (
+                        <div className="rounded-2xl border border-indigo-100/60 dark:border-indigo-500/20 bg-indigo-50/40 dark:bg-indigo-500/10 p-5">
+                          <div className="text-sm font-bold text-gray-900 dark:text-white">
+                            {t("optionsEnhanceModeManualHintTitle")}
+                          </div>
+                          <div className="mt-1 text-xs text-gray-600 dark:text-gray-300/90 font-medium leading-relaxed">
+                            {t("optionsEnhanceModeManualHintDesc")}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pt-2">
+                          {enhanceSiteMode === "auto_whitelist" ? (
+                            <div className="space-y-4">
+                              <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                {t("optionsAllowedSitesLabel")}
+                              </Label>
+                              <Textarea
+                                value={form.allowedSites.join("\n")}
+                                onChange={(e) => {
+                                  const lines = e.target.value
+                                    .split("\n")
+                                    .map(normalizeSiteEntry)
+                                    .filter(Boolean) as string[];
+                                  setForm({ ...form, allowedSites: dedupeStrings(lines) });
+                                }}
+                                rows={8}
+                                className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-indigo-500/30 font-medium transition-all"
+                                placeholder="example.com"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                                <AlertCircle className="h-4 w-4 text-rose-500" />
+                                {t("optionsExcludedSitesLabel")}
+                              </Label>
+                              <Textarea
+                                value={form.excludedSites.join("\n")}
+                                onChange={(e) => {
+                                  const lines = e.target.value
+                                    .split("\n")
+                                    .map(normalizeSiteEntry)
+                                    .filter(Boolean) as string[];
+                                  setForm({ ...form, excludedSites: dedupeStrings(lines) });
+                                }}
+                                rows={8}
+                                className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-rose-500/20 font-medium transition-all"
+                                placeholder="google.com"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
+                <div className="h-px bg-gray-100 dark:bg-white/5 my-8" />
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-5">
+                    <div className="space-y-1">
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                        {t("optionsWebShowOriginalLabel")}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        {t("optionsWebShowOriginalDesc")}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.webShowOriginal ?? false}
+                      onCheckedChange={(checked) => setForm({ ...form, webShowOriginal: checked })}
+                      className="data-[state=checked]:bg-indigo-600"
+                    />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-5">
+                    <div className="space-y-1">
+                      <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                        {t("openOnboarding")}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        {t("optionsOpenOnboardingDesc")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto h-10 rounded-xl border-gray-200 dark:border-white/10 bg-white/70 dark:bg-black/20 font-bold text-xs"
+                      onClick={async () => {
+                        await sendMessage("SET_SETTINGS", { hasCompletedOnboarding: false });
+                        const url = browser.runtime.getURL("src/ui/onboarding/index.html");
+                        globalThis.open?.(url, "_blank");
+                      }}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {t("openOnboarding")}
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
-                   <div className="space-y-4">
-                      <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                         {t("optionsAllowedSitesLabel")}
-                      </Label>
-                      <Textarea 
-                        value={form.allowedSites.join("\n")}
-                        onChange={e => {
-                           const lines = e.target.value.split("\n").map(normalizeSiteEntry).filter(Boolean) as string[];
-                           setForm({...form, allowedSites: dedupeStrings(lines)});
-                        }}
-                        rows={8}
-                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-indigo-500/30 font-medium transition-all"
-                        placeholder="example.com"
-                      />
-                   </div>
-                   <div className="space-y-4">
-                      <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-                         <AlertCircle className="h-4 w-4 text-rose-500" />
-                         {t("optionsExcludedSitesLabel")}
-                      </Label>
-                      <Textarea 
-                        value={form.excludedSites.join("\n")}
-                        onChange={e => {
-                           const lines = e.target.value.split("\n").map(normalizeSiteEntry).filter(Boolean) as string[];
-                           setForm({...form, excludedSites: dedupeStrings(lines)});
-                        }}
-                        rows={8}
-                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-rose-500/20 font-medium transition-all"
-                        placeholder="google.com"
-                      />
-                   </div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                      {t("optionsWebStyleLabel")}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      {t("optionsWebStyleDesc")}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                      { key: "within", label: t("optionsWebStyleWithin") },
+                      { key: "out", label: t("optionsWebStyleOut") },
+                      { key: "forgotten", label: t("optionsWebStyleForgotten") },
+                    ].map((item) => (
+                      <div key={item.key} className="space-y-2.5">
+                        <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                          {item.label}
+                        </Label>
+                        <Select
+                          value={(form.webStyleMapping as any)?.[item.key] ?? "border"}
+                          onValueChange={(value) =>
+                            setForm({
+                              ...form,
+                              webStyleMapping: {
+                                ...(form.webStyleMapping as any),
+                                [item.key]: value,
+                              } as any,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="bg-white/70 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                            {["border", "dashedLine", "weakened", "background", "textColor"].map((k) => (
+                              <SelectItem key={k} value={k}>
+                                {t(`optionsWebStyleKey_${k}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <Label className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                      <Zap className="h-4 w-4 text-indigo-500" />
+                      {t("optionsWebCustomCssLabel")}
+                    </Label>
+                    <Textarea
+                      value={form.webCustomCss ?? ""}
+                      onChange={(e) => setForm({ ...form, webCustomCss: e.target.value })}
+                      rows={6}
+                      className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-2xl p-4 focus:ring-indigo-500/20 font-medium transition-all"
+                      placeholder={t("optionsWebCustomCssPlaceholder")}
+                    />
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {t("optionsWebCustomCssDesc")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+                      {t("optionsScenesLabel")}
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      {t("optionsScenesDesc")}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { key: "webNative", title: t("onboardingSceneWebNativeTitle"), desc: t("onboardingSceneWebNativeDesc") },
+                      { key: "webTarget", title: t("onboardingSceneWebTargetTitle"), desc: t("onboardingSceneWebTargetDesc") },
+                      { key: "videoNative", title: t("onboardingSceneVideoNativeTitle"), desc: t("onboardingSceneVideoNativeDesc") },
+                      { key: "videoTarget", title: t("onboardingSceneVideoTargetTitle"), desc: t("onboardingSceneVideoTargetDesc") },
+                    ].map((item) => (
+                      <div
+                        key={item.key}
+                        className="flex items-start justify-between gap-4 rounded-2xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-5"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                            {item.title}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                            {item.desc}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={(form.scenesEnabled as any)?.[item.key] ?? true}
+                          onCheckedChange={(checked) =>
+                            setForm({
+                              ...form,
+                              scenesEnabled: {
+                                ...(form.scenesEnabled as any),
+                                [item.key]: checked,
+                              } as any,
+                            })
+                          }
+                          className="data-[state=checked]:bg-indigo-600"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
              </div>
           </TabsContent>

@@ -1,34 +1,91 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Languages, PanelRightClose, Power, X } from "lucide-react";
+import {
+  BookOpen,
+  Eye,
+  EyeOff,
+  Globe,
+  Languages,
+  PanelRightClose,
+  Power,
+  Repeat,
+  Settings2,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { cn } from "../../lib/utils";
 import browser from "webextension-polyfill";
 import { Button } from "./button";
 
+type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
+type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
+
 interface FloatingButtonProps {
   onToggleEnabled?: (enabled: boolean) => void;
   onOpenSidebar?: () => void;
+  onRunEnhanceOnce?: () => void | Promise<void>;
+  onCycleWebEnhanceMode?: () => void | Promise<void>;
+  onCycleEnhanceSiteMode?: () => void | Promise<void>;
+  onToggleCurrentSiteRule?: () => void | Promise<void>;
+  onToggleOriginalTab?: () => void | Promise<void>;
+  onToggleOriginalGlobal?: () => void | Promise<void>;
+  onOpenOptions?: () => void | Promise<void>;
+  onHideOnce?: () => void | Promise<void>;
+  onHideFloatingButton?: () => void | Promise<void>;
+  enabled?: boolean;
   initialEnabled?: boolean;
+  webEnhanceMode?: "light" | "i_plus_1" | "full";
+  enhanceSiteMode?: EnhanceSiteMode;
+  siteRuleStatus?: SiteRuleStatus;
+  siteRuleMatchedRule?: string;
+  currentHost?: string;
+  globalShowOriginal?: boolean;
+  forgottenWords?: Array<{ word: string; familiarity: number; encounters: number }>;
 }
 
 export const FloatingButton: React.FC<FloatingButtonProps> = ({
   onToggleEnabled,
   onOpenSidebar,
-  initialEnabled = true
+  onRunEnhanceOnce,
+  onCycleWebEnhanceMode,
+  onCycleEnhanceSiteMode,
+  onToggleCurrentSiteRule,
+  onToggleOriginalTab,
+  onToggleOriginalGlobal,
+  onOpenOptions,
+  onHideOnce,
+  onHideFloatingButton,
+  enabled: enabledProp,
+  initialEnabled = true,
+  webEnhanceMode = "i_plus_1",
+  enhanceSiteMode = "manual",
+  siteRuleStatus = "enabled",
+  siteRuleMatchedRule,
+  currentHost,
+  globalShowOriginal = false,
+  forgottenWords = [],
 }) => {
-  function t(key: string): string {
+  function t(key: string, substitutions?: string | string[]): string {
     try {
-      return browser.i18n.getMessage(key) || key;
-    } catch {
+      const message = browser.i18n.getMessage(key, substitutions as any);
+      return message || key;
+    } catch (error: unknown) {
+      void error;
       return key;
     }
   }
 
   const [isOpen, setIsOpen] = useState(false);
-  const [enabled, setEnabled] = useState(initialEnabled);
+  const [enabled, setEnabled] = useState(enabledProp ?? initialEnabled);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [forgottenOpen, setForgottenOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (typeof enabledProp !== "boolean") return;
+    setEnabled(enabledProp);
+  }, [enabledProp]);
 
   // Load saved position
   useEffect(() => {
@@ -82,6 +139,44 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
     requestAnimationFrame(() => setIsDragging(false));
   };
 
+  const runAction = (action?: () => void | Promise<void>) => {
+    if (!action) return;
+    try {
+      const result = action();
+      if (result && typeof (result as any).then === "function") {
+        (result as Promise<void>).catch((error: unknown) => {
+          console.warn("Floating button action failed", error);
+        });
+      }
+    } catch (error: unknown) {
+      console.warn("Floating button action threw", error);
+    }
+  };
+
+  const webEnhanceModeLabel = (() => {
+    switch (webEnhanceMode) {
+      case "light":
+        return t("optionsWebEnhanceModeLight");
+      case "full":
+        return t("optionsWebEnhanceModeFull");
+      default:
+        return t("optionsWebEnhanceModeIPlus1");
+    }
+  })();
+
+  const enhanceSiteModeLabel = (() => {
+    switch (enhanceSiteMode) {
+      case "auto_blacklist":
+        return t("optionsEnhanceModeAutoBlacklist");
+      case "auto_whitelist":
+        return t("optionsEnhanceModeAutoWhitelist");
+      default:
+        return t("optionsEnhanceModeManual");
+    }
+  })();
+
+  const forgottenCount = forgottenWords.length;
+
   const menuItems = [
     {
       icon: Power,
@@ -95,12 +190,119 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       },
     },
     {
+      icon: Sparkles,
+      label: t("floatingCommandCenterEnhanceOnce"),
+      hint: t("floatingCommandCenterEnhanceOnceDesc"),
+      color: "text-indigo-500",
+      onClick: () => {
+        runAction(onRunEnhanceOnce);
+        setIsOpen(false);
+      },
+    },
+    {
+      icon: Repeat,
+      label: `${t("optionsWebEnhanceModeLabel")}: ${webEnhanceModeLabel}`,
+      hint: t("floatingCommandCenterCycleEnhanceModeDesc"),
+      color: "text-indigo-500",
+      onClick: () => {
+        runAction(onCycleWebEnhanceMode);
+      },
+    },
+    {
+      icon: Globe,
+      label: `${t("optionsEnhanceModeLabel")}: ${enhanceSiteModeLabel}`,
+      hint: t("floatingCommandCenterCycleSiteModeDesc"),
+      color: "text-sky-500",
+      onClick: () => {
+        runAction(onCycleEnhanceSiteMode);
+      },
+    },
+    ...(enhanceSiteMode === "auto_blacklist" || enhanceSiteMode === "auto_whitelist"
+      ? [
+          {
+            icon: ShieldIconForSiteRule(siteRuleStatus),
+            label: buildSiteRuleLabel({
+              t,
+              enhanceSiteMode,
+              siteRuleStatus,
+              ...(siteRuleMatchedRule ? { siteRuleMatchedRule } : {}),
+              ...(currentHost ? { currentHost } : {}),
+            }),
+            hint: t("floatingCommandCenterToggleSiteRuleDesc"),
+            color: siteRuleStatus === "enabled" ? "text-emerald-500" : "text-rose-500",
+            onClick: () => {
+              runAction(onToggleCurrentSiteRule);
+            },
+          },
+        ]
+      : []),
+    {
+      icon: Eye,
+      label: t("floatingCommandCenterToggleOriginalTab"),
+      hint: t("floatingCommandCenterToggleOriginalTabDesc"),
+      color: "text-gray-700 dark:text-gray-200",
+      onClick: () => {
+        runAction(onToggleOriginalTab);
+      },
+    },
+    {
+      icon: Eye,
+      label: t(
+        "floatingCommandCenterToggleOriginalGlobal",
+        globalShowOriginal ? t("on") : t("off"),
+      ),
+      hint: t("floatingCommandCenterToggleOriginalGlobalDesc"),
+      color: "text-gray-700 dark:text-gray-200",
+      onClick: () => {
+        runAction(onToggleOriginalGlobal);
+      },
+    },
+    {
+      icon: BookOpen,
+      label: `${t("floatingCommandCenterForgotten")} (${forgottenCount})`,
+      hint: t("floatingCommandCenterForgottenDesc"),
+      color: forgottenCount > 0 ? "text-rose-500" : "text-gray-500",
+      onClick: () => {
+        setForgottenOpen(true);
+      },
+    },
+    {
       icon: PanelRightClose,
       label: t("chatTitle"),
       hint: t("chatPageTitle"),
       color: "text-indigo-500",
       onClick: () => {
         onOpenSidebar?.();
+        setIsOpen(false);
+      },
+    },
+    {
+      icon: Settings2,
+      label: t("openSettings"),
+      hint: t("floatingCommandCenterOpenSettingsDesc"),
+      color: "text-indigo-500",
+      onClick: () => {
+        runAction(onOpenOptions);
+        setIsOpen(false);
+      },
+    },
+    {
+      icon: EyeOff,
+      label: t("floatingCommandCenterHideOnce"),
+      hint: t("floatingCommandCenterHideOnceDesc"),
+      color: "text-gray-500",
+      onClick: () => {
+        runAction(onHideOnce);
+        setIsOpen(false);
+      },
+    },
+    {
+      icon: EyeOff,
+      label: t("floatingCommandCenterHide"),
+      hint: t("floatingCommandCenterHideDesc"),
+      color: "text-gray-500",
+      onClick: () => {
+        runAction(onHideFloatingButton);
         setIsOpen(false);
       },
     },
@@ -153,6 +355,69 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
           )}
         </AnimatePresence>
 
+        {/* Forgotten drawer */}
+        <AnimatePresence>
+          {forgottenOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className={cn(
+                "fixed z-[2147483647] pointer-events-auto",
+                "bg-white/95 dark:bg-[#0d0e14]/95 border border-gray-200/80 dark:border-white/10 shadow-2xl backdrop-blur-xl",
+                "rounded-2xl",
+                "w-[320px] max-w-[calc(100vw-24px)]",
+                "p-4",
+                "right-3 bottom-20",
+              )}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-black text-gray-900 dark:text-white">
+                  {t("floatingCommandCenterForgotten")}
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 rounded-xl"
+                  onClick={() => setForgottenOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {forgottenWords.length === 0 ? (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("floatingCommandCenterForgottenEmpty")}
+                </div>
+              ) : (
+                <div className="max-h-[260px] overflow-auto pr-1">
+                  <div className="flex flex-col gap-2">
+                    {forgottenWords.map((item) => (
+                      <div
+                        key={item.word}
+                        className="flex items-center justify-between rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-extrabold text-gray-900 dark:text-white truncate">
+                            {item.word}
+                          </div>
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {t("floatingCommandCenterForgottenMeta", [
+                              String(item.familiarity),
+                              String(item.encounters),
+                            ])}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Main Toggle Button */}
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <Button
@@ -187,3 +452,34 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
     </motion.div>
   );
 };
+
+function ShieldIconForSiteRule(status: SiteRuleStatus) {
+  return status === "disabled" ? EyeOff : Eye;
+}
+
+function buildSiteRuleLabel(options: {
+  t: (key: string, substitutions?: string | string[]) => string;
+  enhanceSiteMode: EnhanceSiteMode;
+  siteRuleStatus: SiteRuleStatus;
+  siteRuleMatchedRule?: string;
+  currentHost?: string;
+}): string {
+  const { t, enhanceSiteMode, siteRuleStatus, siteRuleMatchedRule, currentHost } = options;
+  const host = currentHost?.trim() ? currentHost.trim() : t("floatingCommandCenterCurrentSite");
+
+  if (enhanceSiteMode === "auto_blacklist") {
+    if (siteRuleStatus === "disabled") {
+      return t("floatingCommandCenterEnableThisSite", host);
+    }
+    return t("floatingCommandCenterDisableThisSite", host);
+  }
+
+  if (enhanceSiteMode === "auto_whitelist") {
+    if (siteRuleStatus === "enabled") {
+      return t("floatingCommandCenterRemoveThisSite", siteRuleMatchedRule ?? host);
+    }
+    return t("floatingCommandCenterAllowThisSite", host);
+  }
+
+  return t("floatingCommandCenterCurrentSite", host);
+}

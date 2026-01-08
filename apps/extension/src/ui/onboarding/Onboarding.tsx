@@ -210,6 +210,8 @@ export function Onboarding(): React.ReactElement {
       await sendMessage("SET_SETTINGS", {
         targetLanguage: formData.targetLanguage,
         proficiencyLevel: cefrLevel,
+        scenesEnabled: formData.scenesEnabled,
+        hasCompletedOnboarding: true,
       });
 
       globalThis.close?.();

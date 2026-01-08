@@ -87,6 +87,10 @@ export class SubtitleEnhancer {
     this.pump();
   }
 
+  stop(): void {
+    this.started = false;
+  }
+
   pump(): void {
     if (this.destroyed) return;
     if (!this.started) return;

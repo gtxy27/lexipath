@@ -171,6 +171,82 @@
     "message": "Open Settings",
     "description": "Open settings link"
   },
+  "openOnboarding": {
+    "message": "Restart onboarding",
+    "description": "Open onboarding page"
+  },
+  "optionsOpenOnboardingDesc": {
+    "message": "Reset onboarding completion and open the onboarding wizard.",
+    "description": "Options: open onboarding description"
+  },
+  "optionsWebShowOriginalLabel": {
+    "message": "Show original by default",
+    "description": "Options: show original by default label"
+  },
+  "optionsWebShowOriginalDesc": {
+    "message": "Enable global original view; you can override per tab from the floating menu.",
+    "description": "Options: show original by default description"
+  },
+  "optionsWebStyleLabel": {
+    "message": "Web style mapping",
+    "description": "Options: web style mapping label"
+  },
+  "optionsWebStyleDesc": {
+    "message": "Map within / out / forgotten states to visual presets.",
+    "description": "Options: web style mapping description"
+  },
+  "optionsWebStyleWithin": {
+    "message": "Within",
+    "description": "Options: within style mapping label"
+  },
+  "optionsWebStyleOut": {
+    "message": "Out",
+    "description": "Options: out-of-level style mapping label"
+  },
+  "optionsWebStyleForgotten": {
+    "message": "Forgotten",
+    "description": "Options: forgotten style mapping label"
+  },
+  "optionsWebStyleKey_border": {
+    "message": "border",
+    "description": "Options: web style key border"
+  },
+  "optionsWebStyleKey_dashedLine": {
+    "message": "dashedLine",
+    "description": "Options: web style key dashedLine"
+  },
+  "optionsWebStyleKey_weakened": {
+    "message": "weakened",
+    "description": "Options: web style key weakened"
+  },
+  "optionsWebStyleKey_background": {
+    "message": "background",
+    "description": "Options: web style key background"
+  },
+  "optionsWebStyleKey_textColor": {
+    "message": "textColor",
+    "description": "Options: web style key textColor"
+  },
+  "optionsWebCustomCssLabel": {
+    "message": "Custom CSS",
+    "description": "Options: custom CSS label"
+  },
+  "optionsWebCustomCssPlaceholder": {
+    "message": "/* Only affects LexiPath web highlight styles */",
+    "description": "Options: custom CSS placeholder"
+  },
+  "optionsWebCustomCssDesc": {
+    "message": "Max 2000 chars; prefer rules targeting [data-lx-style] / .lexipath-word.",
+    "description": "Options: custom CSS description"
+  },
+  "optionsScenesLabel": {
+    "message": "Scenes",
+    "description": "Options: scenes label"
+  },
+  "optionsScenesDesc": {
+    "message": "Enable/disable web/video enhancement for native/target scenes.",
+    "description": "Options: scenes description"
+  },
   "toggleTheme": {
     "message": "Theme: $1",
     "description": "Theme button label ($1: System/Light/Dark)"
@@ -182,6 +258,98 @@
   "floatingCommandCenterClose": {
     "message": "Close command center",
     "description": "Floating button: close command center"
+  },
+  "floatingCommandCenterEnhanceOnce": {
+    "message": "Enhance this page",
+    "description": "Floating button: manually run page enhancement once"
+  },
+  "floatingCommandCenterEnhanceOnceDesc": {
+    "message": "Run enhancement once even in manual mode.",
+    "description": "Floating button: manual enhance hint"
+  },
+  "floatingCommandCenterHide": {
+    "message": "Hide command center",
+    "description": "Floating button: hide floating UI"
+  },
+  "floatingCommandCenterHideDesc": {
+    "message": "You can restore it from Popup or Options.",
+    "description": "Floating button: hide hint"
+  },
+  "floatingCommandCenterHideOnce": {
+    "message": "Hide on this page",
+    "description": "Floating button: hide floating UI for this page"
+  },
+  "floatingCommandCenterHideOnceDesc": {
+    "message": "Does not change global settings; reload or re-enable from Popup/Options to restore.",
+    "description": "Floating button: hide-once hint"
+  },
+  "floatingCommandCenterCycleEnhanceModeDesc": {
+    "message": "Cycle web enhancement style between Light / i+1 / Full.",
+    "description": "Floating button: cycle web enhancement mode hint"
+  },
+  "floatingCommandCenterCycleSiteModeDesc": {
+    "message": "Cycle between Manual / Auto (Blacklist) / Auto (Whitelist).",
+    "description": "Floating button: cycle site policy hint"
+  },
+  "floatingCommandCenterToggleSiteRuleDesc": {
+    "message": "Add/remove the current site rule based on the selected mode.",
+    "description": "Floating button: toggle current site rule hint"
+  },
+  "floatingCommandCenterCurrentSite": {
+    "message": "Current site: $1",
+    "description": "Floating button: current site placeholder"
+  },
+  "floatingCommandCenterDisableThisSite": {
+    "message": "Disable auto enhance on $1",
+    "description": "Floating button: add current site to blacklist"
+  },
+  "floatingCommandCenterEnableThisSite": {
+    "message": "Enable auto enhance on $1",
+    "description": "Floating button: remove current site from blacklist"
+  },
+  "floatingCommandCenterAllowThisSite": {
+    "message": "Allow auto enhance on $1",
+    "description": "Floating button: add current site to whitelist"
+  },
+  "floatingCommandCenterRemoveThisSite": {
+    "message": "Remove from allow list: $1",
+    "description": "Floating button: remove current site from whitelist"
+  },
+  "floatingCommandCenterToggleOriginalTab": {
+    "message": "This tab: toggle original/enhanced",
+    "description": "Floating button: tab-level original toggle"
+  },
+  "floatingCommandCenterToggleOriginalTabDesc": {
+    "message": "Only affects the current tab.",
+    "description": "Floating button: tab-level original toggle hint"
+  },
+  "floatingCommandCenterToggleOriginalGlobal": {
+    "message": "Global original: $1",
+    "description": "Floating button: global original toggle"
+  },
+  "floatingCommandCenterToggleOriginalGlobalDesc": {
+    "message": "Applies to all pages (tab toggle can override).",
+    "description": "Floating button: global original toggle hint"
+  },
+  "floatingCommandCenterOpenSettingsDesc": {
+    "message": "Open Options to adjust language, modes and site rules.",
+    "description": "Floating button: open settings hint"
+  },
+  "floatingCommandCenterForgotten": {
+    "message": "Forgotten",
+    "description": "Floating button: forgotten entry"
+  },
+  "floatingCommandCenterForgottenDesc": {
+    "message": "Show forgotten words detected on this page.",
+    "description": "Floating button: forgotten hint"
+  },
+  "floatingCommandCenterForgottenEmpty": {
+    "message": "No forgotten words on this page.",
+    "description": "Floating button: empty forgotten list"
+  },
+  "floatingCommandCenterForgottenMeta": {
+    "message": "Familiarity $1 · Seen $2",
+    "description": "Floating button: forgotten item meta"
   },
   "themeSystem": {
     "message": "System",
@@ -198,6 +366,14 @@
   "popupStatusLabel": {
     "message": "Mode",
     "description": "Popup: status label"
+  },
+  "popupFloatingButtonLabel": {
+    "message": "Command center",
+    "description": "Popup: floating button toggle label"
+  },
+  "popupFloatingButtonDesc": {
+    "message": "Show the floating button on web pages.",
+    "description": "Popup: floating button toggle description"
   },
   "popupModeSmartLearning": {
     "message": "Smart Learning",
@@ -948,8 +1124,64 @@
     "description": "Site rules whitelist mode"
   },
   "optionsSiteModeDesc": {
-    "message": "All sites enhances everywhere; Whitelist only runs on allowed sites.",
+    "message": "Choose how enhancement runs on websites: Manual, Auto (blacklist), or Auto (whitelist).",
     "description": "Site rules mode description"
+  },
+  "optionsEnhanceModeLabel": {
+    "message": "Run mode",
+    "description": "Options: enhancement run mode label"
+  },
+  "optionsEnhanceModeDesc": {
+    "message": "Manual runs only when you click the command center. Auto modes run automatically.",
+    "description": "Options: enhancement run mode description"
+  },
+  "optionsEnhanceModeManual": {
+    "message": "Manual",
+    "description": "Options: manual mode"
+  },
+  "optionsEnhanceModeAutoBlacklist": {
+    "message": "Auto (blacklist)",
+    "description": "Options: auto blacklist mode"
+  },
+  "optionsEnhanceModeAutoWhitelist": {
+    "message": "Auto (whitelist)",
+    "description": "Options: auto whitelist mode"
+  },
+  "optionsEnhanceModeManualHintTitle": {
+    "message": "Manual mode is enabled",
+    "description": "Options: manual mode hint title"
+  },
+  "optionsEnhanceModeManualHintDesc": {
+    "message": "Open the floating command center and click “Enhance this page”, or switch to an Auto mode to run automatically.",
+    "description": "Options: manual mode hint description"
+  },
+  "optionsFloatingButtonLabel": {
+    "message": "Command center",
+    "description": "Options: floating button toggle label"
+  },
+  "optionsFloatingButtonDesc": {
+    "message": "Show the floating button on web pages. You can also hide it from the button menu.",
+    "description": "Options: floating button toggle description"
+  },
+  "optionsWebEnhanceModeLabel": {
+    "message": "Enhance style",
+    "description": "Options: web enhance mode label"
+  },
+  "optionsWebEnhanceModeDesc": {
+    "message": "Light shows inline hints, i+1 keeps text clean, Full rewrites the paragraph when supported.",
+    "description": "Options: web enhance mode description"
+  },
+  "optionsWebEnhanceModeLight": {
+    "message": "Light",
+    "description": "Options: web enhance mode: light"
+  },
+  "optionsWebEnhanceModeIPlus1": {
+    "message": "i+1",
+    "description": "Options: web enhance mode: i+1"
+  },
+  "optionsWebEnhanceModeFull": {
+    "message": "Full",
+    "description": "Options: web enhance mode: full"
   },
   "optionsExcludedSitesLabel": {
     "message": "Excluded Sites",

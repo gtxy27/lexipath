@@ -177,6 +177,25 @@ export async function recordLookup(word: string): Promise<void> {
   await wordQueue.enqueue(normalizedWord, async () => {
     const existing = await readWordRecord(normalizedWord);
     const record = existing ?? createInitialWordFamiliarity(normalizedWord);
+    const encountered = recordWordEncounter(record);
+    // plan15: LOOKUP_MANUAL should strongly bias toward "unknown".
+    const updated = setWordFamiliarity(encountered, 0);
+    await writeWordRecord(updated);
+  });
+}
+
+// plan15: explicit event names for clarity.
+export async function recordLookupManual(word: string): Promise<void> {
+  return recordLookup(word);
+}
+
+export async function recordExposureValid(word: string): Promise<void> {
+  const normalizedWord = normalizeWordForFamiliarity(word);
+  if (!normalizedWord) return;
+
+  await wordQueue.enqueue(normalizedWord, async () => {
+    const existing = await readWordRecord(normalizedWord);
+    const record = existing ?? createInitialWordFamiliarity(normalizedWord);
     const updated = recordWordEncounter(record);
     await writeWordRecord(updated);
   });

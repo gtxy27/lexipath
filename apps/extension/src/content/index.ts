@@ -14,6 +14,7 @@ import type {
   ProviderChannel,
   Settings,
   WebEnhanceOutput,
+  WordFamiliarity,
 } from "@lexipath/core";
 import { detectPrimaryLanguage, qualifySite } from "@lexipath/core/qualify";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
@@ -45,6 +46,55 @@ let hoverTimer: number | null = null;
 const HOVER_UPGRADE_DELAY_MS = 800;
 const wordExplainCache = new Map<string, WordCardData>();
 const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
+
+const SHOW_ORIGINAL_CLASS = "lexipath-show-original";
+const TAB_SHOW_ORIGINAL_KEY = "lexipath-tab-show-original";
+const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
+
+const FORGOTTEN_MIN_ENCOUNTERS = 2;
+const FORGOTTEN_MAX_FAMILIARITY = 30;
+
+type WordFamiliarityLite = { familiarity: number; encounters: number };
+const wordFamiliarityCache = new Map<string, WordFamiliarityLite>();
+const pageForgottenWords = new Map<string, { word: string; familiarity: number; encounters: number }>();
+const exposureSentWords = new Set<string>();
+
+let exposureObserver: IntersectionObserver | null = null;
+const exposureTargets = new WeakMap<Element, string[]>();
+const exposureTimers = new Map<Element, number>();
+
+function getTabShowOriginalOverride(): boolean | null {
+  try {
+    const raw = sessionStorage.getItem(TAB_SHOW_ORIGINAL_KEY);
+    if (raw === null) return null;
+    return raw === "1";
+  } catch (error: unknown) {
+    void error;
+    return null;
+  }
+}
+
+function getEffectiveWebShowOriginal(settings: Settings | null): boolean {
+  if (!settings) return false;
+  const tabOverride = getTabShowOriginalOverride();
+  return tabOverride ?? Boolean(settings.webShowOriginal);
+}
+
+function applyWebShowOriginal(settings: Settings | null): void {
+  const enabled = getEffectiveWebShowOriginal(settings);
+  document.documentElement.classList.toggle(SHOW_ORIGINAL_CLASS, enabled);
+}
+
+function toggleTabShowOriginal(): void {
+  if (!currentSettings) return;
+  const next = !getEffectiveWebShowOriginal(currentSettings);
+  try {
+    sessionStorage.setItem(TAB_SHOW_ORIGINAL_KEY, next ? "1" : "0");
+  } catch (error: unknown) {
+    void error;
+  }
+  applyWebShowOriginal(currentSettings);
+}
 
 function getResolvedTheme(): "light" | "dark" {
   if (!currentSettings) return "dark";
@@ -116,11 +166,88 @@ function isFullCardVisible(): boolean {
   return Boolean(webOverlay && (webOverlay as any).wordCardVisible);
 }
 
+function normalizeWordKey(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+async function getFamiliarityForWords(
+  words: string[],
+): Promise<Record<string, WordFamiliarityLite>> {
+  const normalized = Array.from(new Set(words.map(normalizeWordKey).filter(Boolean)));
+  if (normalized.length === 0) return {};
+
+  const missing = normalized.filter((w) => !wordFamiliarityCache.has(w));
+  if (missing.length > 0) {
+    const response = await sendMessage("BATCH_GET_WORD_FAMILIARITY", { words: missing });
+    if (response.ok) {
+      const seen = new Set<string>();
+      for (const record of response.value as WordFamiliarity[]) {
+        const key = normalizeWordKey(record.word);
+        if (!key) continue;
+        seen.add(key);
+        wordFamiliarityCache.set(key, {
+          familiarity: record.familiarity ?? 0,
+          encounters: record.encounters ?? 0,
+        });
+      }
+      for (const key of missing) {
+        if (seen.has(normalizeWordKey(key))) continue;
+        wordFamiliarityCache.set(key, { familiarity: 0, encounters: 0 });
+      }
+    } else {
+      for (const key of missing) {
+        wordFamiliarityCache.set(key, { familiarity: 0, encounters: 0 });
+      }
+    }
+  }
+
+  const out: Record<string, WordFamiliarityLite> = {};
+  for (const key of normalized) {
+    out[key] = wordFamiliarityCache.get(key) ?? { familiarity: 0, encounters: 0 };
+  }
+  return out;
+}
+
+function updateForgottenWordsForPage(
+  surfaceWords: string[],
+  familiarityByWord: Record<string, WordFamiliarityLite>,
+): void {
+  let changed = false;
+  for (const surface of surfaceWords) {
+    const key = normalizeWordKey(surface);
+    if (!key) continue;
+    const record = familiarityByWord[key];
+    if (!record) continue;
+
+    const isForgotten =
+      record.encounters >= FORGOTTEN_MIN_ENCOUNTERS &&
+      record.familiarity < FORGOTTEN_MAX_FAMILIARITY;
+    if (!isForgotten) continue;
+
+    if (!pageForgottenWords.has(key)) {
+      pageForgottenWords.set(key, {
+        word: surface,
+        familiarity: record.familiarity,
+        encounters: record.encounters,
+      });
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    const list = Array.from(pageForgottenWords.values()).sort(
+      (a, b) => a.familiarity - b.familiarity || b.encounters - a.encounters || a.word.localeCompare(b.word),
+    );
+    floatingButtonController?.updatePageContext?.({ forgottenWords: list });
+  }
+}
+
 // Minimum text length to process
 const MIN_TEXT_LENGTH = 20;
 // Maximum text length per request
 const MAX_TEXT_LENGTH = 2000;
 
+// plan15 [NOW][FE] DONE (performance): viewport-prioritized queue + IntersectionObserver + idle scheduling + concurrency cap.
 const MAX_IN_FLIGHT = 3;
 
 let tooltipInjected = false;
@@ -292,7 +419,10 @@ function shouldProcessElement(element: Element): boolean {
  * Extract text content from element, respecting boundaries
  */
 function extractTextContent(element: Element): string {
-  const text = element.textContent?.trim() || "";
+  const stored = (element as HTMLElement | null)?.dataset?.lxOriginalText;
+  const text = (typeof stored === "string" && stored.trim()
+    ? stored.trim()
+    : element.textContent?.trim()) || "";
   return text.slice(0, MAX_TEXT_LENGTH);
 }
 
@@ -322,6 +452,13 @@ async function processTextElement(
   const text = extractTextContent(element);
   if (text.length < MIN_TEXT_LENGTH) return;
 
+  // Keep a stable baseline for signature/toggle-original. (Limited by MAX_TEXT_LENGTH)
+  try {
+    (element as HTMLElement).dataset.lxOriginalText = text;
+  } catch (error: unknown) {
+    void error;
+  }
+
   const signature = computeTextSignature(text);
   if (processedElementSignature.get(element) === signature) return;
 
@@ -335,7 +472,31 @@ async function processTextElement(
     const nativeDetected =
       currentSettings?.nativeLanguage === "en" ? "en" : "zh";
 
+    const scenes = currentSettings?.scenesEnabled;
+    if (scenes) {
+      if (detected.language === nativeDetected && scenes.webNative === false) {
+        return;
+      }
+      if (
+        currentSettings?.targetLanguage &&
+        detected.language === currentSettings.targetLanguage &&
+        scenes.webTarget === false
+      ) {
+        return;
+      }
+    }
+
     const enhancePayload: EnhanceWebPayload = { content: text };
+    const requestedEnhanceMode = currentSettings?.webEnhanceMode ?? "i_plus_1";
+    const safeElementForFullReplace = element.childElementCount === 0;
+    const effectiveEnhanceMode =
+      requestedEnhanceMode === "full" && !safeElementForFullReplace
+        ? "i_plus_1"
+        : requestedEnhanceMode;
+    // plan15 [NOW][FE] DONE (safety): Full paragraph replacement only runs on leaf elements; otherwise fall back to i+1.
+
+    enhancePayload.mode = effectiveEnhanceMode;
+
     let renderMode: WordRenderMode = "target-to-native";
     if (currentSettings) {
       // Default mode: target language text -> native language tooltip.
@@ -358,6 +519,10 @@ async function processTextElement(
 
       enhancePayload.sourceLang = sourceLang;
       enhancePayload.targetLang = targetLang;
+
+      if (effectiveEnhanceMode === "full") {
+        renderMode = "target-to-native";
+      }
     }
 
     const response = await sendMessage("ENHANCE_WEB", enhancePayload);
@@ -370,7 +535,58 @@ async function processTextElement(
     if (token !== pageProcessingToken) return;
 
     const enhanced = response.value;
-    processedElementSignature.set(element, signature);
+    const surfaceWords = enhanced.convert_word?.map((w) => w.original) ?? [];
+    const familiarityByWord = await getFamiliarityForWords(surfaceWords);
+    updateForgottenWordsForPage(surfaceWords, familiarityByWord);
+    registerExposure(element, Object.keys(familiarityByWord));
+    const styleMapping =
+      currentSettings?.webStyleMapping ?? ({
+        within: "dashedLine",
+        out: "border",
+        forgotten: "weakened",
+      } as const);
+
+    if (
+      effectiveEnhanceMode === "full" &&
+      safeElementForFullReplace &&
+      typeof enhanced.content_result === "string" &&
+      enhanced.content_result.trim() &&
+      enhanced.content_result !== text &&
+      enhanced.convert_word &&
+      enhanced.convert_word.length > 0
+    ) {
+      element.textContent = "";
+
+      const originalSpan = document.createElement("span");
+      originalSpan.className = "lexipath-paragraph-original";
+      originalSpan.textContent = text;
+
+      const enhancedSpan = document.createElement("span");
+      enhancedSpan.className = "lexipath-paragraph-enhanced";
+      enhancedSpan.appendChild(
+        createEnhancedElement(
+          enhanced.content_result,
+          enhanced,
+          "target-to-native",
+          {
+            webEnhanceMode: effectiveEnhanceMode,
+            ...(currentSettings ? { userLevel: currentSettings.proficiencyLevel } : {}),
+            styleMapping,
+            familiarityByWord,
+          },
+        ),
+      );
+
+      element.appendChild(originalSpan);
+      element.appendChild(enhancedSpan);
+
+      const elapsedMs = Math.round(performance.now() - startMs);
+      log.debug(
+        `Enhanced full paragraph (words=${enhanced.convert_word.length}, ms=${elapsedMs}, lang=${detected.language})`,
+      );
+      processedElementSignature.set(element, computeTextSignature(extractTextContent(element)));
+      return;
+    }
 
     // Only modify if there are words to convert
     if (enhanced.convert_word && enhanced.convert_word.length > 0) {
@@ -392,6 +608,12 @@ async function processTextElement(
           nodeText,
           enhanced,
           renderMode,
+          {
+            webEnhanceMode: effectiveEnhanceMode,
+            ...(currentSettings ? { userLevel: currentSettings.proficiencyLevel } : {}),
+            styleMapping,
+            familiarityByWord,
+          },
         );
 
         // Replace the text node with enhanced content
@@ -406,6 +628,8 @@ async function processTextElement(
         `Enhanced ${enhanced.convert_word.length} words (textNodes=${textNodes.length}, ms=${elapsedMs}, lang=${detected.language})`,
       );
     }
+
+    processedElementSignature.set(element, computeTextSignature(extractTextContent(element)));
   } catch (error) {
     log.error("Processing error", { message: getErrorMessage(error) });
   } finally {
@@ -459,6 +683,8 @@ function ensureTooltipInjected(): void {
     clientX: number,
     clientY: number,
   ) => {
+    // plan15: mobile/touch relies on click-to-open bottom sheet; do not show hover tooltip.
+    if (window.matchMedia("(pointer: coarse)").matches) return;
     if (!tooltipEl || isFullCardVisible()) return;
     const tooltipText = wordEl.dataset.tooltip?.trim();
     if (!tooltipText) {
@@ -477,7 +703,7 @@ function ensureTooltipInjected(): void {
       if (tooltipTarget === wordEl) {
         hideTooltip();
         const rect = wordEl.getBoundingClientRect();
-        const word = wordEl.dataset.original || wordEl.textContent || "";
+        const word = wordEl.dataset.lookup || wordEl.dataset.original || wordEl.textContent || "";
         showFullWordCard(word, rect, false);
       }
     }, HOVER_UPGRADE_DELAY_MS);
@@ -535,7 +761,7 @@ function ensureTooltipInjected(): void {
 
       hideTooltip();
       const rect = wordEl.getBoundingClientRect();
-      const word = wordEl.dataset.original || wordEl.textContent || "";
+      const word = wordEl.dataset.lookup || wordEl.dataset.original || wordEl.textContent || "";
       showFullWordCard(word, rect, true); // Pinned on click
     },
     true,
@@ -597,19 +823,69 @@ function ensureStylesInjected(): void {
   }
 
   styleEl.textContent = `
-    .lexipath-word {
-      background: rgba(59, 130, 246, 0.18) !important;
-      border-bottom: 2px dotted #3b82f6 !important;
-      border-radius: 3px !important;
-      padding: 0 2px !important;
-    }
+     .lexipath-word {
+       cursor: pointer;
+       position: relative;
+       border-radius: 3px;
+       padding: 0 2px;
+       border-bottom: 2px dotted var(--lx-word-color, #3b82f6);
+       background: rgba(59, 130, 246, 0.12);
+     }
+
+     @media (pointer: coarse) {
+       .lexipath-word {
+         border-bottom-width: 3px;
+         padding: 2px 0;
+       }
+     }
+
+     /* plan15: style key system (data-lx-style="<key>") */
+     [data-lx-style="border"] {
+       border-bottom-style: dotted;
+     }
+     [data-lx-style="dashedLine"] {
+       border-bottom-style: dashed;
+       background: rgba(99, 102, 241, 0.10);
+     }
+     [data-lx-style="weakened"] {
+       opacity: 0.85;
+       background: rgba(244, 63, 94, 0.10);
+     }
+     [data-lx-style="background"] {
+       background: rgba(34, 197, 94, 0.10);
+     }
+     [data-lx-style="textColor"] {
+       color: ${isDark ? "#e2e8f0" : "#0f172a"};
+       background: rgba(148, 163, 184, 0.12);
+     }
+
+     /* plan15: original/enhanced toggle */
+     .lexipath-word__original {
+       display: none;
+     }
+     .${SHOW_ORIGINAL_CLASS} .lexipath-word__original {
+       display: inline;
+     }
+     .${SHOW_ORIGINAL_CLASS} .lexipath-word__enhanced {
+       display: none;
+     }
+
+     .lexipath-paragraph-original {
+       display: none;
+     }
+     .${SHOW_ORIGINAL_CLASS} .lexipath-paragraph-original {
+       display: inline;
+     }
+     .${SHOW_ORIGINAL_CLASS} .lexipath-paragraph-enhanced {
+       display: none;
+     }
 
     .lexipath-processing {
       background: rgba(59, 130, 246, 0.08) !important;
       transition: background 150ms ease-out;
     }
 
-    #lexipath-tooltip {
+     #lexipath-tooltip {
       position: fixed;
       z-index: 2147483647;
       max-width: min(420px, calc(100vw - 24px));
@@ -623,9 +899,11 @@ function ensureStylesInjected(): void {
       border: ${tooltipBorder};
       pointer-events: none;
       white-space: pre-wrap;
-      backdrop-filter: blur(6px);
-    }
-  `;
+       backdrop-filter: blur(6px);
+     }
+
+     ${currentSettings?.webCustomCss?.trim() ? currentSettings.webCustomCss.trim() : ""}
+   `;
 
   if (!tooltipInjected) {
     ensureTooltipInjected();
@@ -660,6 +938,50 @@ function ensureIntersectionObserver(): void {
       threshold: 0.01,
     },
   );
+}
+
+function ensureExposureObserver(): void {
+  if (exposureObserver) return;
+  if (typeof IntersectionObserver === "undefined") return;
+
+  exposureObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const el = entry.target;
+        if (!(el instanceof Element)) continue;
+
+        const existingTimer = exposureTimers.get(el);
+        if (!entry.isIntersecting) {
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+            exposureTimers.delete(el);
+          }
+          continue;
+        }
+
+        if (existingTimer) continue;
+
+        const timer = window.setTimeout(() => {
+          exposureTimers.delete(el);
+          const words = exposureTargets.get(el) ?? [];
+          const toSend = words.filter((w) => !exposureSentWords.has(w));
+          if (toSend.length === 0) return;
+
+          for (const w of toSend) exposureSentWords.add(w);
+          void sendMessage("RECORD_EXPOSURE_VALID", { words: toSend });
+        }, 2000);
+        exposureTimers.set(el, timer);
+      }
+    },
+    { root: null, rootMargin: "0px", threshold: 0.35 },
+  );
+}
+
+function registerExposure(element: Element, normalizedWords: string[]): void {
+  if (normalizedWords.length === 0) return;
+  ensureExposureObserver();
+  exposureTargets.set(element, normalizedWords);
+  exposureObserver?.observe(element);
 }
 
 function schedulePumpQueue(): void {
@@ -852,6 +1174,19 @@ function resetPageProcessingState(): void {
     intersectionObserver.disconnect();
     intersectionObserver = null;
   }
+
+  if (exposureObserver) {
+    exposureObserver.disconnect();
+    exposureObserver = null;
+  }
+  for (const timer of exposureTimers.values()) {
+    clearTimeout(timer);
+  }
+  exposureTimers.clear();
+
+  exposureSentWords.clear();
+  pageForgottenWords.clear();
+  floatingButtonController?.updatePageContext?.({ forgottenWords: [] });
 }
 
 /**
@@ -876,6 +1211,61 @@ async function initPageProcessing(): Promise<void> {
 
   // Set up observer for dynamic content
   setupMutationObserver();
+}
+
+let manualEnhanceInFlight = false;
+
+async function runManualPageProcessingOnce(): Promise<void> {
+  if (manualEnhanceInFlight) return;
+  manualEnhanceInFlight = true;
+  try {
+    resetPageProcessingState();
+    log.info("Starting manual page processing");
+
+    const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(
+      shouldProcessElement,
+    );
+    elements.sort((a, b) => {
+      const ra = (a as HTMLElement).getBoundingClientRect?.();
+      const rb = (b as HTMLElement).getBoundingClientRect?.();
+      return (ra?.top ?? 0) - (rb?.top ?? 0);
+    });
+    log.info(`Found ${elements.length} text elements to process (manual)`);
+
+    queueElements(elements);
+  } finally {
+    manualEnhanceInFlight = false;
+  }
+}
+
+async function requestWebEnhanceOnce(): Promise<void> {
+  if (!currentSettings?.enabled) {
+    log.info("Manual enhance requested, but extension is disabled");
+    return;
+  }
+
+  const url = window.location.href;
+  const platform = detectPlatform(url);
+  if (platform !== "unknown") {
+    log.info("Manual enhance requested on video platform; ignoring");
+    return;
+  }
+
+  if (!currentSettings) return;
+  if (
+    !isKeywordProviderConfigured(currentSettings) ||
+    !isTranslationProviderConfigured(currentSettings)
+  ) {
+    log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
+    return;
+  }
+
+  if (currentSettings.autoEnhance) {
+    await initPageProcessing();
+    return;
+  }
+
+  await runManualPageProcessingOnce();
 }
 
 /**
@@ -917,6 +1307,15 @@ async function initForUrl(url: string, token: number): Promise<void> {
 
   const platform = detectPlatform(url);
   if (platform !== "unknown") {
+    if (!currentSettings.autoEnhance) {
+      log.info("Auto enhancement disabled; skipping subtitle processing");
+      return;
+    }
+    const scenes = currentSettings.scenesEnabled;
+    if (scenes && scenes.videoNative === false && scenes.videoTarget === false) {
+      log.info("Video scenes disabled; skipping subtitle processing");
+      return;
+    }
     if (!isTranslationProviderConfigured(currentSettings)) {
       log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
       return;
@@ -931,6 +1330,17 @@ async function initForUrl(url: string, token: number): Promise<void> {
     !isTranslationProviderConfigured(currentSettings)
   ) {
     log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
+    return;
+  }
+
+  if (!currentSettings.autoEnhance) {
+    log.info("Auto enhancement disabled; skipping page processing");
+    return;
+  }
+
+  const scenes = currentSettings.scenesEnabled;
+  if (scenes && scenes.webNative === false && scenes.webTarget === false) {
+    log.info("Web scenes disabled; skipping page processing");
     return;
   }
 
@@ -966,8 +1376,12 @@ async function init(): Promise<void> {
   await initForUrl(lastKnownUrl, token);
   startUrlWatcher();
 
+  applyWebShowOriginal(currentSettings);
+
   if (!floatingButtonController) {
-    floatingButtonController = new FloatingButtonController(currentSettings);
+    floatingButtonController = new FloatingButtonController(currentSettings, {
+      onRunWebEnhanceOnce: requestWebEnhanceOnce,
+    });
     floatingButtonController.mount();
   }
 
@@ -976,16 +1390,34 @@ async function init(): Promise<void> {
     const nextSettings = changes?.settings?.newValue;
     if (!nextSettings) return;
     const prevTheme = currentSettings?.theme;
+    const prevFloating = currentSettings?.floatingButtonEnabled ?? true;
     currentSettings = nextSettings;
 
     englishCorrectionController?.setSettings(nextSettings);
     floatingButtonController?.updateSettings(nextSettings);
+    applyWebShowOriginal(nextSettings);
+
+    const nextFloating = nextSettings?.floatingButtonEnabled ?? true;
+    if (!prevFloating && nextFloating) {
+      try {
+        sessionStorage.removeItem(FLOATING_HIDE_ONCE_KEY);
+      } catch (error: unknown) {
+        void error;
+      }
+    }
 
     if (prevTheme !== nextSettings?.theme) {
       const resolvedTheme = getResolvedTheme();
       if (webOverlay) webOverlay.setTheme(resolvedTheme);
       if (subtitleController) subtitleController.setTheme(nextSettings.theme);
       ensureStylesInjected();
+    }
+  });
+
+  browser.runtime?.onMessage?.addListener?.((message: any) => {
+    if (message?.type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
+      toggleTabShowOriginal();
+      return;
     }
   });
 }
