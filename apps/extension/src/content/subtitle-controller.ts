@@ -520,6 +520,7 @@ export class SubtitleController {
       mode: effectiveMode,
       lines,
       interactiveWords,
+      showKeywordTranslations: effectiveMode === 'enhanced',
       ...(keywordTranslations ? { keywordTranslations } : {}),
     };
     this.overlay.display(displayOptions);

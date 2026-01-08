@@ -23,6 +23,7 @@ export interface SubtitleDisplayOptions {
   lines: SubtitleLine[];
   interactiveWords?: Set<string>;
   keywordTranslations?: Record<string, string>;
+  showKeywordTranslations?: boolean;
   modeLabels?: { enhanced?: string; bilingual?: string; bilingualTemp?: string };
 }
 
@@ -355,7 +356,13 @@ export class SubtitleOverlay {
     for (const line of lines) {
       const div = document.createElement('div');
       div.className = line.isEnhanced ? 'line-enhanced' : 'line-original';
-      this.renderLineWithWordSpans(div, line.text, options.interactiveWords, options.keywordTranslations);
+      this.renderLineWithWordSpans(
+        div,
+        line.text,
+        options.interactiveWords,
+        options.keywordTranslations,
+        options.showKeywordTranslations ?? false
+      );
       this.subtitleLinesElement.appendChild(div);
     }
     this.subtitleElement.classList.add('visible');
@@ -685,7 +692,8 @@ export class SubtitleOverlay {
     container: HTMLElement,
     text: string,
     interactiveWords?: Set<string>,
-    keywordTranslations?: Record<string, string>
+    keywordTranslations?: Record<string, string>,
+    showKeywordTranslations: boolean = false
   ): void {
     if (!interactiveWords) {
       this.renderAllWords(container, text);
@@ -727,13 +735,13 @@ export class SubtitleOverlay {
       wordEl.textContent = wordText;
       span.appendChild(wordEl);
 
-      const translationRaw = keywordTranslations?.[match.term];
+      const translationRaw = showKeywordTranslations ? keywordTranslations?.[match.term] : undefined;
       const translation = typeof translationRaw === 'string' ? translationRaw.trim() : '';
       if (translation && translation.toLowerCase() !== match.term.toLowerCase()) {
-        const sub = document.createElement('sub');
-        sub.className = 'lexipath-subtitle-word__translation';
-        sub.textContent = translation;
-        span.appendChild(sub);
+        const sup = document.createElement('sup');
+        sup.className = 'lexipath-subtitle-word__translation';
+        sup.textContent = translation;
+        span.appendChild(sup);
       }
 
       span.dataset.lexipathWord = match.term;
@@ -983,8 +991,10 @@ export class SubtitleOverlay {
 
         .lexipath-subtitle-word {
           display: inline-flex;
-          align-items: baseline;
-          gap: 3px;
+          flex-direction: column;
+          align-items: center;
+          gap: 1px;
+          vertical-align: baseline;
           border-bottom: 2px dotted rgba(59, 130, 246, 0.9);
           cursor: pointer;
           padding: 0 1px;
@@ -996,9 +1006,12 @@ export class SubtitleOverlay {
         }
 
         .lexipath-subtitle-word__translation {
+          order: -1;
+          pointer-events: none;
           font-size: 0.62em;
           line-height: 1;
           opacity: 0.85;
+          white-space: nowrap;
           color: ${isDark ? 'rgba(226, 232, 240, 0.9)' : '#334155'};
         }
 
