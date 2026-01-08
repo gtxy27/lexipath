@@ -79,6 +79,8 @@ describe('storage settings migration', () => {
     expect(channels[0]?.['channelId']).toBe(1);
 
     expect(browserMock.storage.local.set).toHaveBeenCalledTimes(1);
-    expect(browserMock.storage.local.set).toHaveBeenCalledWith({ settings: { theme: 'system' } });
+    expect(browserMock.storage.local.set).toHaveBeenCalledWith({
+      settings: expect.objectContaining({ theme: 'system' }),
+    });
   });
 });

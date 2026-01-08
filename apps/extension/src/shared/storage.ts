@@ -14,17 +14,21 @@ const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
 const log = createLogger('shared:storage');
 
 let cachedSettings: Settings | null = null;
-let mirroredTheme: Settings['theme'] | null = null;
+let mirroredSettingsJson: string | null = null;
 
-function buildLocalSettingsMirror(settings: Settings): Pick<Settings, 'theme'> {
-  return { theme: settings.theme };
+function buildLocalSettingsMirror(settings: Settings): Settings {
+  // Content scripts rely on receiving a full `Settings` snapshot via storage.onChanged.
+  // This stays in extension storage (not readable by web pages) and avoids an extra GET_SETTINGS roundtrip.
+  return settings;
 }
 
 async function ensureLocalSettingsMirror(settings: Settings): Promise<void> {
-  if (mirroredTheme === settings.theme) return;
+  const mirror = buildLocalSettingsMirror(settings);
+  const json = JSON.stringify(mirror);
+  if (mirroredSettingsJson === json) return;
   try {
-    await browser.storage.local.set({ [SETTINGS_KEY]: buildLocalSettingsMirror(settings) });
-    mirroredTheme = settings.theme;
+    await browser.storage.local.set({ [SETTINGS_KEY]: mirror });
+    mirroredSettingsJson = json;
   } catch (error: unknown) {
     log.warn('Failed to update local settings mirror; continuing without mirror', { message: getErrorMessage(error) });
   }
