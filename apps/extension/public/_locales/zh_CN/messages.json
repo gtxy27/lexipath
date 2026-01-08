@@ -1276,12 +1276,60 @@
     "description": "步骤 1 描述"
   },
   "onboardingStep2Title": {
-    "message": "自定义您的学习场景",
+    "message": "选择阅读模式",
     "description": "步骤 2 标题"
   },
   "onboardingStep2Desc": {
-    "message": "选择您最常使用的场景和偏好设置",
+    "message": "决定阅读时需要多少辅助",
     "description": "步骤 2 描述"
+  },
+  "onboardingPercentComplete": {
+    "message": "已完成 $1%",
+    "description": "引导页进度百分比"
+  },
+  "onboardingEnhanceModeLabel": {
+    "message": "默认阅读模式",
+    "description": "引导页增强模式标签"
+  },
+  "onboardingEnhanceModeBreezeTitle": {
+    "message": "轻读",
+    "description": "引导页模式标题（light）"
+  },
+  "onboardingEnhanceModeBreezeDesc": {
+    "message": "正文少量提示，尽量不打断阅读",
+    "description": "引导页模式描述（light）"
+  },
+  "onboardingEnhanceModeGuidedTitle": {
+    "message": "进阶",
+    "description": "引导页模式标题（i+1）"
+  },
+  "onboardingEnhanceModeGuidedDesc": {
+    "message": "标注关键词，释义按需查看",
+    "description": "引导页模式描述（i+1）"
+  },
+  "onboardingEnhanceModeImmersionTitle": {
+    "message": "沉浸",
+    "description": "引导页模式标题（full）"
+  },
+  "onboardingEnhanceModeImmersionDesc": {
+    "message": "整段改写为目标语（带安全降级）",
+    "description": "引导页模式描述（full）"
+  },
+  "onboardingSummaryEnhanceMode": {
+    "message": "阅读模式",
+    "description": "引导页总结 - 增强模式"
+  },
+  "onboardingEnhanceModeSummary_light": {
+    "message": "轻读",
+    "description": "引导页总结值（light）"
+  },
+  "onboardingEnhanceModeSummary_i_plus_1": {
+    "message": "进阶",
+    "description": "引导页总结值（i+1）"
+  },
+  "onboardingEnhanceModeSummary_full": {
+    "message": "沉浸",
+    "description": "引导页总结值（full）"
   },
   "onboardingStep3Title": {
     "message": "准备就绪！",

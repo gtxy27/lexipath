@@ -1260,12 +1260,60 @@
     "description": "Step 1 description"
   },
   "onboardingStep2Title": {
-    "message": "Customize Your Learning Scenarios",
+    "message": "Pick Your Reading Style",
     "description": "Step 2 title"
   },
   "onboardingStep2Desc": {
-    "message": "Choose the scenarios you use most frequently",
+    "message": "Choose how much help you want while reading",
     "description": "Step 2 description"
+  },
+  "onboardingPercentComplete": {
+    "message": "$1% Complete",
+    "description": "Onboarding progress percent label"
+  },
+  "onboardingEnhanceModeLabel": {
+    "message": "Default Reading Style",
+    "description": "Enhance mode label in onboarding"
+  },
+  "onboardingEnhanceModeBreezeTitle": {
+    "message": "Breeze",
+    "description": "Onboarding mode title (light)"
+  },
+  "onboardingEnhanceModeBreezeDesc": {
+    "message": "Gentle hints inline; minimal interruption",
+    "description": "Onboarding mode description (light)"
+  },
+  "onboardingEnhanceModeGuidedTitle": {
+    "message": "Guided",
+    "description": "Onboarding mode title (i+1)"
+  },
+  "onboardingEnhanceModeGuidedDesc": {
+    "message": "Highlight key terms; meanings on-demand",
+    "description": "Onboarding mode description (i+1)"
+  },
+  "onboardingEnhanceModeImmersionTitle": {
+    "message": "Immersion",
+    "description": "Onboarding mode title (full)"
+  },
+  "onboardingEnhanceModeImmersionDesc": {
+    "message": "Rewrite paragraphs into your target language",
+    "description": "Onboarding mode description (full)"
+  },
+  "onboardingSummaryEnhanceMode": {
+    "message": "Reading Style",
+    "description": "Onboarding summary label for enhance mode"
+  },
+  "onboardingEnhanceModeSummary_light": {
+    "message": "Breeze",
+    "description": "Onboarding summary value for light mode"
+  },
+  "onboardingEnhanceModeSummary_i_plus_1": {
+    "message": "Guided",
+    "description": "Onboarding summary value for i+1 mode"
+  },
+  "onboardingEnhanceModeSummary_full": {
+    "message": "Immersion",
+    "description": "Onboarding summary value for full mode"
   },
   "onboardingStep3Title": {
     "message": "All Set!",

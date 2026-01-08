@@ -180,11 +180,12 @@ describe('Onboarding', () => {
     });
   });
 
-  describe('Step 2: Scene Selection', () => {
+  describe('Step 2: Reading Style', () => {
     it('navigates to step 2 when next is clicked', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       const nextButton = screen.getByText('onboardingNext');
       await user.click(nextButton);
 
@@ -193,68 +194,59 @@ describe('Onboarding', () => {
       expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
     });
 
-    it('renders all scene options', async () => {
+    it('renders all reading style options', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
-      expect(screen.getByText('onboardingSceneWebNativeTitle')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSceneWebTargetTitle')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSceneVideoNativeTitle')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSceneVideoTargetTitle')).toBeInTheDocument();
+      expect(screen.getByText('onboardingEnhanceModeBreezeTitle')).toBeInTheDocument();
+      expect(screen.getByText('onboardingEnhanceModeGuidedTitle')).toBeInTheDocument();
+      expect(screen.getByText('onboardingEnhanceModeImmersionTitle')).toBeInTheDocument();
     });
 
-    it('shows scene descriptions', async () => {
+    it('shows style descriptions', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
-      expect(screen.getByText('onboardingSceneWebNativeDesc')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSceneWebTargetDesc')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSceneVideoNativeDesc')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSceneVideoTargetDesc')).toBeInTheDocument();
+      expect(screen.getByText('onboardingEnhanceModeBreezeDesc')).toBeInTheDocument();
+      expect(screen.getByText('onboardingEnhanceModeGuidedDesc')).toBeInTheDocument();
+      expect(screen.getByText('onboardingEnhanceModeImmersionDesc')).toBeInTheDocument();
     });
 
-    it('all scenes are enabled by default', async () => {
+    it('defaults to Guided style', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
+      await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
-      const switches = [
-        screen.getByLabelText('onboardingSceneWebNativeTitle'),
-        screen.getByLabelText('onboardingSceneWebTargetTitle'),
-        screen.getByLabelText('onboardingSceneVideoNativeTitle'),
-        screen.getByLabelText('onboardingSceneVideoTargetTitle'),
-      ];
-      for (const sw of switches) {
-        expect(sw).toBeChecked();
-      }
+      expect(screen.getByTestId('summary-enhance-mode')).toHaveTextContent('onboardingEnhanceModeSummary_i_plus_1');
     });
 
-    it('allows toggling scene selections', async () => {
+    it('allows selecting a different style', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
-      const webNativeSwitch = screen.getByLabelText('onboardingSceneWebNativeTitle');
+      await user.click(screen.getByText('onboardingEnhanceModeImmersionTitle'));
+      await user.click(screen.getByText('onboardingNext'));
 
-      expect(webNativeSwitch).toBeChecked();
-
-      await user.click(webNativeSwitch);
-      expect(webNativeSwitch).not.toBeChecked();
-
-      await user.click(webNativeSwitch);
-      expect(webNativeSwitch).toBeChecked();
+      expect(screen.getByTestId('summary-enhance-mode')).toHaveTextContent('onboardingEnhanceModeSummary_full');
     });
 
     it('shows previous button on step 2', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
       const prevButton = screen.getByText('onboardingPrevious');
@@ -268,6 +260,7 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -281,13 +274,16 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
 
       // Go to step 3
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
       expect(screen.getByText('onboardingSummaryTargetLanguage')).toBeInTheDocument();
       expect(screen.getByText('onboardingSummaryProficiency')).toBeInTheDocument();
+      expect(screen.getByText('onboardingSummaryEnhanceMode')).toBeInTheDocument();
       expect(screen.getByTestId('summary-target-lang')).toHaveTextContent('languageTarget_en');
       expect(screen.getByTestId('summary-proficiency')).toHaveTextContent('proficiency_B1');
+      expect(screen.getByTestId('summary-enhance-mode')).toHaveTextContent('onboardingEnhanceModeSummary_i_plus_1');
     });
 
     it('shows correct summary for Japanese selection', async () => {
@@ -296,6 +292,7 @@ describe('Onboarding', () => {
 
       // Select Japanese
       await user.click(screen.getByText('languageTarget_ja'));
+      await user.click(screen.getByText('proficiency_N3'));
 
       // Go to step 3
       await user.click(screen.getByText('onboardingNext'));
@@ -309,6 +306,7 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -319,6 +317,7 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -339,6 +338,7 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       expect(screen.getByText('onboardingStep2Title')).toBeInTheDocument();
 
@@ -351,6 +351,7 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       expect(screen.getByText('onboardingStep3Title')).toBeInTheDocument();
@@ -370,10 +371,8 @@ describe('Onboarding', () => {
       // Go to step 2
       await user.click(screen.getByText('onboardingNext'));
 
-      // Disable a scene
-      const videoNativeSwitch = screen.getByLabelText('onboardingSceneVideoNativeTitle');
-      await user.click(videoNativeSwitch);
-      expect(videoNativeSwitch).not.toBeChecked();
+      // Pick a different reading style
+      await user.click(screen.getByText('onboardingEnhanceModeImmersionTitle'));
 
       // Go back to step 1
       await user.click(screen.getByText('onboardingPrevious'));
@@ -387,11 +386,9 @@ describe('Onboarding', () => {
       // Go forward to step 2 again
       await user.click(screen.getByText('onboardingNext'));
 
-      // Verify scene selection is preserved
-      const videoNativeSwitchAfter = screen.getByRole('switch', {
-        name: 'onboardingSceneVideoNativeTitle',
-      });
-      expect(videoNativeSwitchAfter).toHaveAttribute('data-state', 'unchecked');
+      // Verify style selection is preserved via summary
+      await user.click(screen.getByText('onboardingNext'));
+      expect(screen.getByTestId('summary-enhance-mode')).toHaveTextContent('onboardingEnhanceModeSummary_full');
     });
   });
 
@@ -400,6 +397,7 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
@@ -410,13 +408,8 @@ describe('Onboarding', () => {
           expect.objectContaining({
             targetLanguage: 'en',
             proficiencyLevel: 'B1',
+            webEnhanceMode: 'i_plus_1',
             hasCompletedOnboarding: true,
-            scenesEnabled: {
-              webNative: true,
-              webTarget: true,
-              videoNative: true,
-              videoTarget: true,
-            },
           }),
         );
       });
@@ -443,13 +436,8 @@ describe('Onboarding', () => {
           expect.objectContaining({
             targetLanguage: 'ja',
             proficiencyLevel: 'B2', // N2 maps to B2
+            webEnhanceMode: 'i_plus_1',
             hasCompletedOnboarding: true,
-            scenesEnabled: {
-              webNative: true,
-              webTarget: true,
-              videoNative: true,
-              videoTarget: true,
-            },
           }),
         );
       });
@@ -476,13 +464,8 @@ describe('Onboarding', () => {
           expect.objectContaining({
             targetLanguage: 'ko',
             proficiencyLevel: 'C1', // TOPIK 5 maps to C1
+            webEnhanceMode: 'i_plus_1',
             hasCompletedOnboarding: true,
-            scenesEnabled: {
-              webNative: true,
-              webTarget: true,
-              videoNative: true,
-              videoTarget: true,
-            },
           }),
         );
       });
@@ -500,6 +483,7 @@ describe('Onboarding', () => {
 
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -529,6 +513,7 @@ describe('Onboarding', () => {
 
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
@@ -549,6 +534,7 @@ describe('Onboarding', () => {
 
       render(<Onboarding />);
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
@@ -572,6 +558,7 @@ describe('Onboarding', () => {
 
       expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
 
+      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
 

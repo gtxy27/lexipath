@@ -10,6 +10,7 @@ import {
   type TOPIKLevel,
   type SupportedLanguage,
   type Theme,
+  type WebEnhanceMode,
 } from "@lexipath/core";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
@@ -22,17 +23,16 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
 import {
   Check,
   ChevronRight,
   ChevronLeft,
   Loader2,
-  Globe,
-  Video,
   Sparkles,
-  Zap,
+  Feather,
+  TrendingUp,
+  Waves,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
@@ -46,12 +46,7 @@ type ProficiencyLevel = CEFRLevel | JLPTLevel | TOPIKLevel;
 type OnboardingFormData = {
   targetLanguage: SupportedLanguage;
   proficiencyLevel: ProficiencyLevel;
-  scenesEnabled: {
-    webNative: boolean;
-    webTarget: boolean;
-    videoNative: boolean;
-    videoTarget: boolean;
-  };
+  webEnhanceMode: WebEnhanceMode;
 };
 
 function t(key: string, substitutions?: string | string[]): string {
@@ -122,13 +117,9 @@ export function Onboarding(): React.ReactElement {
   const [formData, setFormData] = useState<OnboardingFormData>({
     targetLanguage: "en",
     proficiencyLevel: "B1",
-    scenesEnabled: {
-      webNative: true,
-      webTarget: true,
-      videoNative: true,
-      videoTarget: true,
-    },
+    webEnhanceMode: "i_plus_1",
   });
+  const [hasConfirmedProficiency, setHasConfirmedProficiency] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useApplyTheme(theme);
@@ -181,6 +172,10 @@ export function Onboarding(): React.ReactElement {
       newProficiencyLevel = getDefaultProficiency(newLanguage);
     }
 
+    if (newProficiencyLevel !== currentLevel) {
+      setHasConfirmedProficiency(false);
+    }
+
     setFormData({
       ...formData,
       targetLanguage: newLanguage,
@@ -210,7 +205,7 @@ export function Onboarding(): React.ReactElement {
       await sendMessage("SET_SETTINGS", {
         targetLanguage: formData.targetLanguage,
         proficiencyLevel: cefrLevel,
-        scenesEnabled: formData.scenesEnabled,
+        webEnhanceMode: formData.webEnhanceMode,
         hasCompletedOnboarding: true,
       });
 
@@ -280,7 +275,7 @@ export function Onboarding(): React.ReactElement {
             </div>
             <div className="flex justify-between mt-3 px-1">
                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">{t("onboardingStepProgress", String(currentStep))}</span>
-               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{Math.round(progress)}% Complete</span>
+               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t("onboardingPercentComplete", String(Math.round(progress)))}</span>
             </div>
           </div>
 
@@ -354,10 +349,13 @@ export function Onboarding(): React.ReactElement {
                                   : "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400"
                               )}
                               onClick={() =>
-                                setFormData({
-                                  ...formData,
-                                  proficiencyLevel: option.value,
-                                })
+                                {
+                                  setHasConfirmedProficiency(true);
+                                  setFormData({
+                                    ...formData,
+                                    proficiencyLevel: option.value,
+                                  });
+                                }
                               }
                             >
                               <span className="font-black text-xs">
@@ -382,69 +380,70 @@ export function Onboarding(): React.ReactElement {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                        {t("onboardingEnhanceModeLabel")}
+                      </Label>
+
                       {[
                         {
-                          key: "webNative",
-                          icon: Globe,
-                          title: t("onboardingSceneWebNativeTitle"),
-                          desc: t("onboardingSceneWebNativeDesc"),
+                          value: "light" as const,
+                          icon: Feather,
+                          title: t("onboardingEnhanceModeBreezeTitle"),
+                          desc: t("onboardingEnhanceModeBreezeDesc"),
                         },
                         {
-                          key: "webTarget",
-                          icon: Sparkles,
-                          title: t("onboardingSceneWebTargetTitle"),
-                          desc: t("onboardingSceneWebTargetDesc"),
+                          value: "i_plus_1" as const,
+                          icon: TrendingUp,
+                          title: t("onboardingEnhanceModeGuidedTitle"),
+                          desc: t("onboardingEnhanceModeGuidedDesc"),
                         },
                         {
-                          key: "videoNative",
-                          icon: Video,
-                          title: t("onboardingSceneVideoNativeTitle"),
-                          desc: t("onboardingSceneVideoNativeDesc"),
+                          value: "full" as const,
+                          icon: Waves,
+                          title: t("onboardingEnhanceModeImmersionTitle"),
+                          desc: t("onboardingEnhanceModeImmersionDesc"),
                         },
-                        {
-                          key: "videoTarget",
-                          icon: Zap,
-                          title: t("onboardingSceneVideoTargetTitle"),
-                          desc: t("onboardingSceneVideoTargetDesc"),
-                        },
-                      ].map((scene) => (
-                        <div key={scene.key} className={cn(
+                      ].map((mode) => (
+                        <div
+                          key={mode.value}
+                          className={cn(
                           "relative group rounded-2xl border transition-all duration-300 p-5 cursor-pointer select-none",
-                          formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]
+                          formData.webEnhanceMode === mode.value
                             ? "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500/30"
                             : "bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10"
-                        )}
-                        onClick={() => setFormData({
-                          ...formData,
-                          scenesEnabled: {
-                            ...formData.scenesEnabled,
-                            [scene.key]: !formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled],
-                          },
-                        })}>
+                          )}
+                          onClick={() => setFormData({ ...formData, webEnhanceMode: mode.value })}
+                          role="button"
+                          aria-label={mode.title}
+                        >
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-start gap-4">
                               <div className={cn(
                                 "p-3 rounded-xl transition-colors",
-                                formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]
+                                formData.webEnhanceMode === mode.value
                                   ? "bg-indigo-500 text-white"
                                   : "bg-white dark:bg-[#0d0e14] text-gray-300 dark:text-gray-600"
                               )}>
-                                <scene.icon className="h-6 w-6" />
+                                <mode.icon className="h-6 w-6" />
                               </div>
                               <div className="space-y-1">
                                 <h3 className="font-bold text-gray-900 dark:text-white tracking-tight">
-                                  {scene.title}
+                                  {mode.title}
                                 </h3>
-                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider leading-tight">{scene.desc}</p>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider leading-tight">{mode.desc}</p>
                               </div>
                             </div>
-                            <Switch
-                              checked={formData.scenesEnabled[scene.key as keyof typeof formData.scenesEnabled]}
-                              className="data-[state=checked]:bg-indigo-600"
-                              aria-label={scene.title}
-                              onCheckedChange={() => {}} // Controlled by card click
-                            />
+                            <div
+                              className={cn(
+                                "h-6 w-6 rounded-full border flex items-center justify-center transition-colors",
+                                formData.webEnhanceMode === mode.value
+                                  ? "border-indigo-500 bg-indigo-500 text-white"
+                                  : "border-gray-200 dark:border-white/10 text-transparent"
+                              )}
+                            >
+                              <Check className="h-4 w-4" />
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -466,7 +465,7 @@ export function Onboarding(): React.ReactElement {
                     <div className="relative group">
                        <div className="absolute -inset-1 rounded-[2rem] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur opacity-75 group-hover:opacity-100 transition duration-1000" />
                        <Card className="relative bg-gray-50/50 dark:bg-[#0d0e14]/40 border-gray-100 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-inner">
-                          <CardContent className="p-10 grid grid-cols-2 gap-8 text-center relative">
+                          <CardContent className="p-10 grid grid-cols-3 gap-6 text-center relative">
                             <div className="space-y-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/70">
                                 {t("onboardingSummaryTargetLanguage")}
@@ -475,13 +474,22 @@ export function Onboarding(): React.ReactElement {
                                 {t(`languageTarget_${formData.targetLanguage}`)}
                               </p>
                             </div>
-                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-gray-200 dark:bg-white/5" />
+                            <div className="absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-gray-200 dark:bg-white/5" />
                             <div className="space-y-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500 dark:text-purple-400/70">
                                 {t("onboardingSummaryProficiency")}
                               </p>
                               <p data-testid="summary-proficiency" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {t(`proficiency_${formData.proficiencyLevel}`).replace("Proficiency ", "")}
+                              </p>
+                            </div>
+                            <div className="absolute left-2/3 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-gray-200 dark:bg-white/5" />
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400/70">
+                                {t("onboardingSummaryEnhanceMode")}
+                              </p>
+                              <p data-testid="summary-enhance-mode" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                {t(`onboardingEnhanceModeSummary_${formData.webEnhanceMode}`)}
                               </p>
                             </div>
                           </CardContent>
@@ -513,6 +521,7 @@ export function Onboarding(): React.ReactElement {
             {currentStep < 3 ? (
               <Button
                 onClick={handleNext}
+                disabled={currentStep === 1 && !hasConfirmedProficiency}
                 className="gap-2 h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-600/10 dark:shadow-indigo-600/20 transition-all font-bold group"
               >
                 {t("onboardingNext")}
