@@ -87,7 +87,7 @@ export async function getOrRunCachedTask<T>(
   }
 ): Promise<T> {
   const cached = cache.get(key);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   return dedupeInFlight(inFlight, key, async () => {
     const { value, ok } = await options.run();
@@ -95,4 +95,3 @@ export async function getOrRunCachedTask<T>(
     return value;
   });
 }
-
