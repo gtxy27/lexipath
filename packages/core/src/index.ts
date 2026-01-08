@@ -14,4 +14,4 @@ export * from './strategy';
 export * from './proficiency';
 export * from './prompting';
 // export * from './validators';
-// export * from './cache-key';
+export * from './cache-key';
