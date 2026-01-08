@@ -85,6 +85,7 @@ export class SubtitleOverlay {
   private fontSizeUpdateTimer: number | null = null;
   private lastMainFontSizePx: number | null = null;
   private lastOriginalFontSizePx: number | null = null;
+  private keywordTranslationLayoutRaf: number | null = null;
 
   constructor(
     platform: 'youtube' | 'bilibili',
@@ -365,6 +366,10 @@ export class SubtitleOverlay {
       );
       this.subtitleLinesElement.appendChild(div);
     }
+
+    if (options.showKeywordTranslations) {
+      this.scheduleKeywordTranslationPlacement();
+    }
     this.subtitleElement.classList.add('visible');
   }
 
@@ -376,6 +381,46 @@ export class SubtitleOverlay {
     this.subtitleLinesElement.textContent = '';
     this.subtitleElement.classList.remove('visible');
     this.hideWordCard();
+    if (this.keywordTranslationLayoutRaf !== null) {
+      window.cancelAnimationFrame(this.keywordTranslationLayoutRaf);
+      this.keywordTranslationLayoutRaf = null;
+    }
+  }
+
+  private scheduleKeywordTranslationPlacement(): void {
+    if (!this.subtitleLinesElement) return;
+    if (this.keywordTranslationLayoutRaf !== null) {
+      window.cancelAnimationFrame(this.keywordTranslationLayoutRaf);
+    }
+    this.keywordTranslationLayoutRaf = window.requestAnimationFrame(() => {
+      this.keywordTranslationLayoutRaf = null;
+      this.updateKeywordTranslationPlacement();
+    });
+  }
+
+  private updateKeywordTranslationPlacement(): void {
+    if (!this.subtitleLinesElement) return;
+
+    const lineEls = Array.from(this.subtitleLinesElement.children).filter(
+      (el): el is HTMLElement => el instanceof HTMLElement
+    );
+
+    for (const lineEl of lineEls) {
+      const lineTop = lineEl.getBoundingClientRect().top;
+      const wordEls = Array.from(lineEl.querySelectorAll<HTMLElement>('.lexipath-subtitle-word'));
+      for (const wordEl of wordEls) {
+        const hasTranslation = Boolean(wordEl.querySelector('.lexipath-subtitle-word__translation'));
+        if (!hasTranslation) {
+          wordEl.classList.remove('lexipath-subtitle-word--below');
+          continue;
+        }
+
+        const rect = wordEl.getBoundingClientRect();
+        // If the word wrapped onto a lower visual row, place the gloss below to avoid colliding with the row above.
+        const isWrappedRow = rect.top - lineTop > 6;
+        wordEl.classList.toggle('lexipath-subtitle-word--below', isWrappedRow);
+      }
+    }
   }
 
   /**
@@ -990,11 +1035,8 @@ export class SubtitleOverlay {
         }
 
         .lexipath-subtitle-word {
-          display: inline-flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1px;
-          vertical-align: baseline;
+          position: relative;
+          display: inline-block;
           border-bottom: 2px dotted rgba(59, 130, 246, 0.9);
           cursor: pointer;
           padding: 0 1px;
@@ -1006,13 +1048,21 @@ export class SubtitleOverlay {
         }
 
         .lexipath-subtitle-word__translation {
-          order: -1;
           pointer-events: none;
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          top: -0.95em;
           font-size: 0.62em;
           line-height: 1;
           opacity: 0.85;
           white-space: nowrap;
           color: ${isDark ? 'rgba(226, 232, 240, 0.9)' : '#334155'};
+        }
+
+        .lexipath-subtitle-word--below .lexipath-subtitle-word__translation {
+          top: auto;
+          bottom: -0.95em;
         }
 
         .lexipath-wordcard {
