@@ -61,6 +61,8 @@ export const MessageTypeSchema = z.enum([
   'ENHANCE_SUBTITLE',
   'ENGLISH_CORRECTION',
   'EXPLAIN_WORD',
+  'BATCH_GET_WORD_FAMILIARITY',
+  'RECORD_EXPOSURE_VALID',
   'CHAT',
   'GET_CHAT_SESSIONS',
   'GET_CHAT_MESSAGES',
@@ -288,6 +290,52 @@ export const EnglishCorrectionConfigSchema = z
   });
 export type EnglishCorrectionConfig = z.infer<typeof EnglishCorrectionConfigSchema>;
 
+export const WebEnhanceModeSchema = z.enum(['light', 'i_plus_1', 'full']);
+export type WebEnhanceMode = z.infer<typeof WebEnhanceModeSchema>;
+
+// =============================================================================
+// Web UI Display / Style System (plan15)
+// =============================================================================
+
+export const WebStyleKeySchema = z.enum([
+  'border',
+  'dashedLine',
+  'weakened',
+  'background',
+  'textColor',
+]);
+export type WebStyleKey = z.infer<typeof WebStyleKeySchema>;
+
+export const WebStyleMappingSchema = z
+  .object({
+    within: WebStyleKeySchema.default('dashedLine'),
+    out: WebStyleKeySchema.default('border'),
+    forgotten: WebStyleKeySchema.default('weakened'),
+  })
+  .strict()
+  .default({
+    within: 'dashedLine',
+    out: 'border',
+    forgotten: 'weakened',
+  });
+export type WebStyleMapping = z.infer<typeof WebStyleMappingSchema>;
+
+export const SceneFlagsSchema = z
+  .object({
+    webNative: z.boolean().default(true),
+    webTarget: z.boolean().default(true),
+    videoNative: z.boolean().default(true),
+    videoTarget: z.boolean().default(true),
+  })
+  .strict()
+  .default({
+    webNative: true,
+    webTarget: true,
+    videoNative: true,
+    videoTarget: true,
+  });
+export type SceneFlags = z.infer<typeof SceneFlagsSchema>;
+
 export const SettingsSchema = z.object({
   // Language
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
@@ -310,6 +358,13 @@ export const SettingsSchema = z.object({
   // Behavior
   enabled: z.boolean().default(true),
   autoEnhance: z.boolean().default(true),
+  webEnhanceMode: WebEnhanceModeSchema.default('i_plus_1'),
+  floatingButtonEnabled: z.boolean().default(true),
+  webShowOriginal: z.boolean().default(false),
+  webStyleMapping: WebStyleMappingSchema,
+  webCustomCss: z.string().max(2000).default(''),
+  scenesEnabled: SceneFlagsSchema,
+  hasCompletedOnboarding: z.boolean().default(false),
 
   // English correction (3x space)
   englishCorrection: EnglishCorrectionConfigSchema,
@@ -349,13 +404,35 @@ export const ConvertedWordSchema = z.object({
   original: z.string(),
   converted: z.string(),
   difficulty: z.string().optional(),
+  difficultyLevel: CEFRLevelSchema.optional(),
+  difficultyConfidence: z.number().min(0).max(1).optional(),
   partOfSpeech: z.string().optional(),
 });
 export type ConvertedWord = z.infer<typeof ConvertedWordSchema>;
 
+export const WebHighlightOffsetSchema = z
+  .object({
+    start: z.number().int().min(0),
+    end: z.number().int().min(0),
+    term: z.string().min(1).optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.end <= value.start) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'highlight offset end must be > start',
+        path: ['end'],
+      });
+    }
+  });
+export type WebHighlightOffset = z.infer<typeof WebHighlightOffsetSchema>;
+
 export const WebEnhanceOutputSchema = z.object({
   content_result: z.string(),
   convert_word: z.array(ConvertedWordSchema).optional(),
+  highlight_terms: z.array(z.string()).optional(),
+  highlight_offsets: z.array(WebHighlightOffsetSchema).optional(),
 });
 export type WebEnhanceOutput = z.infer<typeof WebEnhanceOutputSchema>;
 
@@ -371,6 +448,7 @@ export const EnhanceWebPayloadSchema = z
     difficultyMin: CEFRLevelSchema.optional(),
     difficultyMax: CEFRLevelSchema.optional(),
     maxWords: z.number().int().min(1).max(50).optional(),
+    mode: WebEnhanceModeSchema.optional(),
   })
   .strict();
 export type EnhanceWebPayload = z.infer<typeof EnhanceWebPayloadSchema>;

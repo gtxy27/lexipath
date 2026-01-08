@@ -25,7 +25,9 @@ function tryParseJson(text: string): unknown | null {
     try {
       return JSON.parse(candidate);
     } catch (error: unknown) {
-      // ignore parse error; try next candidate
+      // Ignore parse error; try next candidate.
+      void error;
+      continue;
     }
   }
 
