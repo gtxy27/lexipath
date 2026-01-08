@@ -343,6 +343,9 @@ export const SettingsSchema = z.object({
   proficiencyLevel: CEFRLevelSchema.default('B1'),
   // Optional (for UI/prompt display): store the user's preferred exam scale (CEFR remains the internal value).
   proficiencyPreference: ProficiencyPreferenceSchema.optional(),
+  // Target level (goal): stored as CEFR; preference is optional and only affects UI selection.
+  targetProficiencyLevel: CEFRLevelSchema.default('B2'),
+  targetProficiencyPreference: ProficiencyPreferenceSchema.optional(),
 
   // Appearance
   theme: ThemeSchema.default('system'),

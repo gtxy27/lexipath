@@ -160,7 +160,7 @@
     "description": "Off state"
   },
   "targetLanguage": {
-    "message": "Target Language",
+    "message": "Target learning language",
     "description": "Target language label"
   },
   "proficiencyLevel": {
@@ -175,9 +175,21 @@
     "message": "Restart onboarding",
     "description": "Open onboarding page"
   },
+  "onboardingBlockedTitle": {
+    "message": "Onboarding completed",
+    "description": "Onboarding blocked title"
+  },
+  "onboardingBlockedDesc": {
+    "message": "This onboarding wizard is only available for first-time setup.",
+    "description": "Onboarding blocked description"
+  },
   "optionsOpenOnboardingDesc": {
     "message": "Reset onboarding completion and open the onboarding wizard.",
     "description": "Options: open onboarding description"
+  },
+  "optionsOnboardingCompletedHint": {
+    "message": "Onboarding is already completed, so it is hidden by design.",
+    "description": "Options: onboarding completed hint"
   },
   "optionsWebShowOriginalLabel": {
     "message": "Show original by default",
@@ -188,43 +200,43 @@
     "description": "Options: show original by default description"
   },
   "optionsWebStyleLabel": {
-    "message": "Web style mapping",
+    "message": "Highlight styles",
     "description": "Options: web style mapping label"
   },
   "optionsWebStyleDesc": {
-    "message": "Map within / out / forgotten states to visual presets.",
+    "message": "Choose how different familiarity states are highlighted.",
     "description": "Options: web style mapping description"
   },
   "optionsWebStyleWithin": {
-    "message": "Within",
+    "message": "Mastered",
     "description": "Options: within style mapping label"
   },
   "optionsWebStyleOut": {
-    "message": "Out",
+    "message": "New",
     "description": "Options: out-of-level style mapping label"
   },
   "optionsWebStyleForgotten": {
-    "message": "Forgotten",
+    "message": "Needs review",
     "description": "Options: forgotten style mapping label"
   },
   "optionsWebStyleKey_border": {
-    "message": "border",
+    "message": "Dotted underline",
     "description": "Options: web style key border"
   },
   "optionsWebStyleKey_dashedLine": {
-    "message": "dashedLine",
+    "message": "Dashed underline",
     "description": "Options: web style key dashedLine"
   },
   "optionsWebStyleKey_weakened": {
-    "message": "weakened",
+    "message": "Faded",
     "description": "Options: web style key weakened"
   },
   "optionsWebStyleKey_background": {
-    "message": "background",
+    "message": "Background",
     "description": "Options: web style key background"
   },
   "optionsWebStyleKey_textColor": {
-    "message": "textColor",
+    "message": "Text color",
     "description": "Options: web style key textColor"
   },
   "optionsWebCustomCssLabel": {
@@ -488,12 +500,20 @@
     "description": "Options page title"
   },
   "optionsDesc": {
-    "message": "Configure models and routing.",
+    "message": "Configure models, learning, display, sites, and backup.",
     "description": "Options page description"
   },
   "optionsTab_channels": {
     "message": "Models",
     "description": "Options tab: channels"
+  },
+  "optionsTab_general": {
+    "message": "General",
+    "description": "Options tab: general"
+  },
+  "optionsTab_learning": {
+    "message": "Learning",
+    "description": "Options tab: learning"
   },
   "optionsTab_language": {
     "message": "Language",
@@ -506,6 +526,130 @@
   "optionsTab_backup": {
     "message": "Backup",
     "description": "Options tab: backup"
+  },
+  "optionsTab_display": {
+    "message": "Display",
+    "description": "Options tab: display"
+  },
+  "optionsDisplayDesc": {
+    "message": "Customize appearance, overlay behavior, and highlight styles.",
+    "description": "Options tab: display description"
+  },
+  "optionsGeneralDesc": {
+    "message": "General settings, including enable/disable, sites, and backup.",
+    "description": "Options tab: general description"
+  },
+  "optionsGeneralStatusTitle": {
+    "message": "Status",
+    "description": "Options: general status section title"
+  },
+  "optionsEnabledTitle": {
+    "message": "Enabled",
+    "description": "Options: enabled switch title"
+  },
+  "optionsGeneralSitesTitle": {
+    "message": "Sites",
+    "description": "Options: general sites section title"
+  },
+  "optionsGeneralSitesDesc": {
+    "message": "Control where LexiPath runs.",
+    "description": "Options: general sites section description"
+  },
+  "optionsGeneralBackupTitle": {
+    "message": "Backup",
+    "description": "Options: general backup section title"
+  },
+  "optionsGeneralBackupDesc": {
+    "message": "Export, import, and cloud sync (WebDAV).",
+    "description": "Options: general backup section description"
+  },
+  "optionsLearningDesc": {
+    "message": "Set your languages, proficiency, and how learning features behave.",
+    "description": "Options tab: learning description"
+  },
+  "optionsLearningLevelsTitle": {
+    "message": "Levels",
+    "description": "Options: learning levels section title"
+  },
+  "optionsUserLevelTitle": {
+    "message": "Your level",
+    "description": "Options: user level section title"
+  },
+  "optionsTargetLevelTitle": {
+    "message": "Target level",
+    "description": "Options: target level section title"
+  },
+  "optionsLearningRoutingTitle": {
+    "message": "Behavior routing",
+    "description": "Options: learning routing title"
+  },
+  "optionsLearningRoutingDesc": {
+    "message": "Advanced: choose the engine used for each learning action.",
+    "description": "Options: learning routing description"
+  },
+  "optionsAiRequiredTitle": {
+    "message": "AI configuration required",
+    "description": "Options: AI required title"
+  },
+  "optionsAiRequiredDesc": {
+    "message": "LexiPath requires at least one AI model configured. Add your model, API key, and base URL (if needed) in the Models tab.",
+    "description": "Options: AI required description"
+  },
+  "optionsAiRequiredCta": {
+    "message": "Go to Models",
+    "description": "Options: AI required CTA"
+  },
+  "optionsWebStyleThemeLabel": {
+    "message": "Highlight theme",
+    "description": "Options: web style theme label"
+  },
+  "optionsWebStyleThemeDesc": {
+    "message": "Choose a preset theme, or switch to Custom to tweak per-state styles.",
+    "description": "Options: web style theme description"
+  },
+  "optionsWebStyleTheme_standard": {
+    "message": "Standard",
+    "description": "Options: web style theme preset (standard)"
+  },
+  "optionsWebStyleTheme_subtle": {
+    "message": "Subtle",
+    "description": "Options: web style theme preset (subtle)"
+  },
+  "optionsWebStyleTheme_contrast": {
+    "message": "Contrast",
+    "description": "Options: web style theme preset (contrast)"
+  },
+  "optionsWebStyleTheme_minimal": {
+    "message": "Minimal",
+    "description": "Options: web style theme preset (minimal)"
+  },
+  "optionsWebStyleTheme_custom": {
+    "message": "Custom",
+    "description": "Options: web style theme preset (custom)"
+  },
+  "optionsWebStylePreviewLabel": {
+    "message": "Preview",
+    "description": "Options: web style preview label"
+  },
+  "optionsScenesQuickDesc": {
+    "message": "Enable or disable enhancement scenes.",
+    "description": "Options: scenes quick description"
+  },
+  "optionsScenesWebLabel": {
+    "message": "Web",
+    "description": "Options: scenes web label"
+  },
+  "optionsScenesWebDesc": {
+    "message": "Enable enhancements on web pages.",
+    "description": "Options: scenes web description"
+  },
+  "optionsScenesVideoLabel": {
+    "message": "Video",
+    "description": "Options: scenes video label"
+  },
+  "optionsScenesVideoDesc": {
+    "message": "Enable enhancements for videos/subtitles.",
+    "description": "Options: scenes video description"
   },
   "optionsBackupTitle": {
     "message": "Backup & Restore",
@@ -651,6 +795,22 @@
     "message": "Type",
     "description": "Channel type label"
   },
+  "optionsChannelType_openaiCompatible": {
+    "message": "OpenAI compatible",
+    "description": "Channel type value: OpenAI compatible"
+  },
+  "optionsChannelType_claude": {
+    "message": "Anthropic Claude",
+    "description": "Channel type value: Claude"
+  },
+  "optionsChannelType_gemini": {
+    "message": "Google Gemini",
+    "description": "Channel type value: Gemini"
+  },
+  "optionsChannelType_unknown": {
+    "message": "Unknown",
+    "description": "Channel type value: unknown"
+  },
   "optionsChannelIconUrlLabel": {
     "message": "Icon URL",
     "description": "Channel icon URL label"
@@ -696,7 +856,7 @@
     "description": "Language section title"
   },
   "optionsLanguageDesc": {
-    "message": "Configure your native/target languages and proficiency.",
+    "message": "Configure your native/target learning languages and proficiency.",
     "description": "Language section description"
   },
   "optionsEnglishCorrectionTitle": {
@@ -1008,7 +1168,7 @@
     "description": "Native language label"
   },
   "optionsTargetLanguageLabel": {
-    "message": "Target Language",
+    "message": "Target learning language",
     "description": "Target language label"
   },
   "optionsProficiencyLevelLabel": {
@@ -1176,19 +1336,19 @@
     "description": "Options: web enhance mode label"
   },
   "optionsWebEnhanceModeDesc": {
-    "message": "Light shows inline hints, i+1 keeps text clean, Full rewrites the paragraph when supported.",
+    "message": "Lightweight shows inline hints, Adaptive keeps text clean, Heavy rewrites paragraphs when supported.",
     "description": "Options: web enhance mode description"
   },
   "optionsWebEnhanceModeLight": {
-    "message": "Light",
+    "message": "Lightweight",
     "description": "Options: web enhance mode: light"
   },
   "optionsWebEnhanceModeIPlus1": {
-    "message": "i+1",
+    "message": "Adaptive",
     "description": "Options: web enhance mode: i+1"
   },
   "optionsWebEnhanceModeFull": {
-    "message": "Full",
+    "message": "Heavy",
     "description": "Options: web enhance mode: full"
   },
   "optionsExcludedSitesLabel": {
@@ -1284,15 +1444,15 @@
     "description": "Enhance mode label in onboarding"
   },
   "onboardingEnhanceModeBreezeTitle": {
-    "message": "Breeze",
+    "message": "Lightweight",
     "description": "Onboarding mode title (light)"
   },
   "onboardingEnhanceModeBreezeDesc": {
-    "message": "Gentle hints inline; minimal interruption",
+    "message": "Inline hints; minimal interruption",
     "description": "Onboarding mode description (light)"
   },
   "onboardingEnhanceModeGuidedTitle": {
-    "message": "Guided",
+    "message": "Adaptive",
     "description": "Onboarding mode title (i+1)"
   },
   "onboardingEnhanceModeGuidedDesc": {
@@ -1300,11 +1460,11 @@
     "description": "Onboarding mode description (i+1)"
   },
   "onboardingEnhanceModeImmersionTitle": {
-    "message": "Immersion",
+    "message": "Heavy",
     "description": "Onboarding mode title (full)"
   },
   "onboardingEnhanceModeImmersionDesc": {
-    "message": "Rewrite paragraphs into your target language",
+    "message": "Rewrite paragraphs into your target learning language",
     "description": "Onboarding mode description (full)"
   },
   "onboardingSummaryEnhanceMode": {
@@ -1312,15 +1472,15 @@
     "description": "Onboarding summary label for enhance mode"
   },
   "onboardingEnhanceModeSummary_light": {
-    "message": "Breeze",
+    "message": "Lightweight",
     "description": "Onboarding summary value for light mode"
   },
   "onboardingEnhanceModeSummary_i_plus_1": {
-    "message": "Guided",
+    "message": "Adaptive",
     "description": "Onboarding summary value for i+1 mode"
   },
   "onboardingEnhanceModeSummary_full": {
-    "message": "Immersion",
+    "message": "Heavy",
     "description": "Onboarding summary value for full mode"
   },
   "onboardingStep3Title": {
@@ -1344,12 +1504,20 @@
     "description": "Finish button"
   },
   "onboardingTargetLanguageLabel": {
-    "message": "Target Language",
+    "message": "Target learning language",
     "description": "Target language label"
   },
   "onboardingProficiencyLabel": {
     "message": "Proficiency Level",
     "description": "Proficiency level label"
+  },
+  "onboardingUserLevelLabel": {
+    "message": "Your level",
+    "description": "Onboarding: user level label"
+  },
+  "onboardingTargetLevelLabel": {
+    "message": "Target level",
+    "description": "Onboarding: target level label"
   },
   "onboardingSceneWeb": {
     "message": "Web Reading",

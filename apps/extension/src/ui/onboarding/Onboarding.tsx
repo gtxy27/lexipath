@@ -5,9 +5,10 @@ import {
   JLPTLevelSchema,
   TOPIKLevelSchema,
   SupportedLanguageSchema,
+  proficiencyPreferenceToCefrLevel,
   type CEFRLevel,
-  type JLPTLevel,
-  type TOPIKLevel,
+  type NativeLanguage,
+  type ProficiencyPreference,
   type SupportedLanguage,
   type Theme,
   type WebEnhanceMode,
@@ -25,6 +26,13 @@ import {
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
   Check,
   ChevronRight,
   ChevronLeft,
@@ -41,11 +49,30 @@ import { ICON_URL } from "../lib/assets";
 
 const log = createLogger("ui:Onboarding");
 
-type ProficiencyLevel = CEFRLevel | JLPTLevel | TOPIKLevel;
+const IELTS_BANDS: readonly string[] = [
+  "3.0",
+  "3.5",
+  "4.0",
+  "4.5",
+  "5.0",
+  "5.5",
+  "6.0",
+  "6.5",
+  "7.0",
+  "7.5",
+  "8.0",
+  "8.5",
+  "9.0",
+];
+
+type ProficiencyScaleOption = "CEFR" | ProficiencyPreference["standard"];
 
 type OnboardingFormData = {
   targetLanguage: SupportedLanguage;
-  proficiencyLevel: ProficiencyLevel;
+  proficiencyLevel: CEFRLevel;
+  proficiencyPreference: ProficiencyPreference | undefined;
+  targetProficiencyLevel: CEFRLevel;
+  targetProficiencyPreference: ProficiencyPreference | undefined;
   webEnhanceMode: WebEnhanceMode;
 };
 
@@ -57,69 +84,92 @@ function t(key: string, substitutions?: string | string[]): string {
   return message || key;
 }
 
-function getProficiencyOptions(
-  language: SupportedLanguage,
-): Array<{ value: ProficiencyLevel; labelKey: string }> {
-  if (language === "ja") {
-    return JLPTLevelSchema.options.map((value) => ({
-      value,
-      labelKey: `proficiency_${value}`,
-    }));
-  } else if (language === "ko") {
-    return TOPIKLevelSchema.options.map((value) => ({
-      value: `${value}` as TOPIKLevel,
-      labelKey: `proficiency_TOPIK${value}`,
-    }));
-  } else {
-    return CEFRLevelSchema.options.map((value) => ({
-      value,
-      labelKey: `proficiency_${value}`,
-    }));
+function getProficiencyScaleOptions(input: {
+  targetLanguage: SupportedLanguage;
+  nativeLanguage: NativeLanguage;
+}): Array<{ value: ProficiencyScaleOption; label: string }> {
+  const options: Array<{ value: ProficiencyScaleOption; label: string }> = [
+    { value: "CEFR", label: "CEFR" },
+  ];
+
+  if (input.targetLanguage === "en") {
+    options.push({ value: "IELTS", label: "IELTS" });
+    if (input.nativeLanguage === "zh-CN" || input.nativeLanguage === "zh-TW") {
+      options.push({ value: "CET-4", label: "CET-4" });
+      options.push({ value: "CET-6", label: "CET-6" });
+    }
   }
+
+  if (input.targetLanguage === "ja") options.push({ value: "JLPT", label: "JLPT" });
+  if (input.targetLanguage === "ko") options.push({ value: "TOPIK", label: "TOPIK" });
+
+  return options;
 }
 
-function getDefaultProficiency(language: SupportedLanguage): ProficiencyLevel {
-  if (language === "ja") return "N3";
-  if (language === "ko") return "3";
-  return "B1";
+function isScaleApplicable(options: {
+  scale: ProficiencyScaleOption;
+  targetLanguage: SupportedLanguage;
+  nativeLanguage: NativeLanguage;
+}): boolean {
+  if (options.scale === "CEFR") return true;
+  if (options.scale === "IELTS") return options.targetLanguage === "en";
+  if (options.scale === "CET-4" || options.scale === "CET-6") {
+    return (
+      options.targetLanguage === "en" &&
+      (options.nativeLanguage === "zh-CN" || options.nativeLanguage === "zh-TW")
+    );
+  }
+  if (options.scale === "JLPT") return options.targetLanguage === "ja";
+  if (options.scale === "TOPIK") return options.targetLanguage === "ko";
+  return false;
 }
 
-function toCEFRLevel(
-  proficiency: ProficiencyLevel,
-  language: SupportedLanguage,
-): CEFRLevel {
-  if (language === "ja") {
-    const mapping: Record<JLPTLevel, CEFRLevel> = {
-      N5: "A1",
-      N4: "A2",
-      N3: "B1",
-      N2: "B2",
-      N1: "C1",
-    };
-    return mapping[proficiency as JLPTLevel];
-  } else if (language === "ko") {
-    const mapping: Record<TOPIKLevel, CEFRLevel> = {
-      "1": "A1",
-      "2": "A2",
-      "3": "B1",
-      "4": "B2",
-      "5": "C1",
-      "6": "C2",
-    };
-    return mapping[proficiency as TOPIKLevel];
+function defaultPreferenceForScale(
+  scale: ProficiencyScaleOption,
+): ProficiencyPreference | undefined {
+  if (scale === "CEFR") return undefined;
+  if (scale === "IELTS") return { standard: "IELTS", value: "6.5" };
+  if (scale === "CET-4") return { standard: "CET-4", value: "pass" };
+  if (scale === "CET-6") return { standard: "CET-6", value: "pass" };
+  if (scale === "JLPT") return { standard: "JLPT", value: "N3" };
+  if (scale === "TOPIK") return { standard: "TOPIK", value: "3" };
+  return undefined;
+}
+
+function deriveCefrFromPreference(preference: ProficiencyPreference): CEFRLevel {
+  return proficiencyPreferenceToCefrLevel(preference);
+}
+
+function displayProficiencyLabel(input: {
+  level: CEFRLevel;
+  preference: ProficiencyPreference | undefined;
+}): string {
+  const { level, preference } = input;
+  if (!preference) return t(`proficiency_${level}`).replace("Proficiency ", "");
+
+  if (preference.standard === "IELTS") return `IELTS ${preference.value}`;
+  if (preference.standard === "CET-4" || preference.standard === "CET-6") {
+    return preference.standard;
   }
-  return proficiency as CEFRLevel;
+  if (preference.standard === "JLPT") return t(`proficiency_${preference.value}`);
+  if (preference.standard === "TOPIK") return t(`proficiency_TOPIK${preference.value}`);
+
+  return t(`proficiency_${level}`).replace("Proficiency ", "");
 }
 
 export function Onboarding(): React.ReactElement {
   const [currentStep, setCurrentStep] = useState(1);
   const [theme, setTheme] = useState<Theme | null>(null);
+  const [nativeLanguage, setNativeLanguage] = useState<NativeLanguage>("zh-CN");
+  const [blocked, setBlocked] = useState(false);
   const [formData, setFormData] = useState<OnboardingFormData>({
     targetLanguage: "en",
     proficiencyLevel: "B1",
+    proficiencyPreference: undefined,
+    targetProficiencyLevel: "B2",
+    targetProficiencyPreference: undefined,
     webEnhanceMode: "i_plus_1",
   });
-  const [hasConfirmedProficiency, setHasConfirmedProficiency] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useApplyTheme(theme);
@@ -130,6 +180,46 @@ export function Onboarding(): React.ReactElement {
         const response = await sendMessage("GET_SETTINGS", undefined);
         if (response.ok) {
           setTheme(response.value.theme);
+          setNativeLanguage(response.value.nativeLanguage);
+          if (response.value.hasCompletedOnboarding) {
+            setBlocked(true);
+            try {
+              await browser.runtime.openOptionsPage();
+            } finally {
+              globalThis.close?.();
+            }
+            return;
+          }
+
+          setFormData((prev) => {
+            const userPref = response.value.proficiencyPreference ?? undefined;
+            const targetPref = response.value.targetProficiencyPreference ?? undefined;
+
+            const userPrefOk = userPref
+              ? isScaleApplicable({
+                  scale: userPref.standard,
+                  targetLanguage: response.value.targetLanguage,
+                  nativeLanguage: response.value.nativeLanguage,
+                })
+              : true;
+            const targetPrefOk = targetPref
+              ? isScaleApplicable({
+                  scale: targetPref.standard,
+                  targetLanguage: response.value.targetLanguage,
+                  nativeLanguage: response.value.nativeLanguage,
+                })
+              : true;
+
+            return {
+              ...prev,
+              targetLanguage: response.value.targetLanguage,
+              proficiencyLevel: response.value.proficiencyLevel,
+              proficiencyPreference: userPrefOk ? userPref : undefined,
+              targetProficiencyLevel: response.value.targetProficiencyLevel,
+              targetProficiencyPreference: targetPrefOk ? targetPref : undefined,
+              webEnhanceMode: response.value.webEnhanceMode,
+            };
+          });
         }
       } catch (error: unknown) {
         log.warn("Failed to load onboarding theme; falling back to system", { message: getErrorMessage(error) });
@@ -147,39 +237,39 @@ export function Onboarding(): React.ReactElement {
     [],
   );
 
-  const proficiencyOptions = useMemo(
-    () => getProficiencyOptions(formData.targetLanguage),
-    [formData.targetLanguage],
+  const scaleOptions = useMemo(
+    () =>
+      getProficiencyScaleOptions({
+        targetLanguage: formData.targetLanguage,
+        nativeLanguage,
+      }),
+    [formData.targetLanguage, nativeLanguage],
   );
 
   function handleTargetLanguageChange(newLanguage: SupportedLanguage) {
-    const oldLanguage = formData.targetLanguage;
-    const currentLevel = formData.proficiencyLevel;
+    const userPref = formData.proficiencyPreference;
+    const targetPref = formData.targetProficiencyPreference;
 
-    let newProficiencyLevel = currentLevel;
-
-    const oldIsJapanese = oldLanguage === "ja";
-    const newIsJapanese = newLanguage === "ja";
-    const oldIsKorean = oldLanguage === "ko";
-    const newIsKorean = newLanguage === "ko";
-
-    if (
-      (oldIsJapanese && !newIsJapanese) ||
-      (!oldIsJapanese && newIsJapanese) ||
-      (oldIsKorean && !newIsKorean) ||
-      (!oldIsKorean && newIsKorean)
-    ) {
-      newProficiencyLevel = getDefaultProficiency(newLanguage);
-    }
-
-    if (newProficiencyLevel !== currentLevel) {
-      setHasConfirmedProficiency(false);
-    }
+    const userPrefOk = userPref
+      ? isScaleApplicable({
+          scale: userPref.standard,
+          targetLanguage: newLanguage,
+          nativeLanguage,
+        })
+      : true;
+    const targetPrefOk = targetPref
+      ? isScaleApplicable({
+          scale: targetPref.standard,
+          targetLanguage: newLanguage,
+          nativeLanguage,
+        })
+      : true;
 
     setFormData({
       ...formData,
       targetLanguage: newLanguage,
-      proficiencyLevel: newProficiencyLevel,
+      proficiencyPreference: userPrefOk ? userPref : undefined,
+      targetProficiencyPreference: targetPrefOk ? targetPref : undefined,
     });
   }
 
@@ -198,13 +288,12 @@ export function Onboarding(): React.ReactElement {
   async function handleFinish() {
     setSaving(true);
     try {
-      const cefrLevel = toCEFRLevel(
-        formData.proficiencyLevel,
-        formData.targetLanguage,
-      );
       await sendMessage("SET_SETTINGS", {
         targetLanguage: formData.targetLanguage,
-        proficiencyLevel: cefrLevel,
+        proficiencyLevel: formData.proficiencyLevel,
+        proficiencyPreference: formData.proficiencyPreference,
+        targetProficiencyLevel: formData.targetProficiencyLevel,
+        targetProficiencyPreference: formData.targetProficiencyPreference,
         webEnhanceMode: formData.webEnhanceMode,
         hasCompletedOnboarding: true,
       });
@@ -218,6 +307,21 @@ export function Onboarding(): React.ReactElement {
   }
 
   const progress = (currentStep / 3) * 100;
+  const step1Valid =
+    !!formData.targetLanguage &&
+    !!formData.proficiencyLevel &&
+    !!formData.targetProficiencyLevel;
+
+  if (blocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+        <div className="max-w-md text-center space-y-3">
+          <div className="text-lg font-black">{t("onboardingBlockedTitle")}</div>
+          <div className="text-sm text-muted-foreground">{t("onboardingBlockedDesc")}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-[#0d0e14] text-gray-900 dark:text-white relative overflow-hidden transition-colors duration-500">
@@ -335,35 +439,356 @@ export function Onboarding(): React.ReactElement {
 
                       <div className="space-y-4">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
-                          {t("onboardingProficiencyLabel")}
+                          {t("onboardingUserLevelLabel")}
                         </Label>
-                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                          {proficiencyOptions.map((option) => (
-                            <Button
-                              key={option.value}
-                              variant="outline"
-                              className={cn(
-                                "h-11 rounded-xl border-gray-100 dark:border-white/5 transition-all",
-                                formData.proficiencyLevel === option.value
-                                  ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-600/10"
-                                  : "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400"
-                              )}
-                              onClick={() =>
-                                {
-                                  setHasConfirmedProficiency(true);
+
+                        {(() => {
+                          const scale = (formData.proficiencyPreference?.standard ??
+                            "CEFR") as ProficiencyScaleOption;
+
+                          return (
+                            <div className="space-y-4">
+                              <Select
+                                value={scale}
+                                onValueChange={(v) => {
+                                  const nextScale = v as ProficiencyScaleOption;
+                                  const nextPref = defaultPreferenceForScale(nextScale);
+                                  if (!nextPref) {
+                                    setFormData({
+                                      ...formData,
+                                      proficiencyPreference: undefined,
+                                    });
+                                    return;
+                                  }
                                   setFormData({
                                     ...formData,
-                                    proficiencyLevel: option.value,
+                                    proficiencyPreference: nextPref,
+                                    proficiencyLevel: deriveCefrFromPreference(nextPref),
                                   });
-                                }
-                              }
-                            >
-                              <span className="font-black text-xs">
-                                {t(option.labelKey).replace("Proficiency ", "").replace("JLPT ", "").replace("Level ", "")}
-                              </span>
-                            </Button>
-                          ))}
-                        </div>
+                                }}
+                              >
+                                <SelectTrigger
+                                  data-testid="onboarding-user-level-scale"
+                                  className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                  {scaleOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {formData.proficiencyPreference ? (
+                                <div className="space-y-3">
+                                  {formData.proficiencyPreference.standard === "IELTS" ? (
+                                    <Select
+                                      value={formData.proficiencyPreference.value}
+                                      onValueChange={(v) => {
+                                        const next: ProficiencyPreference = {
+                                          standard: "IELTS",
+                                          value: v,
+                                        };
+                                        setFormData({
+                                          ...formData,
+                                          proficiencyPreference: next,
+                                          proficiencyLevel: deriveCefrFromPreference(next),
+                                        });
+                                      }}
+                                    >
+                                      <SelectTrigger
+                                        data-testid="onboarding-user-level-value"
+                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                        {IELTS_BANDS.map((band) => (
+                                          <SelectItem key={band} value={band}>
+                                            {band}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : null}
+
+                                  {formData.proficiencyPreference.standard === "JLPT" ? (
+                                    <Select
+                                      value={formData.proficiencyPreference.value}
+                                      onValueChange={(v) => {
+                                        const next: ProficiencyPreference = {
+                                          standard: "JLPT",
+                                          value: v,
+                                        };
+                                        setFormData({
+                                          ...formData,
+                                          proficiencyPreference: next,
+                                          proficiencyLevel: deriveCefrFromPreference(next),
+                                        });
+                                      }}
+                                    >
+                                      <SelectTrigger
+                                        data-testid="onboarding-user-level-value"
+                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                        {JLPTLevelSchema.options.map((level) => (
+                                          <SelectItem key={level} value={level}>
+                                            {t(`proficiency_${level}`)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : null}
+
+                                  {formData.proficiencyPreference.standard === "TOPIK" ? (
+                                    <Select
+                                      value={formData.proficiencyPreference.value}
+                                      onValueChange={(v) => {
+                                        const next: ProficiencyPreference = {
+                                          standard: "TOPIK",
+                                          value: v,
+                                        };
+                                        setFormData({
+                                          ...formData,
+                                          proficiencyPreference: next,
+                                          proficiencyLevel: deriveCefrFromPreference(next),
+                                        });
+                                      }}
+                                    >
+                                      <SelectTrigger
+                                        data-testid="onboarding-user-level-value"
+                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                        {TOPIKLevelSchema.options.map((level) => (
+                                          <SelectItem key={level} value={String(level)}>
+                                            {t(`proficiency_TOPIK${level}`)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : null}
+
+                                  <div className="text-xs text-gray-400 dark:text-gray-500 font-bold">
+                                    {t("optionsProficiencyDerivedCefr", [
+                                      formData.proficiencyLevel,
+                                    ])}
+                                  </div>
+                                </div>
+                              ) : (
+                                <Select
+                                  value={formData.proficiencyLevel}
+                                  onValueChange={(v) =>
+                                    setFormData({
+                                      ...formData,
+                                      proficiencyLevel: v as CEFRLevel,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger
+                                    data-testid="onboarding-user-level-value"
+                                    className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                    {CEFRLevelSchema.options.map((level) => (
+                                      <SelectItem key={level} value={level}>
+                                        {t(`proficiency_${level}`)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="space-y-4 pt-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                          {t("onboardingTargetLevelLabel")}
+                        </Label>
+                        {(() => {
+                          const scale = (formData.targetProficiencyPreference?.standard ??
+                            "CEFR") as ProficiencyScaleOption;
+
+                          return (
+                            <div className="space-y-4">
+                              <Select
+                                value={scale}
+                                onValueChange={(v) => {
+                                  const nextScale = v as ProficiencyScaleOption;
+                                  const nextPref = defaultPreferenceForScale(nextScale);
+                                  if (!nextPref) {
+                                    setFormData({
+                                      ...formData,
+                                      targetProficiencyPreference: undefined,
+                                    });
+                                    return;
+                                  }
+                                  setFormData({
+                                    ...formData,
+                                    targetProficiencyPreference: nextPref,
+                                    targetProficiencyLevel: deriveCefrFromPreference(nextPref),
+                                  });
+                                }}
+                              >
+                                <SelectTrigger
+                                  data-testid="onboarding-target-level-scale"
+                                  className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                  {scaleOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {formData.targetProficiencyPreference ? (
+                                <div className="space-y-3">
+                                  {formData.targetProficiencyPreference.standard ===
+                                  "IELTS" ? (
+                                    <Select
+                                      value={formData.targetProficiencyPreference.value}
+                                      onValueChange={(v) => {
+                                        const next: ProficiencyPreference = {
+                                          standard: "IELTS",
+                                          value: v,
+                                        };
+                                        setFormData({
+                                          ...formData,
+                                          targetProficiencyPreference: next,
+                                          targetProficiencyLevel: deriveCefrFromPreference(next),
+                                        });
+                                      }}
+                                    >
+                                      <SelectTrigger
+                                        data-testid="onboarding-target-level-value"
+                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                        {IELTS_BANDS.map((band) => (
+                                          <SelectItem key={band} value={band}>
+                                            {band}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : null}
+
+                                  {formData.targetProficiencyPreference.standard ===
+                                  "JLPT" ? (
+                                    <Select
+                                      value={formData.targetProficiencyPreference.value}
+                                      onValueChange={(v) => {
+                                        const next: ProficiencyPreference = {
+                                          standard: "JLPT",
+                                          value: v,
+                                        };
+                                        setFormData({
+                                          ...formData,
+                                          targetProficiencyPreference: next,
+                                          targetProficiencyLevel: deriveCefrFromPreference(next),
+                                        });
+                                      }}
+                                    >
+                                      <SelectTrigger
+                                        data-testid="onboarding-target-level-value"
+                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                        {JLPTLevelSchema.options.map((level) => (
+                                          <SelectItem key={level} value={level}>
+                                            {t(`proficiency_${level}`)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : null}
+
+                                  {formData.targetProficiencyPreference.standard ===
+                                  "TOPIK" ? (
+                                    <Select
+                                      value={formData.targetProficiencyPreference.value}
+                                      onValueChange={(v) => {
+                                        const next: ProficiencyPreference = {
+                                          standard: "TOPIK",
+                                          value: v,
+                                        };
+                                        setFormData({
+                                          ...formData,
+                                          targetProficiencyPreference: next,
+                                          targetProficiencyLevel: deriveCefrFromPreference(next),
+                                        });
+                                      }}
+                                    >
+                                      <SelectTrigger
+                                        data-testid="onboarding-target-level-value"
+                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                      >
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                        {TOPIKLevelSchema.options.map((level) => (
+                                          <SelectItem key={level} value={String(level)}>
+                                            {t(`proficiency_TOPIK${level}`)}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : null}
+
+                                  <div className="text-xs text-gray-400 dark:text-gray-500 font-bold">
+                                    {t("optionsProficiencyDerivedCefr", [
+                                      formData.targetProficiencyLevel,
+                                    ])}
+                                  </div>
+                                </div>
+                              ) : (
+                                <Select
+                                  value={formData.targetProficiencyLevel}
+                                  onValueChange={(v) =>
+                                    setFormData({
+                                      ...formData,
+                                      targetProficiencyLevel: v as CEFRLevel,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger
+                                    data-testid="onboarding-target-level-value"
+                                    className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                  >
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                    {CEFRLevelSchema.options.map((level) => (
+                                      <SelectItem key={level} value={level}>
+                                        {t(`proficiency_${level}`)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -465,7 +890,7 @@ export function Onboarding(): React.ReactElement {
                     <div className="relative group">
                        <div className="absolute -inset-1 rounded-[2rem] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur opacity-75 group-hover:opacity-100 transition duration-1000" />
                        <Card className="relative bg-gray-50/50 dark:bg-[#0d0e14]/40 border-gray-100 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-inner">
-                          <CardContent className="p-10 grid grid-cols-3 gap-6 text-center relative">
+                          <CardContent className="p-10 grid grid-cols-1 sm:grid-cols-4 gap-8 text-center">
                             <div className="space-y-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/70">
                                 {t("onboardingSummaryTargetLanguage")}
@@ -474,16 +899,28 @@ export function Onboarding(): React.ReactElement {
                                 {t(`languageTarget_${formData.targetLanguage}`)}
                               </p>
                             </div>
-                            <div className="absolute left-1/3 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-gray-200 dark:bg-white/5" />
                             <div className="space-y-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500 dark:text-purple-400/70">
-                                {t("onboardingSummaryProficiency")}
+                                {t("onboardingUserLevelLabel")}
                               </p>
                               <p data-testid="summary-proficiency" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                {t(`proficiency_${formData.proficiencyLevel}`).replace("Proficiency ", "")}
+                                {displayProficiencyLabel({
+                                  level: formData.proficiencyLevel,
+                                  preference: formData.proficiencyPreference,
+                                })}
                               </p>
                             </div>
-                            <div className="absolute left-2/3 top-1/2 -translate-x-1/2 -translate-y-1/2 h-12 w-px bg-gray-200 dark:bg-white/5" />
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-500 dark:text-teal-400/70">
+                                {t("onboardingTargetLevelLabel")}
+                              </p>
+                              <p data-testid="summary-target-level" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                {displayProficiencyLabel({
+                                  level: formData.targetProficiencyLevel,
+                                  preference: formData.targetProficiencyPreference,
+                                })}
+                              </p>
+                            </div>
                             <div className="space-y-3">
                               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400/70">
                                 {t("onboardingSummaryEnhanceMode")}
@@ -521,7 +958,7 @@ export function Onboarding(): React.ReactElement {
             {currentStep < 3 ? (
               <Button
                 onClick={handleNext}
-                disabled={currentStep === 1 && !hasConfirmedProficiency}
+                disabled={currentStep === 1 && !step1Valid}
                 className="gap-2 h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-600/10 dark:shadow-indigo-600/20 transition-all font-bold group"
               >
                 {t("onboardingNext")}

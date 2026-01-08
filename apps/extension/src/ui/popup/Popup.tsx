@@ -273,20 +273,24 @@ export function Popup(): React.ReactElement {
                 <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
-                onClick={() => {
-                  const url = browser.runtime.getURL("src/ui/onboarding/index.html");
-                  globalThis.open?.(url, "_blank");
-                }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Sparkles className="h-4 w-4 text-indigo-500 dark:text-indigo-400 transition-transform duration-500 group-hover:rotate-12" />
-                  <span className="font-bold text-sm tracking-tight">{t("openOnboarding")}</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
+              {!settings?.hasCompletedOnboarding ? (
+                <Button
+                  variant="outline"
+                  className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
+                  onClick={() => {
+                    const url = browser.runtime.getURL("src/ui/onboarding/index.html");
+                    globalThis.open?.(url, "_blank");
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="h-4 w-4 text-indigo-500 dark:text-indigo-400 transition-transform duration-500 group-hover:rotate-12" />
+                    <span className="font-bold text-sm tracking-tight">
+                      {t("openOnboarding")}
+                    </span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                </Button>
+              ) : null}
             </div>
           </CardFooter>
         </Card>

@@ -106,8 +106,9 @@ describe("Options", () => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
 
-    expect(screen.getAllByText("optionsChannelsTitle")[0]).toBeInTheDocument();
-    expect(screen.getAllByText("optionsRoutingTitle")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("optionsChannelsTitle")[0]).toBeTruthy();
+    expect(screen.getAllByText("optionsTab_general")[0]).toBeTruthy();
+    expect(screen.getAllByText("optionsTab_learning")[0]).toBeTruthy();
   });
 
   it("saves channel config and switches translate route to google", async () => {
@@ -119,19 +120,20 @@ describe("Options", () => {
     });
 
     await user.type(
-      screen.getByLabelText(/optionsProviderBaseUrlLabel/, {
+      screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {
         selector: "#channel-1-base-url",
-      }),
+      })[0]!,
       "https://api.openai.com/v1",
     );
     await user.type(
-      screen.getByLabelText(/optionsProviderModelLabel/, {
+      screen.getAllByLabelText(/optionsProviderModelLabel/, {
         selector: "#channel-1-model",
-      }),
+      })[0]!,
       "gpt-4o-mini",
     );
 
-    await user.click(screen.getAllByRole("tab", { name: "optionsRoutingTitle" })[0]!);
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_learning" })[0]!);
+    await user.click(screen.getByText("optionsLearningRoutingTitle").closest("summary")!);
     await user.click(screen.getByTestId("route-kind-translate"));
     await user.click(await screen.findByText("translationProvider_google"));
 
@@ -157,7 +159,21 @@ describe("Options", () => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
 
-    await user.click(screen.getAllByRole("tab", { name: "optionsRoutingTitle" })[0]!);
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {
+        selector: "#channel-1-base-url",
+      })[0]!,
+      "https://api.openai.com/v1",
+    );
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderModelLabel/, {
+        selector: "#channel-1-model",
+      })[0]!,
+      "gpt-4o-mini",
+    );
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_learning" })[0]!);
+    await user.click(screen.getByText("optionsLearningRoutingTitle").closest("summary")!);
     await user.click(screen.getByRole("button", { name: "optionsTestGoogleTranslate" }));
 
     const calls = sendMessageMock.mock.calls.filter((call) => call[0] === "TEST_PROVIDER_CONNECTION");

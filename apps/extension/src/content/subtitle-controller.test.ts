@@ -147,6 +147,7 @@ describe('SubtitleController', () => {
       nativeLanguage: 'zh-CN',
       targetLanguage: 'en',
       proficiencyLevel: 'B1',
+      targetProficiencyLevel: 'B2',
       theme: 'system',
       promptStyle: 'default',
       channels: [

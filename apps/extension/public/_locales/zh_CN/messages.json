@@ -191,9 +191,21 @@
     "message": "重新引导",
     "description": "打开 onboarding 页面"
   },
+  "onboardingBlockedTitle": {
+    "message": "引导已完成",
+    "description": "引导页：已完成标题"
+  },
+  "onboardingBlockedDesc": {
+    "message": "入门向导仅用于首次初始化配置。",
+    "description": "引导页：已完成描述"
+  },
   "optionsOpenOnboardingDesc": {
     "message": "重置引导完成状态并打开入门向导。",
     "description": "设置：打开 onboarding 描述"
+  },
+  "optionsOnboardingCompletedHint": {
+    "message": "引导已完成（已隐藏）。",
+    "description": "设置：引导已完成提示"
   },
   "optionsWebShowOriginalLabel": {
     "message": "默认显示原文",
@@ -204,43 +216,43 @@
     "description": "设置：网页默认显示原文描述"
   },
   "optionsWebStyleLabel": {
-    "message": "网页样式映射",
+    "message": "标记样式",
     "description": "设置：网页样式映射标签"
   },
   "optionsWebStyleDesc": {
-    "message": "将 within / out / forgotten 状态映射到视觉效果 preset。",
+    "message": "为不同熟悉度状态选择高亮样式。",
     "description": "设置：网页样式映射描述"
   },
   "optionsWebStyleWithin": {
-    "message": "Within",
+    "message": "已掌握",
     "description": "设置：within 样式映射标签"
   },
   "optionsWebStyleOut": {
-    "message": "Out",
+    "message": "未掌握",
     "description": "设置：out-of-level 样式映射标签"
   },
   "optionsWebStyleForgotten": {
-    "message": "Forgotten",
+    "message": "易忘",
     "description": "设置：forgotten 样式映射标签"
   },
   "optionsWebStyleKey_border": {
-    "message": "border",
+    "message": "点状下划线",
     "description": "设置：网页样式 key border"
   },
   "optionsWebStyleKey_dashedLine": {
-    "message": "dashedLine",
+    "message": "虚线下划线",
     "description": "设置：网页样式 key dashedLine"
   },
   "optionsWebStyleKey_weakened": {
-    "message": "weakened",
+    "message": "淡化",
     "description": "设置：网页样式 key weakened"
   },
   "optionsWebStyleKey_background": {
-    "message": "background",
+    "message": "背景高亮",
     "description": "设置：网页样式 key background"
   },
   "optionsWebStyleKey_textColor": {
-    "message": "textColor",
+    "message": "文字颜色",
     "description": "设置：网页样式 key textColor"
   },
   "optionsWebCustomCssLabel": {
@@ -260,7 +272,7 @@
     "description": "设置：场景开关标签"
   },
   "optionsScenesDesc": {
-    "message": "控制网页/视频在母语/目标语场景下是否启用增强。",
+    "message": "控制网页/视频在母语/目标学习语言场景下是否启用增强。",
     "description": "设置：场景开关描述"
   },
   "toggleTheme": {
@@ -504,12 +516,20 @@
     "description": "设置页标题"
   },
   "optionsDesc": {
-    "message": "配置模型与行为路由。",
+    "message": "配置模型、学习、显示、站点与备份。",
     "description": "设置页描述"
   },
   "optionsTab_channels": {
-    "message": "模型",
+    "message": "渠道",
     "description": "设置页 Tab：Channels"
+  },
+  "optionsTab_general": {
+    "message": "通用",
+    "description": "设置页 Tab：通用"
+  },
+  "optionsTab_learning": {
+    "message": "学习",
+    "description": "设置页 Tab：学习"
   },
   "optionsTab_language": {
     "message": "语言",
@@ -522,6 +542,130 @@
   "optionsTab_backup": {
     "message": "备份",
     "description": "设置页 Tab：备份"
+  },
+  "optionsTab_display": {
+    "message": "显示",
+    "description": "设置页 Tab：显示"
+  },
+  "optionsDisplayDesc": {
+    "message": "自定义外观、叠加层行为和高亮样式。",
+    "description": "显示 Tab 描述"
+  },
+  "optionsGeneralDesc": {
+    "message": "通用设置：启用状态、站点规则与备份。",
+    "description": "通用 Tab 描述"
+  },
+  "optionsGeneralStatusTitle": {
+    "message": "状态",
+    "description": "通用：状态区标题"
+  },
+  "optionsEnabledTitle": {
+    "message": "启用",
+    "description": "通用：启用开关标题"
+  },
+  "optionsGeneralSitesTitle": {
+    "message": "站点",
+    "description": "通用：站点区标题"
+  },
+  "optionsGeneralSitesDesc": {
+    "message": "控制 LexiPath 在哪些站点启用。",
+    "description": "通用：站点区描述"
+  },
+  "optionsGeneralBackupTitle": {
+    "message": "备份",
+    "description": "通用：备份区标题"
+  },
+  "optionsGeneralBackupDesc": {
+    "message": "导出/导入与 WebDAV 云同步。",
+    "description": "通用：备份区描述"
+  },
+  "optionsLearningDesc": {
+    "message": "设置学习语言、难度与学习相关功能的使用方式。",
+    "description": "学习 Tab 描述"
+  },
+  "optionsLearningLevelsTitle": {
+    "message": "学习水平",
+    "description": "学习：水平区标题"
+  },
+  "optionsUserLevelTitle": {
+    "message": "用户水平",
+    "description": "学习：用户水平标题"
+  },
+  "optionsTargetLevelTitle": {
+    "message": "目标水平",
+    "description": "学习：目标水平标题"
+  },
+  "optionsLearningRoutingTitle": {
+    "message": "路由管理",
+    "description": "学习：行为路由标题"
+  },
+  "optionsLearningRoutingDesc": {
+    "message": "高级：决定每个学习行为使用哪个引擎（渠道 / Google / Bing）。",
+    "description": "学习：行为路由描述"
+  },
+  "optionsAiRequiredTitle": {
+    "message": "需要配置 AI",
+    "description": "AI 需要配置标题"
+  },
+  "optionsAiRequiredDesc": {
+    "message": "LexiPath 的核心功能依赖 AI。请先在「渠道」中配置至少一个可用的模型（模型名、API Key，必要时还需要 Base URL）。",
+    "description": "AI 需要配置描述"
+  },
+  "optionsAiRequiredCta": {
+    "message": "去配置渠道",
+    "description": "AI 需要配置按钮"
+  },
+  "optionsWebStyleThemeLabel": {
+    "message": "高亮主题",
+    "description": "网页高亮主题标签"
+  },
+  "optionsWebStyleThemeDesc": {
+    "message": "选择一个预设主题；如需细调，请选择「自定义」。",
+    "description": "网页高亮主题描述"
+  },
+  "optionsWebStyleTheme_standard": {
+    "message": "标准",
+    "description": "高亮主题：标准"
+  },
+  "optionsWebStyleTheme_subtle": {
+    "message": "柔和",
+    "description": "高亮主题：柔和"
+  },
+  "optionsWebStyleTheme_contrast": {
+    "message": "高对比",
+    "description": "高亮主题：高对比"
+  },
+  "optionsWebStyleTheme_minimal": {
+    "message": "极简",
+    "description": "高亮主题：极简"
+  },
+  "optionsWebStyleTheme_custom": {
+    "message": "自定义",
+    "description": "高亮主题：自定义"
+  },
+  "optionsWebStylePreviewLabel": {
+    "message": "预览",
+    "description": "高亮预览标签"
+  },
+  "optionsScenesQuickDesc": {
+    "message": "开启或关闭不同场景的增强。",
+    "description": "场景快捷描述"
+  },
+  "optionsScenesWebLabel": {
+    "message": "网页",
+    "description": "场景：网页组标签"
+  },
+  "optionsScenesWebDesc": {
+    "message": "在网页中启用增强。",
+    "description": "场景：网页组描述"
+  },
+  "optionsScenesVideoLabel": {
+    "message": "视频",
+    "description": "场景：视频组标签"
+  },
+  "optionsScenesVideoDesc": {
+    "message": "在视频/字幕中启用增强。",
+    "description": "场景：视频组描述"
   },
   "optionsBackupTitle": {
     "message": "备份与恢复",
@@ -612,15 +756,15 @@
     "description": "阶段徽标"
   },
   "optionsChannelsTitle": {
-    "message": "模型",
+    "message": "渠道管理",
     "description": "Channels 标题"
   },
   "optionsChannelsDesc": {
-    "message": "可新增多个模型配置（同一家可多条，每条只绑定一个模型）。",
+    "message": "可新增多个渠道配置（同一家可多条，每条只绑定一个模型）。",
     "description": "Channels 描述"
   },
   "optionsAddChannel": {
-    "message": "新增模型",
+    "message": "新增渠道",
     "description": "新增 Channel 按钮"
   },
   "optionsChannelModelUnset": {
@@ -632,7 +776,7 @@
     "description": "测试服务商连接按钮"
   },
   "optionsCopyChannel": {
-    "message": "复制模型",
+    "message": "复制渠道",
     "description": "复制 Channel 按钮"
   },
   "optionsChannelCopySuffix": {
@@ -666,6 +810,22 @@
   "optionsChannelTypeLabel": {
     "message": "类型",
     "description": "Channel 类型标签"
+  },
+  "optionsChannelType_openaiCompatible": {
+    "message": "OpenAI 兼容",
+    "description": "Channel 类型：OpenAI compatible"
+  },
+  "optionsChannelType_claude": {
+    "message": "Claude",
+    "description": "Channel 类型：Claude"
+  },
+  "optionsChannelType_gemini": {
+    "message": "Gemini",
+    "description": "Channel 类型：Gemini"
+  },
+  "optionsChannelType_unknown": {
+    "message": "未知",
+    "description": "Channel 类型：未知"
   },
   "optionsChannelIconUrlLabel": {
     "message": "图标 URL",
@@ -712,7 +872,7 @@
     "description": "语言设置标题"
   },
   "optionsLanguageDesc": {
-    "message": "配置母语/目标语言与水平。",
+    "message": "配置母语/目标学习语言与水平。",
     "description": "语言设置描述"
   },
   "optionsEnglishCorrectionTitle": {
@@ -1024,7 +1184,7 @@
     "description": "母语标签"
   },
   "optionsTargetLanguageLabel": {
-    "message": "目标语言",
+    "message": "目标学习语言",
     "description": "目标语言标签"
   },
   "optionsProficiencyLevelLabel": {
@@ -1192,19 +1352,19 @@
     "description": "设置：网页增强风格标签"
   },
   "optionsWebEnhanceModeDesc": {
-    "message": "Light 显示括号提示，i+1 正文不插母语，Full 在支持时整段改写。",
+    "message": "轻量：括号提示为主；自适应：更少插入母语、按需提示；重度：在支持时整段改写。",
     "description": "设置：网页增强风格描述"
   },
   "optionsWebEnhanceModeLight": {
-    "message": "Light",
+    "message": "轻量",
     "description": "设置：网页增强风格 Light"
   },
   "optionsWebEnhanceModeIPlus1": {
-    "message": "i+1",
+    "message": "自适应",
     "description": "设置：网页增强风格 i+1"
   },
   "optionsWebEnhanceModeFull": {
-    "message": "Full",
+    "message": "重度",
     "description": "设置：网页增强风格 Full"
   },
   "optionsExcludedSitesLabel": {
@@ -1280,7 +1440,7 @@
     "description": "步骤 1 标题"
   },
   "onboardingStep1Desc": {
-    "message": "根据您的目标语言选择合适的水平",
+    "message": "根据您的目标学习语言选择合适的水平",
     "description": "步骤 1 描述"
   },
   "onboardingStep2Title": {
@@ -1300,27 +1460,27 @@
     "description": "引导页增强模式标签"
   },
   "onboardingEnhanceModeBreezeTitle": {
-    "message": "轻读",
+    "message": "轻量",
     "description": "引导页模式标题（light）"
   },
   "onboardingEnhanceModeBreezeDesc": {
-    "message": "正文少量提示，尽量不打断阅读",
+    "message": "括号提示为主，尽量不打断阅读",
     "description": "引导页模式描述（light）"
   },
   "onboardingEnhanceModeGuidedTitle": {
-    "message": "进阶",
+    "message": "自适应",
     "description": "引导页模式标题（i+1）"
   },
   "onboardingEnhanceModeGuidedDesc": {
-    "message": "标注关键词，释义按需查看",
+    "message": "更少插入母语，按需提示与标注",
     "description": "引导页模式描述（i+1）"
   },
   "onboardingEnhanceModeImmersionTitle": {
-    "message": "沉浸",
+    "message": "重度",
     "description": "引导页模式标题（full）"
   },
   "onboardingEnhanceModeImmersionDesc": {
-    "message": "整段改写为目标语（带安全降级）",
+    "message": "在支持时整段改写为目标学习语言",
     "description": "引导页模式描述（full）"
   },
   "onboardingSummaryEnhanceMode": {
@@ -1328,15 +1488,15 @@
     "description": "引导页总结 - 增强模式"
   },
   "onboardingEnhanceModeSummary_light": {
-    "message": "轻读",
+    "message": "轻量",
     "description": "引导页总结值（light）"
   },
   "onboardingEnhanceModeSummary_i_plus_1": {
-    "message": "进阶",
+    "message": "自适应",
     "description": "引导页总结值（i+1）"
   },
   "onboardingEnhanceModeSummary_full": {
-    "message": "沉浸",
+    "message": "重度",
     "description": "引导页总结值（full）"
   },
   "onboardingStep3Title": {
@@ -1360,12 +1520,20 @@
     "description": "完成按钮"
   },
   "onboardingTargetLanguageLabel": {
-    "message": "目标语言",
+    "message": "目标学习语言",
     "description": "目标语言标签"
   },
   "onboardingProficiencyLabel": {
     "message": "学习水平",
     "description": "学习水平标签"
+  },
+  "onboardingUserLevelLabel": {
+    "message": "用户水平",
+    "description": "引导页：用户水平标签"
+  },
+  "onboardingTargetLevelLabel": {
+    "message": "目标水平",
+    "description": "引导页：目标水平标签"
   },
   "onboardingSceneWeb": {
     "message": "网页阅读",
@@ -1380,7 +1548,7 @@
     "description": "母语内容场景"
   },
   "onboardingSceneTarget": {
-    "message": "目标语内容",
+    "message": "目标学习语言内容",
     "description": "目标语内容场景"
   },
   "onboardingSceneWebNativeTitle": {
@@ -1388,15 +1556,15 @@
     "description": "中文网页场景标题"
   },
   "onboardingSceneWebNativeDesc": {
-    "message": "在中文网页中注入目标语表达，提供沉浸式学习体验",
+    "message": "在中文网页中注入目标学习语言表达，提供沉浸式学习体验",
     "description": "中文网页场景描述"
   },
   "onboardingSceneWebTargetTitle": {
-    "message": "目标语网页",
+    "message": "目标学习语言网页",
     "description": "目标语网页场景标题"
   },
   "onboardingSceneWebTargetDesc": {
-    "message": "在目标语网页中高亮难词，提供按需中文辅助",
+    "message": "在目标学习语言网页中高亮难词，提供按需中文辅助",
     "description": "目标语网页场景描述"
   },
   "onboardingSceneVideoNativeTitle": {
@@ -1404,15 +1572,15 @@
     "description": "中文视频场景标题"
   },
   "onboardingSceneVideoNativeDesc": {
-    "message": "在中文字幕中注入目标语表达，边看边学",
+    "message": "在中文字幕中注入目标学习语言表达，边看边学",
     "description": "中文视频场景描述"
   },
   "onboardingSceneVideoTargetTitle": {
-    "message": "目标语视频",
+    "message": "目标学习语言视频",
     "description": "目标语视频场景标题"
   },
   "onboardingSceneVideoTargetDesc": {
-    "message": "增强目标语字幕，默认单语显示，可一键切换双语",
+    "message": "增强目标学习语言字幕，默认单语显示，可一键切换双语",
     "description": "目标语视频场景描述"
   },
   "onboardingSummaryTitle": {
@@ -1420,7 +1588,7 @@
     "description": "总结标题"
   },
   "onboardingSummaryTargetLanguage": {
-    "message": "目标语言",
+    "message": "目标学习语言",
     "description": "总结：目标语言"
   },
   "onboardingSummaryProficiency": {
@@ -1596,7 +1764,7 @@
     "description": "Gemini base url placeholder"
   },
   "providerChannel_openai": {
-    "message": "OpenAI-compatible",
+    "message": "OpenAI 兼容",
     "description": "Provider channel option: openai"
   },
   "providerChannel_claude": {
@@ -1608,7 +1776,7 @@
     "description": "Provider channel option: gemini"
   },
   "translationProvider_openai": {
-    "message": "OpenAI-compatible",
+    "message": "OpenAI 兼容",
     "description": "Translation provider option: openai"
   },
   "translationProvider_claude": {
@@ -1628,7 +1796,7 @@
     "description": "Translation provider option: bing"
   },
   "optionsRoutingTitle": {
-    "message": "路由",
+    "message": "路由管理",
     "description": "Routing section title"
   },
   "optionsRoutingDesc": {

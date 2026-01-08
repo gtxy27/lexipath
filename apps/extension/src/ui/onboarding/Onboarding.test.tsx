@@ -31,7 +31,9 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => ({
       }),
     },
   },
-  sendMessageMock: vi.fn(() => Promise.resolve({ ok: true, value: {} })),
+  sendMessageMock: vi.fn((_type: string, _payload: unknown) =>
+    Promise.resolve({ ok: true, value: {} }),
+  ),
 }));
 
 vi.mock('webextension-polyfill', () => ({
@@ -44,10 +46,44 @@ vi.mock('../../shared/messages', () => ({
 
 import { Onboarding } from './Onboarding';
 
+const DEFAULT_SETTINGS = {
+  theme: 'system',
+  nativeLanguage: 'zh-CN',
+  targetLanguage: 'en',
+  proficiencyLevel: 'B1',
+  targetProficiencyLevel: 'B2',
+  webEnhanceMode: 'i_plus_1',
+  hasCompletedOnboarding: false,
+};
+
+function getSelectOption(name: string): HTMLElement {
+  return (
+    screen.queryByRole('option', { name }) ??
+    screen.queryByText(name) ??
+    (() => {
+      throw new Error(`Select option not found: ${name}`);
+    })()
+  );
+}
+
+async function selectFromSelect(
+  user: ReturnType<typeof userEvent.setup>,
+  triggerTestId: string,
+  optionName: string,
+) {
+  await user.click(screen.getByTestId(triggerTestId));
+  await user.click(getSelectOption(optionName));
+}
+
 describe('Onboarding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sendMessageMock.mockImplementation(() => Promise.resolve({ ok: true, value: {} }));
+    sendMessageMock.mockImplementation((kind: string) => {
+      if (kind === 'GET_SETTINGS') {
+        return Promise.resolve({ ok: true, value: { ...DEFAULT_SETTINGS } });
+      }
+      return Promise.resolve({ ok: true, value: {} });
+    });
     // Mock window.close
     vi.stubGlobal('close', vi.fn());
   });
@@ -91,92 +127,86 @@ describe('Onboarding', () => {
       expect(enButton).toHaveClass('bg-indigo-600');
     });
 
-    it('shows CEFR levels for English', () => {
+    it('defaults to CEFR user+target levels', () => {
       render(<Onboarding />);
 
-      expect(screen.getByText('proficiency_A1')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_A2')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_B1')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_B2')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_C1')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_C2')).toBeInTheDocument();
+      expect(screen.getByTestId('onboarding-user-level-scale')).toHaveTextContent('CEFR');
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_B1');
+      expect(screen.getByTestId('onboarding-target-level-scale')).toHaveTextContent('CEFR');
+      expect(screen.getByTestId('onboarding-target-level-value')).toHaveTextContent('proficiency_B2');
     });
 
-    it('selects B1 by default for English', () => {
-      render(<Onboarding />);
-
-      const b1Button = screen.getByText('proficiency_B1').closest('button');
-      expect(b1Button).toHaveClass('bg-indigo-600');
-    });
-
-    it('switches to JLPT levels when Japanese is selected', async () => {
+    it('exposes IELTS + CET scales for English (zh native)', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      const jaButton = screen.getByText('languageTarget_ja').closest('button');
-      await user.click(jaButton!);
+      await user.click(screen.getByTestId('onboarding-user-level-scale'));
+      expect(getSelectOption('IELTS')).toBeInTheDocument();
+      expect(getSelectOption('CET-4')).toBeInTheDocument();
+      expect(getSelectOption('CET-6')).toBeInTheDocument();
 
-      expect(screen.getByText('proficiency_N5')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_N4')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_N3')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_N2')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_N1')).toBeInTheDocument();
-
-      // Should not show CEFR levels
-      expect(screen.queryByText('proficiency_A1')).not.toBeInTheDocument();
+      await user.keyboard('{Escape}');
     });
 
-    it('selects N3 by default when switching to Japanese', async () => {
+    it('shows JLPT scale when Japanese is selected', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      const jaButton = screen.getByText('languageTarget_ja').closest('button');
-      await user.click(jaButton!);
-
-      const n3Button = screen.getByText('proficiency_N3').closest('button');
-      expect(n3Button).toHaveClass('bg-indigo-600');
+      await user.click(screen.getByText('languageTarget_ja'));
+      await user.click(screen.getByTestId('onboarding-user-level-scale'));
+      expect(getSelectOption('JLPT')).toBeInTheDocument();
+      await user.keyboard('{Escape}');
     });
 
-    it('switches to TOPIK levels when Korean is selected', async () => {
+    it('defaults to JLPT N3 after selecting JLPT scale', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      const koButton = screen.getByText('languageTarget_ko').closest('button');
-      await user.click(koButton!);
-
-      expect(screen.getByText('proficiency_TOPIK1')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_TOPIK2')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_TOPIK3')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_TOPIK4')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_TOPIK5')).toBeInTheDocument();
-      expect(screen.getByText('proficiency_TOPIK6')).toBeInTheDocument();
+      await user.click(screen.getByText('languageTarget_ja'));
+      await selectFromSelect(user, 'onboarding-user-level-scale', 'JLPT');
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_N3');
     });
 
-    it('allows selecting different proficiency levels', async () => {
+    it('shows TOPIK scale when Korean is selected', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      const c1Button = screen.getByText('proficiency_C1').closest('button');
-      await user.click(c1Button!);
+      await user.click(screen.getByText('languageTarget_ko'));
+      await user.click(screen.getByTestId('onboarding-user-level-scale'));
+      expect(getSelectOption('TOPIK')).toBeInTheDocument();
+      await user.keyboard('{Escape}');
+    });
 
-      expect(c1Button).toHaveClass('bg-indigo-600');
+    it('allows selecting different CEFR levels', async () => {
+      const user = userEvent.setup();
+      render(<Onboarding />);
+
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_C1');
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_C1');
     });
 
     it('preserves proficiency selection when switching between CEFR languages', async () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      // Select C1
-      const c1Button = screen.getByText('proficiency_C1').closest('button');
-      await user.click(c1Button!);
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_C1');
+      await user.click(screen.getByText('languageTarget_fr').closest('button')!);
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_C1');
+    });
 
-      // Switch to French (also CEFR)
-      const frButton = screen.getByText('languageTarget_fr').closest('button');
-      await user.click(frButton!);
+    it('supports selecting JLPT and TOPIK levels', async () => {
+      const user = userEvent.setup();
+      render(<Onboarding />);
 
-      // C1 should still be selected
-      const c1AfterSwitch = screen.getByText('proficiency_C1').closest('button');
-      expect(c1AfterSwitch).toHaveClass('bg-indigo-600');
+      await user.click(screen.getByText('languageTarget_ja'));
+      await selectFromSelect(user, 'onboarding-user-level-scale', 'JLPT');
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_N2');
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_N2');
+
+      await user.click(screen.getByText('languageTarget_ko'));
+      await selectFromSelect(user, 'onboarding-user-level-scale', 'TOPIK');
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_TOPIK5');
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_TOPIK5');
     });
   });
 
@@ -185,7 +215,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       const nextButton = screen.getByText('onboardingNext');
       await user.click(nextButton);
 
@@ -198,7 +227,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
       expect(screen.getByText('onboardingEnhanceModeBreezeTitle')).toBeInTheDocument();
@@ -210,7 +238,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
       expect(screen.getByText('onboardingEnhanceModeBreezeDesc')).toBeInTheDocument();
@@ -222,7 +249,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -233,7 +259,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
       await user.click(screen.getByText('onboardingEnhanceModeImmersionTitle'));
@@ -246,7 +271,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
 
       const prevButton = screen.getByText('onboardingPrevious');
@@ -260,7 +284,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -274,15 +297,14 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
 
       // Go to step 3
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
       expect(screen.getByText('onboardingSummaryTargetLanguage')).toBeInTheDocument();
-      expect(screen.getByText('onboardingSummaryProficiency')).toBeInTheDocument();
       expect(screen.getByText('onboardingSummaryEnhanceMode')).toBeInTheDocument();
       expect(screen.getByTestId('summary-target-lang')).toHaveTextContent('languageTarget_en');
       expect(screen.getByTestId('summary-proficiency')).toHaveTextContent('proficiency_B1');
+      expect(screen.getByTestId('summary-target-level')).toHaveTextContent('proficiency_B2');
       expect(screen.getByTestId('summary-enhance-mode')).toHaveTextContent('onboardingEnhanceModeSummary_i_plus_1');
     });
 
@@ -292,7 +314,8 @@ describe('Onboarding', () => {
 
       // Select Japanese
       await user.click(screen.getByText('languageTarget_ja'));
-      await user.click(screen.getByText('proficiency_N3'));
+      await selectFromSelect(user, 'onboarding-user-level-scale', 'JLPT');
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_N3');
 
       // Go to step 3
       await user.click(screen.getByText('onboardingNext'));
@@ -306,7 +329,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -317,7 +339,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -338,7 +359,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       expect(screen.getByText('onboardingStep2Title')).toBeInTheDocument();
 
@@ -351,7 +371,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       expect(screen.getByText('onboardingStep3Title')).toBeInTheDocument();
@@ -366,7 +385,7 @@ describe('Onboarding', () => {
 
       // Select French and C2
       await user.click(screen.getByText('languageTarget_fr').closest('button')!);
-      await user.click(screen.getByText('proficiency_C2').closest('button')!);
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_C2');
 
       // Go to step 2
       await user.click(screen.getByText('onboardingNext'));
@@ -379,9 +398,8 @@ describe('Onboarding', () => {
 
       // Verify selections are preserved
       const frButtonAfter = screen.getByText('languageTarget_fr').closest('button');
-      const c2ButtonAfter = screen.getByText('proficiency_C2').closest('button');
       expect(frButtonAfter).toHaveClass('bg-indigo-600');
-      expect(c2ButtonAfter).toHaveClass('bg-indigo-600');
+      expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_C2');
 
       // Go forward to step 2 again
       await user.click(screen.getByText('onboardingNext'));
@@ -397,7 +415,6 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
@@ -408,6 +425,7 @@ describe('Onboarding', () => {
           expect.objectContaining({
             targetLanguage: 'en',
             proficiencyLevel: 'B1',
+            targetProficiencyLevel: 'B2',
             webEnhanceMode: 'i_plus_1',
             hasCompletedOnboarding: true,
           }),
@@ -420,11 +438,9 @@ describe('Onboarding', () => {
       render(<Onboarding />);
 
       // Select Japanese N2
-      const jaButton = screen.getByText('languageTarget_ja').closest('button');
-      await user.click(jaButton!);
-
-      const n2Button = screen.getByText('proficiency_N2').closest('button');
-      await user.click(n2Button!);
+      await user.click(screen.getByText('languageTarget_ja'));
+      await selectFromSelect(user, 'onboarding-user-level-scale', 'JLPT');
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_N2');
 
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
@@ -436,6 +452,8 @@ describe('Onboarding', () => {
           expect.objectContaining({
             targetLanguage: 'ja',
             proficiencyLevel: 'B2', // N2 maps to B2
+            proficiencyPreference: { standard: 'JLPT', value: 'N2' },
+            targetProficiencyLevel: 'B2',
             webEnhanceMode: 'i_plus_1',
             hasCompletedOnboarding: true,
           }),
@@ -448,11 +466,9 @@ describe('Onboarding', () => {
       render(<Onboarding />);
 
       // Select Korean TOPIK 5
-      const koButton = screen.getByText('languageTarget_ko').closest('button');
-      await user.click(koButton!);
-
-      const topik5Button = screen.getByText('proficiency_TOPIK5').closest('button');
-      await user.click(topik5Button!);
+      await user.click(screen.getByText('languageTarget_ko'));
+      await selectFromSelect(user, 'onboarding-user-level-scale', 'TOPIK');
+      await selectFromSelect(user, 'onboarding-user-level-value', 'proficiency_TOPIK5');
 
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
@@ -464,6 +480,8 @@ describe('Onboarding', () => {
           expect.objectContaining({
             targetLanguage: 'ko',
             proficiencyLevel: 'C1', // TOPIK 5 maps to C1
+            proficiencyPreference: { standard: 'TOPIK', value: '5' },
+            targetProficiencyLevel: 'B2',
             webEnhanceMode: 'i_plus_1',
             hasCompletedOnboarding: true,
           }),
@@ -475,15 +493,18 @@ describe('Onboarding', () => {
       const user = userEvent.setup();
       let resolveSave: (() => void) | undefined;
       sendMessageMock.mockImplementation(
-        () =>
-          new Promise<{ ok: true; value: {} }>((resolve) => {
+        (type: string) => {
+          if (type === 'GET_SETTINGS') {
+            return Promise.resolve({ ok: true, value: { ...DEFAULT_SETTINGS } });
+          }
+          return new Promise<{ ok: true; value: {} }>((resolve) => {
             resolveSave = () => resolve({ ok: true, value: {} });
-          })
+          });
+        },
       );
 
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
 
@@ -508,12 +529,8 @@ describe('Onboarding', () => {
       const closeMock = vi.fn();
       vi.stubGlobal('close', closeMock);
 
-      // Ensure sendMessage resolves successfully
-      sendMessageMock.mockResolvedValueOnce({ ok: true, value: {} });
-
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
@@ -530,11 +547,15 @@ describe('Onboarding', () => {
     it('handles save errors gracefully', async () => {
       const user = userEvent.setup();
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      sendMessageMock.mockRejectedValue(new Error('Save failed'));
+      sendMessageMock.mockImplementation((type: string) => {
+        if (type === 'GET_SETTINGS') {
+          return Promise.resolve({ ok: true, value: { ...DEFAULT_SETTINGS } });
+        }
+        return Promise.reject(new Error('Save failed'));
+      });
 
       render(<Onboarding />);
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
@@ -558,7 +579,6 @@ describe('Onboarding', () => {
 
       expect(screen.getByText('Step 1 of 3')).toBeInTheDocument();
 
-      await user.click(screen.getByText('proficiency_B1'));
       await user.click(screen.getByText('onboardingNext'));
       expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
 
