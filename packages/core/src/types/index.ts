@@ -336,6 +336,17 @@ export const SceneFlagsSchema = z
   });
 export type SceneFlags = z.infer<typeof SceneFlagsSchema>;
 
+export const WordCardSectionKeySchema = z.enum([
+  'definition',
+  'translation',
+  'example',
+  'exampleTranslation',
+]);
+export type WordCardSectionKey = z.infer<typeof WordCardSectionKeySchema>;
+
+export const EnglishAccentSchema = z.enum(['us', 'uk']);
+export type EnglishAccent = z.infer<typeof EnglishAccentSchema>;
+
 export const SettingsSchema = z.object({
   // Language
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
@@ -362,12 +373,21 @@ export const SettingsSchema = z.object({
   enabled: z.boolean().default(true),
   autoEnhance: z.boolean().default(true),
   webEnhanceMode: WebEnhanceModeSchema.default('i_plus_1'),
+  webEnhanceModeNative: z.enum(['light', 'i_plus_1']).default('i_plus_1'),
   floatingButtonEnabled: z.boolean().default(true),
   webShowOriginal: z.boolean().default(false),
   webStyleMapping: WebStyleMappingSchema,
   webCustomCss: z.string().max(2000).default(''),
   scenesEnabled: SceneFlagsSchema,
   hasCompletedOnboarding: z.boolean().default(false),
+
+  // Word card
+  webSelectionExplainEnabled: z.boolean().default(true),
+  wordCardSectionsOrder: z
+    .array(WordCardSectionKeySchema)
+    .default(['definition', 'translation', 'example', 'exampleTranslation']),
+  wordCardAutoPronounce: z.boolean().default(true),
+  wordCardEnglishAccent: EnglishAccentSchema.default('us'),
 
   // English correction (3x space)
   englishCorrection: EnglishCorrectionConfigSchema,
