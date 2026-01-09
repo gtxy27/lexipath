@@ -43,6 +43,22 @@
     "message": "Error loading definition",
     "description": "Word card: unexpected error"
   },
+  "wordCard_sectionDefinition": {
+    "message": "Meaning",
+    "description": "Word card: section label (definition)"
+  },
+  "wordCard_sectionTranslation": {
+    "message": "Translation",
+    "description": "Word card: section label (translation)"
+  },
+  "wordCard_sectionExample": {
+    "message": "Example",
+    "description": "Word card: section label (example)"
+  },
+  "wordCard_sectionExampleTranslation": {
+    "message": "Example translation",
+    "description": "Word card: section label (example translation)"
+  },
   "englishCorrection_tagEncouragement": {
     "message": "Encouragement",
     "description": "English correction: card tag (encouragement)"
@@ -263,6 +279,22 @@
     "message": "Theme: $1",
     "description": "Theme button label ($1: System/Light/Dark)"
   },
+  "floatingCommandCenterTitle": {
+    "message": "Command center",
+    "description": "Floating button: panel title"
+  },
+  "floatingCommandCenterSection_page": {
+    "message": "Page",
+    "description": "Floating button: section title (page actions)"
+  },
+  "floatingCommandCenterSection_focus": {
+    "message": "Focus",
+    "description": "Floating button: section title (learning/focus actions)"
+  },
+  "floatingCommandCenterSection_settings": {
+    "message": "Settings",
+    "description": "Floating button: section title (settings actions)"
+  },
   "floatingCommandCenterOpen": {
     "message": "Open command center",
     "description": "Floating button: open command center"
@@ -275,16 +307,32 @@
     "message": "Enhance this page",
     "description": "Floating button: manually run page enhancement once"
   },
+  "floatingCommandCenterCancelEnhance": {
+    "message": "Cancel enhancement",
+    "description": "Floating button: cancel enhancement for this page (show original)"
+  },
+  "floatingCommandCenterRewritePage": {
+    "message": "Rewrite this page",
+    "description": "Floating button: rewrite this page into learning language"
+  },
   "floatingCommandCenterEnhanceOnceDesc": {
     "message": "Run enhancement once even in manual mode.",
     "description": "Floating button: manual enhance hint"
+  },
+  "floatingCommandCenterCancelEnhanceDesc": {
+    "message": "Show original text on this page (does not change global settings).",
+    "description": "Floating button: cancel enhancement hint"
+  },
+  "floatingCommandCenterRewritePageDesc": {
+    "message": "Translate this page into your learning language (best-effort).",
+    "description": "Floating button: rewrite this page hint"
   },
   "floatingCommandCenterHide": {
     "message": "Hide command center",
     "description": "Floating button: hide floating UI"
   },
   "floatingCommandCenterHideDesc": {
-    "message": "You can restore it from Popup or Options.",
+    "message": "Hide in this tab; re-enable from Popup or Options.",
     "description": "Floating button: hide hint"
   },
   "floatingCommandCenterHideOnce": {
@@ -312,20 +360,20 @@
     "description": "Floating button: current site placeholder"
   },
   "floatingCommandCenterDisableThisSite": {
-    "message": "Disable auto enhance on $1",
-    "description": "Floating button: add current site to blacklist"
+    "message": "Disable auto enhance on this page",
+    "description": "Floating button: disable auto enhance for this page"
   },
   "floatingCommandCenterEnableThisSite": {
-    "message": "Enable auto enhance on $1",
-    "description": "Floating button: remove current site from blacklist"
+    "message": "Enable auto enhance on this page",
+    "description": "Floating button: enable auto enhance for this page"
   },
   "floatingCommandCenterAllowThisSite": {
-    "message": "Allow auto enhance on $1",
-    "description": "Floating button: add current site to whitelist"
+    "message": "Allow auto enhance on this page",
+    "description": "Floating button: add this page to allow list"
   },
   "floatingCommandCenterRemoveThisSite": {
-    "message": "Remove from allow list: $1",
-    "description": "Floating button: remove current site from whitelist"
+    "message": "Cancel auto enhance on this page",
+    "description": "Floating button: remove this page from allow list"
   },
   "floatingCommandCenterToggleOriginalTab": {
     "message": "This tab: toggle original/enhanced",
@@ -1331,6 +1379,70 @@
     "message": "Show the floating button on web pages. You can also hide it from the button menu.",
     "description": "Options: floating button toggle description"
   },
+  "optionsWordCardTitle": {
+    "message": "Word card",
+    "description": "Options: word card section title"
+  },
+  "optionsWordCardAutoPronounceLabel": {
+    "message": "Auto pronounce",
+    "description": "Options: word card auto pronounce label"
+  },
+  "optionsWordCardAutoPronounceDesc": {
+    "message": "Automatically play pronunciation when you open a word card (click/selection).",
+    "description": "Options: word card auto pronounce description"
+  },
+  "optionsWordCardEnglishAccentLabel": {
+    "message": "English accent",
+    "description": "Options: word card English accent label"
+  },
+  "optionsWordCardEnglishAccentUs": {
+    "message": "American (US)",
+    "description": "Options: word card English accent: US"
+  },
+  "optionsWordCardEnglishAccentUk": {
+    "message": "British (UK)",
+    "description": "Options: word card English accent: UK"
+  },
+  "optionsWebSelectionExplainLabel": {
+    "message": "Double-click selection",
+    "description": "Options: enable selection-based word card"
+  },
+  "optionsWebSelectionExplainDesc": {
+    "message": "Show a word card when you double-click a single word on a web page.",
+    "description": "Options: selection-based word card description"
+  },
+  "optionsWordCardOrderLabel": {
+    "message": "Card section order",
+    "description": "Options: word card sections order label"
+  },
+  "optionsWordCardOrderHint": {
+    "message": "Applies to the in-page word card.",
+    "description": "Options: word card sections order hint"
+  },
+  "optionsWordCardMoveUp": {
+    "message": "Move up",
+    "description": "Options: move word card section up"
+  },
+  "optionsWordCardMoveDown": {
+    "message": "Move down",
+    "description": "Options: move word card section down"
+  },
+  "optionsWordCardSection_definition": {
+    "message": "Meaning",
+    "description": "Options: word card section name (definition)"
+  },
+  "optionsWordCardSection_translation": {
+    "message": "Translation",
+    "description": "Options: word card section name (translation)"
+  },
+  "optionsWordCardSection_example": {
+    "message": "Example",
+    "description": "Options: word card section name (example)"
+  },
+  "optionsWordCardSection_exampleTranslation": {
+    "message": "Example translation",
+    "description": "Options: word card section name (example translation)"
+  },
   "optionsWebEnhanceModeLabel": {
     "message": "Enhance style",
     "description": "Options: web enhance mode label"
@@ -1338,6 +1450,18 @@
   "optionsWebEnhanceModeDesc": {
     "message": "Lightweight shows inline hints, Adaptive keeps text clean, Heavy rewrites paragraphs when supported.",
     "description": "Options: web enhance mode description"
+  },
+  "optionsWebEnhanceModeTargetLabel": {
+    "message": "Target-language pages",
+    "description": "Options: web enhance mode label for target-language pages"
+  },
+  "optionsWebEnhanceModeNativeLabel": {
+    "message": "Native-language pages",
+    "description": "Options: web enhance mode label for native-language pages"
+  },
+  "optionsWebEnhanceModeNativeHint": {
+    "message": "Native pages do not support Heavy mode.",
+    "description": "Options: web enhance mode hint for native-language pages"
   },
   "optionsWebEnhanceModeLight": {
     "message": "Lightweight",

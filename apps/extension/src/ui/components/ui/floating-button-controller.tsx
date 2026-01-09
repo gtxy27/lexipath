@@ -10,11 +10,19 @@ type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
 type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
 type PageContext = {
   forgottenWords: Array<{ word: string; familiarity: number; encounters: number }>;
+  translatedCount?: number;
+  seenCount?: number;
+  webEnhanceMode?: "i_plus_1" | "light" | "full";
+  pageEligible?: boolean;
+  pageLanguage?: string;
 };
 
 const SHOW_ORIGINAL_CLASS = "lexipath-show-original";
 const TAB_SHOW_ORIGINAL_KEY = "lexipath-tab-show-original";
+const ENHANCE_PAUSED_CLASS = "lexipath-enhance-paused";
+const TAB_ENHANCE_PAUSED_KEY = "lexipath-tab-enhance-paused";
 const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
+const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
 
 export class FloatingButtonController {
   private container: HTMLDivElement | null = null;
@@ -22,14 +30,19 @@ export class FloatingButtonController {
   private root: Root | null = null;
   private settings: Settings | null = null;
   private onRunWebEnhanceOnce: (() => void | Promise<void>) | null = null;
+  private onRunWebRewriteOnce: (() => void | Promise<void>) | null = null;
   private pageContext: PageContext = { forgottenWords: [] };
 
   constructor(
     settings: Settings | null,
-    options?: { onRunWebEnhanceOnce?: () => void | Promise<void> },
+    options?: {
+      onRunWebEnhanceOnce?: () => void | Promise<void>;
+      onRunWebRewriteOnce?: () => void | Promise<void>;
+    },
   ) {
     this.settings = settings;
     this.onRunWebEnhanceOnce = options?.onRunWebEnhanceOnce ?? null;
+    this.onRunWebRewriteOnce = options?.onRunWebRewriteOnce ?? null;
   }
 
   mount() {
@@ -67,6 +80,13 @@ export class FloatingButtonController {
 
     this.root = createRoot(rootEl);
     this.render();
+
+    try {
+      const paused = sessionStorage.getItem(TAB_ENHANCE_PAUSED_KEY) === "1";
+      document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, paused);
+    } catch (error: unknown) {
+      void error;
+    }
 
     document.documentElement.appendChild(this.container);
   }
@@ -145,15 +165,27 @@ export class FloatingButtonController {
     document.documentElement.classList.toggle(SHOW_ORIGINAL_CLASS, enabled);
   }
 
-  private toggleTabOriginal(): void {
-    const current = document.documentElement.classList.contains(SHOW_ORIGINAL_CLASS);
-    const next = !current;
+  private setTabShowOriginal(next: boolean): void {
+    const globalEnabled = Boolean(this.settings?.webShowOriginal);
     try {
-      sessionStorage.setItem(TAB_SHOW_ORIGINAL_KEY, next ? "1" : "0");
+      if (next === globalEnabled) {
+        sessionStorage.removeItem(TAB_SHOW_ORIGINAL_KEY);
+      } else {
+        sessionStorage.setItem(TAB_SHOW_ORIGINAL_KEY, next ? "1" : "0");
+      }
     } catch (error: unknown) {
       void error;
     }
     document.documentElement.classList.toggle(SHOW_ORIGINAL_CLASS, next);
+  }
+
+  private setTabEnhancePaused(next: boolean): void {
+    try {
+      sessionStorage.setItem(TAB_ENHANCE_PAUSED_KEY, next ? "1" : "0");
+    } catch (error: unknown) {
+      void error;
+    }
+    document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, next);
   }
 
   private render() {
@@ -163,41 +195,36 @@ export class FloatingButtonController {
     const siteMode = settings ? this.getEnhanceSiteMode(settings) : "manual";
     const siteRule = settings ? this.getSiteRuleStatus(settings) : { status: "enabled" as const };
     const currentHost = window.location.hostname;
+    const tabShowOriginal = document.documentElement.classList.contains(SHOW_ORIGINAL_CLASS);
+    const tabEnhancePaused = document.documentElement.classList.contains(ENHANCE_PAUSED_CLASS);
+    const hasEnhancedOnce = (() => {
+      try {
+        return sessionStorage.getItem(HAS_ENHANCED_ONCE_KEY) === "1";
+      } catch (error: unknown) {
+        void error;
+        return false;
+      }
+    })();
+    const hasEnhancedMarkup = Boolean(
+      hasEnhancedOnce || document.querySelector(".lexipath-word, .lexipath-paragraph-enhanced"),
+    );
 
     this.root.render(
       <FloatingButton
         enabled={settings?.enabled ?? true}
-        webEnhanceMode={settings?.webEnhanceMode ?? "i_plus_1"}
         enhanceSiteMode={siteMode}
         siteRuleStatus={siteRule.status}
         {...(siteRule.matchedRule ? { siteRuleMatchedRule: siteRule.matchedRule } : {})}
         currentHost={currentHost}
-        globalShowOriginal={Boolean(settings?.webShowOriginal)}
+        tabShowOriginal={tabShowOriginal}
+        enhancePaused={tabEnhancePaused}
+        hasEnhancedMarkup={hasEnhancedMarkup}
         forgottenWords={this.pageContext.forgottenWords}
-        onToggleEnabled={(enabled) => {
-          sendMessage("SET_SETTINGS", { enabled });
-        }}
-        onCycleWebEnhanceMode={() => {
-          if (!settings) return;
-          const order: Array<Settings["webEnhanceMode"]> = ["light", "i_plus_1", "full"];
-          const idx = Math.max(0, order.indexOf(settings.webEnhanceMode ?? "i_plus_1"));
-          const next = order[(idx + 1) % order.length];
-          sendMessage("SET_SETTINGS", { webEnhanceMode: next });
-        }}
-        onCycleEnhanceSiteMode={() => {
-          if (!settings) return;
-          const current = this.getEnhanceSiteMode(settings);
-          const next: EnhanceSiteMode =
-            current === "manual" ? "auto_blacklist" : current === "auto_blacklist" ? "auto_whitelist" : "manual";
-
-          if (next === "manual") {
-            sendMessage("SET_SETTINGS", { autoEnhance: false, siteMode: "all" });
-          } else if (next === "auto_blacklist") {
-            sendMessage("SET_SETTINGS", { autoEnhance: true, siteMode: "all" });
-          } else {
-            sendMessage("SET_SETTINGS", { autoEnhance: true, siteMode: "whitelist" });
-          }
-        }}
+        translatedCount={this.pageContext.translatedCount ?? 0}
+        seenCount={this.pageContext.seenCount ?? 0}
+        webEnhanceMode={this.pageContext.webEnhanceMode ?? "i_plus_1"}
+        pageEligible={this.pageContext.pageEligible ?? true}
+        {...(this.pageContext.pageLanguage ? { pageLanguage: this.pageContext.pageLanguage } : {})}
         onToggleCurrentSiteRule={() => {
           if (!settings) return;
           const url = window.location.href;
@@ -220,16 +247,27 @@ export class FloatingButtonController {
             sendMessage("SET_SETTINGS", { allowedSites: nextAllowed });
           }
         }}
-        onRunEnhanceOnce={() => this.onRunWebEnhanceOnce?.()}
-        onToggleOriginalTab={() => {
-          this.toggleTabOriginal();
+        onRunEnhanceOnce={async () => {
+          try {
+            await this.onRunWebEnhanceOnce?.();
+          } finally {
+            this.render();
+          }
         }}
-        onToggleOriginalGlobal={() => {
-          if (!settings) return;
-          const next = !Boolean(settings.webShowOriginal);
-          sendMessage("SET_SETTINGS", { webShowOriginal: next }).then(() => {
-            this.applyOriginalClass({ ...settings, webShowOriginal: next });
-          });
+        onRunRewriteOnce={async () => {
+          try {
+            await this.onRunWebRewriteOnce?.();
+          } finally {
+            this.render();
+          }
+        }}
+        onSetTabShowOriginal={(showOriginal) => {
+          this.setTabShowOriginal(showOriginal);
+          this.render();
+        }}
+        onSetTabEnhancePaused={(paused) => {
+          this.setTabEnhancePaused(paused);
+          this.render();
         }}
         onOpenOptions={() => {
           browser.runtime.openOptionsPage();
@@ -244,9 +282,6 @@ export class FloatingButtonController {
             void error;
           }
           this.unmount();
-        }}
-        onHideFloatingButton={() => {
-          sendMessage("SET_SETTINGS", { floatingButtonEnabled: false });
         }}
       />
     );

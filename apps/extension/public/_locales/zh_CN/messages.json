@@ -43,6 +43,22 @@
     "message": "加载释义出错",
     "description": "单词卡：发生未知错误"
   },
+  "wordCard_sectionDefinition": {
+    "message": "释义",
+    "description": "单词卡：板块标题（释义）"
+  },
+  "wordCard_sectionTranslation": {
+    "message": "翻译",
+    "description": "单词卡：板块标题（翻译）"
+  },
+  "wordCard_sectionExample": {
+    "message": "例句",
+    "description": "单词卡：板块标题（例句）"
+  },
+  "wordCard_sectionExampleTranslation": {
+    "message": "例句翻译",
+    "description": "单词卡：板块标题（例句翻译）"
+  },
   "englishCorrection_tagEncouragement": {
     "message": "鼓励",
     "description": "英文纠错：卡片标签（鼓励）"
@@ -279,6 +295,22 @@
     "message": "主题：$1",
     "description": "主题按钮文案（$1: 系统/浅色/深色）"
   },
+  "floatingCommandCenterTitle": {
+    "message": "指令中心",
+    "description": "悬浮按钮：面板标题"
+  },
+  "floatingCommandCenterSection_page": {
+    "message": "本页",
+    "description": "悬浮按钮：分组标题（页面操作）"
+  },
+  "floatingCommandCenterSection_focus": {
+    "message": "学习",
+    "description": "悬浮按钮：分组标题（学习/专注）"
+  },
+  "floatingCommandCenterSection_settings": {
+    "message": "设置",
+    "description": "悬浮按钮：分组标题（设置）"
+  },
   "floatingCommandCenterOpen": {
     "message": "打开悬浮菜单",
     "description": "悬浮按钮：打开命令中心/菜单"
@@ -291,17 +323,33 @@
     "message": "增强本页",
     "description": "悬浮按钮：手动触发一次网页增强"
   },
+  "floatingCommandCenterCancelEnhance": {
+    "message": "取消增强",
+    "description": "悬浮按钮：本页取消增强（显示原文）"
+  },
+  "floatingCommandCenterRewritePage": {
+    "message": "将此页改写",
+    "description": "悬浮按钮：将当前页面改写为学习语言"
+  },
+  "floatingCommandCenterRewritePageDesc": {
+    "message": "将当前页面翻译成你的学习语言（尽力而为）。",
+    "description": "悬浮按钮：将此页改写提示"
+  },
   "floatingCommandCenterEnhanceOnceDesc": {
     "message": "即使在手动模式也可以点击触发一次。",
     "description": "悬浮按钮：手动增强提示"
+  },
+  "floatingCommandCenterCancelEnhanceDesc": {
+    "message": "本页临时显示原文（不影响全局设置）。",
+    "description": "悬浮按钮：本页取消增强提示"
   },
   "floatingCommandCenterHide": {
     "message": "隐藏悬浮菜单",
     "description": "悬浮按钮：隐藏悬浮 UI"
   },
   "floatingCommandCenterHideDesc": {
-    "message": "可在弹窗或设置中恢复显示。",
-    "description": "悬浮按钮：隐藏后恢复入口提示"
+    "message": "仅隐藏当前标签页；可在弹窗或设置中重新开启。",
+    "description": "悬浮按钮：隐藏提示"
   },
   "floatingCommandCenterHideOnce": {
     "message": "本页隐藏悬浮菜单",
@@ -328,20 +376,20 @@
     "description": "悬浮按钮：当前站点占位符"
   },
   "floatingCommandCenterDisableThisSite": {
-    "message": "在 $1 上禁用自动增强",
-    "description": "悬浮按钮：将当前站点加入黑名单"
+    "message": "在此网页禁用自动增强",
+    "description": "悬浮按钮：本页禁用自动增强"
   },
   "floatingCommandCenterEnableThisSite": {
-    "message": "在 $1 上启用自动增强",
-    "description": "悬浮按钮：将当前站点移出黑名单"
+    "message": "在此网页启用自动增强",
+    "description": "悬浮按钮：本页启用自动增强"
   },
   "floatingCommandCenterAllowThisSite": {
-    "message": "允许 $1 自动增强",
-    "description": "悬浮按钮：将当前站点加入白名单"
+    "message": "允许此网页自动增强",
+    "description": "悬浮按钮：本页加入允许列表"
   },
   "floatingCommandCenterRemoveThisSite": {
-    "message": "移出允许列表：$1",
-    "description": "悬浮按钮：将当前站点移出白名单"
+    "message": "取消此网页自动增强",
+    "description": "悬浮按钮：本页移出允许列表"
   },
   "floatingCommandCenterToggleOriginalTab": {
     "message": "本页：原文/增强切换",
@@ -1347,6 +1395,70 @@
     "message": "在网页中显示悬浮按钮；你也可以在悬浮菜单里选择隐藏。",
     "description": "设置：悬浮按钮开关描述"
   },
+  "optionsWordCardTitle": {
+    "message": "单词卡",
+    "description": "设置：单词卡设置标题"
+  },
+  "optionsWordCardAutoPronounceLabel": {
+    "message": "自动发音",
+    "description": "设置：单词卡自动发音标签"
+  },
+  "optionsWordCardAutoPronounceDesc": {
+    "message": "打开单词卡时自动播放发音（点击/双击选中）。",
+    "description": "设置：单词卡自动发音描述"
+  },
+  "optionsWordCardEnglishAccentLabel": {
+    "message": "英语口音",
+    "description": "设置：单词卡英语口音标签"
+  },
+  "optionsWordCardEnglishAccentUs": {
+    "message": "美音 (US)",
+    "description": "设置：单词卡英语口音（US）"
+  },
+  "optionsWordCardEnglishAccentUk": {
+    "message": "英音 (UK)",
+    "description": "设置：单词卡英语口音（UK）"
+  },
+  "optionsWebSelectionExplainLabel": {
+    "message": "双击选词释义",
+    "description": "设置：双击选词释义开关"
+  },
+  "optionsWebSelectionExplainDesc": {
+    "message": "双击选中单个单词时显示单词卡。",
+    "description": "设置：双击选词释义描述"
+  },
+  "optionsWordCardOrderLabel": {
+    "message": "卡片内容顺序",
+    "description": "设置：单词卡内容顺序标签"
+  },
+  "optionsWordCardOrderHint": {
+    "message": "仅影响网页/字幕中的单词卡显示顺序。",
+    "description": "设置：单词卡内容顺序提示"
+  },
+  "optionsWordCardMoveUp": {
+    "message": "上移",
+    "description": "设置：单词卡板块上移"
+  },
+  "optionsWordCardMoveDown": {
+    "message": "下移",
+    "description": "设置：单词卡板块下移"
+  },
+  "optionsWordCardSection_definition": {
+    "message": "释义",
+    "description": "设置：单词卡板块名称（释义）"
+  },
+  "optionsWordCardSection_translation": {
+    "message": "翻译",
+    "description": "设置：单词卡板块名称（翻译）"
+  },
+  "optionsWordCardSection_example": {
+    "message": "例句",
+    "description": "设置：单词卡板块名称（例句）"
+  },
+  "optionsWordCardSection_exampleTranslation": {
+    "message": "例句翻译",
+    "description": "设置：单词卡板块名称（例句翻译）"
+  },
   "optionsWebEnhanceModeLabel": {
     "message": "增强风格",
     "description": "设置：网页增强风格标签"
@@ -1354,6 +1466,18 @@
   "optionsWebEnhanceModeDesc": {
     "message": "轻量：括号提示为主；自适应：更少插入母语、按需提示；重度：在支持时整段改写。",
     "description": "设置：网页增强风格描述"
+  },
+  "optionsWebEnhanceModeTargetLabel": {
+    "message": "目标语言页面",
+    "description": "设置：目标语言页面的增强风格标签"
+  },
+  "optionsWebEnhanceModeNativeLabel": {
+    "message": "母语页面",
+    "description": "设置：母语页面的增强风格标签"
+  },
+  "optionsWebEnhanceModeNativeHint": {
+    "message": "母语页面不支持“重度”模式。",
+    "description": "设置：母语页面增强风格提示"
   },
   "optionsWebEnhanceModeLight": {
     "message": "轻量",

@@ -5,6 +5,7 @@ import { AiGate } from "../AiGate";
 import { t } from "../optionsI18n";
 import type { FieldErrors, FormState } from "../optionsTypes";
 import { BackupTab } from "./BackupTab";
+import { DisplayTab } from "./DisplayTab";
 import { SitesTab } from "./SitesTab";
 
 export function GeneralTab(props: {
@@ -57,6 +58,14 @@ export function GeneralTab(props: {
               />
             </div>
           </div>
+
+          <DisplayTab
+            embedded
+            form={form}
+            setForm={setForm}
+            aiEnabled={aiEnabled}
+            onOpenChannels={onOpenChannels}
+          />
 
           <details className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#15161e] p-6">
             <summary className="cursor-pointer list-none select-none flex items-center justify-between gap-4">
@@ -116,4 +125,3 @@ export function GeneralTab(props: {
     </>
   );
 }
-
