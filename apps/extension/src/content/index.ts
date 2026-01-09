@@ -24,7 +24,11 @@ import {
   detectPlatform,
   type Platform,
 } from "./subtitle-controller";
-import { createEnhancedElement, type WordRenderMode } from "./enhanced-text";
+import {
+  createEnhancedElement,
+  createEnhancedRenderer,
+  type WordRenderMode,
+} from "./enhanced-text";
 import { getI18nMessage } from "./i18n";
 import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
 import { EnglishCorrectionController } from "./english-correction";
@@ -36,6 +40,7 @@ let subtitleController: SubtitleController | null = null;
 let englishCorrectionController: EnglishCorrectionController | null = null;
 let floatingButtonController: FloatingButtonController | null = null;
 let currentSettings: Settings | null = null;
+let currentSiteQualified = false;
 let observer: MutationObserver | null = null;
 let urlPollTimer: number | null = null;
 let navigationToken = 0;
@@ -46,9 +51,13 @@ let hoverTimer: number | null = null;
 const HOVER_UPGRADE_DELAY_MS = 800;
 const wordExplainCache = new Map<string, WordCardData>();
 const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
+let selectionExplainInjected = false;
+const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
 
 const SHOW_ORIGINAL_CLASS = "lexipath-show-original";
 const TAB_SHOW_ORIGINAL_KEY = "lexipath-tab-show-original";
+const ENHANCE_PAUSED_CLASS = "lexipath-enhance-paused";
+const TAB_ENHANCE_PAUSED_KEY = "lexipath-tab-enhance-paused";
 const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
 
 const FORGOTTEN_MIN_ENCOUNTERS = 2;
@@ -58,6 +67,10 @@ type WordFamiliarityLite = { familiarity: number; encounters: number };
 const wordFamiliarityCache = new Map<string, WordFamiliarityLite>();
 const pageForgottenWords = new Map<string, { word: string; familiarity: number; encounters: number }>();
 const exposureSentWords = new Set<string>();
+const pageTranslatedWords = new Set<string>();
+let pagePrimaryLanguage: string | null = null;
+let pageEligibleForLearning = true;
+let enhancePauseObserver: MutationObserver | null = null;
 
 let exposureObserver: IntersectionObserver | null = null;
 const exposureTargets = new WeakMap<Element, string[]>();
@@ -96,6 +109,63 @@ function toggleTabShowOriginal(): void {
   applyWebShowOriginal(currentSettings);
 }
 
+function isEnhancePausedNow(): boolean {
+  return document.documentElement.classList.contains(ENHANCE_PAUSED_CLASS);
+}
+
+function applyTabEnhancePausedFromStorage(): void {
+  let paused = false;
+  try {
+    paused = sessionStorage.getItem(TAB_ENHANCE_PAUSED_KEY) === "1";
+  } catch (error: unknown) {
+    void error;
+  }
+  document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, paused);
+}
+
+function forceHideTooltipAndCard(): void {
+  tooltipTarget = null;
+  if (tooltipEl) tooltipEl.style.display = "none";
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
+  try {
+    webOverlay?.hideWordCard?.();
+  } catch (error: unknown) {
+    void error;
+  }
+}
+
+function clearPendingPageProcessingQueues(): void {
+  // Stop further processing quickly (in-flight requests cannot be aborted, but we can stop pumping/queuing).
+  pumpScheduled = false;
+  elementQueue = [];
+  priorityQueue = [];
+  queueHead = 0;
+}
+
+function ensureEnhancePauseObserver(): void {
+  if (enhancePauseObserver) return;
+  enhancePauseObserver = new MutationObserver(() => {
+    if (isEnhancePausedNow()) {
+      clearPendingPageProcessingQueues();
+      forceHideTooltipAndCard();
+      return;
+    }
+
+    // Resuming: if we still have backlog, keep pumping.
+    if (getQueuedBacklogCount() > 0) {
+      schedulePumpQueue({ eager: true });
+    }
+  });
+
+  enhancePauseObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+}
+
 function getResolvedTheme(): "light" | "dark" {
   if (!currentSettings) return "dark";
   if (currentSettings.theme === "system") {
@@ -106,6 +176,24 @@ function getResolvedTheme(): "light" | "dark" {
   return currentSettings.theme === "dark" ? "dark" : "light";
 }
 
+function resolveWordCardTtsLang(settings: Settings | null): string {
+  if (!settings) return "en-US";
+  const targetLanguage = settings.targetLanguage;
+
+  if (targetLanguage === "en") {
+    return settings.wordCardEnglishAccent === "uk" ? "en-GB" : "en-US";
+  }
+  if (targetLanguage === "ja") return "ja-JP";
+  if (targetLanguage === "ko") return "ko-KR";
+  if (targetLanguage === "fr") return "fr-FR";
+  if (targetLanguage === "de") return "de-DE";
+  if (targetLanguage === "zh") {
+    return settings.nativeLanguage === "zh-TW" ? "zh-TW" : "zh-CN";
+  }
+
+  return "en-US";
+}
+
 function getWebOverlay(): SubtitleOverlay {
   if (!webOverlay) {
     webOverlay = new SubtitleOverlay("youtube", {
@@ -113,9 +201,31 @@ function getWebOverlay(): SubtitleOverlay {
       theme: getResolvedTheme(),
       onWordClick: (word, rect) => showFullWordCard(word, rect, true),
     });
+    webOverlay.setWordCardConfig({
+      sectionsOrder:
+        currentSettings?.wordCardSectionsOrder ?? [
+          "definition",
+          "translation",
+          "example",
+          "exampleTranslation",
+        ],
+      autoPronounce: currentSettings?.wordCardAutoPronounce ?? true,
+      ttsLang: resolveWordCardTtsLang(currentSettings),
+    });
     webOverlay.mount();
   } else {
     webOverlay.setTheme(getResolvedTheme());
+    webOverlay.setWordCardConfig({
+      sectionsOrder:
+        currentSettings?.wordCardSectionsOrder ?? [
+          "definition",
+          "translation",
+          "example",
+          "exampleTranslation",
+        ],
+      autoPronounce: currentSettings?.wordCardAutoPronounce ?? true,
+      ttsLang: resolveWordCardTtsLang(currentSettings),
+    });
   }
   return webOverlay;
 }
@@ -164,6 +274,88 @@ async function showFullWordCard(word: string, rect: DOMRect, pinned = false) {
 
 function isFullCardVisible(): boolean {
   return Boolean(webOverlay && (webOverlay as any).wordCardVisible);
+}
+
+function ensureSelectionExplainInjected(): void {
+  if (selectionExplainInjected) return;
+  selectionExplainInjected = true;
+
+  const isInsideLexipathUi = (target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) return false;
+    if (target.closest("#lexipath-subtitle-overlay")) return true;
+    if (target.closest("#lexipath-floating-button-container")) return true;
+    if (target.closest("#lexipath-tooltip")) return true;
+    return false;
+  };
+
+  const normalizeSelectedWord = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+
+    try {
+      // Trim punctuation from both ends.
+      const cleaned = trimmed.replace(/^[^\p{L}\p{M}']+|[^\p{L}\p{M}']+$/gu, "");
+      if (!cleaned) return "";
+      if (cleaned.length > 60) return "";
+      if (/\s/u.test(cleaned)) return "";
+      if (!/^[\p{L}\p{M}'’-]+$/u.test(cleaned)) return "";
+      return cleaned;
+    } catch (error: unknown) {
+      // Fallback for engines without Unicode property escapes.
+      void error;
+      const cleaned = trimmed.replace(/^[^A-Za-z0-9']+|[^A-Za-z0-9']+$/g, "");
+      if (!cleaned) return "";
+      if (cleaned.length > 60) return "";
+      if (/\s/.test(cleaned)) return "";
+      if (!/^[A-Za-z0-9'’-]+$/.test(cleaned)) return "";
+      return cleaned;
+    }
+  };
+
+  const getSelectionAnchorRect = (fallbackEvent: MouseEvent): DOMRect => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return new DOMRect(fallbackEvent.clientX, fallbackEvent.clientY, 1, 1);
+    }
+    try {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect && (rect.width > 0 || rect.height > 0)) return rect;
+    } catch (error: unknown) {
+      void error;
+    }
+    return new DOMRect(fallbackEvent.clientX, fallbackEvent.clientY, 1, 1);
+  };
+
+  let lastOpenAt = 0;
+  const tryOpenFromSelection = (event: MouseEvent) => {
+    if (!currentSettings?.enabled) return;
+    if ((currentSettings.webSelectionExplainEnabled ?? true) === false) return;
+    if (isInsideLexipathUi(event.target)) return;
+
+    const now = Date.now();
+    if (now - lastOpenAt < 250) return;
+
+    const selection = window.getSelection();
+    const selectedText = selection?.toString?.() ?? "";
+    const word = normalizeSelectedWord(selectedText);
+    if (!word) return;
+
+    lastOpenAt = now;
+    const rect = getSelectionAnchorRect(event);
+    showFullWordCard(word, rect, true);
+  };
+
+  document.addEventListener("dblclick", tryOpenFromSelection, true);
+  // Some sites block dblclick; mouseup.detail==2 is a reliable fallback.
+  document.addEventListener(
+    "mouseup",
+    (event) => {
+      if (event.detail !== 2) return;
+      tryOpenFromSelection(event);
+    },
+    true,
+  );
 }
 
 function normalizeWordKey(raw: string): string {
@@ -248,7 +440,44 @@ const MIN_TEXT_LENGTH = 20;
 const MAX_TEXT_LENGTH = 2000;
 
 // plan15 [NOW][FE] DONE (performance): viewport-prioritized queue + IntersectionObserver + idle scheduling + concurrency cap.
-const MAX_IN_FLIGHT = 3;
+function getMaxInFlight(): number {
+  // Match user's expectation: content-side in-flight should follow the effective channel concurrency (bounded),
+  // so we can saturate the provider while still avoiding catastrophic DOM jank.
+  const settings = currentSettings;
+
+  const resolveWebEnhanceChannelLimit = (): number => {
+    if (!settings) return 15;
+
+    // Background ENHANCE_WEB uses translate channel when translate is LLM; otherwise it uses select_keywords channel.
+    const translateRoute = resolveRoute("translate", settings);
+    const keywordRoute = resolveChannelRoute("select_keywords", settings);
+    const route = translateRoute.kind === 1 ? translateRoute : keywordRoute;
+    const channel =
+      route.kind === 1 ? resolveChannel(route.channelId, settings) : null;
+    const raw = channel?.concurrencyLimit;
+    if (typeof raw === "number" && Number.isFinite(raw) && raw >= 1) {
+      return Math.min(500, Math.floor(raw));
+    }
+    return 15;
+  };
+
+  const channelLimit = resolveWebEnhanceChannelLimit();
+  let base = Math.min(20, Math.max(4, channelLimit));
+
+  if (window.matchMedia("(pointer: coarse)").matches) {
+    return Math.min(base, 4);
+  }
+
+  // Weak CPUs: cap a bit lower, but still allow visible concurrency.
+  const hw = typeof navigator.hardwareConcurrency === "number"
+    ? navigator.hardwareConcurrency
+    : 0;
+  if (hw > 0 && hw <= 4) {
+    base = Math.min(base, 10);
+  }
+
+  return base;
+}
 
 let tooltipInjected = false;
 let tooltipEl: HTMLDivElement | null = null;
@@ -385,7 +614,19 @@ async function initSubtitleController(
  * Check if an element should be processed for text enhancement
  */
 function shouldProcessElement(element: Element): boolean {
+  if (!shouldQueueElement(element)) return false;
+
+  // Skip hidden elements (expensive; avoid calling this on large scans).
+  if (element.hasAttribute("hidden")) return false;
+
   // Skip non-text elements
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+
+  return true;
+}
+
+function shouldQueueElement(element: Element): boolean {
   const tagName = element.tagName.toLowerCase();
   const skipTags = [
     "script",
@@ -407,10 +648,6 @@ function shouldProcessElement(element: Element): boolean {
 
   // Skip elements with contenteditable
   if (element.getAttribute("contenteditable") === "true") return false;
-
-  // Skip hidden elements
-  const style = window.getComputedStyle(element);
-  if (style.display === "none" || style.visibility === "hidden") return false;
 
   return true;
 }
@@ -447,6 +684,8 @@ async function processTextElement(
   token: number,
 ): Promise<void> {
   if (token !== pageProcessingToken) return;
+  if (isEnhancePausedNow()) return;
+  if (!pageEligibleForLearning && manualForceEnhanceMode !== "full") return;
   if (!shouldProcessElement(element)) return;
 
   const text = extractTextContent(element);
@@ -466,6 +705,7 @@ async function processTextElement(
     ensureStylesInjected();
     element.classList.add("lexipath-processing");
 
+    const isDarkMode = getResolvedTheme() === "dark";
     const startMs = performance.now();
 
     const detected = detectPrimaryLanguage({ text });
@@ -487,23 +727,15 @@ async function processTextElement(
     }
 
     const enhancePayload: EnhanceWebPayload = { content: text };
-    const requestedEnhanceMode = currentSettings?.webEnhanceMode ?? "i_plus_1";
-    const safeElementForFullReplace = element.childElementCount === 0;
-    const effectiveEnhanceMode =
-      requestedEnhanceMode === "full" && !safeElementForFullReplace
-        ? "i_plus_1"
-        : requestedEnhanceMode;
-    // plan15 [NOW][FE] DONE (safety): Full paragraph replacement only runs on leaf elements; otherwise fall back to i+1.
-
-    enhancePayload.mode = effectiveEnhanceMode;
 
     let renderMode: WordRenderMode = "target-to-native";
+    let sourceLang: EnhanceWebPayload["sourceLang"] = currentSettings?.targetLanguage;
+    let targetLang: EnhanceWebPayload["targetLang"] = currentSettings?.nativeLanguage;
+
     if (currentSettings) {
       // Default mode: target language text -> native language tooltip.
-      let sourceLang: EnhanceWebPayload["sourceLang"] =
-        currentSettings.targetLanguage;
-      let targetLang: EnhanceWebPayload["targetLang"] =
-        currentSettings.nativeLanguage;
+      sourceLang = currentSettings.targetLanguage;
+      targetLang = currentSettings.nativeLanguage;
 
       // If we're learning English and the paragraph is in native Chinese,
       // flip direction so we can still learn from native-language pages.
@@ -516,14 +748,43 @@ async function processTextElement(
         targetLang = "en";
         renderMode = "native-to-target";
       }
+    }
 
-      enhancePayload.sourceLang = sourceLang;
-      enhancePayload.targetLang = targetLang;
+    const forcedEnhanceMode =
+      manualForceEnhanceMode && manualForceEnhanceModeToken === token
+        ? manualForceEnhanceMode
+        : null;
+    const requestedEnhanceMode =
+      forcedEnhanceMode ??
+      (renderMode === "native-to-target"
+        ? (currentSettings?.webEnhanceModeNative ?? "i_plus_1")
+        : (currentSettings?.webEnhanceMode ?? "i_plus_1"));
+    const safeElementForFullReplace = element.childElementCount === 0;
+    const effectiveEnhanceMode =
+      requestedEnhanceMode === "full" && !safeElementForFullReplace
+        ? "i_plus_1"
+        : requestedEnhanceMode;
+    // plan15 [NOW][FE] DONE (safety): Full paragraph replacement only runs on leaf elements; otherwise fall back to i+1.
 
-      if (effectiveEnhanceMode === "full") {
-        renderMode = "target-to-native";
+    if (effectiveEnhanceMode === "full") {
+      renderMode = "target-to-native";
+
+      // Full rewrite: when learning English, allow rewriting non-English content into English.
+      // The background expects `targetLang: "en"` to enable the rewrite path.
+      if (
+        currentSettings?.targetLanguage === "en" &&
+        detected.language &&
+        detected.language !== "en" &&
+        detected.language !== "unknown"
+      ) {
+        sourceLang = detected.language as any;
+        targetLang = "en";
       }
     }
+
+    enhancePayload.mode = effectiveEnhanceMode;
+    enhancePayload.sourceLang = sourceLang;
+    enhancePayload.targetLang = targetLang;
 
     const response = await sendMessage("ENHANCE_WEB", enhancePayload);
 
@@ -533,12 +794,24 @@ async function processTextElement(
     }
 
     if (token !== pageProcessingToken) return;
+    if (isEnhancePausedNow()) return;
 
     const enhanced = response.value;
     const surfaceWords = enhanced.convert_word?.map((w) => w.original) ?? [];
     const familiarityByWord = await getFamiliarityForWords(surfaceWords);
     updateForgottenWordsForPage(surfaceWords, familiarityByWord);
-    registerExposure(element, Object.keys(familiarityByWord));
+
+    const normalizedSurfaceWords = Array.from(
+      new Set(surfaceWords.map(normalizeWordKey).filter(Boolean)),
+    );
+    registerExposure(element, normalizedSurfaceWords);
+
+    const prevTranslatedCount = pageTranslatedWords.size;
+    for (const key of normalizedSurfaceWords) pageTranslatedWords.add(key);
+    if (pageTranslatedWords.size !== prevTranslatedCount) {
+      floatingButtonController?.updatePageContext?.({ translatedCount: pageTranslatedWords.size });
+    }
+
     const styleMapping =
       currentSettings?.webStyleMapping ?? ({
         within: "dashedLine",
@@ -573,6 +846,7 @@ async function processTextElement(
             ...(currentSettings ? { userLevel: currentSettings.proficiencyLevel } : {}),
             styleMapping,
             familiarityByWord,
+            isDarkMode,
           },
         ),
       );
@@ -590,6 +864,14 @@ async function processTextElement(
 
     // Only modify if there are words to convert
     if (enhanced.convert_word && enhanced.convert_word.length > 0) {
+      const renderEnhanced = createEnhancedRenderer(enhanced, renderMode, {
+        webEnhanceMode: effectiveEnhanceMode,
+        ...(currentSettings ? { userLevel: currentSettings.proficiencyLevel } : {}),
+        styleMapping,
+        familiarityByWord,
+        isDarkMode,
+      });
+
       // Find text nodes and replace them
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
       const textNodes: Text[] = [];
@@ -604,17 +886,7 @@ async function processTextElement(
       // Process each text node
       for (const textNode of textNodes) {
         const nodeText = textNode.textContent || "";
-        const enhancedFragment = createEnhancedElement(
-          nodeText,
-          enhanced,
-          renderMode,
-          {
-            webEnhanceMode: effectiveEnhanceMode,
-            ...(currentSettings ? { userLevel: currentSettings.proficiencyLevel } : {}),
-            styleMapping,
-            familiarityByWord,
-          },
-        );
+        const enhancedFragment = renderEnhanced(nodeText);
 
         // Replace the text node with enhanced content
         const parent = textNode.parentNode;
@@ -683,6 +955,7 @@ function ensureTooltipInjected(): void {
     clientX: number,
     clientY: number,
   ) => {
+    if (isEnhancePausedNow()) return;
     // plan15: mobile/touch relies on click-to-open bottom sheet; do not show hover tooltip.
     if (window.matchMedia("(pointer: coarse)").matches) return;
     if (!tooltipEl || isFullCardVisible()) return;
@@ -718,6 +991,7 @@ function ensureTooltipInjected(): void {
   document.addEventListener(
     "pointerover",
     (event) => {
+      if (isEnhancePausedNow()) return;
       const wordEl = getWordEl(event.target);
       if (!wordEl) return;
       showTooltipForWord(wordEl, event.clientX, event.clientY);
@@ -753,6 +1027,7 @@ function ensureTooltipInjected(): void {
   document.addEventListener(
     "click",
     (event) => {
+      if (isEnhancePausedNow()) return;
       const wordEl = getWordEl(event.target);
       if (!wordEl) return;
 
@@ -770,6 +1045,7 @@ function ensureTooltipInjected(): void {
   document.addEventListener(
     "focusin",
     (event) => {
+      if (isEnhancePausedNow()) return;
       const wordEl = getWordEl(event.target);
       if (!wordEl) return;
       const rect = wordEl.getBoundingClientRect();
@@ -796,11 +1072,14 @@ let inFlightCount = 0;
 let pumpScheduled = false;
 
 let stylesInjected = false;
+let injectedStylesKey: string | null = null;
 let intersectionObserver: IntersectionObserver | null = null;
 
 function ensureStylesInjected(): void {
   const theme = getResolvedTheme();
   const isDark = theme === "dark";
+  const customCss = currentSettings?.webCustomCss?.trim() ?? "";
+  const nextStylesKey = `${theme}::${customCss}`;
 
   const tooltipBg = isDark
     ? "rgba(15, 23, 42, 0.92)"
@@ -813,9 +1092,12 @@ function ensureStylesInjected(): void {
     ? "1px solid rgba(148, 163, 184, 0.2)"
     : "1px solid rgba(226, 232, 240, 0.8)";
 
-  let styleEl = document.getElementById(
-    "lexipath-styles",
-  ) as HTMLStyleElement | null;
+  let styleEl = document.getElementById("lexipath-styles") as HTMLStyleElement | null;
+  if (stylesInjected && injectedStylesKey === nextStylesKey && styleEl) {
+    if (!tooltipInjected) ensureTooltipInjected();
+    return;
+  }
+
   if (!styleEl) {
     styleEl = document.createElement("style");
     styleEl.id = "lexipath-styles";
@@ -823,14 +1105,25 @@ function ensureStylesInjected(): void {
   }
 
   styleEl.textContent = `
-     .lexipath-word {
-       cursor: pointer;
-       position: relative;
-       border-radius: 3px;
-       padding: 0 2px;
-       border-bottom: 2px dotted var(--lx-word-color, #3b82f6);
-       background: rgba(59, 130, 246, 0.12);
-     }
+	     .lexipath-word {
+	       cursor: pointer;
+	       position: relative;
+	       border-radius: 3px;
+	       padding: 0 2px;
+	       border-bottom: 2px dotted var(--lx-word-color, #3b82f6);
+	       background: rgba(59, 130, 246, 0.12);
+	     }
+
+	     /* Avoid changing table layout (padding/background can expand rows/cells). */
+	     table .lexipath-word,
+	     td .lexipath-word,
+	     th .lexipath-word {
+	       padding: 0 !important;
+	       background: transparent !important;
+	       border-bottom: none !important;
+	       border-radius: 0 !important;
+	       cursor: inherit !important;
+	     }
 
      @media (pointer: coarse) {
        .lexipath-word {
@@ -880,10 +1173,37 @@ function ensureStylesInjected(): void {
        display: none;
      }
 
-    .lexipath-processing {
-      background: rgba(59, 130, 246, 0.08) !important;
-      transition: background 150ms ease-out;
-    }
+     /* plan15: cancel enhancement (pause) should look like the original page. */
+     .${ENHANCE_PAUSED_CLASS} .lexipath-word {
+       cursor: text;
+       padding: 0 !important;
+       background: transparent !important;
+       border-bottom: none !important;
+       border-radius: 0 !important;
+     }
+     .${ENHANCE_PAUSED_CLASS} .lexipath-word__original {
+       display: inline;
+     }
+     .${ENHANCE_PAUSED_CLASS} .lexipath-word__enhanced {
+       display: none;
+     }
+     .${ENHANCE_PAUSED_CLASS} .lexipath-paragraph-original {
+       display: inline;
+     }
+     .${ENHANCE_PAUSED_CLASS} .lexipath-paragraph-enhanced {
+       display: none;
+     }
+
+	    .lexipath-processing {
+	      background: rgba(59, 130, 246, 0.08) !important;
+	      transition: background 150ms ease-out;
+	    }
+
+	    table .lexipath-processing,
+	    td.lexipath-processing,
+	    th.lexipath-processing {
+	      background: transparent !important;
+	    }
 
      #lexipath-tooltip {
       position: fixed;
@@ -902,8 +1222,11 @@ function ensureStylesInjected(): void {
        backdrop-filter: blur(6px);
      }
 
-     ${currentSettings?.webCustomCss?.trim() ? currentSettings.webCustomCss.trim() : ""}
+     ${customCss}
    `;
+
+  stylesInjected = true;
+  injectedStylesKey = nextStylesKey;
 
   if (!tooltipInjected) {
     ensureTooltipInjected();
@@ -968,6 +1291,7 @@ function ensureExposureObserver(): void {
           if (toSend.length === 0) return;
 
           for (const w of toSend) exposureSentWords.add(w);
+          floatingButtonController?.updatePageContext?.({ seenCount: exposureSentWords.size });
           void sendMessage("RECORD_EXPOSURE_VALID", { words: toSend });
         }, 2000);
         exposureTimers.set(el, timer);
@@ -984,7 +1308,25 @@ function registerExposure(element: Element, normalizedWords: string[]): void {
   exposureObserver?.observe(element);
 }
 
-function schedulePumpQueue(): void {
+const PUMP_IDLE_TIMEOUT_MS = 50;
+
+function getQueuedBacklogCount(): number {
+  return priorityQueue.length + Math.max(0, elementQueue.length - queueHead);
+}
+
+function shouldPumpEagerly(): boolean {
+  const pending = getQueuedBacklogCount();
+  if (pending <= 0) return false;
+
+  const maxInFlight = getMaxInFlight();
+  if (inFlightCount < maxInFlight) return true;
+
+  // Large backlog: keep pumping without waiting for idle.
+  return pending > maxInFlight * 2;
+}
+
+function schedulePumpQueue(opts?: { eager?: boolean }): void {
+  if (isEnhancePausedNow()) return;
   if (pumpScheduled) return;
   pumpScheduled = true;
 
@@ -993,7 +1335,17 @@ function schedulePumpQueue(): void {
     pumpQueue();
   };
 
-  // Prefer idle time to reduce UI jank, but keep a timeout so it progresses.
+  const eager = opts?.eager ?? shouldPumpEagerly();
+  if (eager) {
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(run);
+    } else {
+      Promise.resolve().then(run);
+    }
+    return;
+  }
+
+  // Prefer idle time to reduce UI jank, but keep a short timeout so it progresses.
   const requestIdleCallback = (
     window as unknown as {
       requestIdleCallback?: (
@@ -1003,7 +1355,7 @@ function schedulePumpQueue(): void {
     }
   ).requestIdleCallback;
   if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(run, { timeout: 200 });
+    requestIdleCallback(run, { timeout: PUMP_IDLE_TIMEOUT_MS });
   } else {
     setTimeout(run, 0);
   }
@@ -1013,7 +1365,9 @@ function schedulePumpQueue(): void {
  * Pump queue with concurrency limit; avoids head-of-line blocking from Promise.all batches.
  */
 function pumpQueue(): void {
+  if (isEnhancePausedNow()) return;
   const token = pageProcessingToken;
+  const maxInFlight = getMaxInFlight();
 
   const dequeue = (): Element | null => {
     while (priorityQueue.length > 0) {
@@ -1033,7 +1387,7 @@ function pumpQueue(): void {
     return null;
   };
 
-  while (inFlightCount < MAX_IN_FLIGHT) {
+  while (inFlightCount < maxInFlight) {
     const el = dequeue();
     if (!el) break;
 
@@ -1055,6 +1409,16 @@ function pumpQueue(): void {
         inFlightElements.delete(el);
         inFlightCount--;
 
+        if (
+          manualForceEnhanceMode &&
+          manualForceEnhanceModeToken === token &&
+          inFlightCount <= 0 &&
+          getQueuedBacklogCount() === 0
+        ) {
+          manualForceEnhanceMode = null;
+          manualForceEnhanceModeToken = 0;
+        }
+
         // Compact queue occasionally
         if (queueHead > 1000 && queueHead > elementQueue.length / 2) {
           elementQueue = elementQueue.slice(queueHead);
@@ -1069,28 +1433,42 @@ function pumpQueue(): void {
 /**
  * Queue elements for processing
  */
-function queueElements(elements: Element[]): void {
+function queueElements(
+  elements: Element[],
+  opts?: { rectPrioritization?: boolean },
+): void {
   ensureIntersectionObserver();
+  const rectPrioritization = opts?.rectPrioritization ?? false;
   for (const el of elements) {
-    if (!shouldProcessElement(el)) continue;
+    if (!shouldQueueElement(el)) continue;
     if (queuedElements.has(el) || inFlightElements.has(el)) continue;
 
-    // If element is near viewport, prioritize it for better perceived speed.
-    const rect = (el as HTMLElement).getBoundingClientRect?.();
-    const isNearViewport = rect
-      ? rect.top < window.innerHeight * 1.5 &&
-        rect.bottom > -window.innerHeight * 0.5
-      : false;
+    if (rectPrioritization) {
+      // If element is near viewport, prioritize it for better perceived speed.
+      // Avoid doing this on huge scans to prevent layout thrash.
+      const rect = (el as HTMLElement).getBoundingClientRect?.();
+      const isNearViewport = rect
+        ? rect.top < window.innerHeight * 1.5 &&
+          rect.bottom > -window.innerHeight * 0.5
+        : false;
 
-    if (isNearViewport) {
-      elementQueue.splice(queueHead, 0, el);
+      if (isNearViewport) {
+        if (!priorityQueuedElements.has(el)) {
+          priorityQueuedElements.add(el);
+          priorityQueue.push(el);
+        } else {
+          elementQueue.push(el);
+        }
+      } else {
+        elementQueue.push(el);
+      }
     } else {
       elementQueue.push(el);
     }
     queuedElements.add(el);
     intersectionObserver?.observe(el);
   }
-  schedulePumpQueue();
+  schedulePumpQueue({ eager: true });
 }
 
 const TEXT_SELECTOR = [
@@ -1112,6 +1490,73 @@ const TEXT_SELECTOR = [
   "blockquote",
 ].join(", ");
 
+function evaluatePageEligibility(settings: Settings | null): void {
+  pagePrimaryLanguage = null;
+  pageEligibleForLearning = true;
+
+  if (!settings) return;
+  if (detectPlatform(window.location.href) !== "unknown") return;
+
+  try {
+    const els = document.querySelectorAll(TEXT_SELECTOR);
+    let sample = "";
+    const maxEls = Math.min(25, els.length);
+    for (let i = 0; i < maxEls; i++) {
+      const el = els[i];
+      if (!el) continue;
+      const text = extractTextContent(el);
+      if (!text) continue;
+      sample += ` ${text.slice(0, 220)}`;
+      if (sample.length >= 2200) break;
+    }
+
+    if (sample.trim().length < 120) return;
+
+    const detected = detectPrimaryLanguage({ text: sample });
+    const language = typeof detected?.language === "string" ? detected.language : "unknown";
+    pagePrimaryLanguage = language;
+
+    const nativeBase = settings.nativeLanguage?.split?.("-")?.[0] ?? settings.nativeLanguage;
+    const target = settings.targetLanguage;
+
+    if (!target || language === "unknown") {
+      pageEligibleForLearning = true;
+      return;
+    }
+
+    pageEligibleForLearning = language === target || language === nativeBase;
+  } catch (error: unknown) {
+    void error;
+    pagePrimaryLanguage = null;
+    pageEligibleForLearning = true;
+  }
+}
+
+function resolvePageWebEnhanceMode(settings: Settings | null): "i_plus_1" | "light" | "full" {
+  if (!settings) return "i_plus_1";
+
+  // Match the direction logic used in `processTextElement` (best-effort at page-level).
+  const nativeDetected = settings.nativeLanguage === "en" ? "en" : "zh";
+  if (
+    settings.targetLanguage === "en" &&
+    pagePrimaryLanguage === nativeDetected &&
+    nativeDetected === "zh"
+  ) {
+    return (settings.webEnhanceModeNative ?? "i_plus_1") as any;
+  }
+  return (settings.webEnhanceMode ?? "i_plus_1") as any;
+}
+
+function syncFloatingButtonMeta(): void {
+  floatingButtonController?.updatePageContext?.({
+    pageEligible: pageEligibleForLearning,
+    ...(pagePrimaryLanguage ? { pageLanguage: pagePrimaryLanguage } : {}),
+    webEnhanceMode: resolvePageWebEnhanceMode(currentSettings),
+    translatedCount: pageTranslatedWords.size,
+    seenCount: exposureSentWords.size,
+  });
+}
+
 /**
  * Set up MutationObserver to handle dynamic content
  */
@@ -1127,12 +1572,12 @@ function setupMutationObserver(): void {
           if (node instanceof Element) {
             // Check the added element itself + descendants (scoped query, avoids rescanning entire document)
             try {
-              if (node.matches(TEXT_SELECTOR) && shouldProcessElement(node)) {
+              if (node.matches(TEXT_SELECTOR) && shouldQueueElement(node)) {
                 newElements.push(node);
               }
               const descendants = node.querySelectorAll(TEXT_SELECTOR);
               descendants.forEach((el) => {
-                if (shouldProcessElement(el)) newElements.push(el);
+                if (shouldQueueElement(el)) newElements.push(el);
               });
             } catch (error: unknown) {
               log.debug("MutationObserver selector check failed; ignoring node", { message: getErrorMessage(error) });
@@ -1185,54 +1630,105 @@ function resetPageProcessingState(): void {
   exposureTimers.clear();
 
   exposureSentWords.clear();
+  pageTranslatedWords.clear();
   pageForgottenWords.clear();
-  floatingButtonController?.updatePageContext?.({ forgottenWords: [] });
+  floatingButtonController?.updatePageContext?.({ forgottenWords: [], translatedCount: 0, seenCount: 0 });
 }
 
 /**
  * Initialize page content processing
  */
-async function initPageProcessing(): Promise<void> {
+async function initPageProcessing(options?: { forceMode?: EnhanceWebPayload["mode"] }): Promise<void> {
   resetPageProcessingState();
+  manualForceEnhanceMode = options?.forceMode ?? null;
+  manualForceEnhanceModeToken = manualForceEnhanceMode ? pageProcessingToken : 0;
   log.info("Starting page processing");
 
   // Initial processing of existing content
-  const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(
-    shouldProcessElement,
-  );
-  elements.sort((a, b) => {
-    const ra = (a as HTMLElement).getBoundingClientRect?.();
-    const rb = (b as HTMLElement).getBoundingClientRect?.();
-    return (ra?.top ?? 0) - (rb?.top ?? 0);
-  });
-  log.info(`Found ${elements.length} text elements to process`);
+  // Avoid expensive operations (computedStyle + getBoundingClientRect sort) on large pages,
+  // otherwise we delay the first visible results and it feels "non-concurrent".
+  const selectorResults = document.querySelectorAll(TEXT_SELECTOR);
+  log.info(`Found ${selectorResults.length} candidate text elements`);
 
-  queueElements(elements);
+  const scanToken = pageProcessingToken;
+  const total = selectorResults.length;
+  const CHUNK_SIZE = 500;
+  let idx = 0;
+
+  const scanChunk = () => {
+    if (scanToken !== pageProcessingToken) return;
+
+    const chunk: Element[] = [];
+    const end = Math.min(total, idx + CHUNK_SIZE);
+    for (; idx < end; idx++) {
+      const el = selectorResults[idx];
+      if (!el) continue;
+      if (!shouldQueueElement(el)) continue;
+      chunk.push(el);
+    }
+
+    if (chunk.length > 0) {
+      queueElements(chunk, { rectPrioritization: idx <= CHUNK_SIZE });
+    }
+
+    if (idx < total) {
+      setTimeout(scanChunk, 0);
+    } else {
+      log.info(`Queued ${total} candidate elements for processing`);
+    }
+  };
+
+  scanChunk();
 
   // Set up observer for dynamic content
   setupMutationObserver();
 }
 
 let manualEnhanceInFlight = false;
+let manualForceEnhanceMode: EnhanceWebPayload["mode"] | null = null;
+let manualForceEnhanceModeToken = 0;
 
-async function runManualPageProcessingOnce(): Promise<void> {
+async function runManualPageProcessingOnce(options?: { forceMode?: EnhanceWebPayload["mode"] }): Promise<void> {
   if (manualEnhanceInFlight) return;
   manualEnhanceInFlight = true;
   try {
     resetPageProcessingState();
+    manualForceEnhanceMode = options?.forceMode ?? null;
+    manualForceEnhanceModeToken = manualForceEnhanceMode ? pageProcessingToken : 0;
     log.info("Starting manual page processing");
 
-    const elements = Array.from(document.querySelectorAll(TEXT_SELECTOR)).filter(
-      shouldProcessElement,
-    );
-    elements.sort((a, b) => {
-      const ra = (a as HTMLElement).getBoundingClientRect?.();
-      const rb = (b as HTMLElement).getBoundingClientRect?.();
-      return (ra?.top ?? 0) - (rb?.top ?? 0);
-    });
-    log.info(`Found ${elements.length} text elements to process (manual)`);
+    const selectorResults = document.querySelectorAll(TEXT_SELECTOR);
+    log.info(`Found ${selectorResults.length} candidate text elements to process (manual)`);
 
-    queueElements(elements);
+    const scanToken = pageProcessingToken;
+    const total = selectorResults.length;
+    const CHUNK_SIZE = 500;
+    let idx = 0;
+
+    const scanChunk = () => {
+      if (scanToken !== pageProcessingToken) return;
+
+      const chunk: Element[] = [];
+      const end = Math.min(total, idx + CHUNK_SIZE);
+      for (; idx < end; idx++) {
+        const el = selectorResults[idx];
+        if (!el) continue;
+        if (!shouldQueueElement(el)) continue;
+        chunk.push(el);
+      }
+
+      if (chunk.length > 0) {
+        queueElements(chunk, { rectPrioritization: idx <= CHUNK_SIZE });
+      }
+
+      if (idx < total) {
+        setTimeout(scanChunk, 0);
+      } else {
+        log.info(`Queued ${total} candidate elements for processing (manual)`);
+      }
+    };
+
+    scanChunk();
   } finally {
     manualEnhanceInFlight = false;
   }
@@ -1242,6 +1738,12 @@ async function requestWebEnhanceOnce(): Promise<void> {
   if (!currentSettings?.enabled) {
     log.info("Manual enhance requested, but extension is disabled");
     return;
+  }
+
+  try {
+    sessionStorage.setItem(HAS_ENHANCED_ONCE_KEY, "1");
+  } catch (error: unknown) {
+    void error;
   }
 
   const url = window.location.href;
@@ -1260,6 +1762,13 @@ async function requestWebEnhanceOnce(): Promise<void> {
     return;
   }
 
+  evaluatePageEligibility(currentSettings);
+  syncFloatingButtonMeta();
+  if (!pageEligibleForLearning) {
+    log.info(`Manual enhance skipped: page language not eligible lang=${pagePrimaryLanguage ?? "unknown"}`);
+    return;
+  }
+
   if (currentSettings.autoEnhance) {
     await initPageProcessing();
     return;
@@ -1268,12 +1777,55 @@ async function requestWebEnhanceOnce(): Promise<void> {
   await runManualPageProcessingOnce();
 }
 
+async function requestWebRewriteOnce(): Promise<void> {
+  if (!currentSettings?.enabled) {
+    log.info("Rewrite requested, but extension is disabled");
+    return;
+  }
+
+  try {
+    sessionStorage.setItem(HAS_ENHANCED_ONCE_KEY, "1");
+  } catch (error: unknown) {
+    void error;
+  }
+
+  const url = window.location.href;
+  const platform = detectPlatform(url);
+  if (platform !== "unknown") {
+    log.info("Rewrite requested on video platform; ignoring");
+    return;
+  }
+
+  if (!currentSettings) return;
+  if (
+    !isKeywordProviderConfigured(currentSettings) ||
+    !isTranslationProviderConfigured(currentSettings)
+  ) {
+    log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
+    return;
+  }
+
+  // We are explicitly rewriting into the learning language; treat the page as eligible for this run.
+  pageEligibleForLearning = true;
+  pagePrimaryLanguage = currentSettings.targetLanguage ?? pagePrimaryLanguage;
+  syncFloatingButtonMeta();
+
+  // Force full rewrite for this run (best-effort; background will fall back if unsupported).
+  if (currentSettings.autoEnhance) {
+    await initPageProcessing({ forceMode: "full" });
+    return;
+  }
+
+  await runManualPageProcessingOnce({ forceMode: "full" });
+}
+
 /**
  * Initialize content script.
  */
 async function initForUrl(url: string, token: number): Promise<void> {
   currentSettings = await getSettings();
   if (token !== navigationToken) return;
+  currentSiteQualified = false;
 
   if (!currentSettings?.enabled) {
     log.info("Extension is disabled");
@@ -1296,6 +1848,10 @@ async function initForUrl(url: string, token: number): Promise<void> {
     englishCorrectionController?.setSettings(null);
     return;
   }
+  currentSiteQualified = true;
+
+  evaluatePageEligibility(currentSettings);
+  syncFloatingButtonMeta();
 
   log.info("Content script initialized");
 
@@ -1344,6 +1900,11 @@ async function initForUrl(url: string, token: number): Promise<void> {
     return;
   }
 
+  if (!pageEligibleForLearning) {
+    log.info(`Page language not eligible; skipping page processing lang=${pagePrimaryLanguage ?? "unknown"}`);
+    return;
+  }
+
   // Initialize page content processing
   await initPageProcessing();
 }
@@ -1377,13 +1938,18 @@ async function init(): Promise<void> {
   startUrlWatcher();
 
   applyWebShowOriginal(currentSettings);
+  applyTabEnhancePausedFromStorage();
+  ensureSelectionExplainInjected();
+  ensureEnhancePauseObserver();
 
   if (!floatingButtonController) {
     floatingButtonController = new FloatingButtonController(currentSettings, {
       onRunWebEnhanceOnce: requestWebEnhanceOnce,
+      onRunWebRewriteOnce: requestWebRewriteOnce,
     });
     floatingButtonController.mount();
   }
+  syncFloatingButtonMeta();
 
   browser.storage?.onChanged?.addListener?.((changes: any, area: string) => {
     if (area !== "local") return;
@@ -1393,9 +1959,12 @@ async function init(): Promise<void> {
     const prevFloating = currentSettings?.floatingButtonEnabled ?? true;
     currentSettings = nextSettings;
 
-    englishCorrectionController?.setSettings(nextSettings);
-    floatingButtonController?.updateSettings(nextSettings);
-    applyWebShowOriginal(nextSettings);
+	    englishCorrectionController?.setSettings(nextSettings);
+	    floatingButtonController?.updateSettings(nextSettings);
+	    applyWebShowOriginal(nextSettings);
+	    evaluatePageEligibility(nextSettings);
+	    subtitleController?.setSettings(nextSettings);
+	    syncFloatingButtonMeta();
 
     const nextFloating = nextSettings?.floatingButtonEnabled ?? true;
     if (!prevFloating && nextFloating) {
@@ -1406,13 +1975,20 @@ async function init(): Promise<void> {
       }
     }
 
-    if (prevTheme !== nextSettings?.theme) {
-      const resolvedTheme = getResolvedTheme();
-      if (webOverlay) webOverlay.setTheme(resolvedTheme);
-      if (subtitleController) subtitleController.setTheme(nextSettings.theme);
-      ensureStylesInjected();
-    }
-  });
+	    if (prevTheme !== nextSettings?.theme) {
+	      const resolvedTheme = getResolvedTheme();
+	      if (webOverlay) webOverlay.setTheme(resolvedTheme);
+	      ensureStylesInjected();
+	    }
+
+	    if (webOverlay) {
+	      webOverlay.setWordCardConfig({
+	        sectionsOrder: nextSettings.wordCardSectionsOrder,
+	        autoPronounce: nextSettings.wordCardAutoPronounce,
+	        ttsLang: resolveWordCardTtsLang(nextSettings),
+	      });
+	    }
+	  });
 
   browser.runtime?.onMessage?.addListener?.((message: any) => {
     if (message?.type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
