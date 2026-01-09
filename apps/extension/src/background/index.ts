@@ -36,7 +36,12 @@ import {
   type WebEnhanceOutput,
   type TranslateKeywordsPayload,
 } from '@lexipath/core';
-import { validateEnglishCorrectionOutput, validateEnglishCorrectionOutputDetailed, validateSubtitleEnhanceOutput } from '@lexipath/core/validators';
+import {
+  validateEnglishCorrectionOutput,
+  validateEnglishCorrectionOutputDetailed,
+  validateSubtitleEnhanceOutput,
+  validateWebEnhanceOutput,
+} from '@lexipath/core/validators';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import {
   BingTranslateProvider,
@@ -98,6 +103,13 @@ type ConcurrencyState = {
 };
 const modelConcurrency = new Map<string, ConcurrencyState>();
 const lastSaturationLogAt = new Map<string, number>();
+
+const CEFR_ORDER: readonly CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+function nextCefrLevel(level: CEFRLevel): CEFRLevel {
+  const idx = CEFR_ORDER.indexOf(level);
+  if (idx < 0) return level;
+  return CEFR_ORDER[Math.min(CEFR_ORDER.length - 1, idx + 1)] ?? level;
+}
 
 function t(key: string, substitutions?: string | string[], fallback = ''): string {
   try {
@@ -1217,8 +1229,11 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
   const keywordRoute = resolveChannelRoute('select_keywords', settings);
   const translateRoute = resolveRoute('translate', settings);
 
+  const algorithm = mode !== 'full' && translateRoute.kind === 1 ? 'prompt' : 'pipeline';
+
   const cacheKey = makeCacheKey('ENHANCE_WEB', {
-    v: 4,
+    v: 5,
+    algo: algorithm,
     providers: {
       keyword: routeIdentity(keywordRoute, settings),
       translation: routeIdentity(translateRoute, settings),
@@ -1348,9 +1363,103 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
           return { content_result: options.text, convert_word, highlight_terms, highlight_offsets };
         };
 
+        const runPromptEnhance = async (options: {
+          text: string;
+          sourceLang: EnhanceWebPayload['sourceLang'];
+          targetLang: EnhanceWebPayload['targetLang'];
+          maxWords: number;
+        }) => {
+          // Match older behavior: one LLM call that returns { content_result, convert_word } directly.
+          // Also uses the translate channel when translate is LLM, so concurrency follows the user’s main channel settings.
+          const resolvedRoute = translateRoute.kind === 1 ? translateRoute : keywordRoute;
+          const channel = resolveChannel(resolvedRoute.channelId, settings);
+          if (!channel) {
+            return runKeywordEnhance(options);
+          }
+
+          const providerInfo = getChatProviderByChannel(channel);
+          if (!providerInfo) {
+            return runKeywordEnhance(options);
+          }
+
+          const provider = getChatProvider(providerInfo.type, providerInfo.config);
+          const difficultyMin = userLevel;
+          const difficultyMax = nextCefrLevel(userLevel);
+
+          try {
+            const prompt = await promptBuilder.buildWebEnhancePrompt({
+              content: options.text,
+              sourceLang: String(options.sourceLang ?? settings.targetLanguage) as any,
+              targetLang: String(options.targetLang ?? settings.nativeLanguage) as any,
+              difficultyMin,
+              difficultyMax,
+              maxWords: options.maxWords,
+            });
+
+            const limit = getChannelConcurrencyLimit(channel, resolvedRoute.kind);
+            const response = await runWithChannelConcurrency(routeKey(resolvedRoute), limit, () =>
+              provider.chat([{ role: 'user', content: prompt }], { temperature: 0.2, maxTokens: 900 })
+            );
+
+            const responseText = response.choices?.[0]?.message?.content ?? '';
+            const validated = validateWebEnhanceOutput(responseText);
+            if (!validated.ok) {
+              return runKeywordEnhance(options);
+            }
+
+            const base = validated.value;
+            const rawConvert = Array.isArray(base.convert_word) ? base.convert_word : [];
+            if (rawConvert.length === 0) {
+              return { content_result: options.text, convert_word: [], highlight_terms: [], highlight_offsets: [] };
+            }
+
+            const originals = rawConvert.map((w) => w.original);
+            const dictEntries = await dictionaryService.batchLookup(originals);
+            const enriched = filterConvertWordByHits(
+              options.text,
+              rawConvert.map((word, idx) => {
+                const entry = dictEntries[idx];
+                const dictDifficulty = typeof entry?.difficulty === 'string' ? entry.difficulty.trim() : '';
+                const normalizedDifficulty = dictDifficulty.toUpperCase();
+                const difficultyLevel = (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const).includes(normalizedDifficulty as any)
+                  ? (normalizedDifficulty as CEFRLevel)
+                  : undefined;
+                const partOfSpeech =
+                  typeof entry?.definitions?.[0]?.partOfSpeech === 'string' ? entry.definitions[0].partOfSpeech : undefined;
+
+                const difficulty = typeof word.difficulty === 'string' && word.difficulty.trim()
+                  ? word.difficulty.trim()
+                  : dictDifficulty;
+
+                return {
+                  original: word.original,
+                  converted: word.converted,
+                  ...(difficulty ? { difficulty } : {}),
+                  ...(difficultyLevel ? { difficultyLevel } : {}),
+                  ...(typeof entry?.difficulty === 'string'
+                    ? { difficultyConfidence: difficultyLevel ? 0.9 : 0.4 }
+                    : { difficultyConfidence: 0.2 }),
+                  ...(partOfSpeech ? { partOfSpeech } : {}),
+                };
+              })
+            );
+
+            const convert_word = enriched.slice(0, Math.max(0, options.maxWords));
+            const highlight_terms = convert_word.map((entry) => entry.original);
+            const highlight_offsets = buildHighlightOffsets(options.text, highlight_terms);
+            return { content_result: options.text, convert_word, highlight_terms, highlight_offsets };
+          } catch (error: unknown) {
+            log.debug('ENHANCE_WEB prompt enhance failed; falling back to keyword enhance', { message: getErrorMessage(error) });
+            return runKeywordEnhance(options);
+          }
+        };
+
         if (mode !== 'full') {
-          const enhanced = await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
-          return { value: enhanced, ok: enhanced.convert_word.length > 0 };
+          const enhanced =
+            algorithm === 'prompt'
+              ? await runPromptEnhance({ text: content, sourceLang, targetLang, maxWords })
+              : await runKeywordEnhance({ text: content, sourceLang, targetLang, maxWords });
+          return { value: enhanced, ok: (enhanced.convert_word?.length ?? 0) > 0 };
         }
 
         const isLearningLanguageContent = sourceLang === settings.targetLanguage;
@@ -2384,7 +2493,7 @@ registry.register('OPEN_SIDEBAR', async (payload, sender) => {
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
     id: 'lexipath-explain-selection',
-    title: t('contextMenu_explainSelection'),
+    title: `${t('extensionName')}: ${t('contextMenu_explainSelection')}`,
     contexts: ['selection'],
   });
 });
