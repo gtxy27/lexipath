@@ -24,6 +24,19 @@ const SLOW_LOG_THRESHOLD_MS = 800;
 const DEBUG_LOG_THROTTLE_MS = 1500;
 const log = createLogger('subtitle-controller');
 
+function resolveWordCardTtsLang(settings: Settings): string {
+  const targetLanguage = settings.targetLanguage;
+  if (targetLanguage === 'en') {
+    return settings.wordCardEnglishAccent === 'uk' ? 'en-GB' : 'en-US';
+  }
+  if (targetLanguage === 'ja') return 'ja-JP';
+  if (targetLanguage === 'ko') return 'ko-KR';
+  if (targetLanguage === 'fr') return 'fr-FR';
+  if (targetLanguage === 'de') return 'de-DE';
+  if (targetLanguage === 'zh') return settings.nativeLanguage === 'zh-TW' ? 'zh-TW' : 'zh-CN';
+  return 'en-US';
+}
+
 /**
  * Subtitle Controller
  */
@@ -86,6 +99,19 @@ export class SubtitleController {
     if (this.overlay) {
       this.overlay.setTheme(this.getResolvedTheme());
     }
+  }
+
+  setSettings(settings: Settings): void {
+    this.settings = settings;
+    if (this.overlay) {
+      this.overlay.setTheme(this.getResolvedTheme());
+      this.overlay.setWordCardConfig({
+        sectionsOrder: settings.wordCardSectionsOrder,
+        autoPronounce: settings.wordCardAutoPronounce,
+        ttsLang: resolveWordCardTtsLang(settings),
+      });
+    }
+    this.maxPrefetchInFlight = this.getPrefetchConcurrencyLimit();
   }
 
   private isVideoPaused(): boolean {
@@ -185,6 +211,11 @@ export class SubtitleController {
       onWordHover: (word, anchorRect) => {
         void this.handleSubtitleWordHover(word, anchorRect);
       },
+    });
+    this.overlay.setWordCardConfig({
+      sectionsOrder: this.settings.wordCardSectionsOrder,
+      autoPronounce: this.settings.wordCardAutoPronounce,
+      ttsLang: resolveWordCardTtsLang(this.settings),
     });
 
     // Mount overlay

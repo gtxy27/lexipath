@@ -8,6 +8,7 @@
 import { getI18nMessage } from '../i18n';
 import { sendMessage } from '../../shared/messages';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
+import { speak, stop } from '@lexipath/dictionary';
 
 const log = createLogger('subtitle-overlay');
 
@@ -35,6 +36,14 @@ export interface WordCardData {
   translation?: string;
   example?: string;
   exampleTranslation?: string;
+}
+
+export type WordCardSectionKey = 'definition' | 'translation' | 'example' | 'exampleTranslation';
+
+export interface WordCardConfig {
+  sectionsOrder?: WordCardSectionKey[];
+  autoPronounce?: boolean;
+  ttsLang?: string;
 }
 
 /**
@@ -86,6 +95,14 @@ export class SubtitleOverlay {
   private lastMainFontSizePx: number | null = null;
   private lastOriginalFontSizePx: number | null = null;
   private keywordTranslationLayoutRaf: number | null = null;
+  private wordCardConfig: WordCardConfig = {
+    sectionsOrder: ['definition', 'translation', 'example', 'exampleTranslation'],
+    autoPronounce: true,
+    ttsLang: 'en-US',
+  };
+  private wordCardLastWord: string | null = null;
+  private wordCardTempTtsLang: string | null = null;
+  private wordCardSpeakToken = 0;
 
   constructor(
     platform: 'youtube' | 'bilibili',
@@ -501,6 +518,31 @@ export class SubtitleOverlay {
     this.updateModeLabel();
   }
 
+  setWordCardConfig(config: WordCardConfig): void {
+    this.wordCardConfig = {
+      ...this.wordCardConfig,
+      ...config,
+    };
+  }
+
+  private getWordCardSectionsOrder(): WordCardSectionKey[] {
+    const all: WordCardSectionKey[] = ['definition', 'translation', 'example', 'exampleTranslation'];
+    const raw = this.wordCardConfig.sectionsOrder ?? all;
+    const seen = new Set<WordCardSectionKey>();
+    const next: WordCardSectionKey[] = [];
+    for (const item of raw) {
+      if (!all.includes(item)) continue;
+      if (seen.has(item)) continue;
+      seen.add(item);
+      next.push(item);
+    }
+    for (const item of all) {
+      if (seen.has(item)) continue;
+      next.push(item);
+    }
+    return next;
+  }
+
   showWordCardLoading(word: string, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
     const loadingText = getI18nMessage('wordCard_loading', undefined, getI18nMessage('loading'));
     this.showWordCard(
@@ -516,6 +558,11 @@ export class SubtitleOverlay {
   showWordCard(data: WordCardData, anchorRect: DOMRect, options?: { pinned?: boolean }): void {
     if (!this.wordCardElement) return;
 
+    if (this.wordCardLastWord !== data.word) {
+      this.wordCardTempTtsLang = null;
+      this.wordCardLastWord = data.word;
+    }
+
     this.wordCardPinned = options?.pinned ?? this.wordCardPinned;
     this.wordCardElement.textContent = '';
 
@@ -530,7 +577,6 @@ export class SubtitleOverlay {
     const metaParts: string[] = [];
     if (data.phonetic) metaParts.push(data.phonetic);
     if (data.difficulty) metaParts.push(data.difficulty);
-    if (data.translation) metaParts.push(data.translation);
 
     if (metaParts.length > 0) {
       const meta = document.createElement('div');
@@ -542,23 +588,58 @@ export class SubtitleOverlay {
     const body = document.createElement('div');
     body.className = 'lexipath-wordcard__body';
 
+    const sectionsByKey: Partial<Record<WordCardSectionKey, HTMLElement>> = {};
+
     const definition = document.createElement('div');
-    definition.className = 'lexipath-wordcard__definition';
-    definition.textContent = data.definition;
-    body.appendChild(definition);
+    definition.className = 'lexipath-wordcard__section lexipath-wordcard__definition';
+    definition.innerHTML = `
+      <div class="lexipath-wordcard__section-label">${getI18nMessage('wordCard_sectionDefinition')}</div>
+      <div class="lexipath-wordcard__section-text"></div>
+    `;
+    const defText = definition.querySelector('.lexipath-wordcard__section-text');
+    if (defText) defText.textContent = data.definition;
+    sectionsByKey.definition = definition;
+
+    if (data.translation) {
+      const translation = document.createElement('div');
+      translation.className = 'lexipath-wordcard__section lexipath-wordcard__translation';
+      translation.innerHTML = `
+        <div class="lexipath-wordcard__section-label">${getI18nMessage('wordCard_sectionTranslation')}</div>
+        <div class="lexipath-wordcard__section-text"></div>
+      `;
+      const trText = translation.querySelector('.lexipath-wordcard__section-text');
+      if (trText) trText.textContent = data.translation;
+      sectionsByKey.translation = translation;
+    }
 
     if (data.example) {
       const example = document.createElement('div');
-      example.className = 'lexipath-wordcard__example';
-      example.textContent = data.example;
-      body.appendChild(example);
+      example.className = 'lexipath-wordcard__section lexipath-wordcard__example';
+      example.innerHTML = `
+        <div class="lexipath-wordcard__section-label">${getI18nMessage('wordCard_sectionExample')}</div>
+        <div class="lexipath-wordcard__section-text"></div>
+      `;
+      const exText = example.querySelector('.lexipath-wordcard__section-text');
+      if (exText) exText.textContent = data.example;
+      sectionsByKey.example = example;
     }
 
     if (data.exampleTranslation) {
       const exampleTranslation = document.createElement('div');
-      exampleTranslation.className = 'lexipath-wordcard__example-translation';
-      exampleTranslation.textContent = data.exampleTranslation;
-      body.appendChild(exampleTranslation);
+      exampleTranslation.className = 'lexipath-wordcard__section lexipath-wordcard__example-translation';
+      exampleTranslation.innerHTML = `
+        <div class="lexipath-wordcard__section-label">${getI18nMessage('wordCard_sectionExampleTranslation')}</div>
+        <div class="lexipath-wordcard__section-text"></div>
+      `;
+      const exTrText = exampleTranslation.querySelector('.lexipath-wordcard__section-text');
+      if (exTrText) exTrText.textContent = data.exampleTranslation;
+      sectionsByKey.exampleTranslation = exampleTranslation;
+    }
+
+    for (const key of this.getWordCardSectionsOrder()) {
+      const el = sectionsByKey[key];
+      if (!el) continue;
+      body.appendChild(el);
     }
 
     this.wordCardElement.appendChild(header);
@@ -566,6 +647,86 @@ export class SubtitleOverlay {
 
     const footer = document.createElement('div');
     footer.className = 'lexipath-wordcard__footer';
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'lexipath-wordcard__actions';
+
+    const pronounceButton = document.createElement('button');
+    pronounceButton.type = 'button';
+    pronounceButton.className = 'lexipath-wordcard__pronounce-button';
+    pronounceButton.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+      </svg>
+      <span>${getI18nMessage('wordCard_pronounce') || 'Pronounce'}</span>
+    `;
+
+    const setPronounceButtonSpeaking = (speaking: boolean) => {
+      pronounceButton.classList.toggle('is-speaking', speaking);
+      pronounceButton.setAttribute('aria-pressed', speaking ? 'true' : 'false');
+    };
+
+    const resolveEffectiveTtsLang = (): string => {
+      const base = this.wordCardConfig.ttsLang ?? 'en-US';
+      return this.wordCardTempTtsLang ?? base;
+    };
+
+    const shouldShowAccentToggle = () => {
+      const base = this.wordCardConfig.ttsLang ?? '';
+      const effective = this.wordCardTempTtsLang ?? base;
+      return (
+        typeof effective === 'string' &&
+        (effective.toLowerCase() === 'en-us' || effective.toLowerCase() === 'en-gb')
+      );
+    };
+
+    const accentToggle = document.createElement('button');
+    accentToggle.type = 'button';
+    accentToggle.className = 'lexipath-wordcard__accent-toggle';
+
+    const updateAccentToggleLabel = () => {
+      const lang = resolveEffectiveTtsLang().toLowerCase();
+      accentToggle.textContent = lang === 'en-gb' ? 'UK' : 'US';
+    };
+    updateAccentToggleLabel();
+
+    accentToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const current = resolveEffectiveTtsLang().toLowerCase();
+      this.wordCardTempTtsLang = current === 'en-us' ? 'en-GB' : 'en-US';
+      updateAccentToggleLabel();
+    });
+
+    if (shouldShowAccentToggle()) {
+      actionRow.appendChild(accentToggle);
+    }
+
+    pronounceButton.addEventListener('click', async (e) => {
+      e.stopPropagation();
+
+      if (pronounceButton.classList.contains('is-speaking')) {
+        stop();
+        setPronounceButtonSpeaking(false);
+        return;
+      }
+
+      const token = ++this.wordCardSpeakToken;
+      setPronounceButtonSpeaking(true);
+      try {
+        await speak(data.word, resolveEffectiveTtsLang());
+      } catch (error: unknown) {
+        log.debug('Word card TTS failed', { message: getErrorMessage(error) });
+      } finally {
+        if (token === this.wordCardSpeakToken) {
+          setPronounceButtonSpeaking(false);
+        }
+      }
+    });
+
+    actionRow.appendChild(pronounceButton);
+    footer.appendChild(actionRow);
 
     const chatButton = document.createElement('button');
     chatButton.className = 'lexipath-wordcard__chat-button';
@@ -582,6 +743,24 @@ export class SubtitleOverlay {
     footer.appendChild(chatButton);
     this.wordCardElement.appendChild(footer);
 
+    const loadingText = getI18nMessage('wordCard_loading', undefined, getI18nMessage('loading'));
+    const shouldAutoPronounce = Boolean(options?.pinned) && Boolean(this.wordCardConfig.autoPronounce);
+    if (shouldAutoPronounce && data.definition !== loadingText) {
+      // Avoid overlapping audio when flipping from loading -> resolved card.
+      stop();
+      const token = ++this.wordCardSpeakToken;
+      setPronounceButtonSpeaking(true);
+      void speak(data.word, resolveEffectiveTtsLang())
+        .catch((error: unknown) => {
+          log.debug('Word card auto TTS failed', { message: getErrorMessage(error) });
+        })
+        .finally(() => {
+          if (token === this.wordCardSpeakToken) {
+            setPronounceButtonSpeaking(false);
+          }
+        });
+    }
+
     const { top, left } = this.computeWordCardPosition(anchorRect);
     this.wordCardElement.style.top = `${top}px`;
     this.wordCardElement.style.left = `${left}px`;
@@ -597,6 +776,8 @@ export class SubtitleOverlay {
     if (!this.wordCardVisible) return;
     this.wordCardVisible = false;
     this.wordCardPinned = false;
+    this.wordCardSpeakToken++;
+    stop();
     this.wordCardElement.classList.remove('visible');
     this.wordCardElement.setAttribute('aria-hidden', 'true');
     this.detachDocumentClickListener();
@@ -1085,8 +1266,8 @@ export class SubtitleOverlay {
           display: block;
         }
 
-        @media (pointer: coarse) {
-          .lexipath-wordcard {
+	        @media (pointer: coarse) {
+	          .lexipath-wordcard {
             position: fixed !important;
             bottom: 0 !important;
             left: 0 !important;
@@ -1103,18 +1284,35 @@ export class SubtitleOverlay {
             animation: slideUp 0.3s ease-out;
           }
 
-          .lexipath-wordcard__chat-button {
-            width: 100%;
-            height: 48px;
-            justify-content: center;
-            font-size: 13px;
-          }
+	          .lexipath-wordcard__chat-button {
+	            width: 100%;
+	            height: 48px;
+	            justify-content: center;
+	            font-size: 13px;
+	          }
 
-          .lexipath-subtitle-word {
-            padding: 2px 4px !important;
-            border-bottom-width: 3px !important;
-          }
-        }
+	          .lexipath-wordcard__footer {
+	            flex-direction: column;
+	            align-items: stretch;
+	            gap: 10px;
+	          }
+
+	          .lexipath-wordcard__actions {
+	            width: 100%;
+	          }
+
+	          .lexipath-wordcard__pronounce-button {
+	            flex: 1;
+	            height: 48px;
+	            justify-content: center;
+	            font-size: 13px;
+	          }
+
+	          .lexipath-subtitle-word {
+	            padding: 2px 4px !important;
+	            border-bottom-width: 3px !important;
+	          }
+	        }
 
         @keyframes slideUp {
           from { transform: translateY(100%); }
@@ -1139,37 +1337,118 @@ export class SubtitleOverlay {
           color: ${textMuted};
         }
 
-        .lexipath-wordcard__body {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          font-size: 13px;
-          line-height: 1.45;
-          color: ${isDark ? 'rgba(241, 245, 249, 0.95)' : '#334155'};
-        }
+	        .lexipath-wordcard__body {
+	          display: flex;
+	          flex-direction: column;
+	          gap: 10px;
+	          font-size: 13px;
+	          line-height: 1.45;
+	          color: ${isDark ? 'rgba(241, 245, 249, 0.95)' : '#334155'};
+	        }
 
-        .lexipath-wordcard__definition {
-          font-size: 13px;
-        }
+	        .lexipath-wordcard__section {
+	          display: flex;
+	          flex-direction: column;
+	          gap: 4px;
+	        }
 
-        .lexipath-wordcard__example {
-          padding-top: 8px;
-          border-top: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(226, 232, 240, 0.8)'};
-          font-style: italic;
-          color: ${isDark ? 'rgba(226, 232, 240, 0.95)' : '#475569'};
-        }
+	        .lexipath-wordcard__section-label {
+	          font-size: 10px;
+	          font-weight: 800;
+	          text-transform: uppercase;
+	          letter-spacing: 0.10em;
+	          color: ${textMuted};
+	        }
 
-        .lexipath-wordcard__example-translation {
-          color: ${isDark ? 'rgba(148, 163, 184, 0.95)' : '#64748b'};
-        }
+	        .lexipath-wordcard__section-text {
+	          font-size: 13px;
+	        }
 
-        .lexipath-wordcard__footer {
-          margin-top: 14px;
-          padding-top: 10px;
-          border-top: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(226, 232, 240, 0.5)'};
-          display: flex;
-          justify-content: flex-end;
-        }
+	        .lexipath-wordcard__example {
+	          padding-top: 8px;
+	          border-top: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(226, 232, 240, 0.8)'};
+	        }
+
+	        .lexipath-wordcard__example .lexipath-wordcard__section-text {
+	          font-style: italic;
+	          color: ${isDark ? 'rgba(226, 232, 240, 0.95)' : '#475569'};
+	        }
+
+	        .lexipath-wordcard__example-translation {
+	          color: ${textMuted};
+	        }
+
+	        .lexipath-wordcard__example-translation .lexipath-wordcard__section-text {
+	          color: ${isDark ? 'rgba(148, 163, 184, 0.95)' : '#64748b'};
+	        }
+
+	        .lexipath-wordcard__footer {
+	          margin-top: 14px;
+	          padding-top: 10px;
+	          border-top: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(226, 232, 240, 0.5)'};
+	          display: flex;
+	          align-items: center;
+	          justify-content: space-between;
+	          gap: 10px;
+	          flex-wrap: wrap;
+	        }
+
+	        .lexipath-wordcard__actions {
+	          display: flex;
+	          align-items: center;
+	          gap: 8px;
+	          flex: 1;
+	          min-width: 0;
+	        }
+
+	        .lexipath-wordcard__pronounce-button {
+	          display: inline-flex;
+	          align-items: center;
+	          gap: 6px;
+	          padding: 6px 10px;
+	          border-radius: 10px;
+	          border: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.30)' : 'rgba(203, 213, 225, 0.65)'};
+	          background: ${isDark ? 'rgba(15, 23, 42, 0.55)' : 'rgba(241, 245, 249, 0.9)'};
+	          color: ${btnText};
+	          font-size: 11px;
+	          font-weight: 800;
+	          text-transform: uppercase;
+	          letter-spacing: 0.05em;
+	          cursor: pointer;
+	          transition: all 0.2s ease;
+	          user-select: none;
+	        }
+
+	        .lexipath-wordcard__pronounce-button:hover {
+	          background: ${isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(226, 232, 240, 0.95)'};
+	          transform: translateY(-1px);
+	        }
+
+	        .lexipath-wordcard__pronounce-button.is-speaking {
+	          border-color: rgba(99, 102, 241, 0.55);
+	          color: ${isDark ? '#a5b4fc' : '#4f46e5'};
+	        }
+
+	        .lexipath-wordcard__accent-toggle {
+	          height: 28px;
+	          min-width: 44px;
+	          padding: 0 10px;
+	          border-radius: 999px;
+	          border: 1px solid rgba(99, 102, 241, 0.35);
+	          background: rgba(99, 102, 241, 0.08);
+	          color: ${isDark ? '#a5b4fc' : '#4f46e5'};
+	          font-size: 10px;
+	          font-weight: 900;
+	          letter-spacing: 0.08em;
+	          cursor: pointer;
+	          user-select: none;
+	          transition: all 0.2s ease;
+	        }
+
+	        .lexipath-wordcard__accent-toggle:hover {
+	          background: rgba(99, 102, 241, 0.14);
+	          border-color: rgba(99, 102, 241, 0.55);
+	        }
 
         .lexipath-wordcard__chat-button {
           display: flex;
