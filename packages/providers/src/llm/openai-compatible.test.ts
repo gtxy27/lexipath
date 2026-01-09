@@ -88,7 +88,38 @@ describe('OpenAICompatibleProvider cancellation', () => {
 });
 
 describe('OpenAICompatibleProvider thinking field', () => {
-  it('does not include `thinking` by default (disabled)', async () => {
+  it('includes `thinking` by default on gateways (disabled)', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string, options?: RequestInit) => {
+      const bodyRaw = options?.body as string | undefined;
+      const body = bodyRaw ? (JSON.parse(bodyRaw) as Record<string, unknown>) : {};
+      expect(body.thinking).toEqual({ type: 'disabled' });
+
+      return new Response(
+        JSON.stringify({
+          id: 'test',
+          choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    globalThis.fetch = fetchMock as any;
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: 'https://example.com/v1',
+        model: 'gpt-test',
+      });
+
+      const result = await provider.chat([{ role: 'user', content: 'Hi' }], { maxTokens: 1, timeout: 10_000 });
+      expect(result.choices[0]?.message.content).toBe('ok');
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('does not include `thinking` for official OpenAI baseUrl by default', async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn(async (_url: string, options?: RequestInit) => {
       const bodyRaw = options?.body as string | undefined;
@@ -107,7 +138,7 @@ describe('OpenAICompatibleProvider thinking field', () => {
     globalThis.fetch = fetchMock as any;
     try {
       const provider = new OpenAICompatibleProvider({
-        baseUrl: 'https://example.com/v1',
+        baseUrl: 'https://api.openai.com/v1',
         model: 'gpt-test',
       });
 

@@ -150,9 +150,12 @@ export class OpenAICompatibleProvider {
   private shouldIncludeThinking(thinking: ThinkingMode): boolean {
     if (!this.supportsThinkingByDefault()) return false;
     if (this.supportsThinkingControl === false) return false;
-    // Only include when the caller expresses an intent (we default to disabled).
-    // Note: `ThinkingMode` is a non-empty string union, so `Boolean(thinking)` is always true.
-    return thinking !== 'disabled';
+
+    // Some OpenAI-compatible gateways default to "reasoning/thinking enabled" when the field is absent.
+    // To keep latency predictable (and match older behavior where we effectively sent "disabled"),
+    // we include the `thinking` field whenever we're on a gateway that might support it.
+    void thinking;
+    return true;
   }
 
   private isThinkingLikelyUnsupported(error: unknown): boolean {
@@ -280,7 +283,8 @@ export class OpenAICompatibleProvider {
           status === 400 &&
           this.supportsThinkingControl === null &&
           this.shouldIncludeThinking(thinkingMode) &&
-          this.isThinkingLikelyUnsupported(error)
+          // Some gateways return unhelpful 400 bodies; don't require keyword matching.
+          (this.isThinkingLikelyUnsupported(error) || thinkingMode === 'disabled')
         ) {
           try {
             const response = await this.fetchWithTimeout(
