@@ -52,12 +52,17 @@ export type FormState = {
   enabled: boolean;
   autoEnhance: boolean;
   webEnhanceMode: Settings["webEnhanceMode"];
+  webEnhanceModeNative: Settings["webEnhanceModeNative"];
   webShowOriginal: Settings["webShowOriginal"];
   webStyleMapping: Settings["webStyleMapping"];
   webCustomCss: Settings["webCustomCss"];
   scenesEnabled: Settings["scenesEnabled"];
   hasCompletedOnboarding: Settings["hasCompletedOnboarding"];
   floatingButtonEnabled: Settings["floatingButtonEnabled"];
+  webSelectionExplainEnabled: Settings["webSelectionExplainEnabled"];
+  wordCardSectionsOrder: Settings["wordCardSectionsOrder"];
+  wordCardAutoPronounce: Settings["wordCardAutoPronounce"];
+  wordCardEnglishAccent: Settings["wordCardEnglishAccent"];
   englishCorrection: Settings["englishCorrection"];
   siteMode: SiteMode;
   excludedSites: string[];

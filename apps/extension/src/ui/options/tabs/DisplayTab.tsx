@@ -25,8 +25,9 @@ export function DisplayTab(props: {
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
   aiEnabled: boolean;
   onOpenChannels: () => void;
+  embedded?: boolean;
 }): React.ReactElement {
-  const { form, setForm, aiEnabled, onOpenChannels } = props;
+  const { form, setForm, aiEnabled, onOpenChannels, embedded } = props;
 
   const webStyleThemeKey = useMemo(
     () => deriveWebStyleThemeKey(form.webStyleMapping),
@@ -34,23 +35,13 @@ export function DisplayTab(props: {
   );
   const webStyleMapping = form.webStyleMapping ?? WEB_STYLE_THEME_PRESETS.standard;
 
-  return (
-    <>
-      <header className="space-y-3">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-          {t("optionsTab_display")}
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">
-          {t("optionsDisplayDesc")}
-        </p>
-      </header>
-
-      <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-              {t("optionsAppearanceTitle")}
-            </h4>
+  const content = (
+    <div className={embedded ? "mt-0" : "mt-4"}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+	          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+	            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+	              {t("optionsAppearanceTitle")}
+	            </h4>
 
             <div className="space-y-5">
               <div className="space-y-2.5">
@@ -101,10 +92,10 @@ export function DisplayTab(props: {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-              {t("optionsFloatingButtonLabel")}
-            </h4>
+	          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+	            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+	              {t("optionsFloatingButtonLabel")}
+	            </h4>
 
             <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
               <div className="space-y-1">
@@ -115,17 +106,17 @@ export function DisplayTab(props: {
                   {t("optionsFloatingButtonDesc")}
                 </div>
               </div>
-              <Switch
-                checked={form.floatingButtonEnabled ?? true}
-                onCheckedChange={(checked) => setForm({ ...form, floatingButtonEnabled: checked })}
-              />
-            </div>
-          </div>
+	              <Switch
+	                checked={form.floatingButtonEnabled ?? true}
+	                onCheckedChange={(checked) => setForm({ ...form, floatingButtonEnabled: checked })}
+	              />
+	            </div>
+	          </div>
 
-          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-              {t("optionsScenesLabel")}
-            </h4>
+	          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+	            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+	              {t("optionsScenesLabel")}
+	            </h4>
             <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
               {t("optionsScenesQuickDesc")}
             </p>
@@ -398,9 +389,27 @@ export function DisplayTab(props: {
                   </div>
                 </div>
               </details>
-            </div>
-          </div>
-        </div>
+	            </div>
+	          </div>
+	        </div>
+	    </div>
+	  );
+
+  if (embedded) return content;
+
+  return (
+    <>
+      <header className="space-y-3">
+        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+          {t("optionsTab_display")}
+        </h2>
+        <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">
+          {t("optionsDisplayDesc")}
+        </p>
+      </header>
+
+      <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
+        {content}
       </AiGate>
     </>
   );

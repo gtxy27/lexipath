@@ -13,14 +13,12 @@ import {
   Languages,
   SlidersHorizontal,
   Sparkles,
-  Zap,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { ICON_URL } from "../lib/assets";
 import { BackupTab } from "./tabs/BackupTab";
 import { ChannelsTab } from "./tabs/ChannelsTab";
-import { DisplayTab } from "./tabs/DisplayTab";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { LearningTab } from "./tabs/LearningTab";
 import {
@@ -41,7 +39,7 @@ export function Options(): React.ReactElement {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("channels");
+  const [activeTab, setActiveTab] = useState("learning");
 
   useApplyTheme(form?.theme ?? settings?.theme);
 
@@ -161,13 +159,12 @@ export function Options(): React.ReactElement {
             </h1>
           </div>
 
-          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
-            {[
-              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-              { value: "display", label: t("optionsTab_display"), icon: Zap },
-            ].map((tab) => (
+	          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
+	            {[
+	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
+	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
+	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
+	            ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
@@ -225,61 +222,48 @@ export function Options(): React.ReactElement {
             </Button>
           </div>
 
-          <TabsContent
-            value="channels"
-            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-          >
-            <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
-          </TabsContent>
+	          <TabsContent
+	            value="learning"
+	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+	          >
+	            <LearningTab
+	              form={currentForm}
+	              setForm={setFormState}
+	              errors={errors}
+	              aiEnabled={hasAiConfigured}
+	              onOpenChannels={openChannelsTab}
+	            />
+	          </TabsContent>
 
-          <TabsContent
-            value="general"
-            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-          >
-            <GeneralTab
-              form={currentForm}
-              setForm={setFormState}
-              errors={errors}
-              aiEnabled={hasAiConfigured}
-              onOpenChannels={openChannelsTab}
-              onReloadSettings={reloadSettings}
-            />
-          </TabsContent>
+	          <TabsContent
+	            value="channels"
+	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+	          >
+	            <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
+	          </TabsContent>
 
-          <TabsContent
-            value="learning"
-            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-          >
-            <LearningTab
-              form={currentForm}
-              setForm={setFormState}
-              errors={errors}
-              aiEnabled={hasAiConfigured}
-              onOpenChannels={openChannelsTab}
-            />
-          </TabsContent>
+	          <TabsContent
+	            value="general"
+	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+	          >
+	            <GeneralTab
+	              form={currentForm}
+	              setForm={setFormState}
+	              errors={errors}
+	              aiEnabled={hasAiConfigured}
+	              onOpenChannels={openChannelsTab}
+	              onReloadSettings={reloadSettings}
+	            />
+	          </TabsContent>
+	        </div>
 
-          <TabsContent
-            value="display"
-            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-          >
-            <DisplayTab
-              form={currentForm}
-              setForm={setFormState}
-              aiEnabled={hasAiConfigured}
-              onOpenChannels={openChannelsTab}
-            />
-          </TabsContent>
-        </div>
-
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-[#0d0e14]/80 backdrop-blur-xl border-t border-gray-200 dark:border-white/5 px-2 pb-safe pt-2 z-50">
-          <TabsList className="flex h-auto bg-transparent border-0 p-0">
-            {[
-              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-              { value: "display", label: t("optionsTab_display"), icon: Zap },
-            ].map((tab) => (
+	        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-[#0d0e14]/80 backdrop-blur-xl border-t border-gray-200 dark:border-white/5 px-2 pb-safe pt-2 z-50">
+	          <TabsList className="flex h-auto bg-transparent border-0 p-0">
+	            {[
+	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
+	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
+	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
+	            ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
