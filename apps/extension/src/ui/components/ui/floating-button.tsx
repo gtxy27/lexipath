@@ -570,7 +570,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               "px-3.5",
               isEnhanceActive
                 ? "bg-indigo-600/90 border-indigo-500 text-white"
-                : "bg-gray-200/90 dark:bg-gray-800/90 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300",
+                : "bg-gray-200/90 dark:bg-gray-800/90 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-white hover:bg-primary/90 hover:border-primary/60",
             )}
           >
             {isOpen ? (

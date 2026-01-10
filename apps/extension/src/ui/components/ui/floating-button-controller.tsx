@@ -24,14 +24,65 @@ const TAB_ENHANCE_PAUSED_KEY = "lexipath-tab-enhance-paused";
 const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
 const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
 
+// Theme variables should be owned by the extension, not inherited from the page.
+// These values mirror `apps/extension/src/ui/styles.css` (:root + .dark).
+const LIGHT_THEME_VARS: Record<string, string> = {
+  "--background": "240 25% 98%",
+  "--foreground": "222.2 84% 4.9%",
+  "--card": "0 0% 100%",
+  "--card-foreground": "222.2 84% 4.9%",
+  "--popover": "0 0% 100%",
+  "--popover-foreground": "222.2 84% 4.9%",
+  "--primary": "221.2 83.2% 53.3%",
+  "--primary-foreground": "210 40% 98%",
+  "--secondary": "210 40% 96.1%",
+  "--secondary-foreground": "222.2 47.4% 11.2%",
+  "--muted": "210 40% 96.1%",
+  "--muted-foreground": "215.4 16.3% 46.9%",
+  "--accent": "210 40% 96.1%",
+  "--accent-foreground": "222.2 47.4% 11.2%",
+  "--destructive": "0 84.2% 60.2%",
+  "--destructive-foreground": "210 40% 98%",
+  "--border": "214.3 31.8% 91.4%",
+  "--input": "214.3 31.8% 91.4%",
+  "--ring": "221.2 83.2% 53.3%",
+  "--radius": "0.5rem",
+};
+
+const DARK_THEME_VARS: Record<string, string> = {
+  "--background": "222.2 84% 4.9%",
+  "--foreground": "210 40% 98%",
+  "--card": "222.2 84% 4.9%",
+  "--card-foreground": "210 40% 98%",
+  "--popover": "222.2 84% 4.9%",
+  "--popover-foreground": "210 40% 98%",
+  "--primary": "217.2 91.2% 59.8%",
+  "--primary-foreground": "222.2 47.4% 11.2%",
+  "--secondary": "217.2 32.6% 17.5%",
+  "--secondary-foreground": "210 40% 98%",
+  "--muted": "217.2 32.6% 17.5%",
+  "--muted-foreground": "215 20.2% 65.1%",
+  "--accent": "217.2 32.6% 17.5%",
+  "--accent-foreground": "210 40% 98%",
+  "--destructive": "0 62.8% 30.6%",
+  "--destructive-foreground": "210 40% 98%",
+  "--border": "217.2 32.6% 17.5%",
+  "--input": "217.2 32.6% 17.5%",
+  "--ring": "224.3 76.3% 48%",
+  "--radius": "0.5rem",
+};
+
 export class FloatingButtonController {
   private container: HTMLDivElement | null = null;
   private shadow: ShadowRoot | null = null;
   private root: Root | null = null;
+  private rootEl: HTMLDivElement | null = null;
   private settings: Settings | null = null;
   private onRunWebEnhanceOnce: (() => void | Promise<void>) | null = null;
   private onRunWebRewriteOnce: (() => void | Promise<void>) | null = null;
   private pageContext: PageContext = { forgottenWords: [] };
+  private prefersDarkMql: MediaQueryList | null = null;
+  private prefersDarkHandler: (() => void) | null = null;
 
   constructor(
     settings: Settings | null,
@@ -76,7 +127,11 @@ export class FloatingButtonController {
 
     const rootEl = document.createElement("div");
     rootEl.style.cssText = "pointer-events: auto;";
+    rootEl.className = "lexipath-floating-root";
     this.shadow.appendChild(rootEl);
+    this.rootEl = rootEl;
+    this.setupThemeSync();
+    this.applyThemeToRoot();
 
     this.root = createRoot(rootEl);
     this.render();
@@ -107,7 +162,68 @@ export class FloatingButtonController {
       this.mount();
       return;
     }
+    this.applyThemeToRoot();
     this.render();
+  }
+
+  private isDarkTheme(): boolean {
+    const theme = this.settings?.theme ?? "system";
+    if (theme === "dark") return true;
+    if (theme === "light") return false;
+    return Boolean(window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
+  }
+
+  private applyThemeToRoot(): void {
+    const rootEl = this.rootEl;
+    if (!rootEl) return;
+
+    const isDark = this.isDarkTheme();
+    rootEl.classList.toggle("dark", isDark);
+    rootEl.style.colorScheme = isDark ? "dark" : "light";
+
+    const vars = isDark ? DARK_THEME_VARS : LIGHT_THEME_VARS;
+    for (const [key, value] of Object.entries(vars)) {
+      rootEl.style.setProperty(key, value);
+    }
+  }
+
+  private setupThemeSync(): void {
+    if (this.prefersDarkMql || this.prefersDarkHandler) return;
+    if (!window.matchMedia) return;
+
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      const theme = this.settings?.theme ?? "system";
+      if (theme !== "system") return;
+      this.applyThemeToRoot();
+      this.render();
+    };
+
+    this.prefersDarkMql = mql;
+    this.prefersDarkHandler = handler;
+
+    try {
+      mql.addEventListener("change", handler);
+    } catch (error: unknown) {
+      void error;
+      (mql as any).addListener?.(handler);
+    }
+  }
+
+  private teardownThemeSync(): void {
+    const mql = this.prefersDarkMql;
+    const handler = this.prefersDarkHandler;
+    if (!mql || !handler) return;
+
+    try {
+      mql.removeEventListener("change", handler);
+    } catch (error: unknown) {
+      void error;
+      (mql as any).removeListener?.(handler);
+    } finally {
+      this.prefersDarkMql = null;
+      this.prefersDarkHandler = null;
+    }
   }
 
   private shouldShowFloatingButton(settingsOverride?: Settings | null): boolean {
@@ -190,6 +306,8 @@ export class FloatingButtonController {
 
   private render() {
     if (!this.root) return;
+
+    this.applyThemeToRoot();
 
     const settings = this.settings;
     const siteMode = settings ? this.getEnhanceSiteMode(settings) : "manual";
@@ -288,6 +406,7 @@ export class FloatingButtonController {
   }
 
   unmount() {
+    this.teardownThemeSync();
     if (this.root) {
       this.root.unmount();
       this.root = null;
@@ -297,5 +416,6 @@ export class FloatingButtonController {
     }
     this.container = null;
     this.shadow = null;
+    this.rootEl = null;
   }
 }
