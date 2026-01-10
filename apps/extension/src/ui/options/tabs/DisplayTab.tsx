@@ -37,7 +37,7 @@ export function DisplayTab(props: {
 
   const content = (
     <div className={embedded ? "mt-0" : "mt-4"}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
 	          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
 	            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
 	              {t("optionsAppearanceTitle")}

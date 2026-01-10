@@ -74,13 +74,13 @@ export function LanguageTab(props: {
       </header>
 
       <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 items-start">
-          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 items-stretch">
+          <div className="md:col-span-2 md:order-1 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
             <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
               {t("optionsLanguageTitle")}
             </h4>
 
-            <div className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2.5">
                 <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
                   {t("nativeLanguage")}
@@ -173,7 +173,7 @@ export function LanguageTab(props: {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+          <div className="md:order-2 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
             <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
               {t("optionsLearningLevelsTitle")}
             </h4>
@@ -568,67 +568,7 @@ export function LanguageTab(props: {
             </div>
           </div>
 
-	          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-	            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-	              {t("optionsWebEnhanceModeLabel")}
-	            </h4>
-
-	            <div className="space-y-5">
-	              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
-	                {t("optionsWebEnhanceModeDesc")}
-	              </p>
-	              <div className="space-y-4">
-	                <div className="space-y-2.5">
-	                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
-	                    {t("optionsWebEnhanceModeTargetLabel")}
-	                  </Label>
-	                  <Select
-	                    value={form.webEnhanceMode}
-	                    onValueChange={(v) =>
-	                      setForm({ ...form, webEnhanceMode: v as Settings["webEnhanceMode"] })
-	                    }
-	                  >
-	                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
-	                      <SelectValue />
-	                    </SelectTrigger>
-	                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-	                      <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
-	                      <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
-	                      <SelectItem value="full">{t("optionsWebEnhanceModeFull")}</SelectItem>
-	                    </SelectContent>
-	                  </Select>
-	                </div>
-
-	                <div className="space-y-2.5">
-	                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
-	                    {t("optionsWebEnhanceModeNativeLabel")}
-	                  </Label>
-	                  <Select
-	                    value={form.webEnhanceModeNative}
-	                    onValueChange={(v) =>
-	                      setForm({
-	                        ...form,
-	                        webEnhanceModeNative: v as Settings["webEnhanceModeNative"],
-	                      })
-	                    }
-	                  >
-	                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
-	                      <SelectValue />
-	                    </SelectTrigger>
-	                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
-	                      <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
-	                      <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
-	                    </SelectContent>
-	                  </Select>
-	                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium ml-1">
-	                    {t("optionsWebEnhanceModeNativeHint")}
-	                  </p>
-	                </div>
-	              </div>
-		            </div>
-		          </div>
-
-          <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+          <div className="md:order-3 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
             <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
               {t("optionsWordCardTitle")}
             </h4>
@@ -761,8 +701,69 @@ export function LanguageTab(props: {
             </div>
           </div>
 
+          <div className="md:col-span-2 md:order-4 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+              {t("optionsWebEnhanceModeLabel")}
+            </h4>
+
+            <div className="space-y-5">
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                {t("optionsWebEnhanceModeDesc")}
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2.5">
+                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                    {t("optionsWebEnhanceModeTargetLabel")}
+                  </Label>
+                  <Select
+                    value={form.webEnhanceMode}
+                    onValueChange={(v) =>
+                      setForm({ ...form, webEnhanceMode: v as Settings["webEnhanceMode"] })
+                    }
+                  >
+                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                      <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
+                      <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
+                      <SelectItem value="full">{t("optionsWebEnhanceModeFull")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2.5">
+                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                    {t("optionsWebEnhanceModeNativeLabel")}
+                  </Label>
+                  <Select
+                    value={form.webEnhanceModeNative}
+                    onValueChange={(v) =>
+                      setForm({
+                        ...form,
+                        webEnhanceModeNative: v as Settings["webEnhanceModeNative"],
+                      })
+                    }
+                  >
+                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                      <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
+                      <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium ml-1">
+                    {t("optionsWebEnhanceModeNativeHint")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {form.hasCompletedOnboarding ? null : (
-            <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+            <div className="md:col-span-2 md:order-5 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
               <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
                 {t("openOnboarding")}
               </h4>
@@ -786,7 +787,7 @@ export function LanguageTab(props: {
             </div>
           )}
 
-          <div className="md:col-span-2 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
+          <div className="md:col-span-2 md:order-6 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
             <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
               {t("optionsEnglishCorrectionTitle")}
             </h4>
