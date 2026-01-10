@@ -409,7 +409,7 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 
 提交粒度：
 - 一次提交只做一类事情，避免"功能 + 格式化 + 重构"混杂。
-- 必须要包含变更摘要（subject），不能只写"fix"或"feat"。 使用 - 来说明
+- 必须要包含变更摘要（subject），不能只写"fix"或"feat"。 使用 - 来说明细节详细。
 - 如必须大规模格式化，请单独提交，并在 subject 中标明 `format`。
 
 ### 14.4 禁止提交的内容
@@ -421,6 +421,7 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 
 每个 PR 至少包含：
 - 变更摘要（做了什么）
+- 必须要包含变更说明,不能只写commit总结
 - 影响范围（哪些包/页面）
 - 手工验证清单（Chrome + Firefox，包含至少一个网页场景 + 一个字幕场景）
 - 如涉及权限：说明新增/变更的 permission 与原因
