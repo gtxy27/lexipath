@@ -19,7 +19,7 @@ if (elementProto && typeof elementProto.releasePointerCapture !== "function") {
   elementProto.releasePointerCapture = () => {};
 }
 
-const { browserMock, sendMessageMock, defaultSettings } = vi.hoisted(() => {
+const { browserMock, sendMessageMock } = vi.hoisted(() => {
   const settings = {
     nativeLanguage: "zh-CN",
     targetLanguage: "en",
@@ -106,9 +106,13 @@ describe("Options", () => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
 
-    expect(screen.getAllByText("optionsChannelsTitle")[0]).toBeTruthy();
     expect(screen.getAllByText("optionsTab_general")[0]).toBeTruthy();
     expect(screen.getAllByText("optionsTab_learning")[0]).toBeTruthy();
+    expect(screen.getAllByText("optionsTab_channels")[0]).toBeTruthy();
+
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!);
+    expect(screen.getAllByText("optionsChannelsTitle")[0]).toBeTruthy();
   });
 
   it("saves channel config and switches translate route to google", async () => {
@@ -118,6 +122,8 @@ describe("Options", () => {
     await waitFor(() => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!);
 
     await user.type(
       screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {
@@ -158,6 +164,8 @@ describe("Options", () => {
     await waitFor(() => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!);
 
     await user.type(
       screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {

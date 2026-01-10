@@ -356,7 +356,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 	                className={cn(
 	                  "w-[340px] max-w-[calc(100vw-24px)]",
 	                  "rounded-2xl border border-gray-200/80 dark:border-white/10",
-	                  "bg-white/95 dark:bg-[#0d0e14]/95 shadow-2xl backdrop-blur-xl",
+	                  "bg-white dark:bg-[#0d0e14] shadow-2xl",
 	                  "p-3",
 	                )}
 	              >
@@ -375,7 +375,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 	                    type="button"
 	                    size="icon"
 	                    variant="ghost"
-	                    className="h-8 w-8 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5"
+	                    className="h-8 w-8 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-[#1c1d2e]"
 	                    onClick={() => setIsOpen(false)}
 	                  >
 	                    <X className="h-4 w-4" />
@@ -405,8 +405,8 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                        className={cn(
 		                          "rounded-2xl border border-gray-200/70 dark:border-white/10",
 		                          section.key === "page"
-		                            ? "bg-gradient-to-b from-indigo-50/70 to-white/60 dark:from-indigo-500/10 dark:to-white/5"
-		                            : "bg-white/60 dark:bg-white/5",
+		                            ? "bg-indigo-50 dark:bg-[#131423]"
+		                            : "bg-gray-50 dark:bg-[#131423]",
 		                          "p-3",
 		                        )}
 		                      >
@@ -437,8 +437,8 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                  "w-full text-left transition-all",
 		                                  "rounded-2xl border border-gray-200/70 dark:border-white/10",
 		                                  isPrimary
-		                                    ? "bg-indigo-600 text-white hover:bg-indigo-600/95 shadow-lg shadow-indigo-600/15"
-		                                    : "bg-gray-50/60 dark:bg-white/5 hover:bg-gray-100/70 dark:hover:bg-white/10",
+		                                    ? "bg-indigo-600/85 text-white hover:bg-indigo-600/95 border-indigo-500/60 shadow-lg shadow-indigo-600/20"
+		                                    : "bg-white dark:bg-[#0d0e14] hover:bg-gray-100 dark:hover:bg-[#1c1d2e]",
 		                                  isPrimary ? "px-4 py-3" : "px-3 py-2.5",
 		                                )}
 		                              >
@@ -448,7 +448,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                      "mt-0.5 flex items-center justify-center rounded-xl border",
 		                                      isPrimary
 		                                        ? "h-10 w-10 bg-white/10 border-white/15 text-white"
-		                                        : "h-8 w-8 bg-white/70 dark:bg-white/5 border-gray-200/70 dark:border-white/10",
+		                                        : "h-8 w-8 bg-white dark:bg-[#131423] border-gray-200/70 dark:border-white/10",
 		                                      !isPrimary && item.color,
 		                                    )}
 		                                  >
@@ -501,7 +501,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               }}
               className={cn(
                 "fixed z-[2147483647] pointer-events-auto",
-                "bg-white/95 dark:bg-[#0d0e14]/95 border border-gray-200/80 dark:border-white/10 shadow-2xl backdrop-blur-xl",
+                "bg-white dark:bg-[#0d0e14] border border-gray-200/80 dark:border-white/10 shadow-2xl",
                 "rounded-2xl",
                 "w-[320px] max-w-[calc(100vw-24px)]",
                 "p-4",
@@ -533,7 +533,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                     {forgottenWords.map((item) => (
                       <div
                         key={item.word}
-                        className="flex items-center justify-between rounded-xl border border-gray-200/70 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2"
+                        className="flex items-center justify-between rounded-xl border border-gray-200/70 dark:border-white/10 bg-white dark:bg-[#131423] px-3 py-2"
                       >
                         <div className="min-w-0">
                           <div className="text-xs font-extrabold text-gray-900 dark:text-white truncate">
@@ -559,6 +559,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <Button
             ref={buttonRef}
+            variant="ghost"
             type="button"
             aria-label={isOpen ? t("floatingCommandCenterClose") : t("floatingCommandCenterOpen")}
             onClick={() => {
@@ -569,8 +570,8 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               "relative h-12 rounded-full shadow-2xl backdrop-blur-xl transition-colors border",
               "px-3.5",
               isEnhanceActive
-                ? "bg-indigo-600/90 border-indigo-500 text-white"
-                : "bg-gray-200/90 dark:bg-gray-800/90 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:text-white hover:bg-primary/90 hover:border-primary/60",
+                ? "bg-indigo-600/85 border-indigo-500/60 text-white hover:bg-indigo-600/95 hover:border-indigo-400/70"
+                : "bg-white/55 dark:bg-gray-800/55 border-gray-200/70 dark:border-gray-700/70 text-gray-700 dark:text-gray-200 hover:bg-white/70 hover:border-gray-300/80 hover:text-gray-900 dark:hover:bg-gray-700/70 dark:hover:border-gray-600/80 dark:hover:text-white",
             )}
           >
             {isOpen ? (
