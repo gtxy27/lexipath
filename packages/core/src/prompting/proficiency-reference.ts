@@ -1,4 +1,4 @@
-import type { CEFRLevel, ProficiencyPreference, SupportedLanguage, NativeLanguage } from '@lexipath/core';
+import type { CEFRLevel, NativeLanguage, ProficiencyPreference, SupportedLanguage } from '../types';
 
 function formatProficiencyPreferenceValue(preference: ProficiencyPreference): string {
   if (preference.standard === 'CET-4' || preference.standard === 'CET-6') {

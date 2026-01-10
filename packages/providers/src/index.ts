@@ -14,5 +14,3 @@ export { BingTranslateProvider } from './translate/bing-translate';
 export * from './dictionary';
 export { classifyError } from './errors';
 export type { ProviderError, ProviderErrorCode } from './errors';
-
-export * from './prompts';

@@ -7,7 +7,6 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./prompts": "./src/prompts/index.ts",
     "./dictionary": "./src/dictionary/index.ts",
     "./openai-compatible": "./src/llm/openai-compatible.ts",
     "./errors": "./src/errors.ts"

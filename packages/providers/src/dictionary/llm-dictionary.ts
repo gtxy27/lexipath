@@ -1,5 +1,5 @@
 import type { ExplainWordOutput } from '@lexipath/core';
-import { parseExplainWordResponse } from '../prompts/explain-word-prompt';
+import { parseExplainWordResponse } from '@lexipath/core/prompting';
 import type { ChatOptions } from '../llm/openai-compatible';
 import type { ChatProvider, ExplainWordPromptBuilder, ExplainWordRequest } from './types';
 
@@ -49,4 +49,3 @@ export class LLMDictionaryProvider {
     return output;
   }
 }
-

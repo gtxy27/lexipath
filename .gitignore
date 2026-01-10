@@ -55,3 +55,6 @@ apps/extension/src/background/dictionary-seed.ts
 # Temporary files
 *.tmp
 *.temp
+
+# Prompting: generated prompt samples (local, from tests)
+packages/core/src/prompting/prompt-samples.txt

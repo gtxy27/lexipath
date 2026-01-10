@@ -1,10 +1,13 @@
-import type { CEFRLevel } from '../types';
+import type { CEFRLevel, PromptStyleKey } from '../types';
+import type { PromptSceneKey } from './scenes';
 
 export type PromptUserInfo = {
   motherTongue: string;
   targetLearningLanguage: string;
   cefrLevel: CEFRLevel;
   levelReferenceLine?: string | undefined;
+  targetLearningLanguageLevel?: CEFRLevel | undefined;
+  targetLearningLanguageLevelReferenceLine?: string | undefined;
 };
 
 export type PromptContextInfo = {
@@ -12,17 +15,48 @@ export type PromptContextInfo = {
   after: string[];
 };
 
-export type PromptTemplateInput = {
-  // Top section (no tags; fixed order)
-  role: string;
-  scene: string;
-  style: string;
-  task: string;
+/**
+ * Canonical section order (as discussed).
+ * Note: Role/Scene/Style/Task are rendered as a fixed top header (no tags).
+ * The remaining sections are rendered as tagged blocks in this order.
+ */
+export const PROMPT_SECTION_ORDER = [
+  'Role',
+  'Scene',
+  'Style',
+  'Task',
+  'UserInfo',
+  'ContextInfo',
+  'UserInput',
+  'OutputFormat',
+  'OutputNotes',
+] as const;
 
-  // Tagged information blocks
+export type PromptSectionKey = typeof PROMPT_SECTION_ORDER[number];
+
+/**
+ * The four bound strings owned by an agent behavior.
+ */
+export type PromptBehaviorSnapshot = {
+  role: string;
+  task: string;
+  outputFormat: string;
+  outputNotes: string;
+};
+
+export type PromptAgentKey = string;
+
+/**
+ * External API (key-based):
+ * - `agentKey`: string key → behavior snapshot mapping
+ * - `sceneKey/styleKey`: keys resolved internally
+ * - `userInfo/contextInfo/userInput`: runtime payload
+ */
+export type BuildPromptRequest = {
+  agentKey: PromptAgentKey;
+  sceneKey: PromptSceneKey | string;
+  styleKey: PromptStyleKey | string;
   userInfo: PromptUserInfo;
   contextInfo?: PromptContextInfo;
   userInput: string;
-  outputFormat: string;
-  outputNotes: string;
 };

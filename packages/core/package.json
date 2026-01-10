@@ -11,6 +11,7 @@
     "./qualify": "./src/qualify/index.ts",
     "./familiarity": "./src/familiarity/index.ts",
     "./log": "./src/log/index.ts",
+    "./prompting": "./src/prompting/index.ts",
     "./strategy": "./src/strategy/index.ts",
     "./validators": "./src/validators/index.ts",
     "./cache-key": "./src/cache-key/index.ts"

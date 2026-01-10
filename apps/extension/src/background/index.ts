@@ -52,12 +52,17 @@ import {
 } from '@lexipath/providers';
 import { WebDAVProvider } from '@lexipath/storage';
 import {
-  PromptBuilder,
+  buildPrompt,
+  buildProficiencyRangeReferenceLine,
+  buildProficiencyReferenceLine,
   parseExplainWordResponse,
   parseKeywordSelectResponse,
   parseTermTranslateResponse,
   parseTranslateKeywordsResponse,
-} from '@lexipath/providers/prompts';
+  resolvePromptStyleKey,
+  type PromptContextInfo,
+  type PromptUserInfo,
+} from '@lexipath/core/prompting';
 import { DictionaryService } from '@lexipath/dictionary';
 
 import { MessageError, createMessageHandlerRegistry } from '../shared/messages';
@@ -388,7 +393,37 @@ const translateKeywordsInFlight = new Map<string, Promise<Record<string, string>
 const explainWordInFlight = new Map<string, Promise<ExplainWordOutput>>();
 const englishCorrectionInFlight = new Map<string, Promise<EnglishCorrectionOutput>>();
 const dictionaryService = new DictionaryService();
-const promptBuilder = new PromptBuilder({ getSettings });
+
+function pickStyleKey(explicit: unknown, fallback: Settings['promptStyle']): string {
+  if (explicit !== undefined && explicit !== null && String(explicit).trim()) {
+    return resolvePromptStyleKey(explicit);
+  }
+  if (fallback) return fallback;
+  return 'default';
+}
+
+function makePromptUserInfo(options: {
+  motherTongue: string;
+  targetLearningLanguage: string;
+  cefrLevel: CEFRLevel;
+  levelReferenceLine?: string;
+}): PromptUserInfo {
+  return {
+    motherTongue: options.motherTongue,
+    targetLearningLanguage: options.targetLearningLanguage,
+    cefrLevel: options.cefrLevel,
+    ...(options.levelReferenceLine ? { levelReferenceLine: options.levelReferenceLine } : {}),
+  };
+}
+
+function makeContextInfoFromText(text: string): PromptContextInfo {
+  const lines = text
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return { before: lines, after: [] };
+}
 
 function openOnboardingPage(): Promise<void> {
   const url = browser.runtime.getURL('src/ui/onboarding/index.html');
@@ -748,12 +783,28 @@ async function getKeywordsForText(options: {
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
     run: async () => {
       try {
-        const prompt = await promptBuilder.buildKeywordSelectPrompt({
-          text,
-          sourceLang: sourceLang ?? settings.targetLanguage,
-          targetLang: targetLang ?? settings.nativeLanguage,
+        const resolvedSourceLang = sourceLang ?? settings.targetLanguage;
+        const resolvedTargetLang = targetLang ?? settings.nativeLanguage;
+        const referenceLine = buildProficiencyReferenceLine({
+          sourceLang: resolvedSourceLang,
+          targetLang: resolvedTargetLang,
           userLevel,
-          scene,
+          ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+        });
+
+        const userInfo = makePromptUserInfo({
+          motherTongue: resolvedTargetLang,
+          targetLearningLanguage: resolvedSourceLang,
+          cefrLevel: userLevel,
+          ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+        });
+
+        const prompt = buildPrompt({
+          agentKey: 'keyword_select',
+          sceneKey: scene === 'web' ? 'keyword_select_web' : 'keyword_select_subtitle',
+          styleKey: pickStyleKey(undefined, settings.promptStyle),
+          userInfo,
+          userInput: text,
         });
 
         const limit = getChannelConcurrencyLimit(channel, route.kind);
@@ -874,12 +925,27 @@ async function translateKeywords(options: {
               return fallbackViaTranslateRoute();
             }
 
-            const prompt = await promptBuilder.buildTranslateKeywordsPrompt({
-              keywords: normalizedKeywords,
-              ...(options.context ? { context: options.context } : {}),
+            const referenceLine = buildProficiencyReferenceLine({
               sourceLang: parsedSourceLang.data,
               targetLang: parsedTargetLang.data,
               userLevel: settings.proficiencyLevel,
+              ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+            });
+
+            const userInfo = makePromptUserInfo({
+              motherTongue: parsedTargetLang.data,
+              targetLearningLanguage: parsedSourceLang.data,
+              cefrLevel: settings.proficiencyLevel,
+              ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+            });
+
+            const prompt = buildPrompt({
+              agentKey: 'translate_keywords',
+              sceneKey: 'keyword_translate',
+              styleKey: pickStyleKey(undefined, settings.promptStyle),
+              userInfo,
+              ...(options.context ? { contextInfo: makeContextInfoFromText(options.context) } : {}),
+              userInput: normalizedKeywords.join('\n'),
             });
 
             const limit = getChannelConcurrencyLimit(channel, route.kind);
@@ -989,11 +1055,26 @@ async function translateTerms(options: {
   const parsedTargetLang = NativeLanguageSchema.safeParse(options.targetLang);
   if (!parsedSourceLang.success || !parsedTargetLang.success) return terms;
 
-  const prompt = await promptBuilder.buildTermTranslatePrompt({
-    terms,
+  const referenceLine = buildProficiencyReferenceLine({
     sourceLang: parsedSourceLang.data,
     targetLang: parsedTargetLang.data,
     userLevel: settings.proficiencyLevel,
+    ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+  });
+
+  const userInfo = makePromptUserInfo({
+    motherTongue: parsedTargetLang.data,
+    targetLearningLanguage: parsedSourceLang.data,
+    cefrLevel: settings.proficiencyLevel,
+    ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+  });
+
+  const prompt = buildPrompt({
+    agentKey: 'term_translate',
+    sceneKey: 'term_translate',
+    styleKey: pickStyleKey(undefined, settings.promptStyle),
+    userInfo,
+    userInput: terms.join('\n'),
   });
 
   try {
@@ -1387,13 +1468,39 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
           const difficultyMax = nextCefrLevel(userLevel);
 
           try {
-            const prompt = await promptBuilder.buildWebEnhancePrompt({
-              content: options.text,
-              sourceLang: String(options.sourceLang ?? settings.targetLanguage) as any,
-              targetLang: String(options.targetLang ?? settings.nativeLanguage) as any,
+            const resolvedSourceLang = String(options.sourceLang ?? settings.targetLanguage) as any;
+            const resolvedTargetLang = String(options.targetLang ?? settings.nativeLanguage) as any;
+
+            const referenceLine = buildProficiencyRangeReferenceLine({
+              sourceLang: resolvedSourceLang,
+              targetLang: resolvedTargetLang,
               difficultyMin,
               difficultyMax,
-              maxWords: options.maxWords,
+              ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+            });
+
+            const userInfo = makePromptUserInfo({
+              motherTongue: resolvedTargetLang,
+              targetLearningLanguage: resolvedSourceLang,
+              cefrLevel: difficultyMax,
+              ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+            });
+
+            const userInput = [
+              '参数：',
+              `- difficultyMin: ${difficultyMin}`,
+              `- difficultyMax: ${difficultyMax}`,
+              `- maxWords: ${options.maxWords}`,
+              '',
+              options.text,
+            ].join('\n');
+
+            const prompt = buildPrompt({
+              agentKey: 'web_enhance',
+              sceneKey: 'web_content',
+              styleKey: pickStyleKey(undefined, settings.promptStyle),
+              userInfo,
+              userInput,
             });
 
             const limit = getChannelConcurrencyLimit(channel, resolvedRoute.kind);
@@ -1594,11 +1701,36 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
 
         const provider = getChatProvider(adaptProviderInfo.type, adaptProviderInfo.config);
 
-        const prompt = await promptBuilder.buildSubtitleAdaptPrompt({
+        const motherTongue = settings.nativeLanguage;
+        const targetLearningLanguage = settings.targetLanguage;
+
+        const referenceLine = buildProficiencyReferenceLine({
+          sourceLang: targetLearningLanguage,
+          targetLang: motherTongue,
+          userLevel: difficultyLevel,
+          ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+        });
+
+        const userInfo = makePromptUserInfo({
+          motherTongue,
+          targetLearningLanguage,
+          cefrLevel: difficultyLevel,
+          ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+        });
+
+        const userInput = [
+          `sourceLang: ${String(sourceLang)}`,
+          `targetLang: ${String(targetLearningLanguage)}`,
+          '',
           subtitle,
-          sourceLang,
-          targetLang: settings.targetLanguage,
-          difficultyLevel,
+        ].join('\n');
+
+        const prompt = buildPrompt({
+          agentKey: 'subtitle_adapt',
+          sceneKey: 'video_subtitle',
+          styleKey: pickStyleKey(undefined, settings.promptStyle),
+          userInfo,
+          userInput,
         });
 
         const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute!.kind);
@@ -1664,14 +1796,34 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
   return getOrRunCachedTask(englishCorrectionCache, englishCorrectionInFlight, cacheKey, {
     ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
-    run: async () => {
-      try {
-        const prompt = await promptBuilder.buildEnglishCorrectionPrompt({ text });
+      run: async () => {
+        try {
+          const referenceLine = buildProficiencyReferenceLine({
+            sourceLang: settings.targetLanguage,
+            targetLang: settings.nativeLanguage,
+            userLevel: settings.proficiencyLevel,
+            ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+          });
 
-        const limit = getChannelConcurrencyLimit(channel, route.kind);
-        const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
-          provider.chat([{ role: 'user', content: prompt }], { temperature: 0.1, maxTokens: 180 })
-        );
+          const userInfo = makePromptUserInfo({
+            motherTongue: settings.nativeLanguage,
+            targetLearningLanguage: settings.targetLanguage,
+            cefrLevel: settings.proficiencyLevel,
+            ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+          });
+
+          const prompt = buildPrompt({
+            agentKey: 'english_correction',
+            sceneKey: 'english_correction',
+            styleKey: pickStyleKey(undefined, settings.promptStyle),
+            userInfo,
+            userInput: text,
+          });
+
+          const limit = getChannelConcurrencyLimit(channel, route.kind);
+          const response = await runWithChannelConcurrency(routeKey(route), limit, () =>
+            provider.chat([{ role: 'user', content: prompt }], { temperature: 0.1, maxTokens: 180 })
+          );
 
         const responseText = response.choices?.[0]?.message?.content ?? '';
         const validated = validateEnglishCorrectionOutputDetailed(responseText);
@@ -1789,12 +1941,39 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     try {
       const provider = getChatProvider(dictionaryProviderInfo.type, dictionaryProviderInfo.config);
 
-      const prompt = await promptBuilder.buildExplainWordPrompt({
-        word,
-        ...(context ? { context } : {}),
-        sourceLang,
-        targetLang,
+      const parsedSourceLang = SupportedLanguageSchema.safeParse(sourceLang);
+      const parsedTargetLang = NativeLanguageSchema.safeParse(targetLang);
+      if (!parsedSourceLang.success || !parsedTargetLang.success) {
+        throw new Error('Invalid sourceLang/targetLang for explain-word prompt');
+      }
+
+      const referenceLine = buildProficiencyReferenceLine({
+        sourceLang: parsedSourceLang.data,
+        targetLang: parsedTargetLang.data,
         userLevel,
+        ...(settings.proficiencyPreference ? { proficiencyPreference: settings.proficiencyPreference } : {}),
+      });
+
+      const userInfo = makePromptUserInfo({
+        motherTongue: parsedTargetLang.data,
+        targetLearningLanguage: parsedSourceLang.data,
+        cefrLevel: userLevel,
+        ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
+      });
+
+      const userInput = [
+        `word: ${word}`,
+        `sourceLang: ${String(sourceLang)}`,
+        `targetLang: ${String(targetLang)}`,
+      ].join('\n');
+
+      const prompt = buildPrompt({
+        agentKey: 'explain_word',
+        sceneKey: 'word_card',
+        styleKey: pickStyleKey(undefined, settings.promptStyle),
+        userInfo,
+        ...(context ? { contextInfo: makeContextInfoFromText(context) } : {}),
+        userInput,
       });
 
       const limit = getChannelConcurrencyLimit(dictionaryChannel, dictionaryRoute.kind);
