@@ -14,6 +14,45 @@ export type EnhancedTextOptions = {
   isDarkMode?: boolean;
 };
 
+/**
+ * Lowercase in a way that preserves string length (code units) so indexes remain valid for slicing.
+ * JS `toLowerCase()` can expand some characters (e.g. U+0130 "İ"), which breaks offset-based matching.
+ */
+const lowerForMatch = (input: string): string => {
+  if (!input) return input;
+  const out: string[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i);
+    // Normalize common punctuation to keep matching consistent without changing string length.
+    if (code === 0x2018 || code === 0x2019) {
+      out.push("'");
+      continue;
+    }
+    if (code === 0x201c || code === 0x201d) {
+      out.push('"');
+      continue;
+    }
+    if (code === 0x2013 || code === 0x2014) {
+      out.push('-');
+      continue;
+    }
+    if (code === 0x00a0) {
+      out.push(' ');
+      continue;
+    }
+    if (code >= 0x41 && code <= 0x5a) {
+      out.push(String.fromCharCode(code + 0x20));
+      continue;
+    }
+    if (code === 0x0130) {
+      out.push('i');
+      continue;
+    }
+    out.push(input[i] ?? '');
+  }
+  return out.join('');
+};
+
 const CEFR_ORDER: readonly CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const cefrRank = (level: CEFRLevel) => {
   const idx = CEFR_ORDER.indexOf(level);
@@ -43,7 +82,7 @@ export function createEnhancedElement(
   }
 
   const currentText = original;
-  const currentLower = currentText.toLowerCase();
+  const currentLower = lowerForMatch(currentText);
   const isDarkMode =
     typeof options?.isDarkMode === 'boolean'
       ? options.isDarkMode
@@ -57,13 +96,13 @@ export function createEnhancedElement(
   const words = enhanced.convert_word
     .map((word) => ({
       ...word,
-      originalLower: word.original.toLowerCase(),
+      originalLower: lowerForMatch(word.original),
       enforceWordBoundary: /[A-Za-z]/.test(word.original),
     }))
     .filter((word) => word.originalLower.trim().length > 0);
 
   const buildOffsetsFromTerms = (text: string, terms: string[]) => {
-    const haystack = text.toLowerCase();
+    const haystack = lowerForMatch(text);
     const uniqueTerms = Array.from(new Set(terms.map((t) => t.trim()).filter(Boolean)));
     uniqueTerms.sort((a, b) => b.length - a.length);
 
@@ -73,7 +112,7 @@ export function createEnhancedElement(
       taken.some((range) => !(end <= range.start || start >= range.end));
 
     for (const term of uniqueTerms) {
-      const needleLower = term.toLowerCase();
+      const needleLower = lowerForMatch(term);
       const len = needleLower.length;
       if (!len) continue;
 
@@ -148,14 +187,20 @@ export function createEnhancedElement(
   let cursor = 0;
   let plainStart = 0;
 
+  // Prefer local, deterministic matching to avoid server-provided offset drift.
+  // If offsets include `term` and they match exactly, we can use them; otherwise fall back to Trie matching.
   const offsets = (() => {
-    const rawOffsets = normalizeOffsets((enhanced as any).highlight_offsets);
-    if (rawOffsets.length > 0) return rawOffsets;
+    const rawOffsets = normalizeOffsets((enhanced as any).highlight_offsets).filter(
+      (off) => typeof off.term === 'string' && off.term.trim().length > 0,
+    );
+    if (rawOffsets.length === 0) return [];
 
-    const terms = Array.isArray((enhanced as any).highlight_terms)
-      ? ((enhanced as any).highlight_terms as string[])
-      : words.map((w) => w.original);
-    return normalizeOffsets(buildOffsetsFromTerms(currentText, terms));
+    for (const off of rawOffsets) {
+      const matched = currentText.slice(off.start, off.end);
+      if (lowerForMatch(matched) !== lowerForMatch(off.term!)) return [];
+    }
+
+    return rawOffsets;
   })();
 
   if (offsets.length > 0) {
@@ -167,9 +212,9 @@ export function createEnhancedElement(
       }
 
       const matchedOriginal = currentText.slice(start, end);
-      const matchedLower = matchedOriginal.toLowerCase();
+      const matchedLower = lowerForMatch(matchedOriginal);
       const byMatched = wordByLower.get(matchedLower);
-      const byTerm = off.term ? wordByLower.get(off.term.toLowerCase()) : undefined;
+      const byTerm = off.term ? wordByLower.get(lowerForMatch(off.term)) : undefined;
       const bestWord = byMatched ?? byTerm ?? null;
 
       if (!bestWord) {
@@ -312,12 +357,26 @@ export function createEnhancedElement(
 
     const isForgotten =
       familiarity && familiarity.encounters >= 2 && familiarity.familiarity < 30;
-    const isWithin = familiarity && familiarity.familiarity >= 60;
+
+    const isOutOfLevel = (() => {
+      // plan15: "uncertain" defaults to low-friction out-of-level.
+      if (!userLevel) return true;
+      const wordLevel =
+        (bestWord as any).difficultyLevel ?? parseCefrLevel((bestWord as any).difficulty);
+      const confidence =
+        typeof (bestWord as any).difficultyConfidence === 'number'
+          ? (bestWord as any).difficultyConfidence
+          : 0;
+      if (!wordLevel) return true;
+      if (confidence < 0.55) return true;
+      return cefrRank(wordLevel) > cefrRank(userLevel);
+    })();
+
     const styleKey = isForgotten
       ? styleMapping.forgotten
-      : isWithin
-        ? styleMapping.within
-        : styleMapping.out;
+      : isOutOfLevel
+        ? styleMapping.out
+        : styleMapping.within;
     span.dataset.lxStyle = styleKey;
 
     const enhancedText = (() => {
@@ -382,7 +441,7 @@ export function createEnhancedRenderer(
   const words = enhanced.convert_word
     .map((word) => ({
       ...word,
-      originalLower: word.original.toLowerCase(),
+      originalLower: lowerForMatch(word.original),
       enforceWordBoundary: /[A-Za-z]/.test(word.original),
     }))
     .filter((word) => word.originalLower.trim().length > 0);
@@ -412,7 +471,7 @@ export function createEnhancedRenderer(
   uniqueTerms.sort((a, b) => b.length - a.length);
   const preparedTerms = uniqueTerms.map((term) => ({
     term,
-    lower: term.toLowerCase(),
+    lower: lowerForMatch(term),
     len: term.length,
     enforceBoundary: /[A-Za-z]/.test(term),
   }));
@@ -431,7 +490,7 @@ export function createEnhancedRenderer(
     const fragment = document.createDocumentFragment();
 
     const currentText = original;
-    const currentLower = currentText.toLowerCase();
+    const currentLower = lowerForMatch(currentText);
 
     const hasWordBoundary = (start: number, length: number) => {
       const beforeCode = start > 0 ? currentText.charCodeAt(start - 1) : Number.NaN;
@@ -495,9 +554,17 @@ export function createEnhancedRenderer(
     let plainStart = 0;
 
     const offsets = (() => {
-      const rawOffsets = normalizeOffsets((enhanced as any).highlight_offsets);
-      if (rawOffsets.length > 0) return rawOffsets;
-      return normalizeOffsets(buildOffsetsFromTerms());
+      const rawOffsets = normalizeOffsets((enhanced as any).highlight_offsets).filter(
+        (off) => typeof off.term === 'string' && off.term.trim().length > 0,
+      );
+      if (rawOffsets.length === 0) return [];
+
+      for (const off of rawOffsets) {
+        const matched = currentText.slice(off.start, off.end);
+        if (lowerForMatch(matched) !== lowerForMatch(off.term!)) return [];
+      }
+
+      return rawOffsets;
     })();
 
     if (offsets.length > 0) {
@@ -509,9 +576,9 @@ export function createEnhancedRenderer(
         }
 
         const matchedOriginal = currentText.slice(start, end);
-        const matchedLower = matchedOriginal.toLowerCase();
+        const matchedLower = lowerForMatch(matchedOriginal);
         const byMatched = wordByLower.get(matchedLower);
-        const byTerm = off.term ? wordByLower.get(off.term.toLowerCase()) : undefined;
+        const byTerm = off.term ? wordByLower.get(lowerForMatch(off.term)) : undefined;
         const bestWord = byMatched ?? byTerm ?? null;
 
         if (!bestWord) {
@@ -653,12 +720,25 @@ export function createEnhancedRenderer(
 
       const isForgotten =
         familiarity && familiarity.encounters >= 2 && familiarity.familiarity < 30;
-      const isWithin = familiarity && familiarity.familiarity >= 60;
+
+      const isOutOfLevel = (() => {
+        if (!userLevel) return true;
+        const wordLevel =
+          (bestWord as any).difficultyLevel ?? parseCefrLevel((bestWord as any).difficulty);
+        const confidence =
+          typeof (bestWord as any).difficultyConfidence === 'number'
+            ? (bestWord as any).difficultyConfidence
+            : 0;
+        if (!wordLevel) return true;
+        if (confidence < 0.55) return true;
+        return cefrRank(wordLevel) > cefrRank(userLevel);
+      })();
+
       const styleKey = isForgotten
         ? styleMapping.forgotten
-        : isWithin
-          ? styleMapping.within
-          : styleMapping.out;
+        : isOutOfLevel
+          ? styleMapping.out
+          : styleMapping.within;
       span.dataset.lxStyle = styleKey;
 
       const enhancedText = (() => {

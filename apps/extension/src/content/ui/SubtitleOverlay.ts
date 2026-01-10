@@ -1362,6 +1362,7 @@ export class SubtitleOverlay {
 
 	        .lexipath-wordcard__section-text {
 	          font-size: 13px;
+	          white-space: pre-line;
 	        }
 
 	        .lexipath-wordcard__example {
