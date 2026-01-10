@@ -47,6 +47,84 @@ function pickVoice(params: {
   const { voices, lang, voiceURI, voiceName } = params;
   if (!voices.length) return null;
 
+  const normalize = (value: string) => value.trim().toLowerCase();
+  const isFemaleName = (name: string, requestedLang: string) => {
+    const n = normalize(name);
+    const base = requestedLang.split('-')[0]?.toLowerCase();
+
+    if (/\bfemale\b/.test(n)) return true;
+
+    // Heuristics for common high-quality voices across platforms.
+    const commonFemale = [
+      'zira',
+      'huihui',
+      'yaoyao',
+      'tingting',
+      'samantha',
+      'victoria',
+      'karen',
+      'tessa',
+      'serena',
+      'allison',
+      'ava',
+      'emma',
+      'olivia',
+      'joanna',
+      'ivy',
+      'kimberly',
+      'salli',
+      'amy',
+      'lisa',
+      'kyoko',
+      'seoyeon',
+      'milena',
+    ];
+    if (commonFemale.some((token) => n.includes(token))) return true;
+
+    // Google voices often encode gender explicitly, but keep a mild language-aware fallback.
+    if (n.includes('google') && n.includes('english') && n.includes('uk') && !n.includes('male')) {
+      return true;
+    }
+
+    // Some locales ship with a single prominent female voice name.
+    if (base === 'en' && n.includes('susan')) return true;
+    if (base === 'zh' && (n.includes('xiaoxiao') || n.includes('xiaoyi'))) return true;
+
+    return false;
+  };
+
+  const isLikelyMaleName = (name: string) => {
+    const n = normalize(name);
+    if (/\bmale\b/.test(n)) return true;
+    const commonMale = ['david', 'mark', 'alex', 'fred', 'daniel', 'george', 'thomas'];
+    return commonMale.some((token) => n.includes(token));
+  };
+
+  const pickPreferredFrom = (candidates: SpeechSynthesisVoice[]) => {
+    if (!candidates.length) return null;
+    let best: SpeechSynthesisVoice | null = null;
+    let bestScore = -Infinity;
+
+    for (const v of candidates) {
+      const name = v.name ?? '';
+      let score = 0;
+
+      if (v.localService) score += 2;
+      if (v.default) score += 5;
+
+      // Prefer nicer female-sounding voices when available.
+      if (isFemaleName(name, lang)) score += 100;
+      if (isLikelyMaleName(name)) score -= 30;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = v;
+      }
+    }
+
+    return best ?? candidates[0] ?? null;
+  };
+
   if (voiceURI) {
     const match = voices.find((v) => v.voiceURI === voiceURI);
     if (match) return match;
@@ -58,17 +136,15 @@ function pickVoice(params: {
   }
 
   const exact = voices.filter((v) => v.lang?.toLowerCase() === lang.toLowerCase());
-  const exactDefault = exact.find((v) => v.default);
-  if (exactDefault) return exactDefault;
-  if (exact.length) return exact[0] ?? null;
+  const exactPick = pickPreferredFrom(exact);
+  if (exactPick) return exactPick;
 
   const base = voices.filter((v) => isVoiceLanguageMatch(v.lang, lang));
-  const baseDefault = base.find((v) => v.default);
-  if (baseDefault) return baseDefault;
-  if (base.length) return base[0] ?? null;
+  const basePick = pickPreferredFrom(base);
+  if (basePick) return basePick;
 
-  const anyDefault = voices.find((v) => v.default);
-  return anyDefault ?? voices[0] ?? null;
+  const anyPick = pickPreferredFrom(voices);
+  return anyPick ?? null;
 }
 
 function getVoicesInternal(lang?: string): SpeechSynthesisVoice[] {
