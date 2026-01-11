@@ -1499,14 +1499,7 @@ registry.register('ENHANCE_WEB', async (payload: EnhanceWebPayload) => {
               ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
             });
 
-            const userInput = [
-              '参数：',
-              `- difficultyMin: ${difficultyMin}`,
-              `- difficultyMax: ${difficultyMax}`,
-              `- maxWords: ${options.maxWords}`,
-              '',
-              options.text,
-            ].join('\n');
+            const userInput = options.text;
 
             const prompt = buildPrompt({
               agentKey: 'web_enhance',
@@ -1734,12 +1727,7 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
         });
 
-        const userInput = [
-          `sourceLang: ${String(sourceLang)}`,
-          `targetLang: ${String(targetLearningLanguage)}`,
-          '',
-          subtitle,
-        ].join('\n');
+        const userInput = subtitle;
 
         const prompt = buildPrompt({
           agentKey: 'subtitle_adapt',
@@ -1995,11 +1983,7 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
         ...(referenceLine ? { levelReferenceLine: referenceLine } : {}),
       });
 
-      const userInput = [
-        `word: ${word}`,
-        `sourceLang: ${String(sourceLang)}`,
-        `targetLang: ${String(targetLang)}`,
-      ].join('\n');
+      const userInput = word;
 
       const prompt = buildPrompt({
         agentKey: 'explain_word',
