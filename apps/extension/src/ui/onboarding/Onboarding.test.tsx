@@ -124,7 +124,7 @@ describe('Onboarding', () => {
       const elements = screen.getAllByText('languageTarget_en');
       const enButton = elements[0]!.closest('button');
       expect(enButton).not.toBeNull();
-      expect(enButton).toHaveClass('bg-indigo-600');
+      expect(enButton).toHaveClass('bg-primary');
     });
 
     it('defaults to CEFR user+target levels', () => {
@@ -398,7 +398,7 @@ describe('Onboarding', () => {
 
       // Verify selections are preserved
       const frButtonAfter = screen.getByText('languageTarget_fr').closest('button');
-      expect(frButtonAfter).toHaveClass('bg-indigo-600');
+      expect(frButtonAfter).toHaveClass('bg-primary');
       expect(screen.getByTestId('onboarding-user-level-value')).toHaveTextContent('proficiency_C2');
 
       // Go forward to step 2 again
