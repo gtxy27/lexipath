@@ -210,7 +210,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             icon: Languages,
             label: t("floatingCommandCenterRewritePage"),
             hint: t("floatingCommandCenterRewritePageDesc"),
-            color: "text-indigo-500",
+            color: "text-primary",
             onClick: () => {
               runAction(() => onSetTabEnhancePaused?.(false));
               runAction(() => onSetTabShowOriginal?.(false));
@@ -230,7 +230,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             hint: showCancelEnhance
               ? t("floatingCommandCenterCancelEnhanceDesc")
               : t("floatingCommandCenterEnhanceOnceDesc"),
-            color: "text-indigo-500",
+            color: "text-primary",
             onClick: () => {
               if (showCancelEnhance) {
                 runAction(() => onSetTabEnhancePaused?.(true));
@@ -273,7 +273,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       icon: BookOpen,
       label: `${t("floatingCommandCenterForgotten")} (${forgottenCount})`,
       hint: t("floatingCommandCenterForgottenDesc"),
-      color: forgottenCount > 0 ? "text-rose-500" : "text-gray-500",
+      color: forgottenCount > 0 ? "text-destructive" : "text-muted-foreground",
       onClick: () => {
         setForgottenOpen(true);
         setIsOpen(false);
@@ -284,7 +284,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       icon: PanelRightClose,
       label: t("chatTitle"),
       hint: t("chatPageTitle"),
-      color: "text-indigo-500",
+      color: "text-primary",
       onClick: () => {
         onOpenSidebar?.();
         setIsOpen(false);
@@ -295,7 +295,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       icon: Settings2,
       label: t("openSettings"),
       hint: t("floatingCommandCenterOpenSettingsDesc"),
-      color: "text-indigo-500",
+      color: "text-primary",
       onClick: () => {
         runAction(onOpenOptions);
         setIsOpen(false);
@@ -306,7 +306,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       icon: EyeOff,
       label: t("floatingCommandCenterHide"),
       hint: t("floatingCommandCenterHideDesc"),
-      color: "text-gray-500",
+      color: "text-muted-foreground",
       onClick: () => {
         runAction(onHideOnce);
         setIsOpen(false);
@@ -354,19 +354,21 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 	            >
 	              <div
 	                className={cn(
+	                  "relative overflow-hidden",
 	                  "w-[340px] max-w-[calc(100vw-24px)]",
-	                  "rounded-2xl border border-gray-200/80 dark:border-white/10",
-	                  "bg-white dark:bg-[#0d0e14] shadow-2xl",
+	                  "rounded-xl border border-border bg-popover shadow-lg",
 	                  "p-3",
 	                )}
 	              >
+	                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
+	                <div className="relative">
 	                <div className="flex items-start justify-between gap-3 px-1 pb-2">
 	                  <div className="min-w-0">
-	                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+	                    <div className="text-[13px] font-semibold tracking-tight">
 	                      {t("floatingCommandCenterTitle")}
 	                    </div>
 	                    {currentHost ? (
-	                      <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+	                      <div className="text-[11px] text-muted-foreground truncate">
 	                        {currentHost}
 	                      </div>
 	                    ) : null}
@@ -375,7 +377,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 	                    type="button"
 	                    size="icon"
 	                    variant="ghost"
-	                    className="h-8 w-8 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-[#1c1d2e]"
+	                    className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/40"
 	                    onClick={() => setIsOpen(false)}
 	                  >
 	                    <X className="h-4 w-4" />
@@ -403,15 +405,12 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                      <div
 		                        key={section.key}
 		                        className={cn(
-		                          "rounded-2xl border border-gray-200/70 dark:border-white/10",
-		                          section.key === "page"
-		                            ? "bg-indigo-50 dark:bg-[#131423]"
-		                            : "bg-gray-50 dark:bg-[#131423]",
+		                          "rounded-lg border border-border bg-muted/20",
 		                          "p-3",
 		                        )}
 		                      >
 		                        <div className="px-1 pb-2">
-		                          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+		                          <div className="text-[11px] text-muted-foreground/90 uppercase tracking-wide">
 		                            {section.title}
 		                          </div>
 		                        </div>
@@ -434,11 +433,11 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                  event.stopPropagation();
 		                                }}
 		                                className={cn(
-		                                  "w-full text-left transition-all",
-		                                  "rounded-2xl border border-gray-200/70 dark:border-white/10",
+		                                  "w-full text-left transition-colors",
+		                                  "rounded-xl border border-border shadow-sm",
 		                                  isPrimary
-		                                    ? "bg-indigo-600/85 text-white hover:bg-indigo-600/95 border-indigo-500/60 shadow-lg shadow-indigo-600/20"
-		                                    : "bg-white dark:bg-[#0d0e14] hover:bg-gray-100 dark:hover:bg-[#1c1d2e]",
+		                                    ? "bg-primary text-primary-foreground hover:bg-primary/90 border-primary/50"
+		                                    : "bg-card hover:bg-muted/30 dark:hover:bg-muted/60",
 		                                  isPrimary ? "px-4 py-3" : "px-3 py-2.5",
 		                                )}
 		                              >
@@ -447,8 +446,8 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                    className={cn(
 		                                      "mt-0.5 flex items-center justify-center rounded-xl border",
 		                                      isPrimary
-		                                        ? "h-10 w-10 bg-white/10 border-white/15 text-white"
-		                                        : "h-8 w-8 bg-white dark:bg-[#131423] border-gray-200/70 dark:border-white/10",
+		                                        ? "h-10 w-10 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
+		                                        : "h-8 w-8 bg-card border-border shadow-sm",
 		                                      !isPrimary && item.color,
 		                                    )}
 		                                  >
@@ -457,10 +456,10 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                  <div className="min-w-0 flex-1">
 		                                    <div
 		                                      className={cn(
-		                                        "truncate font-extrabold",
+		                                        "truncate font-medium",
 		                                        isPrimary
-		                                          ? "text-sm text-white"
-		                                          : "text-xs text-gray-900 dark:text-white",
+		                                          ? "text-[13px] text-primary-foreground"
+		                                          : "text-[13px] text-foreground",
 		                                      )}
 		                                    >
 		                                      {item.label}
@@ -469,8 +468,8 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                      className={cn(
 		                                        "leading-snug max-h-10 overflow-hidden",
 		                                        isPrimary
-		                                          ? "text-[11px] text-white/85"
-		                                          : "text-[11px] text-gray-500 dark:text-gray-400",
+		                                          ? "text-[11px] text-primary-foreground/80"
+		                                          : "text-[11px] text-muted-foreground",
 		                                      )}
 		                                    >
 		                                      {item.hint}
@@ -484,6 +483,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                      </div>
 		                    ))}
 		                </div>
+	                </div>
 	              </div>
 	            </motion.div>
 	          )}
@@ -501,22 +501,24 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               }}
               className={cn(
                 "fixed z-[2147483647] pointer-events-auto",
-                "bg-white dark:bg-[#0d0e14] border border-gray-200/80 dark:border-white/10 shadow-2xl",
-                "rounded-2xl",
+                "bg-popover border border-border shadow-lg",
+                "rounded-xl",
                 "w-[320px] max-w-[calc(100vw-24px)]",
-                "p-4",
+                "p-4 overflow-hidden relative",
                 "right-3 bottom-20",
               )}
             >
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
+              <div className="relative">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-black text-gray-900 dark:text-white">
+                <div className="text-[13px] font-semibold tracking-tight">
                   {t("floatingCommandCenterForgotten")}
                 </div>
                 <Button
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 rounded-xl"
+                  className="h-8 w-8 rounded-xl hover:bg-muted/40"
                   onClick={() => setForgottenOpen(false)}
                 >
                   <X className="h-4 w-4" />
@@ -524,7 +526,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               </div>
 
               {forgottenWords.length === 0 ? (
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div className="text-[11px] text-muted-foreground">
                   {t("floatingCommandCenterForgottenEmpty")}
                 </div>
               ) : (
@@ -533,13 +535,13 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                     {forgottenWords.map((item) => (
                       <div
                         key={item.word}
-                        className="flex items-center justify-between rounded-xl border border-gray-200/70 dark:border-white/10 bg-white dark:bg-[#131423] px-3 py-2"
+                        className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"
                       >
                         <div className="min-w-0">
-                          <div className="text-xs font-extrabold text-gray-900 dark:text-white truncate">
+                          <div className="text-[13px] font-medium truncate">
                             {item.word}
                           </div>
-                          <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          <div className="text-[11px] text-muted-foreground">
                             {t("floatingCommandCenterForgottenMeta", [
                               String(item.familiarity),
                               String(item.encounters),
@@ -551,6 +553,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                   </div>
                 </div>
               )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -567,11 +570,11 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               setIsOpen((prev) => !prev);
             }}
             className={cn(
-              "relative h-12 rounded-full shadow-2xl backdrop-blur-xl transition-colors border",
+              "relative h-12 rounded-full shadow-md transition-colors border",
               "px-3.5",
               isEnhanceActive
-                ? "bg-indigo-600/85 border-indigo-500/60 text-white hover:bg-indigo-600/95 hover:border-indigo-400/70"
-                : "bg-white/55 dark:bg-gray-800/55 border-gray-200/70 dark:border-gray-700/70 text-gray-700 dark:text-gray-200 hover:bg-white/70 hover:border-gray-300/80 hover:text-gray-900 dark:hover:bg-gray-700/70 dark:hover:border-gray-600/80 dark:hover:text-white",
+                ? "bg-primary border-primary/50 text-primary-foreground hover:bg-primary/90"
+                : "bg-card border-border text-foreground hover:bg-muted/40 dark:hover:bg-muted/70",
             )}
           >
             {isOpen ? (
@@ -579,7 +582,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             ) : (
               <div className="flex items-center gap-2">
                 <Languages className="h-5 w-5" />
-                <span className="text-sm font-black tabular-nums">{displayCount}</span>
+                <span className="text-[13px] font-semibold tabular-nums">{displayCount}</span>
               </div>
             )}
 
@@ -587,7 +590,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             {!isOpen && (
               <span
                 className={cn(
-                  "absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#0d0e14]",
+                  "absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-background",
                   isEnhanceActive ? "bg-emerald-500" : "bg-rose-500",
                 )}
               />

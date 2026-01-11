@@ -1122,6 +1122,9 @@ export class SubtitleController {
     if (!word.trim()) return;
 
     const normalized = this.normalizeTerm(word);
+    if (normalized) {
+      void sendMessage('REPORT_USAGE_EVENT', { event: 'word_card_opened', word: normalized, scene: 'subtitle' });
+    }
     const cached = this.wordExplainCache.get(normalized);
     if (cached) {
       this.overlay.showWordCard(cached, anchorRect, options);

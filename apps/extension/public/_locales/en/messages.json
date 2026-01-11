@@ -563,6 +563,10 @@
     "message": "Learning",
     "description": "Options tab: learning"
   },
+  "optionsTab_summary": {
+    "message": "Summary",
+    "description": "Options tab: summary"
+  },
   "optionsTab_language": {
     "message": "Language",
     "description": "Options tab: language"
@@ -578,6 +582,218 @@
   "optionsTab_display": {
     "message": "Display",
     "description": "Options tab: display"
+  },
+  "summaryTitle": {
+    "message": "Today Summary",
+    "description": "Options summary: title"
+  },
+  "summarySubtitle": {
+    "message": "Usage overview (local device)",
+    "description": "Options summary: subtitle"
+  },
+  "summaryRefresh": {
+    "message": "Refresh",
+    "description": "Options summary: refresh button"
+  },
+  "summaryUpdatedMinsAgo": {
+    "message": "updated $1m ago",
+    "description": "Options summary: last updated label, $1=minutes"
+  },
+  "summaryInsight_conversion": {
+    "message": "Today: $1 lookup rate · $2 viewed · $3 lookups",
+    "description": "Options summary: headline insight, $1=rate $2=exposures $3=lookups"
+  },
+  "summaryEmpty": {
+    "message": "No data yet for today.",
+    "description": "Options summary: empty state"
+  },
+  "summaryNoApiCalls": {
+    "message": "No external API calls yet today.",
+    "description": "Options summary: no API calls state"
+  },
+  "summaryOfflineLookups": {
+    "message": "Offline lookups: $1",
+    "description": "Options summary: offline lookups hint, $1=count"
+  },
+  "summaryStat_words": {
+    "message": "Words",
+    "description": "Options summary: total words stat"
+  },
+  "summaryStat_wordsHint": {
+    "message": "Keywords + lookups",
+    "description": "Options summary: words stat hint"
+  },
+  "summaryStat_events": {
+    "message": "Actions",
+    "description": "Options summary: total events stat"
+  },
+  "summaryStat_apiEvents": {
+    "message": "API Calls*",
+    "description": "Options summary: api events stat"
+  },
+  "summaryStat_apiEventsHint": {
+    "message": "External calls only",
+    "description": "Options summary: api events hint"
+  },
+  "summaryStat_cacheHits": {
+    "message": "Cache Hits",
+    "description": "Options summary: cache hits stat"
+  },
+  "summaryStat_exposures": {
+    "message": "Viewed (valid)",
+    "description": "Options summary: exposures stat"
+  },
+  "summaryStat_exposuresHint": {
+    "message": "Counted after staying visible ~2s",
+    "description": "Options summary: exposures hint"
+  },
+  "summaryStat_lookups": {
+    "message": "Lookups",
+    "description": "Options summary: lookup requests stat"
+  },
+  "summaryStat_lookupsHint": {
+    "message": "Word card / explain requests",
+    "description": "Options summary: lookups hint"
+  },
+  "summaryStat_corrections": {
+    "message": "Corrections",
+    "description": "Options summary: english correction stat"
+  },
+  "summaryStat_correctionsHint": {
+    "message": "English correction requests",
+    "description": "Options summary: corrections hint"
+  },
+  "summaryTrendTitle": {
+    "message": "7-Day Pulse",
+    "description": "Options summary: trend title"
+  },
+  "summaryTrendDesc": {
+    "message": "Viewed vs. lookups over recent days.",
+    "description": "Options summary: trend description"
+  },
+  "summaryTrendEmpty": {
+    "message": "Not enough history yet.",
+    "description": "Options summary: trend empty state"
+  },
+  "summaryTrendExposureLabel": {
+    "message": "Viewed",
+    "description": "Options summary: trend label for exposures"
+  },
+  "summaryTrendLookupLabel": {
+    "message": "Lookups",
+    "description": "Options summary: trend label for lookups"
+  },
+  "summaryProviderCalls": {
+    "message": "$1 calls",
+    "description": "Options summary: provider calls label, $1=count"
+  },
+  "summaryProvidersTitle": {
+    "message": "API Share",
+    "description": "Options summary: provider split title"
+  },
+  "summaryProvidersDesc": {
+    "message": "Share of external API calls triggered by learning actions.",
+    "description": "Options summary: provider split description"
+  },
+  "summaryTasksTitle": {
+    "message": "Breakdown",
+    "description": "Options summary: tasks title"
+  },
+  "summaryTasksDesc": {
+    "message": "Actions and word counts by feature.",
+    "description": "Options summary: tasks description"
+  },
+  "summaryRow_events": {
+    "message": "$1 actions · $2 API calls",
+    "description": "Options summary: task row events, $1=events $2=apiEvents"
+  },
+  "summaryRow_words": {
+    "message": "$1 words",
+    "description": "Options summary: task row words, $1=words"
+  },
+  "summaryProvider_offline": {
+    "message": "Offline dictionary",
+    "description": "Options summary: provider label (offline)"
+  },
+  "summaryTask_selectKeywords": {
+    "message": "Select keywords",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_translateKeywords": {
+    "message": "Translate keywords",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_translateTerms": {
+    "message": "Translate terms",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_explainWord": {
+    "message": "Explain word",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_wordCardOpened": {
+    "message": "Word card opened",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_exposureValid": {
+    "message": "Valid exposure",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_enhanceWeb": {
+    "message": "Enhance web content",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_enhanceSubtitle": {
+    "message": "Enhance subtitles",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_englishCorrection": {
+    "message": "English correction",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_chat": {
+    "message": "Chat",
+    "description": "Options summary: task label"
+  },
+  "summaryDetailsOpen": {
+    "message": "Details",
+    "description": "Options summary: open details label"
+  },
+  "summaryDetailsTitleFallback": {
+    "message": "Details",
+    "description": "Options summary: details title fallback"
+  },
+  "summaryDetailsDesc": {
+    "message": "Daily breakdown (last 7 days).",
+    "description": "Options summary: details description"
+  },
+  "summaryDetailsLast7Days": {
+    "message": "Last 7 days",
+    "description": "Options summary: details section title"
+  },
+  "summaryDetailsStat_words": {
+    "message": "Words",
+    "description": "Options summary: details stat label"
+  },
+  "summaryDetailsStat_events": {
+    "message": "Events",
+    "description": "Options summary: details stat label"
+  },
+  "summaryDetailsStat_apiEvents": {
+    "message": "API calls",
+    "description": "Options summary: details stat label"
+  },
+  "summaryDetailsMetric_words": {
+    "message": "Words",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_events": {
+    "message": "Events",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_apiEvents": {
+    "message": "API calls",
+    "description": "Options summary: details metric label"
   },
   "optionsDisplayDesc": {
     "message": "Customize appearance, overlay behavior, and highlight styles.",

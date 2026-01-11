@@ -53,6 +53,8 @@ export type ProficiencyScore = z.infer<typeof ProficiencyScoreSchema>;
 export const MessageTypeSchema = z.enum([
   'GET_SETTINGS',
   'SET_SETTINGS',
+  'GET_USAGE_SUMMARY',
+  'REPORT_USAGE_EVENT',
   'REQUEST_HOST_PERMISSION',
   'TEST_PROVIDER_CONNECTION',
   'SELECT_KEYWORDS',

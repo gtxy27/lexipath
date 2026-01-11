@@ -3,7 +3,7 @@ import browser from "webextension-polyfill";
 import type { Settings } from "@lexipath/core";
 import { createLogger } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -13,13 +13,11 @@ import {
 } from "../components/ui/card";
 import { Switch } from "../components/ui/switch";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { useApplyTheme } from "../lib/theme";
 import { ICON_URL } from "../lib/assets";
 import {
   Loader2,
   Settings2,
-  Power,
   Languages,
   GraduationCap,
   ChevronRight,
@@ -98,28 +96,17 @@ export function Popup(): React.ReactElement {
 
   if (loading) {
     return (
-      <div className="flex h-72 w-[340px] items-center justify-center bg-white dark:bg-[#0d0e14]">
-        <motion.div
-          animate={{
-            scale: [1, 1.1, 1],
-            opacity: [0.5, 1, 0.5],
-          }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <div className="h-12 w-12 rounded-2xl bg-gradient-premium p-[1px]">
-             <div className="flex h-full w-full items-center justify-center rounded-[15px] bg-white dark:bg-[#0d0e14]">
-                <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
-             </div>
-          </div>
-        </motion.div>
+      <div className="flex h-72 w-[340px] flex-col items-center justify-center gap-3 bg-background text-foreground">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-card">
+          <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
+        </div>
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   const isEnabled = !!settings?.enabled;
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
   const currentTheme = settings?.theme ?? "system";
-  const isDark = currentTheme === "dark" || (currentTheme === "system" && prefersDark);
   const themeLabel =
     currentTheme === "system"
       ? t("themeSystem")
@@ -132,169 +119,148 @@ export function Popup(): React.ReactElement {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-[340px] overflow-hidden bg-white dark:bg-[#0d0e14]"
+      className="w-[340px] overflow-hidden bg-background text-foreground"
     >
-      <div className={`relative transition-all duration-500 ${isEnabled ? 'bg-indigo-50/10 dark:bg-indigo-500/[0.02]' : ''}`}>
-        {/* Decorative Background Elements */}
-        <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-indigo-600/[0.03] dark:bg-indigo-600/10 blur-[60px] pointer-events-none" />
-        <div className="absolute -left-20 -bottom-20 h-40 w-40 rounded-full bg-purple-600/[0.03] dark:bg-purple-600/10 blur-[60px] pointer-events-none" />
-
-        <Card className="border-0 bg-transparent shadow-none">
-          <CardHeader className="pb-4 pt-6 px-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/10">
-                  <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
-                    <img
-                      src={ICON_URL}
-                      className="h-6 w-6"
-                      alt={t("extensionName")}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
-                    {t("extensionName")}
-                  </CardTitle>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className={`h-1.5 w-1.5 rounded-full ${isEnabled ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                      {isEnabled ? t("on") : t("off")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-10 w-10 rounded-xl bg-white/60 dark:bg-white/[0.03] hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-200"
-                  onClick={toggleTheme}
-                  aria-label={themeButtonLabel}
-                  title={themeButtonLabel}
-                >
-                  {currentTheme === "system" ? (
-                    <Monitor className="h-4 w-4" />
-                  ) : currentTheme === "dark" ? (
-                    <Moon className="h-4 w-4" />
-                  ) : (
-                    <Sun className="h-4 w-4" />
-                  )}
-                </Button>
-                <Switch
-                  checked={isEnabled}
-                  onCheckedChange={toggleEnabled}
-                  className="data-[state=checked]:bg-indigo-600"
+      <Card className="rounded-none border-0 shadow-none">
+        <CardHeader className="relative flex-row items-center justify-between gap-3 border-b border-border px-5 py-4 overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-card">
+              <img src={ICON_URL} className="h-5 w-5" alt={t("extensionName")} />
+            </div>
+            <div className="min-w-0">
+              <CardTitle className="text-sm font-semibold leading-5 relative">
+                {t("extensionName")}
+              </CardTitle>
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full border bg-background/70 dark:bg-card/60 px-2.5 py-1 text-xs text-muted-foreground shadow-sm relative">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isEnabled ? "bg-emerald-500" : "bg-muted-foreground/40"
+                  }`}
                 />
+                <span className="truncate">{isEnabled ? t("on") : t("off")}</span>
               </div>
             </div>
-          </CardHeader>
+          </div>
 
-          <CardContent className="space-y-4 px-6 pb-6">
-            {/* Main Status Display */}
-            <div className="relative group">
-              <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition duration-500 blur-sm" />
-              <div className="relative bg-gray-50/50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex items-center justify-between transition-all">
-                <div className="flex items-center gap-3.5">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${isEnabled ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' : 'bg-gray-100 dark:bg-white/5 text-gray-400'}`}>
-                    <Zap className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400/70">
-                      {t("popupStatusLabel")}
-                    </div>
-                    <div className="text-sm font-bold text-gray-900 dark:text-white">
-                      {t("popupModeSmartLearning")}
-                    </div>
-                  </div>
-                </div>
+          <div className="flex items-center gap-2 relative">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 rounded-lg hover:bg-muted/40"
+              onClick={toggleTheme}
+              aria-label={themeButtonLabel}
+              title={themeButtonLabel}
+            >
+              {currentTheme === "system" ? (
+                <Monitor className="h-4 w-4" />
+              ) : currentTheme === "dark" ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
+            </Button>
+            <Switch
+              checked={isEnabled}
+              onCheckedChange={toggleEnabled}
+              className="data-[state=checked]:bg-primary"
+            />
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-3 px-5 py-4">
+          <div className="relative flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm overflow-hidden">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-60 dark:opacity-45" />
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-md ${
+                isEnabled
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <Zap className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 relative">
+              <div className="text-xs text-muted-foreground">{t("popupStatusLabel")}</div>
+              <div className="truncate text-sm font-medium">
+                {t("popupModeSmartLearning")}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border bg-card p-3 shadow-sm">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Languages className="h-4 w-4 text-primary" />
+                <span className="truncate">{t("targetLanguage")}</span>
+              </div>
+              <div className="mt-2 truncate text-sm font-medium">
+                {settings?.targetLanguage
+                  ? t(`languageTarget_${settings.targetLanguage}`)
+                  : t("popupValueUnset")}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50/50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 rounded-2xl p-3.5 transition-all hover:bg-gray-100/50 dark:hover:bg-white/5">
-                <div className="mb-2.5 flex items-center gap-2">
-                  <Languages className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                    {t("targetLanguage")}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                  {settings?.targetLanguage
-                    ? t(`languageTarget_${settings.targetLanguage}`)
-                    : t("popupValueUnset")}
-                </div>
+            <div className="rounded-xl border bg-card p-3 shadow-sm">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <GraduationCap className="h-4 w-4 text-primary" />
+                <span className="truncate">{t("proficiencyLevel")}</span>
               </div>
-
-              <div className="bg-gray-50/50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 rounded-2xl p-3.5 transition-all hover:bg-gray-100/50 dark:hover:bg-white/5">
-                <div className="mb-2.5 flex items-center gap-2">
-                  <GraduationCap className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                    {t("proficiencyLevel")}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                  {settings?.proficiencyLevel
-                    ? t(`proficiency_${settings.proficiencyLevel}`)
-                    : t("popupValueUnset")}
-                </div>
+              <div className="mt-2 truncate text-sm font-medium">
+                {settings?.proficiencyLevel
+                  ? t(`proficiency_${settings.proficiencyLevel}`)
+                  : t("popupValueUnset")}
               </div>
             </div>
+          </div>
 
-            <div className="bg-gray-50/50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 rounded-2xl p-3.5 flex items-center justify-between">
-              <div className="pr-3">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                  {t("popupFloatingButtonLabel")}
-                </div>
-                <div className="text-xs font-medium text-gray-600 dark:text-gray-300/90 mt-0.5 leading-snug">
-                  {t("popupFloatingButtonDesc")}
-                </div>
+          <div className="flex items-start justify-between gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="min-w-0">
+              <div className="text-xs font-medium">{t("popupFloatingButtonLabel")}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {t("popupFloatingButtonDesc")}
               </div>
-              <Switch
-                checked={settings?.floatingButtonEnabled ?? true}
-                onCheckedChange={toggleFloatingButton}
-                className="data-[state=checked]:bg-indigo-600"
-              />
             </div>
-          </CardContent>
+            <Switch
+              checked={settings?.floatingButtonEnabled ?? true}
+              onCheckedChange={toggleFloatingButton}
+              className="data-[state=checked]:bg-primary"
+            />
+          </div>
+        </CardContent>
 
-          <CardFooter className="px-6 pb-6 pt-0">
-            <div className="flex flex-col gap-3 w-full">
-              <Button
-                variant="outline"
-                className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
-                onClick={() => browser.runtime.openOptionsPage()}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Settings2 className="h-4 w-4 text-indigo-500 dark:text-indigo-400 group-hover:rotate-90 transition-transform duration-500" />
-                  <span className="font-bold text-sm tracking-tight">{t("openSettings")}</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
+        <CardFooter className="flex-col gap-2 px-5 pb-5 pt-0">
+          <Button
+            variant="outline"
+            className="h-10 w-full justify-between rounded-xl px-3 bg-background dark:bg-card hover:bg-muted/40 dark:hover:bg-muted/60 shadow-sm"
+            onClick={() => browser.runtime.openOptionsPage()}
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <Settings2 className="h-4 w-4 text-primary" />
+              {t("openSettings")}
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Button>
 
-              {!settings?.hasCompletedOnboarding ? (
-                <Button
-                  variant="outline"
-                  className="w-full h-11 justify-between bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/5 border-gray-200 dark:border-white/10 text-gray-900 dark:text-white transition-all group rounded-xl px-4"
-                  onClick={() => {
-                    const url = browser.runtime.getURL("src/ui/onboarding/index.html");
-                    globalThis.open?.(url, "_blank");
-                  }}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Sparkles className="h-4 w-4 text-indigo-500 dark:text-indigo-400 transition-transform duration-500 group-hover:rotate-12" />
-                    <span className="font-bold text-sm tracking-tight">
-                      {t("openOnboarding")}
-                    </span>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
-                </Button>
-              ) : null}
-            </div>
-          </CardFooter>
-        </Card>
-      </div>
+          {!settings?.hasCompletedOnboarding ? (
+            <Button
+              variant="outline"
+              className="h-10 w-full justify-between rounded-xl px-3 bg-background dark:bg-card hover:bg-muted/40 dark:hover:bg-muted/60 shadow-sm"
+              onClick={() => {
+                const url = browser.runtime.getURL("src/ui/onboarding/index.html");
+                globalThis.open?.(url, "_blank");
+              }}
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Sparkles className="h-4 w-4 text-primary" />
+                {t("openOnboarding")}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          ) : null}
+        </CardFooter>
+      </Card>
     </motion.div>
   );
 }

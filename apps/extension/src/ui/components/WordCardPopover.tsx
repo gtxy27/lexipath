@@ -272,20 +272,20 @@ export function WordCardPopover({
       >
         {isLoading ? (
           <div className={cn(
-            "bg-white dark:bg-[#1a1b23] border border-gray-200 dark:border-white/10 p-4 min-w-[280px]",
+            "bg-popover text-popover-foreground border border-border p-4 min-w-[280px]",
             isMobile ? "rounded-t-2xl px-6 pb-12 pt-8" : "rounded-lg"
           )}>
             <div className="flex items-center justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
           </div>
         ) : cardData ? (
           <div className={cn(
-            "bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 overflow-hidden",
+            "bg-popover text-popover-foreground overflow-hidden border border-border",
             isMobile ? "rounded-t-3xl border-t shadow-[0_-10px_40px_rgba(0,0,0,0.2)] px-2 pb-8 pt-4" : "rounded-lg border shadow-xl"
           )}>
             {isMobile && (
-              <div className="w-12 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full mx-auto mb-4" />
+              <div className="w-12 h-1.5 bg-muted/60 rounded-full mx-auto mb-4" />
             )}
             <WordCard
               data={cardData}

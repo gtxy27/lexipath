@@ -2010,5 +2010,221 @@
   "optionsTestBingTranslate": {
     "message": "测试 Bing 翻译",
     "description": "Test Bing Translate button"
+  },
+  "optionsTab_summary": {
+    "message": "\u4eca\u65e5\u603b\u7ed3",
+    "description": "Options tab: summary"
+  },
+  "summaryTitle": {
+    "message": "\u4eca\u65e5\u603b\u7ed3",
+    "description": "Options summary: title"
+  },
+  "summarySubtitle": {
+    "message": "\u4f7f\u7528\u6982\u89c8\uff08\u672c\u5730\u7edf\u8ba1\uff09",
+    "description": "Options summary: subtitle"
+  },
+  "summaryRefresh": {
+    "message": "\u5237\u65b0",
+    "description": "Options summary: refresh button"
+  },
+  "summaryUpdatedMinsAgo": {
+    "message": "$1\u5206\u949f\u524d\u66f4\u65b0",
+    "description": "Options summary: last updated label, $1=minutes"
+  },
+  "summaryInsight_conversion": {
+    "message": "\u4eca\u5929\uff1a\u67e5\u8bcd\u7387 $1 \u00b7 \u5df2\u770b $2 \u00b7 \u67e5\u8bcd $3",
+    "description": "Options summary: headline insight, $1=rate $2=exposures $3=lookups"
+  },
+  "summaryEmpty": {
+    "message": "\u4eca\u5929\u8fd8\u6ca1\u6709\u6570\u636e\u3002",
+    "description": "Options summary: empty state"
+  },
+  "summaryNoApiCalls": {
+    "message": "\u4eca\u5929\u8fd8\u6ca1\u6709\u5916\u90e8 API \u8c03\u7528\u3002",
+    "description": "Options summary: no API calls state"
+  },
+  "summaryOfflineLookups": {
+    "message": "\u79bb\u7ebf\u67e5\u8bcd\uff1a$1",
+    "description": "Options summary: offline lookups hint, $1=count"
+  },
+  "summaryStat_words": {
+    "message": "\u5355\u8bcd\u6570",
+    "description": "Options summary: total words stat"
+  },
+  "summaryStat_wordsHint": {
+    "message": "\u5173\u952e\u8bcd + \u67e5\u8bcd",
+    "description": "Options summary: words stat hint"
+  },
+  "summaryStat_events": {
+    "message": "\u64cd\u4f5c\u6b21\u6570",
+    "description": "Options summary: total events stat"
+  },
+  "summaryStat_apiEvents": {
+    "message": "API \u8c03\u7528*",
+    "description": "Options summary: api events stat"
+  },
+  "summaryStat_apiEventsHint": {
+    "message": "\u4ec5\u5916\u90e8\u8c03\u7528",
+    "description": "Options summary: api events hint"
+  },
+  "summaryStat_cacheHits": {
+    "message": "\u7f13\u5b58\u547d\u4e2d",
+    "description": "Options summary: cache hits stat"
+  },
+  "summaryStat_exposures": {
+    "message": "\u5df2\u770b\uff08\u6709\u6548\uff09",
+    "description": "Options summary: exposures stat"
+  },
+  "summaryStat_exposuresHint": {
+    "message": "\u5728\u89c6\u53e3\u505c\u7559\u7ea62\u79d2\u5de6\u53f3\u8ba1\u5165",
+    "description": "Options summary: exposures hint"
+  },
+  "summaryStat_lookups": {
+    "message": "\u67e5\u8bcd\u6b21\u6570",
+    "description": "Options summary: lookup requests stat"
+  },
+  "summaryStat_lookupsHint": {
+    "message": "\u6253\u5f00\u5355\u8bcd\u5361/\u8bf7\u6c42\u89e3\u91ca",
+    "description": "Options summary: lookups hint"
+  },
+  "summaryStat_corrections": {
+    "message": "\u7ea0\u9519\u6b21\u6570",
+    "description": "Options summary: english correction stat"
+  },
+  "summaryStat_correctionsHint": {
+    "message": "\u82f1\u6587\u7ea0\u9519\u8bf7\u6c42",
+    "description": "Options summary: corrections hint"
+  },
+  "summaryTrendTitle": {
+    "message": "7\u65e5\u8d8b\u52bf",
+    "description": "Options summary: trend title"
+  },
+  "summaryTrendDesc": {
+    "message": "\u6709\u6548\u66dd\u5149 vs \u67e5\u8bcd\u7684\u8fd1\u671f\u53d8\u5316\u3002",
+    "description": "Options summary: trend description"
+  },
+  "summaryTrendEmpty": {
+    "message": "\u8fd8\u6ca1\u6709\u8db3\u591f\u7684\u5386\u53f2\u6570\u636e\u3002",
+    "description": "Options summary: trend empty state"
+  },
+  "summaryTrendExposureLabel": {
+    "message": "\u5df2\u770b",
+    "description": "Options summary: trend label for exposures"
+  },
+  "summaryTrendLookupLabel": {
+    "message": "\u67e5\u8bcd",
+    "description": "Options summary: trend label for lookups"
+  },
+  "summaryProviderCalls": {
+    "message": "$1\u6b21\u8c03\u7528",
+    "description": "Options summary: provider calls label, $1=count"
+  },
+  "summaryProvidersTitle": {
+    "message": "API \u5360\u6bd4",
+    "description": "Options summary: provider split title"
+  },
+  "summaryProvidersDesc": {
+    "message": "\u6309\u5b66\u4e60\u884c\u4e3a\u89e6\u53d1\u7684\u5916\u90e8 API \u8c03\u7528\u7edf\u8ba1\u3002",
+    "description": "Options summary: provider split description"
+  },
+  "summaryTasksTitle": {
+    "message": "\u9879\u76ee\u660e\u7ec6",
+    "description": "Options summary: tasks title"
+  },
+  "summaryTasksDesc": {
+    "message": "\u6309\u529f\u80fd\u7edf\u8ba1\u64cd\u4f5c\u6b21\u6570\u4e0e\u5355\u8bcd\u6570\u3002",
+    "description": "Options summary: tasks description"
+  },
+  "summaryRow_events": {
+    "message": "$1 \u6b21\u64cd\u4f5c \u00b7 $2 \u6b21 API \u8c03\u7528",
+    "description": "Options summary: task row events, $1=events $2=apiEvents"
+  },
+  "summaryRow_words": {
+    "message": "$1 \u4e2a\u5355\u8bcd",
+    "description": "Options summary: task row words, $1=words"
+  },
+  "summaryProvider_offline": {
+    "message": "\u79bb\u7ebf\u8bcd\u5178",
+    "description": "Options summary: provider label (offline)"
+  },
+  "summaryTask_selectKeywords": {
+    "message": "\u5173\u952e\u8bcd\u63d0\u53d6",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_translateKeywords": {
+    "message": "\u5173\u952e\u8bcd\u7ffb\u8bd1",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_translateTerms": {
+    "message": "\u8bcd\u8bed\u7ffb\u8bd1",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_explainWord": {
+    "message": "\u67e5\u8bcd\u89e3\u91ca",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_wordCardOpened": {
+    "message": "\u6253\u5f00\u5355\u8bcd\u5361",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_exposureValid": {
+    "message": "\u6709\u6548\u66dd\u5149",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_enhanceWeb": {
+    "message": "\u7f51\u9875\u589e\u5f3a",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_enhanceSubtitle": {
+    "message": "\u5b57\u5e55\u589e\u5f3a",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_englishCorrection": {
+    "message": "\u82f1\u6587\u7ea0\u9519",
+    "description": "Options summary: task label"
+  },
+  "summaryTask_chat": {
+    "message": "\u804a\u5929",
+    "description": "Options summary: task label"
+  },
+  "summaryDetailsOpen": {
+    "message": "\u67e5\u770b\u8be6\u60c5",
+    "description": "Options summary: open details label"
+  },
+  "summaryDetailsTitleFallback": {
+    "message": "\u8be6\u60c5",
+    "description": "Options summary: details title fallback"
+  },
+  "summaryDetailsDesc": {
+    "message": "\u6700\u8fd1 7 \u5929\u5206\u65e5\u7edf\u8ba1\u3002",
+    "description": "Options summary: details description"
+  },
+  "summaryDetailsLast7Days": {
+    "message": "\u6700\u8fd1 7 \u5929",
+    "description": "Options summary: details section title"
+  },
+  "summaryDetailsStat_words": {
+    "message": "\u5355\u8bcd\u6570",
+    "description": "Options summary: details stat label"
+  },
+  "summaryDetailsStat_events": {
+    "message": "\u64cd\u4f5c\u6b21\u6570",
+    "description": "Options summary: details stat label"
+  },
+  "summaryDetailsStat_apiEvents": {
+    "message": "API \u8c03\u7528",
+    "description": "Options summary: details stat label"
+  },
+  "summaryDetailsMetric_words": {
+    "message": "\u5355\u8bcd\u6570",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_events": {
+    "message": "\u64cd\u4f5c\u6b21\u6570",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_apiEvents": {
+    "message": "API \u8c03\u7528",
+    "description": "Options summary: details metric label"
   }
 }

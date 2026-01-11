@@ -3,6 +3,7 @@ import { t } from "../optionsI18n";
 import type { FieldErrors, FormState } from "../optionsTypes";
 import { LanguageTab } from "./LanguageTab";
 import { RoutingTab } from "./RoutingTab";
+import { OptionsDisclosure } from "../components/OptionsDisclosure";
 
 export function LearningTab(props: {
   form: FormState;
@@ -22,22 +23,12 @@ export function LearningTab(props: {
         onOpenChannels={onOpenChannels}
       />
 
-      <details className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#15161e] p-6">
-        <summary className="cursor-pointer list-none select-none flex items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-              {t("optionsLearningRoutingTitle")}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t("optionsLearningRoutingDesc")}
-            </div>
-          </div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-            {t("optionsAdvancedTitle")}
-          </span>
-        </summary>
-
-        <div className="pt-6 space-y-8">
+      <OptionsDisclosure
+        title={t("optionsLearningRoutingTitle")}
+        description={t("optionsLearningRoutingDesc")}
+        summaryRight={t("optionsAdvancedTitle")}
+      >
+        <div className="space-y-8">
           <RoutingTab
             embedded
             form={form}
@@ -47,7 +38,7 @@ export function LearningTab(props: {
             onOpenChannels={onOpenChannels}
           />
         </div>
-      </details>
+      </OptionsDisclosure>
     </div>
   );
 }

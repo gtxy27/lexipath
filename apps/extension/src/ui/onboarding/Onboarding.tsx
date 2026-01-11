@@ -324,36 +324,32 @@ export function Onboarding(): React.ReactElement {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-[#0d0e14] text-gray-900 dark:text-white relative overflow-hidden transition-colors duration-500">
-      {/* Immersive background */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/5 dark:bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-600/5 dark:bg-purple-600/20 rounded-full blur-[120px] animate-pulse" />
-      </div>
-
+    <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 dark:from-primary/6 via-transparent to-transparent opacity-70 dark:opacity-50" />
+      <div className="pointer-events-none absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-48 -right-48 h-[520px] w-[520px] rounded-full bg-muted/60 blur-3xl" />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-2xl relative z-10"
       >
-        <Card className="glass-card border-gray-100 dark:border-white/5 bg-white/80 dark:bg-white/5 backdrop-blur-2xl overflow-hidden rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] dark:shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)]">
+        <Card className="border border-border bg-card overflow-hidden rounded-xl shadow-sm">
           <CardHeader className="text-center pb-8 pt-10 px-8 relative overflow-hidden">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-indigo-500/5 dark:bg-indigo-500/10 blur-3xl rounded-full" />
-            
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
             <motion.div 
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
-              className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-premium p-[1px] shadow-2xl shadow-indigo-500/10 dark:shadow-indigo-500/20"
+              className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-lg border bg-background"
             >
-              <div className="flex h-full w-full items-center justify-center rounded-[15px] bg-white dark:bg-[#0d0e14]">
+              <div className="flex h-full w-full items-center justify-center rounded-md bg-background">
                 <img src={ICON_URL} className="h-9 w-9" alt={t("extensionName")} />
               </div>
             </motion.div>
             
-            <CardTitle className="text-4xl font-black tracking-tighter text-gray-900 dark:text-white mb-2">
+            <CardTitle className="text-2xl font-semibold tracking-tight mb-2">
               {t("welcomeTitle")}
             </CardTitle>
-            <CardDescription className="text-lg text-gray-500 dark:text-gray-400 font-bold max-w-md mx-auto leading-relaxed uppercase tracking-wider text-[11px]">
+            <CardDescription className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
               {t("welcomeDesc")}
             </CardDescription>
           </CardHeader>
@@ -369,17 +365,17 @@ export function Onboarding(): React.ReactElement {
                 "onboardingProgressAriaValueText",
                 String(Math.round(progress)),
               )}
-              className="relative h-1.5 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden"
+              className="relative h-1.5 w-full bg-muted rounded-full overflow-hidden"
             >
               <motion.div
-                className="absolute top-0 left-0 h-full bg-gradient-premium rounded-full"
+                className="absolute top-0 left-0 h-full bg-primary rounded-full"
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.5, ease: "circOut" }}
               />
             </div>
             <div className="flex justify-between mt-3 px-1">
-               <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400">{t("onboardingStepProgress", String(currentStep))}</span>
-               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{t("onboardingPercentComplete", String(Math.round(progress)))}</span>
+               <span className="text-xs text-muted-foreground">{t("onboardingStepProgress", String(currentStep))}</span>
+               <span className="text-xs text-muted-foreground">{t("onboardingPercentComplete", String(Math.round(progress)))}</span>
             </div>
           </div>
 
@@ -396,17 +392,17 @@ export function Onboarding(): React.ReactElement {
                 {currentStep === 1 && (
                   <div className="space-y-10">
                     <div className="space-y-2">
-                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                      <h2 className="text-xl font-semibold tracking-tight">
                         {t("onboardingStep1Title")}
                       </h2>
-                      <p className="text-gray-400 dark:text-gray-500 font-bold text-[11px] uppercase tracking-wider leading-relaxed">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
                         {t("onboardingStep1Desc")}
                       </p>
                     </div>
 
                     <div className="space-y-8">
                       <div className="space-y-4">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                        <Label className="text-xs text-muted-foreground ml-1">
                           {t("onboardingTargetLanguageLabel")}
                         </Label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -415,10 +411,10 @@ export function Onboarding(): React.ReactElement {
                               key={option.value}
                               variant="outline"
                               className={cn(
-                                "h-auto py-4 px-4 rounded-2xl border-gray-100 dark:border-white/5 transition-all duration-300 relative overflow-hidden group",
+                                "h-auto py-4 px-4 rounded-lg border border-border transition-colors",
                                 formData.targetLanguage === option.value
-                                  ? "bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/5 dark:shadow-indigo-500/10"
-                                  : "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                                  ? "bg-primary text-primary-foreground border-primary/50"
+                                  : "bg-card hover:bg-muted/40 text-muted-foreground hover:text-foreground"
                               )}
                               onClick={() => handleTargetLanguageChange(option.value)}
                             >
@@ -438,7 +434,7 @@ export function Onboarding(): React.ReactElement {
                       </div>
 
                       <div className="space-y-4">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                        <Label className="text-xs text-muted-foreground ml-1">
                           {t("onboardingUserLevelLabel")}
                         </Label>
 
@@ -469,11 +465,11 @@ export function Onboarding(): React.ReactElement {
                               >
                                 <SelectTrigger
                                   data-testid="onboarding-user-level-scale"
-                                  className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                  className="h-11 rounded-lg text-xs"
                                 >
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                <SelectContent className="bg-popover border-border max-h-60">
                                   {scaleOptions.map((opt) => (
                                     <SelectItem key={opt.value} value={opt.value}>
                                       {opt.label}
@@ -501,11 +497,11 @@ export function Onboarding(): React.ReactElement {
                                     >
                                       <SelectTrigger
                                         data-testid="onboarding-user-level-value"
-                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                        className="h-11 rounded-lg text-xs"
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                      <SelectContent className="bg-popover border-border max-h-60">
                                         {IELTS_BANDS.map((band) => (
                                           <SelectItem key={band} value={band}>
                                             {band}
@@ -532,11 +528,11 @@ export function Onboarding(): React.ReactElement {
                                     >
                                       <SelectTrigger
                                         data-testid="onboarding-user-level-value"
-                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                        className="h-11 rounded-lg text-xs"
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                      <SelectContent className="bg-popover border-border max-h-60">
                                         {JLPTLevelSchema.options.map((level) => (
                                           <SelectItem key={level} value={level}>
                                             {t(`proficiency_${level}`)}
@@ -563,11 +559,11 @@ export function Onboarding(): React.ReactElement {
                                     >
                                       <SelectTrigger
                                         data-testid="onboarding-user-level-value"
-                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                        className="h-11 rounded-lg text-xs"
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                      <SelectContent className="bg-popover border-border max-h-60">
                                         {TOPIKLevelSchema.options.map((level) => (
                                           <SelectItem key={level} value={String(level)}>
                                             {t(`proficiency_TOPIK${level}`)}
@@ -577,7 +573,7 @@ export function Onboarding(): React.ReactElement {
                                     </Select>
                                   ) : null}
 
-                                  <div className="text-xs text-gray-400 dark:text-gray-500 font-bold">
+                                  <div className="text-xs text-muted-foreground font-semibold">
                                     {t("optionsProficiencyDerivedCefr", [
                                       formData.proficiencyLevel,
                                     ])}
@@ -595,11 +591,11 @@ export function Onboarding(): React.ReactElement {
                                 >
                                   <SelectTrigger
                                     data-testid="onboarding-user-level-value"
-                                    className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                    className="h-11 rounded-lg text-xs"
                                   >
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                  <SelectContent className="bg-popover border-border max-h-60">
                                     {CEFRLevelSchema.options.map((level) => (
                                       <SelectItem key={level} value={level}>
                                         {t(`proficiency_${level}`)}
@@ -614,7 +610,7 @@ export function Onboarding(): React.ReactElement {
                       </div>
 
                       <div className="space-y-4 pt-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                        <Label className="text-xs text-muted-foreground ml-1">
                           {t("onboardingTargetLevelLabel")}
                         </Label>
                         {(() => {
@@ -644,11 +640,11 @@ export function Onboarding(): React.ReactElement {
                               >
                                 <SelectTrigger
                                   data-testid="onboarding-target-level-scale"
-                                  className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                  className="h-11 rounded-lg text-xs"
                                 >
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                <SelectContent className="bg-popover border-border max-h-60">
                                   {scaleOptions.map((opt) => (
                                     <SelectItem key={opt.value} value={opt.value}>
                                       {opt.label}
@@ -677,11 +673,11 @@ export function Onboarding(): React.ReactElement {
                                     >
                                       <SelectTrigger
                                         data-testid="onboarding-target-level-value"
-                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                        className="h-11 rounded-lg text-xs"
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                      <SelectContent className="bg-popover border-border max-h-60">
                                         {IELTS_BANDS.map((band) => (
                                           <SelectItem key={band} value={band}>
                                             {band}
@@ -709,11 +705,11 @@ export function Onboarding(): React.ReactElement {
                                     >
                                       <SelectTrigger
                                         data-testid="onboarding-target-level-value"
-                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                        className="h-11 rounded-lg text-xs"
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                      <SelectContent className="bg-popover border-border max-h-60">
                                         {JLPTLevelSchema.options.map((level) => (
                                           <SelectItem key={level} value={level}>
                                             {t(`proficiency_${level}`)}
@@ -741,11 +737,11 @@ export function Onboarding(): React.ReactElement {
                                     >
                                       <SelectTrigger
                                         data-testid="onboarding-target-level-value"
-                                        className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                        className="h-11 rounded-lg text-xs"
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
-                                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                      <SelectContent className="bg-popover border-border max-h-60">
                                         {TOPIKLevelSchema.options.map((level) => (
                                           <SelectItem key={level} value={String(level)}>
                                             {t(`proficiency_TOPIK${level}`)}
@@ -755,7 +751,7 @@ export function Onboarding(): React.ReactElement {
                                     </Select>
                                   ) : null}
 
-                                  <div className="text-xs text-gray-400 dark:text-gray-500 font-bold">
+                                  <div className="text-xs text-muted-foreground font-semibold">
                                     {t("optionsProficiencyDerivedCefr", [
                                       formData.targetProficiencyLevel,
                                     ])}
@@ -773,11 +769,11 @@ export function Onboarding(): React.ReactElement {
                                 >
                                   <SelectTrigger
                                     data-testid="onboarding-target-level-value"
-                                    className="bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 rounded-xl h-11 font-bold text-xs"
+                                    className="h-11 rounded-lg text-xs"
                                   >
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                                  <SelectContent className="bg-popover border-border max-h-60">
                                     {CEFRLevelSchema.options.map((level) => (
                                       <SelectItem key={level} value={level}>
                                         {t(`proficiency_${level}`)}
@@ -797,16 +793,16 @@ export function Onboarding(): React.ReactElement {
                 {currentStep === 2 && (
                   <div className="space-y-10">
                     <div className="space-y-2">
-                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                      <h2 className="text-xl font-semibold tracking-tight">
                         {t("onboardingStep2Title")}
                       </h2>
-                      <p className="text-gray-400 dark:text-gray-500 font-bold text-[11px] uppercase tracking-wider leading-relaxed">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
                         {t("onboardingStep2Desc")}
                       </p>
                     </div>
 
                     <div className="space-y-4">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">
+                      <Label className="text-xs text-muted-foreground ml-1">
                         {t("onboardingEnhanceModeLabel")}
                       </Label>
 
@@ -833,10 +829,10 @@ export function Onboarding(): React.ReactElement {
                         <div
                           key={mode.value}
                           className={cn(
-                          "relative group rounded-2xl border transition-all duration-300 p-5 cursor-pointer select-none",
+                          "rounded-lg border transition-colors p-5 cursor-pointer select-none",
                           formData.webEnhanceMode === mode.value
-                            ? "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-500/30"
-                            : "bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-gray-200 dark:hover:border-white/10"
+                            ? "bg-primary/5 border-primary/30"
+                            : "bg-card border-border hover:bg-muted/40"
                           )}
                           onClick={() => setFormData({ ...formData, webEnhanceMode: mode.value })}
                           role="button"
@@ -845,26 +841,26 @@ export function Onboarding(): React.ReactElement {
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-start gap-4">
                               <div className={cn(
-                                "p-3 rounded-xl transition-colors",
+                                "p-3 rounded-lg transition-colors",
                                 formData.webEnhanceMode === mode.value
-                                  ? "bg-indigo-500 text-white"
-                                  : "bg-white dark:bg-[#0d0e14] text-gray-300 dark:text-gray-600"
+                                  ? "bg-primary/10 text-primary"
+                                  : "bg-muted text-muted-foreground"
                               )}>
                                 <mode.icon className="h-6 w-6" />
                               </div>
                               <div className="space-y-1">
-                                <h3 className="font-bold text-gray-900 dark:text-white tracking-tight">
+                                <h3 className="font-medium tracking-tight">
                                   {mode.title}
                                 </h3>
-                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider leading-tight">{mode.desc}</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{mode.desc}</p>
                               </div>
                             </div>
                             <div
                               className={cn(
                                 "h-6 w-6 rounded-full border flex items-center justify-center transition-colors",
                                 formData.webEnhanceMode === mode.value
-                                  ? "border-indigo-500 bg-indigo-500 text-white"
-                                  : "border-gray-200 dark:border-white/10 text-transparent"
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border text-transparent"
                               )}
                             >
                               <Check className="h-4 w-4" />
@@ -879,62 +875,61 @@ export function Onboarding(): React.ReactElement {
                 {currentStep === 3 && (
                   <div className="space-y-10">
                     <div className="space-y-2">
-                      <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight text-center">
+                      <h2 className="text-xl font-semibold tracking-tight text-center">
                         {t("onboardingStep3Title")}
                       </h2>
-                      <p className="text-gray-400 dark:text-gray-500 font-bold text-[11px] uppercase tracking-wider leading-relaxed text-center">
+                      <p className="text-sm text-muted-foreground leading-relaxed text-center">
                         {t("onboardingStep3Desc")}
                       </p>
                     </div>
 
-                    <div className="relative group">
-                       <div className="absolute -inset-1 rounded-[2rem] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur opacity-75 group-hover:opacity-100 transition duration-1000" />
-                       <Card className="relative bg-gray-50/50 dark:bg-[#0d0e14]/40 border-gray-100 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-inner">
-                          <CardContent className="p-10 grid grid-cols-1 sm:grid-cols-4 gap-8 text-center">
-                            <div className="space-y-3">
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400/70">
-                                {t("onboardingSummaryTargetLanguage")}
+                    <div>
+                       <Card className="bg-muted/30 border border-border rounded-xl overflow-hidden">
+                           <CardContent className="p-10 grid grid-cols-1 sm:grid-cols-4 gap-8 text-center">
+                             <div className="space-y-3">
+                              <p className="text-xs text-muted-foreground">
+                                 {t("onboardingSummaryTargetLanguage")}
                               </p>
-                              <p data-testid="summary-target-lang" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                {t(`languageTarget_${formData.targetLanguage}`)}
-                              </p>
-                            </div>
-                            <div className="space-y-3">
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-500 dark:text-purple-400/70">
-                                {t("onboardingUserLevelLabel")}
-                              </p>
-                              <p data-testid="summary-proficiency" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                {displayProficiencyLabel({
-                                  level: formData.proficiencyLevel,
-                                  preference: formData.proficiencyPreference,
-                                })}
+                              <p data-testid="summary-target-lang" className="text-2xl font-semibold tracking-tight">
+                                 {t(`languageTarget_${formData.targetLanguage}`)}
                               </p>
                             </div>
                             <div className="space-y-3">
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-500 dark:text-teal-400/70">
-                                {t("onboardingTargetLevelLabel")}
+                              <p className="text-xs text-muted-foreground">
+                                 {t("onboardingUserLevelLabel")}
                               </p>
-                              <p data-testid="summary-target-level" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                {displayProficiencyLabel({
-                                  level: formData.targetProficiencyLevel,
-                                  preference: formData.targetProficiencyPreference,
-                                })}
+                              <p data-testid="summary-proficiency" className="text-2xl font-semibold tracking-tight">
+                                 {displayProficiencyLabel({
+                                   level: formData.proficiencyLevel,
+                                   preference: formData.proficiencyPreference,
+                                 })}
                               </p>
                             </div>
                             <div className="space-y-3">
-                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 dark:text-emerald-400/70">
-                                {t("onboardingSummaryEnhanceMode")}
+                              <p className="text-xs text-muted-foreground">
+                                 {t("onboardingTargetLevelLabel")}
                               </p>
-                              <p data-testid="summary-enhance-mode" className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                {t(`onboardingEnhanceModeSummary_${formData.webEnhanceMode}`)}
+                              <p data-testid="summary-target-level" className="text-2xl font-semibold tracking-tight">
+                                 {displayProficiencyLabel({
+                                   level: formData.targetProficiencyLevel,
+                                   preference: formData.targetProficiencyPreference,
+                                 })}
                               </p>
                             </div>
-                          </CardContent>
+                            <div className="space-y-3">
+                              <p className="text-xs text-muted-foreground">
+                                 {t("onboardingSummaryEnhanceMode")}
+                              </p>
+                              <p data-testid="summary-enhance-mode" className="text-2xl font-semibold tracking-tight">
+                                 {t(`onboardingEnhanceModeSummary_${formData.webEnhanceMode}`)}
+                              </p>
+                            </div>
+                           </CardContent>
                        </Card>
                     </div>
 
-                    <div className="glass-card bg-gray-50 dark:bg-white/5 rounded-2xl p-6 border-gray-100 dark:border-indigo-500/10 text-center">
-                       <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
+                    <div className="bg-muted/30 border border-border rounded-lg p-5 text-center">
+                       <p className="text-xs text-muted-foreground leading-relaxed">
                           {t("onboardingSummaryNote")}
                        </p>
                     </div>
@@ -949,7 +944,7 @@ export function Onboarding(): React.ReactElement {
               variant="ghost"
               onClick={handlePrevious}
               disabled={currentStep === 1}
-              className="gap-2 h-12 px-6 text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl transition-all font-bold"
+              className="gap-2 h-10 px-4 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
             >
               <ChevronLeft className="h-4 w-4" />
               {t("onboardingPrevious")}
@@ -959,18 +954,18 @@ export function Onboarding(): React.ReactElement {
               <Button
                 onClick={handleNext}
                 disabled={currentStep === 1 && !step1Valid}
-                className="gap-2 h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl shadow-xl shadow-indigo-600/10 dark:shadow-indigo-600/20 transition-all font-bold group"
+                className="gap-2 h-11 px-6 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
               >
                 {t("onboardingNext")}
-                <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
               <Button
                 onClick={handleFinish}
                 disabled={saving}
-                className="gap-2 h-14 px-10 bg-gradient-premium text-white rounded-2xl shadow-2xl shadow-indigo-600/20 dark:shadow-indigo-600/30 transition-all font-black text-lg group"
+                className="gap-2 h-11 px-6 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
               >
-                {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Sparkles className="h-6 w-6 group-hover:rotate-12 transition-transform" />}
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {saving ? t("optionsSaving") : t("onboardingFinish")}
               </Button>
             )}

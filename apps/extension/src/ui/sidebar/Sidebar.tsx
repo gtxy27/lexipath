@@ -382,47 +382,38 @@ export function Sidebar(): React.ReactElement {
   }, [messages.length]);
 
   return (
-    <div className="flex h-screen flex-col bg-white dark:bg-[#0d0e14] text-gray-900 dark:text-white overflow-hidden relative transition-colors duration-500">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-5%] left-[-5%] w-64 h-64 bg-indigo-600/5 dark:bg-indigo-600/10 rounded-full blur-[100px]" />
-        <div className="absolute top-1/2 -right-10 w-80 h-80 bg-purple-600/5 dark:bg-purple-600/10 rounded-full blur-[120px]" />
-      </div>
-
-      <header className="relative z-20 flex items-center justify-between px-5 py-4 bg-white/80 dark:bg-[#0d0e14]/50 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 shadow-sm">
+    <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
+      <header className="relative flex items-center justify-between px-5 py-4 bg-background border-b border-border overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
         <div className="flex items-center gap-3">
           {showSessions ? (
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowSessions(false)}
-              className="h-9 w-9 rounded-lg"
+              className="h-9 w-9 rounded-xl hover:bg-muted/30"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
           ) : (
-            <motion.div 
-              whileHover={{ scale: 1.05 }}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/10"
-            >
-              <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
-                <Sparkles className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />
-              </div>
-            </motion.div>
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl border bg-card shadow-sm overflow-hidden">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 dark:from-primary/6 via-transparent to-transparent opacity-70 dark:opacity-50" />
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
           )}
-          <div>
-            <h1 className="font-black text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/70">
+          <div className="relative">
+            <h1 className="text-base font-semibold tracking-tight">
               {showSessions ? t("chatHistory") || "History" : t("chatTitle")}
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 relative">
           <Button
             variant="ghost"
             size="icon"
             onClick={handleNewChat}
             title={t("chatNew") || "New Chat"}
-            className="h-9 w-9 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+            className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30"
           >
             <PlusCircle className="h-4 w-4" />
           </Button>
@@ -435,8 +426,8 @@ export function Sidebar(): React.ReactElement {
             }}
             title={t("chatHistory") || "History"}
             className={cn(
-              "h-9 w-9 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-white/5 rounded-lg transition-colors",
-              showSessions && "text-indigo-500 bg-indigo-50 dark:bg-white/5"
+              "h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30",
+              showSessions && "bg-muted/30 text-foreground"
             )}
           >
             <History className="h-4 w-4" />
@@ -448,7 +439,7 @@ export function Sidebar(): React.ReactElement {
               onClick={handleClear}
               aria-label={t("chatClear")}
               title={t("chatClear")}
-              className="h-9 w-9 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-white/5 rounded-lg transition-colors"
+              className="h-9 w-9 rounded-xl text-muted-foreground hover:text-destructive hover:bg-muted/30"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -466,17 +457,17 @@ export function Sidebar(): React.ReactElement {
               exit={{ opacity: 0, x: -20 }}
               className="flex-1 overflow-hidden flex flex-col"
             >
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-white/5">
+              <div className="px-4 py-3 border-b border-border bg-muted/15">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t("chatSearchPlaceholder") || "Search messages..."}
-                    className="pl-10 h-10 bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/5 rounded-xl text-sm"
+                    className="pl-10 h-10 rounded-xl text-sm bg-card shadow-sm"
                   />
                   {isSearching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                   )}
                 </div>
               </div>
@@ -484,7 +475,7 @@ export function Sidebar(): React.ReactElement {
                 <div className="flex flex-col gap-2 py-4">
                   {searchQuery.trim() ? (
                     searchResults.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                         <Search className="h-12 w-12 opacity-20 mb-4" />
                         <p className="text-sm font-medium">{t("chatNoSearchResults") || "No results found"}</p>
                       </div>
@@ -497,17 +488,17 @@ export function Sidebar(): React.ReactElement {
                             setShowSessions(false);
                             setSearchQuery("");
                           }}
-                          className="flex flex-col gap-1 p-4 rounded-2xl text-left transition-all border bg-white dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-indigo-200 dark:hover:border-indigo-500/20"
+                          className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
                         >
                           <div className="flex items-center justify-between w-full mb-1">
-                            <Badge className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20 text-[10px]">
+                            <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
                               {result.role === 'user' ? t('user') || 'User' : t('assistant') || 'AI'}
                             </Badge>
-                            <span className="text-[10px] text-gray-400">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(result.timestamp).toLocaleDateString()}
                             </span>
                           </div>
-                          <p className="text-sm line-clamp-2 text-gray-600 dark:text-gray-300">
+                          <p className="text-sm line-clamp-2 text-muted-foreground">
                             {result.content}
                           </p>
                         </button>
@@ -515,7 +506,7 @@ export function Sidebar(): React.ReactElement {
                     )
                   ) : (
                     sessions.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                         <MessageSquare className="h-12 w-12 opacity-20 mb-4" />
                         <p className="text-sm font-medium">{t("chatNoHistory") || "No history yet"}</p>
                       </div>
@@ -528,21 +519,21 @@ export function Sidebar(): React.ReactElement {
                             setShowSessions(false);
                           }}
                           className={cn(
-                            "flex flex-col gap-1 p-4 rounded-2xl text-left transition-all border",
+                            "flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border shadow-sm",
                             conversationId === session.sessionId
-                              ? "bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20"
-                              : "bg-white dark:bg-white/5 border-gray-100 dark:border-white/5 hover:border-indigo-200 dark:hover:border-indigo-500/20"
+                              ? "bg-muted/30 text-foreground"
+                              : "bg-card hover:bg-muted/30"
                           )}
                         >
                           <div className="flex items-center justify-between w-full">
-                            <span className="font-bold text-sm truncate max-w-[180px]">
+                            <span className="font-medium text-sm truncate max-w-[180px]">
                               {session.keyword || "General Conversation"}
                             </span>
-                            <span className="text-[10px] text-gray-400">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(session.lastAccessedAt).toLocaleDateString()}
                             </span>
                           </div>
-                          <div className="text-[10px] uppercase tracking-widest font-black opacity-40">
+                          <div className="text-xs text-muted-foreground/70">
                             {session.sessionId.split('-').slice(0, 2).join('-')}
                           </div>
                         </button>
@@ -567,21 +558,15 @@ export function Sidebar(): React.ReactElement {
                       <motion.div 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex h-[calc(100vh-250px)] flex-col items-center justify-center gap-6 text-center"
+                        className="flex h-[calc(100vh-250px)] flex-col items-center justify-center gap-4 text-center"
                       >
-                        <div className="relative">
-                           <div className="absolute -inset-4 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 blur-xl animate-pulse" />
-                           <div className="relative p-6 rounded-3xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 glass-card shadow-inner">
-                              <Bot className="h-16 w-16 text-indigo-500 dark:text-indigo-400" />
-                           </div>
+                        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border bg-card shadow-sm overflow-hidden">
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 dark:from-primary/6 via-transparent to-transparent opacity-70 dark:opacity-50" />
+                          <Bot className="h-7 w-7 text-primary" />
                         </div>
-                        <div className="space-y-2 max-w-[240px]">
-                          <p className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
-                            {t("chatEmptyTitle")}
-                          </p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest leading-relaxed">
-                            {t("chatEmpty")}
-                          </p>
+                        <div className="space-y-1 max-w-[260px]">
+                          <p className="text-base font-semibold">{t("chatEmptyTitle")}</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{t("chatEmpty")}</p>
                         </div>
                       </motion.div>
                     ) : (
@@ -597,20 +582,20 @@ export function Sidebar(): React.ReactElement {
                           )}
                         >
                           <div className={cn(
-                            "h-8 w-8 mt-1 rounded-lg flex items-center justify-center shrink-0 border shadow-sm transition-all",
+                            "h-9 w-9 mt-1 rounded-xl flex items-center justify-center shrink-0 border shadow-sm",
                             msg.role === "user" 
-                              ? "bg-indigo-600 border-indigo-500 text-white" 
-                              : "bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10"
+                              ? "bg-primary border-primary/50 text-primary-foreground" 
+                              : "bg-card border-border"
                           )}>
-                            {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />}
+                            {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4 text-primary" />}
                           </div>
 
                           <div
                             className={cn(
-                              "relative rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-lg transition-all",
+                              "relative rounded-xl px-4 py-3 text-sm leading-relaxed border shadow-sm",
                               msg.role === "user"
-                                ? "bg-indigo-600 text-white rounded-tr-none shadow-indigo-600/10"
-                                : "bg-white dark:bg-white/5 glass-card text-gray-800 dark:text-gray-200 rounded-tl-none border border-gray-100 dark:border-white/5"
+                                ? "bg-primary text-primary-foreground border-primary/50 rounded-tr-none"
+                                : "bg-card text-foreground border-border rounded-tl-none"
                             )}
                           >
                             {msg.role === "assistant" ? (
@@ -622,7 +607,7 @@ export function Sidebar(): React.ReactElement {
                             )}
                             <div
                               className={cn(
-                                "text-[10px] mt-2 font-black uppercase tracking-widest opacity-40",
+                                "mt-2 text-xs text-muted-foreground/70",
                                 msg.role === "user" ? "text-right" : "text-left",
                               )}
                             >
@@ -644,43 +629,40 @@ export function Sidebar(): React.ReactElement {
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mx-4 mb-2 flex items-center gap-2 px-4 py-3 bg-rose-50 dark:bg-red-500/10 text-rose-600 dark:text-red-400 text-xs border border-rose-100 dark:border-red-500/20 rounded-xl backdrop-blur-lg relative z-10 shadow-sm"
+                  className="mx-4 mb-2 flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive text-sm border border-destructive/20 rounded-lg"
                 >
                   <AlertCircle className="h-4 w-4" />
-                  <p className="font-bold uppercase tracking-wider">{error}</p>
+                  <p className="font-medium">{error}</p>
                 </motion.div>
               )}
 
-              <div className="p-5 border-t border-gray-100 dark:border-white/5 bg-white/80 dark:bg-[#0d0e14]/80 backdrop-blur-xl relative z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-                <div className="relative group">
-                  <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 blur opacity-75 group-focus-within:opacity-100 transition duration-300 pointer-events-none" />
-                  <div className="relative flex gap-2">
-                    <Input
-                      ref={inputRef}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder={t("chatPlaceholder")}
-                      disabled={isLoading}
-                      className="flex-1 h-12 bg-gray-50 dark:bg-[#1a1b23] border-gray-200 dark:border-white/5 focus-visible:ring-indigo-500/30 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 rounded-xl transition-all font-medium"
-                    />
-                    <Button
-                      onClick={handleSend}
-                      disabled={!inputValue.trim() || isLoading}
-                      aria-label={t("chatSend")}
-                      title={t("chatSend")}
-                      className={cn(
-                        "h-12 w-12 shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-600/10 transition-all",
-                        !inputValue.trim() && !isLoading && "opacity-50 grayscale",
-                      )}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Send className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
+              <div className="p-4 border-t border-border bg-muted/15">
+                <div className="flex gap-2 rounded-2xl border border-border bg-muted/15 p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/25 focus-within:ring-offset-2 focus-within:ring-offset-background">
+                  <Input
+                    ref={inputRef}
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t("chatPlaceholder")}
+                    disabled={isLoading}
+                    className="flex-1 h-11 rounded-xl border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                  />
+                  <Button
+                    onClick={handleSend}
+                    disabled={!inputValue.trim() || isLoading}
+                    aria-label={t("chatSend")}
+                    title={t("chatSend")}
+                    className={cn(
+                      "h-11 w-11 shrink-0 rounded-xl shadow-sm",
+                      !inputValue.trim() && !isLoading && "opacity-50 grayscale",
+                    )}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </motion.div>

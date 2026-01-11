@@ -88,6 +88,39 @@ const SetSettingsPayloadSchema = SettingsSchema.partial()
     return cleaned;
   });
 
+const UsageBucketSchema = z
+  .object({
+    events: z.number().int().min(0),
+    apiEvents: z.number().int().min(0),
+    words: z.number().int().min(0),
+  })
+  .strict();
+
+const DailyUsageSummarySchema = z
+  .object({
+    date: z.string().min(1),
+    updatedAt: z.number().int().min(0),
+    totals: UsageBucketSchema,
+    tasks: z.record(UsageBucketSchema),
+    providers: z.record(UsageBucketSchema),
+  })
+  .strict();
+
+const UsageSummaryResponseSchema = z
+  .object({
+    today: DailyUsageSummarySchema,
+    recentDays: z.array(DailyUsageSummarySchema),
+  })
+  .strict();
+
+const ReportUsageEventPayloadSchema = z
+  .object({
+    event: z.enum(['word_card_opened']),
+    word: z.string().min(1),
+    scene: z.enum(['web', 'subtitle', 'sidebar', 'popup']).optional(),
+  })
+  .strict();
+
 const messageDefinitions = {
   GET_SETTINGS: {
     payloadSchema: z.undefined(),
@@ -95,6 +128,14 @@ const messageDefinitions = {
   },
   SET_SETTINGS: {
     payloadSchema: SetSettingsPayloadSchema,
+    valueSchema: z.null(),
+  },
+  GET_USAGE_SUMMARY: {
+    payloadSchema: z.undefined(),
+    valueSchema: UsageSummaryResponseSchema,
+  },
+  REPORT_USAGE_EVENT: {
+    payloadSchema: ReportUsageEventPayloadSchema,
     valueSchema: z.null(),
   },
   REQUEST_HOST_PERMISSION: {

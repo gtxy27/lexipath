@@ -12,8 +12,9 @@ import {
 import { useToast } from "../../components/ui/use-toast";
 import { cn } from "../../lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, Zap } from "lucide-react";
+import { ChevronRight, SlidersHorizontal, Zap } from "lucide-react";
 import { AiGate } from "../AiGate";
+import { OptionsPageHeader } from "../components/OptionsPageHeader";
 import {
   BEHAVIOR_KIND_ALLOWLIST,
   FOLLOW_TRANSLATE_BEHAVIOR_KEYS,
@@ -116,25 +117,25 @@ export function RoutingTab(props: {
         className={cn(
           "relative flex flex-col md:flex-row md:items-center justify-between gap-5 transition-all",
           isNested
-            ? "bg-transparent py-5 px-2 border-b border-gray-100 dark:border-white/5 last:border-0"
-            : "bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-5 hover:shadow-md",
+            ? "bg-transparent py-5 px-2 border-b border-border last:border-0"
+            : "bg-card border border-border rounded-xl p-5",
         )}
       >
         <div className="flex items-center gap-4">
           <div
             className={cn(
-              "h-12 w-12 rounded-xl flex items-center justify-center shadow-sm transition-colors",
+              "h-12 w-12 rounded-lg flex items-center justify-center border transition-colors",
               isNested
-                ? "bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5"
-                : "bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/5",
+                ? "bg-muted/40 border-border"
+                : "bg-primary/10 border-border",
             )}
           >
             <Zap
               className={cn(
                 "h-6 w-6",
                 isNested
-                  ? "text-gray-400 dark:text-gray-500"
-                  : "text-indigo-500 dark:text-indigo-400",
+                  ? "text-muted-foreground"
+                  : "text-primary",
               )}
             />
           </div>
@@ -142,19 +143,19 @@ export function RoutingTab(props: {
             <div className="flex items-center gap-2">
               <h4
                 className={cn(
-                  "font-bold text-gray-900 dark:text-white",
+                  "font-medium",
                   isNested ? "text-sm" : "text-base",
                 )}
               >
                 {behaviorLabel(key)}
               </h4>
               {followSupported && route.followTranslate && (
-                <Badge className="bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20">
+                <Badge className="border border-border bg-muted text-muted-foreground">
                   {t("optionsRouteFollowTranslate")}
                 </Badge>
               )}
             </div>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-muted-foreground">
               {behaviorDesc(key)}
             </p>
           </div>
@@ -190,11 +191,11 @@ export function RoutingTab(props: {
             >
               <SelectTrigger
                 data-testid={`route-kind-${key}`}
-                className="w-40 bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-10 font-bold text-xs"
+                className="w-40 h-10 rounded-lg text-xs"
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+              <SelectContent>
                 {followSupported && (
                   <SelectItem value="follow">
                     {t("optionsRouteFollowTranslate")}
@@ -214,10 +215,10 @@ export function RoutingTab(props: {
                   })
                 }
               >
-                <SelectTrigger className="w-48 bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl h-10 font-bold text-xs">
+                <SelectTrigger className="w-48 h-10 rounded-lg text-xs">
                   <SelectValue placeholder={t("optionsRouteChannelPlaceholder")} />
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                <SelectContent>
                   {form.channels.map((ch) => (
                     <SelectItem key={ch.channelId} value={String(ch.channelId)}>
                       {ch.name || `#${ch.channelId}`}
@@ -228,7 +229,7 @@ export function RoutingTab(props: {
             )}
           </div>
           {routeError && (
-            <p className="text-[10px] text-rose-500 font-bold ml-1">
+            <p className="text-xs text-destructive">
               {t(routeError)}
             </p>
           )}
@@ -270,10 +271,10 @@ export function RoutingTab(props: {
       <div className="space-y-8">
         <div className="space-y-4">
           <div className="space-y-1">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+            <h3 className="text-sm font-medium">
               {t("optionsRoutingGroupCoreTitle")}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               {t("optionsRoutingGroupCoreDesc")}
             </p>
           </div>
@@ -284,25 +285,25 @@ export function RoutingTab(props: {
           <button
             type="button"
             onClick={() => setRoutingLearningOpen(!routingLearningOpen)}
-            className="w-full flex items-center justify-between bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 hover:shadow-sm transition-all"
+            className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-5 py-4"
           >
             <div className="text-left space-y-1">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+              <h3 className="text-sm font-medium">
                 {t("optionsRoutingGroupLearningTitle")}
               </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {t("optionsRoutingGroupLearningDesc")}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 {routingLearningOpen
                   ? t("optionsRoutingGroupCollapse")
                   : t("optionsRoutingGroupExpand")}
               </span>
               <ChevronRight
                 className={cn(
-                  "h-4 w-4 text-gray-400 transition-transform",
+                  "h-4 w-4 text-muted-foreground transition-transform",
                   routingLearningOpen ? "rotate-90" : "rotate-0",
                 )}
               />
@@ -316,7 +317,7 @@ export function RoutingTab(props: {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="overflow-hidden bg-gray-50/30 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl px-4"
+                className="overflow-hidden bg-muted/15 border border-border rounded-xl px-4"
               >
                 {learningRoutingKeys.map((key) => renderRoutingRow(key, true))}
               </motion.div>
@@ -328,25 +329,25 @@ export function RoutingTab(props: {
           <button
             type="button"
             onClick={() => setRoutingSubtitleOpen(!routingSubtitleOpen)}
-            className="w-full flex items-center justify-between bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl px-5 py-4 hover:shadow-sm transition-all"
+            className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-5 py-4"
           >
             <div className="text-left space-y-1">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+              <h3 className="text-sm font-medium">
                 {t("optionsRoutingGroupSubtitleTitle")}
               </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {t("optionsRoutingGroupSubtitleDesc")}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 {routingSubtitleOpen
                   ? t("optionsRoutingGroupCollapse")
                   : t("optionsRoutingGroupExpand")}
               </span>
               <ChevronRight
                 className={cn(
-                  "h-4 w-4 text-gray-400 transition-transform",
+                  "h-4 w-4 text-muted-foreground transition-transform",
                   routingSubtitleOpen ? "rotate-90" : "rotate-0",
                 )}
               />
@@ -360,7 +361,7 @@ export function RoutingTab(props: {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="overflow-hidden bg-gray-50/30 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl px-4"
+                className="overflow-hidden bg-muted/15 border border-border rounded-xl px-4"
               >
                 {subtitleRoutingKeys.map((key) => renderRoutingRow(key, true))}
               </motion.div>
@@ -373,14 +374,14 @@ export function RoutingTab(props: {
         <Button
           variant="outline"
           onClick={testGoogleTranslate}
-          className="h-10 px-6 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 font-bold text-[10px] uppercase tracking-widest transition-all shadow-sm"
+          className="h-10 px-4 rounded-lg text-xs font-medium"
         >
           {t("optionsTestGoogleTranslate")}
         </Button>
         <Button
           variant="outline"
           onClick={testBingTranslate}
-          className="h-10 px-6 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 font-bold text-[10px] uppercase tracking-widest transition-all shadow-sm"
+          className="h-10 px-4 rounded-lg text-xs font-medium"
         >
           {t("optionsTestBingTranslate")}
         </Button>
@@ -398,14 +399,11 @@ export function RoutingTab(props: {
 
   return (
     <>
-      <header className="space-y-3">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-          {t("optionsRoutingTitle")}
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">
-          {t("optionsRoutingDesc")}
-        </p>
-      </header>
+      <OptionsPageHeader
+        title={t("optionsRoutingTitle")}
+        description={t("optionsRoutingDesc")}
+        icon={SlidersHorizontal}
+      />
 
       <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
         {body}

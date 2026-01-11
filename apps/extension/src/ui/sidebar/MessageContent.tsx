@@ -53,37 +53,37 @@ export const MessageContent = React.memo(function MessageContent(props: {
             pre: {
               props: {
                 className:
-                  "my-2 overflow-x-auto rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3",
+                  "my-2 overflow-x-auto rounded-xl border border-border bg-muted/30 p-3",
               },
             },
             code: {
               props: {
                 className:
-                  "rounded bg-gray-100 dark:bg-white/10 px-1 py-0.5 font-mono text-[0.85em]",
+                  "rounded bg-muted/40 px-1 py-0.5 font-mono text-[0.85em]",
               },
             },
             table: {
               props: {
                 className:
-                  "my-2 w-full border-collapse overflow-hidden rounded-xl border border-gray-200/70 dark:border-white/10",
+                  "my-2 w-full border-collapse overflow-hidden rounded-xl border border-border",
               },
             },
             th: {
               props: {
                 className:
-                  "border border-gray-200/70 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-2 py-1 text-left font-semibold",
+                  "border border-border bg-muted/30 px-2 py-1 text-left font-semibold",
               },
             },
             td: {
               props: {
                 className:
-                  "border border-gray-200/70 dark:border-white/10 px-2 py-1 align-top",
+                  "border border-border px-2 py-1 align-top",
               },
             },
             blockquote: {
               props: {
                 className:
-                  "my-2 border-l-2 border-indigo-400/60 pl-3 text-gray-700 dark:text-gray-300",
+                  "my-2 border-l-2 border-primary/35 pl-3 text-muted-foreground",
               },
             },
           },

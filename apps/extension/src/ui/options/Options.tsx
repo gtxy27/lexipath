@@ -8,8 +8,7 @@ import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import {
-  AlertCircle,
-  Copy,
+  BarChart3,
   Languages,
   SlidersHorizontal,
   Sparkles,
@@ -21,6 +20,7 @@ import { BackupTab } from "./tabs/BackupTab";
 import { ChannelsTab } from "./tabs/ChannelsTab";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { LearningTab } from "./tabs/LearningTab";
+import { SummaryTab } from "./tabs/SummaryTab";
 import {
   buildSettingsPatch,
   channelIsConfigured,
@@ -39,7 +39,7 @@ export function Options(): React.ReactElement {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("learning");
+  const [activeTab, setActiveTab] = useState("summary");
 
   useApplyTheme(form?.theme ?? settings?.theme);
 
@@ -130,37 +130,27 @@ export function Options(): React.ReactElement {
   const openChannelsTab = () => setActiveTab("channels");
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0d0e14] text-gray-900 dark:text-white relative overflow-hidden font-sans transition-colors duration-500">
+    <div className="min-h-screen bg-background text-foreground relative font-sans">
       <Toaster />
-
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/5 dark:bg-indigo-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/5 dark:bg-purple-600/10 rounded-full blur-[120px]" />
-      </div>
 
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className="relative z-10 mx-auto max-w-[1440px] min-h-screen flex flex-col lg:flex-row"
+        className="mx-auto max-w-[1440px] min-h-screen flex flex-col lg:flex-row"
       >
-        <div className="w-full lg:w-72 lg:h-screen lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-white/5 bg-white/70 dark:bg-[#0d0e14]/70 backdrop-blur-xl p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-10 transition-all">
-          <div className="flex items-center gap-3 px-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-premium p-[1px] shadow-lg shadow-indigo-500/20">
-              <div className="flex h-full w-full items-center justify-center rounded-[11px] bg-white dark:bg-[#0d0e14]">
-                <img
-                  src={ICON_URL}
-                  className="h-6 w-6"
-                  alt={t("extensionName")}
-                />
-              </div>
+        <div className="w-full lg:w-72 lg:h-screen lg:sticky lg:top-0 border-b lg:border-b-0 lg:border-r border-border bg-card p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8">
+          <div className="flex items-center gap-3 px-1">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-background">
+              <img src={ICON_URL} className="h-5 w-5" alt={t("extensionName")} />
             </div>
-            <h1 className="font-black text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/70">
+            <h1 className="text-base font-semibold tracking-tight truncate">
               {t("extensionName")}
             </h1>
           </div>
 
 	          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
 	            {[
+	              { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
 	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
 	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
 	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
@@ -168,33 +158,32 @@ export function Options(): React.ReactElement {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="justify-start gap-2.5 px-4 py-3 rounded-xl data-[state=active]:bg-indigo-600 dark:data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all border-0 shadow-none"
+                className="w-full justify-start gap-2.5 px-3 py-2.5 rounded-lg border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
-                <span className="font-bold whitespace-nowrap">{tab.label}</span>
+                <span className="font-medium whitespace-nowrap">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
 
-          <div className="hidden lg:flex mt-auto pt-6 border-t border-gray-200 dark:border-white/5 flex-col gap-4">
+          <div className="hidden lg:flex mt-auto pt-6 border-t border-border flex-col gap-4">
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
                 <div
                   className={cn(
                     "h-2 w-2 rounded-full",
                     form.enabled
-                      ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                      : "bg-gray-400",
+                      ? "bg-emerald-500"
+                      : "bg-muted-foreground/40",
                   )}
                 />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                <span className="text-xs text-muted-foreground">
                   {form.enabled ? t("on") : t("off")}
                 </span>
               </div>
               <Button
                 size="sm"
-                variant="ghost"
-                className="h-9 px-4 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-400/10 rounded-xl"
+                className="h-9 px-4 text-xs font-medium rounded-lg"
                 onClick={handleSave}
                 disabled={saving}
               >
@@ -205,15 +194,15 @@ export function Options(): React.ReactElement {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col p-5 md:p-8 lg:p-12 xl:p-16 pb-32 lg:pb-16 max-w-5xl mx-auto w-full overflow-y-auto h-screen custom-scrollbar relative">
+        <div className="flex-1 flex flex-col p-5 md:p-8 lg:p-12 xl:p-16 pb-32 lg:pb-16 max-w-5xl mx-auto w-full overflow-y-auto h-screen custom-scrollbar">
           <div className="lg:hidden flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
-              <h1 className="font-black text-lg tracking-tight">{t("extensionName")}</h1>
+              <h1 className="text-base font-semibold tracking-tight">{t("extensionName")}</h1>
             </div>
             <Button
               size="sm"
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-6 h-10 shadow-lg shadow-indigo-600/20"
+              className="rounded-lg px-5 h-10"
               onClick={handleSave}
               disabled={saving}
             >
@@ -221,6 +210,13 @@ export function Options(): React.ReactElement {
               {t("optionsSaveButton")}
             </Button>
           </div>
+
+	          <TabsContent
+	            value="summary"
+	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+	          >
+	            <SummaryTab />
+	          </TabsContent>
 
 	          <TabsContent
 	            value="learning"
@@ -257,9 +253,10 @@ export function Options(): React.ReactElement {
 	          </TabsContent>
 	        </div>
 
-	        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-[#0d0e14]/80 backdrop-blur-xl border-t border-gray-200 dark:border-white/5 px-2 pb-safe pt-2 z-50">
+	        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border px-2 pb-safe pt-2 z-50">
 	          <TabsList className="flex h-auto bg-transparent border-0 p-0">
 	            {[
+	              { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
 	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
 	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
 	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
@@ -267,10 +264,10 @@ export function Options(): React.ReactElement {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="flex-1 flex-col gap-1 py-3 rounded-xl data-[state=active]:bg-indigo-600/10 data-[state=active]:text-indigo-600 dark:data-[state=active]:bg-white/10 dark:data-[state=active]:text-white text-gray-500 dark:text-gray-400 border-0 shadow-none transition-all"
+                className="flex-1 flex-col gap-1 py-3 rounded-lg data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground border-0 shadow-none"
               >
                 <tab.icon className="h-5 w-5" />
-                <span className="text-[10px] font-black">{tab.label}</span>
+                <span className="text-[10px] font-medium">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -289,8 +286,8 @@ export function Options(): React.ReactElement {
           .no-scrollbar::-webkit-scrollbar { display: none; }
           .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-          details > summary svg { transition: transform 150ms ease-out; }
-          details[open] > summary svg { transform: rotate(90deg); }
+          details > summary [data-disclosure-chevron] { transition: transform 150ms ease-out; }
+          details[open] > summary [data-disclosure-chevron] { transform: rotate(90deg); }
 
           .lx-style-preview .lx-preview-word {
             cursor: default;

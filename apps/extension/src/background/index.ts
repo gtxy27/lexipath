@@ -77,6 +77,7 @@ import {
   stableStringify,
   dedupeInFlight,
 } from './pipeline';
+import { bumpDailyUsage, getUsageSummary } from './usage-summary';
 import { filterSelectedKeywords } from './keyword-filter';
 import {
   InvalidOriginError,
@@ -1121,6 +1122,18 @@ registry.register('GET_SETTINGS', async () => {
   return getSettings();
 });
 
+registry.register('GET_USAGE_SUMMARY', async () => {
+  return getUsageSummary({ days: 7 });
+});
+
+registry.register('REPORT_USAGE_EVENT', async (payload) => {
+  if (payload.event === 'word_card_opened') {
+    void bumpDailyUsage({ task: 'word_card_opened', words: 1, apiEvent: false });
+    return null;
+  }
+  return null;
+});
+
 registry.register('GET_CHAT_SESSIONS', async (payload) => {
   const storageService = getStorageService();
   if (payload?.keyword) {
@@ -1796,7 +1809,8 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
     text,
   });
 
-  return getOrRunCachedTask(englishCorrectionCache, englishCorrectionInFlight, cacheKey, {
+  const apiEvent = englishCorrectionCache.get(cacheKey) === undefined && !englishCorrectionInFlight.has(cacheKey);
+  const result = await getOrRunCachedTask(englishCorrectionCache, englishCorrectionInFlight, cacheKey, {
     ttlSuccessMs: CACHE_SUCCESS_TTL_MS,
     ttlFallbackMs: CACHE_FALLBACK_TTL_MS,
       run: async () => {
@@ -1854,6 +1868,9 @@ registry.register('ENGLISH_CORRECTION', async (payload: EnglishCorrectionPayload
       }
     },
   });
+
+  void bumpDailyUsage({ task: 'english_correction', provider: providerInfo.type, apiEvent, words: 0 });
+  return result;
 });
 
 registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
@@ -1886,12 +1903,20 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
   });
 
   const cached = explainWordCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    void bumpDailyUsage({ task: 'explain_word', words: 1, apiEvent: false });
+    return cached;
+  }
 
-  return dedupeInFlight(explainWordInFlight, cacheKey, async () => {
+  let providerKey: string | undefined;
+  let apiEvent = !explainWordInFlight.has(cacheKey);
+
+  const value = await dedupeInFlight(explainWordInFlight, cacheKey, async () => {
     // Try offline dictionary first.
     const entry = await dictionaryService.lookup(word);
     if (entry) {
+      providerKey = 'offline';
+      apiEvent = false;
       const definition =
         entry.definitions?.[0]?.definition ??
         entry.definitions?.map((item) => item.definition).filter(Boolean).join('\n') ??
@@ -1912,6 +1937,8 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     // Fallback to provider-based explanation.
     if (dictionaryRoute.kind === 2 || dictionaryRoute.kind === 3) {
       try {
+        providerKey = dictionaryRoute.kind === 2 ? 'google' : 'bing';
+        apiEvent = true;
         const limit = getChannelConcurrencyLimit(null, dictionaryRoute.kind);
         const translated = await runWithChannelConcurrency(routeKey(dictionaryRoute), limit, () =>
           dictionaryRoute.kind === 2
@@ -1936,12 +1963,16 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
     }
 
     if (!dictionaryProviderInfo) {
+      providerKey = undefined;
+      apiEvent = false;
       const value: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
       explainWordCache.set(cacheKey, value, CACHE_FALLBACK_TTL_MS);
       return value;
     }
 
     try {
+      providerKey = dictionaryProviderInfo.type;
+      apiEvent = true;
       const provider = getChatProvider(dictionaryProviderInfo.type, dictionaryProviderInfo.config);
 
       const parsedSourceLang = SupportedLanguageSchema.safeParse(sourceLang);
@@ -2031,6 +2062,15 @@ registry.register('EXPLAIN_WORD', async (payload: ExplainWordPayload) => {
       return value;
     }
   });
+
+  void bumpDailyUsage({
+    task: 'explain_word',
+    ...(providerKey ? { provider: providerKey } : {}),
+    words: 1,
+    apiEvent,
+  });
+
+  return value;
 });
 
 registry.register('BATCH_GET_WORD_FAMILIARITY', async (payload: { words: string[] }) => {
@@ -2046,6 +2086,7 @@ registry.register('RECORD_EXPOSURE_VALID', async (payload: { words: string[] }) 
   const words = payload.words.map((w) => w.trim()).filter(Boolean);
   if (words.length === 0) return null;
   await Promise.all(words.map((word) => recordExposureValid(word)));
+  void bumpDailyUsage({ task: 'exposure_valid', words: words.length, apiEvent: false });
   return null;
 });
 
@@ -2469,6 +2510,8 @@ async function runChatStream(
       message: t('error_providerNotConfigured'),
     });
   }
+
+  void bumpDailyUsage({ task: 'chat', provider: chatProviderInfo.type, apiEvent: true, words: 0 });
 
   const sessionId = payload.conversationId ?? generateSessionId();
   const parsedSessionId = parseKeywordSessionId(sessionId);

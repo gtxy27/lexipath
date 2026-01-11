@@ -26,9 +26,11 @@ import {
   Copy,
   Loader2,
   Plus,
+  Sparkles,
   Trash2,
   Zap,
 } from "lucide-react";
+import { OptionsPageHeader } from "../components/OptionsPageHeader";
 import {
   buildTestPayload,
   channelTypeLabel,
@@ -100,51 +102,45 @@ export function ChannelsTab(props: {
 
   return (
     <>
-      <header className="space-y-3">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-          {t("optionsChannelsTitle")}
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">
-          {t("optionsChannelsDesc")}
-        </p>
-      </header>
-
-      <div className="flex items-center justify-between py-4 border-b border-gray-100 dark:border-white/5">
-        <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-          {t("optionsTab_channels")}
-        </h3>
-        <Button
-          className="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-600 hover:text-white border border-indigo-200 dark:border-indigo-500/20 rounded-xl px-5 h-10 font-bold transition-all"
-          onClick={() => {
-            const id = nextChannelId(form.channels);
-            const typeId: ChannelTypeId = 1;
-            setForm(
-              repairRoutes({
-                ...form,
-                channels: [
-                  ...form.channels,
-                  {
-                    channelId: id,
-                    typeId,
-                    name: defaultChannelName(typeId),
-                    model: "",
-                    baseUrl: "",
-                    apiKey: "",
-                    customHeadersText: "",
-                    iconUrl: "",
-                    concurrencyLimit: 15,
-                    configExtra: {},
-                    extra: {},
-                  },
-                ],
-              }),
-            );
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {t("optionsAddChannel")}
-        </Button>
-      </div>
+      <OptionsPageHeader
+        title={t("optionsChannelsTitle")}
+        description={t("optionsChannelsDesc")}
+        icon={Sparkles}
+        actions={
+          <Button
+            variant="outline"
+            className="h-10 rounded-lg px-4 font-medium"
+            onClick={() => {
+              const id = nextChannelId(form.channels);
+              const typeId: ChannelTypeId = 1;
+              setForm(
+                repairRoutes({
+                  ...form,
+                  channels: [
+                    ...form.channels,
+                    {
+                      channelId: id,
+                      typeId,
+                      name: defaultChannelName(typeId),
+                      model: "",
+                      baseUrl: "",
+                      apiKey: "",
+                      customHeadersText: "",
+                      iconUrl: "",
+                      concurrencyLimit: 15,
+                      configExtra: {},
+                      extra: {},
+                    },
+                  ],
+                }),
+              );
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {t("optionsAddChannel")}
+          </Button>
+        }
+      />
 
       <div className="grid gap-5">
         {form.channels
@@ -156,11 +152,10 @@ export function ChannelsTab(props: {
             const isExpanded = expandedChannels[channel.channelId] ?? false;
 
             return (
-              <div key={channel.channelId} className="relative group">
-                <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
-                <Card className="relative border-gray-200 dark:border-white/10 bg-white dark:bg-[#15161e] shadow-sm overflow-hidden rounded-2xl transition-all duration-300">
+              <div key={channel.channelId}>
+                <Card className="border border-border bg-card shadow-none overflow-hidden rounded-xl">
                   <CardHeader
-                    className="pb-4 pt-5 px-6 cursor-pointer select-none"
+                    className="pb-3 pt-4 px-5 cursor-pointer select-none"
                     onClick={() =>
                       setExpandedChannels((prev) => ({
                         ...prev,
@@ -172,25 +167,25 @@ export function ChannelsTab(props: {
                       <div className="flex items-center gap-4">
                         <div
                           className={cn(
-                            "p-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 transition-transform duration-300",
+                            "p-2 rounded-md border border-border bg-muted/40 transition-transform duration-300",
                             isExpanded ? "rotate-90" : "",
                           )}
                         >
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <CardTitle className="text-lg font-bold text-gray-900 dark:text-white">
+                            <CardTitle className="text-base font-semibold">
                               {channel.name || `#${channel.channelId}`}
                             </CardTitle>
                             <Badge
                               variant="outline"
-                              className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20 px-2 py-0 text-[10px] font-bold"
+                              className="border-border bg-muted text-muted-foreground px-2 py-0 text-xs font-medium"
                             >
                               {channelTypeLabel(channel.typeId)}
                             </Badge>
                           </div>
-                          <CardDescription className="text-gray-500 dark:text-gray-400 mt-1 font-semibold text-[11px] uppercase tracking-wider">
+                          <CardDescription className="mt-1 text-xs text-muted-foreground">
                             {channel.model?.trim()
                               ? channel.model.trim()
                               : t("optionsChannelModelUnset")}
@@ -205,26 +200,26 @@ export function ChannelsTab(props: {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-9 border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white gap-2 rounded-xl px-4"
+                          className="h-9 gap-2 rounded-lg px-3"
                           onClick={() => testProvider(channel)}
                           disabled={isTesting}
                         >
                           {isTesting ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Zap className="h-4 w-4 text-indigo-500" />
+                            <Zap className="h-4 w-4 text-primary" />
                           )}
-                          <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest">
+                          <span className="hidden sm:inline text-xs font-medium">
                             {t("optionsTestConnection")}
                           </span>
                         </Button>
 
-                        <div className="h-6 w-px bg-gray-200 dark:bg-white/10 mx-1" />
+                        <div className="h-6 w-px bg-border mx-1" />
 
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-gray-400 hover:text-indigo-600 dark:hover:text-white hover:bg-indigo-50 dark:hover:bg-white/5 rounded-xl transition-colors"
+                          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
                           onClick={() => {
                             const id = nextChannelId(form.channels);
                             const copy = {
@@ -246,7 +241,7 @@ export function ChannelsTab(props: {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive"
                           onClick={() => {
                             if (form.channels.length <= 1) return;
                             const nextChannels = form.channels.filter(
@@ -278,7 +273,7 @@ export function ChannelsTab(props: {
                           <div className="space-y-2.5">
                             <Label
                               htmlFor={`channel-${channel.channelId}-name`}
-                              className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                              className="text-xs text-muted-foreground"
                             >
                               {t("optionsChannelNameLabel")}
                             </Label>
@@ -295,10 +290,10 @@ export function ChannelsTab(props: {
                                   ),
                                 })
                               }
-                              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 focus:ring-indigo-500/30 rounded-xl h-11 font-medium transition-all"
+                              className="h-11 rounded-lg"
                             />
                             {channelErrors.name && (
-                              <p className="text-[10px] text-rose-500 font-bold ml-1">
+                              <p className="text-xs text-destructive">
                                 {t(channelErrors.name)}
                               </p>
                             )}
@@ -306,7 +301,7 @@ export function ChannelsTab(props: {
                           <div className="space-y-2.5">
                             <Label
                               htmlFor={`channel-${channel.channelId}-type`}
-                              className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                              className="text-xs text-muted-foreground"
                             >
                               {t("optionsChannelTypeLabel")}
                             </Label>
@@ -341,11 +336,11 @@ export function ChannelsTab(props: {
                             >
                               <SelectTrigger
                                 id={`channel-${channel.channelId}-type`}
-                                className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 h-11 rounded-xl font-medium"
+                                className="h-11 rounded-lg"
                               >
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                              <SelectContent className="border-border bg-popover">
                                 <SelectItem value="1">
                                   {channelTypeLabel(1)}
                                 </SelectItem>
@@ -364,7 +359,7 @@ export function ChannelsTab(props: {
                           <div className="space-y-2.5">
                             <Label
                               htmlFor={`channel-${channel.channelId}-model`}
-                              className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                              className="text-xs text-muted-foreground"
                             >
                               {t("optionsProviderModelLabel")}
                             </Label>
@@ -381,10 +376,10 @@ export function ChannelsTab(props: {
                                   ),
                                 })
                               }
-                              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                              className="h-11 rounded-lg"
                             />
                             {channelErrors.model && (
-                              <p className="text-[10px] text-rose-500 font-bold ml-1">
+                              <p className="text-xs text-destructive">
                                 {t(channelErrors.model)}
                               </p>
                             )}
@@ -392,7 +387,7 @@ export function ChannelsTab(props: {
                           <div className="space-y-2.5">
                             <Label
                               htmlFor={`channel-${channel.channelId}-api-key`}
-                              className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                              className="text-xs text-muted-foreground"
                             >
                               {t("optionsProviderApiKeyLabel")}
                             </Label>
@@ -410,11 +405,11 @@ export function ChannelsTab(props: {
                                   ),
                                 })
                               }
-                              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                              className="h-11 rounded-lg"
                               placeholder={t("optionsProviderApiKeyPlaceholder")}
                             />
                             {channelErrors.apiKey && (
-                              <p className="text-[10px] text-rose-500 font-bold ml-1">
+                              <p className="text-xs text-destructive">
                                 {t(channelErrors.apiKey)}
                               </p>
                             )}
@@ -424,7 +419,7 @@ export function ChannelsTab(props: {
                         <div className="space-y-2.5">
                           <Label
                             htmlFor={`channel-${channel.channelId}-base-url`}
-                            className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                            className="text-xs text-muted-foreground"
                           >
                             {t("optionsProviderBaseUrlLabel")}
                           </Label>
@@ -439,9 +434,9 @@ export function ChannelsTab(props: {
                                     ? { ...ch, baseUrl: e.target.value }
                                     : ch,
                                 ),
-                              })
-                            }
-                            className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                                })
+                              }
+                            className="h-11 rounded-lg"
                             placeholder={
                               channel.typeId === 1
                                 ? t("optionsProviderBaseUrlPlaceholder")
@@ -451,7 +446,7 @@ export function ChannelsTab(props: {
                             }
                           />
                           {channelErrors.baseUrl && (
-                            <p className="text-[10px] text-rose-500 font-bold ml-1">
+                            <p className="text-xs text-destructive">
                               {t(channelErrors.baseUrl)}
                             </p>
                           )}
@@ -460,7 +455,7 @@ export function ChannelsTab(props: {
                         <div className="space-y-2.5">
                           <Label
                             htmlFor={`channel-${channel.channelId}-concurrency-limit`}
-                            className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1"
+                            className="text-xs text-muted-foreground"
                           >
                             {t("optionsConcurrencyLimitLabel")}
                           </Label>
@@ -487,10 +482,10 @@ export function ChannelsTab(props: {
                                 ),
                               }));
                             }}
-                            className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                            className="h-11 rounded-lg"
                             placeholder="15"
                           />
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 ml-1">
+                          <p className="text-xs text-muted-foreground">
                             {t("optionsConcurrencyLimitDesc")}
                           </p>
                         </div>

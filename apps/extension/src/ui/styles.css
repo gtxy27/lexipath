@@ -4,7 +4,8 @@
 
 @layer base {
   :root {
-    --background: 240 25% 98%;
+    /* Minimal, high-contrast UI tokens (shadcn compatible). */
+    --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -36,32 +37,34 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Match the extension's existing dark surfaces (#0d0e14 / #131423 / #1a1b23). */
+    /* Slightly lifted surfaces for better separation in overlays/popovers. */
+    --background: 231.4 21.2% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 236.2 24% 12%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 236.2 24% 13%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 233.3 14.8% 13.5%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 233.3 14.8% 13.5%;
+    --muted-foreground: 215 20.2% 70%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 233.3 14.8% 13.5%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 233.3 11% 22%;
+    --input: 233.3 11% 22%;
     --ring: 224.3 76.3% 48%;
   }
 }
@@ -87,20 +90,14 @@
       background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
     }
   
-    .glass-card {
-      background: rgba(255, 255, 255, 0.03);
-      -webkit-backdrop-filter: blur(12px);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    }
-  
+    /* Legacy helpers (kept for compatibility). Prefer `bg-card border-border` in new UI. */
+    .glass-card,
     .glass-card-light {
-      background: rgba(255, 255, 255, 0.7);
-      -webkit-backdrop-filter: blur(10px);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 4px 16px 0 rgba(31, 38, 135, 0.07);
+      background: hsl(var(--card) / 0.92);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border: 1px solid hsl(var(--border) / 0.9);
+      box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.28);
     }
   
     .text-gradient {

@@ -266,6 +266,10 @@ async function getWordCardData(word: string): Promise<WordCardData> {
 }
 
 async function showFullWordCard(word: string, rect: DOMRect, pinned = false) {
+  const normalized = word.toLowerCase().trim();
+  if (normalized) {
+    void sendMessage("REPORT_USAGE_EVENT", { event: "word_card_opened", word: normalized, scene: "web" });
+  }
   const overlay = getWebOverlay();
   overlay.showWordCardLoading(word, rect, { pinned });
   const data = await getWordCardData(word);

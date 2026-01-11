@@ -8,6 +8,8 @@ import { Label } from "../../components/ui/label";
 import { useToast } from "../../components/ui/use-toast";
 import { Download, Loader2, Upload } from "lucide-react";
 import { AiGate } from "../AiGate";
+import { OptionsPageHeader } from "../components/OptionsPageHeader";
+import { OptionsSection } from "../components/OptionsSection";
 import { t } from "../optionsI18n";
 import { sendMessage } from "../optionsMessages";
 import type { FieldErrors, FormState } from "../optionsTypes";
@@ -186,31 +188,25 @@ export function BackupTab(props: {
   }
 
   const content = (
-    <div className="bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-8 shadow-sm">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-            {t("optionsExportButton")}
-          </h4>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t("optionsExportDesc")}
-          </p>
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+        <OptionsSection
+          title={t("optionsExportButton")}
+          description={t("optionsExportDesc")}
+        >
           <Button
             onClick={handleExport}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl h-11 shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-lg flex items-center justify-center gap-2"
           >
             <Download className="h-4 w-4" />
             {t("optionsExportButton")}
           </Button>
-        </div>
+        </OptionsSection>
 
-        <div className="space-y-4">
-          <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
-            {t("optionsImportButton")}
-          </h4>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t("optionsImportDesc")}
-          </p>
+        <OptionsSection
+          title={t("optionsImportButton")}
+          description={t("optionsImportDesc")}
+        >
           <div className="relative">
             <Input
               type="file"
@@ -218,42 +214,43 @@ export function BackupTab(props: {
               onChange={handleImport}
               className="absolute inset-0 opacity-0 cursor-pointer z-10"
             />
-            <Button className="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 font-bold rounded-xl h-11 flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              className="w-full h-11 rounded-lg flex items-center justify-center gap-2 bg-background/70 dark:bg-card/60 hover:bg-background dark:hover:bg-card/80"
+            >
               <Upload className="h-4 w-4" />
               {t("optionsImportButton")}
             </Button>
           </div>
-        </div>
+        </OptionsSection>
       </div>
 
-      <div className="h-px bg-gray-100 dark:bg-white/5 my-8" />
-
-      <div className="space-y-6">
-        <header className="flex items-center justify-between">
-          <div>
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+      <OptionsSection className="shadow-none">
+        <header className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-sm font-medium">
               {t("optionsWebDAVCloudSyncTitle")}
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {t("optionsWebDAVDesc")}
             </p>
           </div>
           <Badge
             variant="outline"
-            className="text-[10px] font-bold uppercase tracking-widest px-2 py-0"
+            className="px-2 py-0 text-xs font-medium text-muted-foreground"
           >
             {t("optionsPhase2Badge")}
           </Badge>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2.5">
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+            <Label className="text-xs text-muted-foreground">
               {t("optionsWebDAVUrl")}
             </Label>
             <Input
               placeholder={t("optionsWebDAVUrlPlaceholder")}
-              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+              className="h-11 rounded-lg"
               value={form.webdav.url}
               onChange={(e) =>
                 setForm({
@@ -263,18 +260,18 @@ export function BackupTab(props: {
               }
             />
             {errors.webdav?.url && (
-              <p className="text-[10px] text-rose-500 font-bold ml-1">
+              <p className="text-xs text-destructive">
                 {t(errors.webdav.url)}
               </p>
             )}
           </div>
           <div className="space-y-2.5">
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+            <Label className="text-xs text-muted-foreground">
               {t("optionsWebDAVPath")}
             </Label>
             <Input
               placeholder={t("optionsWebDAVPathPlaceholder")}
-              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+              className="h-11 rounded-lg"
               value={form.webdav.path}
               onChange={(e) =>
                 setForm({
@@ -285,11 +282,11 @@ export function BackupTab(props: {
             />
           </div>
           <div className="space-y-2.5">
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+            <Label className="text-xs text-muted-foreground">
               {t("optionsWebDAVUser")}
             </Label>
             <Input
-              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+              className="h-11 rounded-lg"
               value={form.webdav.username}
               onChange={(e) =>
                 setForm({
@@ -299,18 +296,18 @@ export function BackupTab(props: {
               }
             />
             {errors.webdav?.username && (
-              <p className="text-[10px] text-rose-500 font-bold ml-1">
+              <p className="text-xs text-destructive">
                 {t(errors.webdav.username)}
               </p>
             )}
           </div>
           <div className="space-y-2.5">
-            <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+            <Label className="text-xs text-muted-foreground">
               {t("optionsWebDAVPass")}
             </Label>
             <Input
               type="password"
-              className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11"
+              className="h-11 rounded-lg"
               value={form.webdav.password}
               onChange={(e) =>
                 setForm({
@@ -320,17 +317,17 @@ export function BackupTab(props: {
               }
             />
             {errors.webdav?.password && (
-              <p className="text-[10px] text-rose-500 font-bold ml-1">
+              <p className="text-xs text-destructive">
                 {t(errors.webdav.password)}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-3 pt-6">
           <Button
             variant="outline"
-            className="flex-1 h-11 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 font-bold text-xs"
+            className="flex-1 h-11 rounded-lg text-xs font-medium"
             onClick={handleWebDAVUpload}
             disabled={webdavAction !== null}
           >
@@ -343,7 +340,7 @@ export function BackupTab(props: {
           </Button>
           <Button
             variant="outline"
-            className="flex-1 h-11 rounded-xl border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 font-bold text-xs"
+            className="flex-1 h-11 rounded-lg text-xs font-medium"
             onClick={handleWebDAVDownload}
             disabled={webdavAction !== null}
           >
@@ -355,7 +352,7 @@ export function BackupTab(props: {
             {t("optionsWebDAVDownload")}
           </Button>
         </div>
-      </div>
+      </OptionsSection>
     </div>
   );
 
@@ -365,14 +362,10 @@ export function BackupTab(props: {
 
   return (
     <>
-      <header className="space-y-3">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
-          {t("optionsBackupTitle")}
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">
-          {t("optionsBackupDesc")}
-        </p>
-      </header>
+      <OptionsPageHeader
+        title={t("optionsBackupTitle")}
+        description={t("optionsBackupDesc")}
+      />
 
       <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
         {content}

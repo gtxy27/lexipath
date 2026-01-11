@@ -65,24 +65,24 @@ export function LanguageTab(props: {
   return (
     <>
       <header className="space-y-3">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900 dark:text-white">
+        <h2 className="text-2xl font-semibold tracking-tight">
           {t("optionsTab_learning")}
         </h2>
-        <p className="text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed font-medium text-sm md:text-base">
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
           {t("optionsLearningDesc")}
         </p>
       </header>
 
       <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 items-stretch">
-          <div className="md:col-span-2 md:order-1 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+          <div className="md:col-span-2 md:order-1 bg-card border border-border rounded-xl p-6 space-y-5">
+            <h4 className="text-sm font-medium">
               {t("optionsLanguageTitle")}
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2.5">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                <Label className="text-xs text-muted-foreground">
                   {t("nativeLanguage")}
                 </Label>
                 <Select
@@ -113,10 +113,10 @@ export function LanguageTab(props: {
                     });
                   }}
                 >
-                  <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                  <SelectTrigger className="h-11 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                  <SelectContent className="bg-popover border-border max-h-60">
                     {NATIVE_LANGUAGE_OPTIONS.map((lang) => (
                       <SelectItem key={lang} value={lang}>
                         {t(`languageNative_${lang.replace("-", "_")}`)}
@@ -127,7 +127,7 @@ export function LanguageTab(props: {
               </div>
 
               <div className="space-y-2.5">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                <Label className="text-xs text-muted-foreground">
                   {t("targetLanguage")}
                 </Label>
                 <Select
@@ -158,10 +158,10 @@ export function LanguageTab(props: {
                     });
                   }}
                 >
-                  <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                  <SelectTrigger className="h-11 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                  <SelectContent className="bg-popover border-border max-h-60">
                     {SupportedLanguageSchema.options.map((lang) => (
                       <SelectItem key={lang} value={lang}>
                         {t(`languageTarget_${lang}`)}
@@ -173,17 +173,17 @@ export function LanguageTab(props: {
             </div>
           </div>
 
-          <div className="md:order-2 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+          <div className="md:order-2 bg-card border border-border rounded-xl p-6 space-y-5">
+            <h4 className="text-sm font-medium">
               {t("optionsLearningLevelsTitle")}
             </h4>
 
             <div className="space-y-5">
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-muted-foreground">
                 {t("optionsUserLevelTitle")}
               </div>
               <div className="space-y-2.5">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                <Label className="text-xs text-muted-foreground">
                   {t("optionsProficiencyScaleLabel")}
                 </Label>
                 <Select
@@ -205,10 +205,10 @@ export function LanguageTab(props: {
                     });
                   }}
                 >
-                  <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                  <SelectTrigger className="h-11 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                  <SelectContent className="bg-popover border-border max-h-60">
                     {getProficiencyScaleOptions({
                       targetLanguage: form.targetLanguage,
                       nativeLanguage: form.nativeLanguage,
@@ -225,7 +225,7 @@ export function LanguageTab(props: {
                 <div className="space-y-2.5">
                   {form.proficiencyPreference.standard !== "CET-4" &&
                   form.proficiencyPreference.standard !== "CET-6" ? (
-                    <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                    <Label className="text-xs text-muted-foreground">
                       {t("optionsProficiencyScaleValueLabel")}
                     </Label>
                   ) : null}
@@ -245,10 +245,10 @@ export function LanguageTab(props: {
                         });
                       }}
                     >
-                      <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectTrigger className="h-11 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                      <SelectContent className="bg-popover border-border max-h-60">
                         {IELTS_BANDS.map((band) => (
                           <SelectItem key={band} value={band}>
                             {band}
@@ -273,10 +273,10 @@ export function LanguageTab(props: {
                         });
                       }}
                     >
-                      <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectTrigger className="h-11 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                      <SelectContent className="bg-popover border-border">
                         {JLPTLevelSchema.options.map((level) => (
                           <SelectItem key={level} value={level}>
                             {t(`proficiency_${level}`)}
@@ -301,10 +301,10 @@ export function LanguageTab(props: {
                         });
                       }}
                     >
-                      <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectTrigger className="h-11 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                      <SelectContent className="bg-popover border-border">
                         {TOPIKLevelSchema.options.map((level) => (
                           <SelectItem key={level} value={String(level)}>
                             {t(`proficiency_TOPIK${level}`)}
@@ -314,20 +314,20 @@ export function LanguageTab(props: {
                     </Select>
                   ) : null}
 
-                  <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                  <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {t("optionsProficiencyDerivedCefr", [
                         form.proficiencyLevel,
                       ])}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1">
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">
                       {t(`proficiencyRequirement_${form.proficiencyLevel}`)}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                  <Label className="text-xs text-muted-foreground">
                     {t("proficiencyLevel")}
                   </Label>
                   <Select
@@ -336,10 +336,10 @@ export function LanguageTab(props: {
                       setForm({ ...form, proficiencyLevel: v as CEFRLevel })
                     }
                   >
-                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                    <SelectTrigger className="h-11 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                    <SelectContent className="bg-popover border-border">
                       {CEFRLevelSchema.options.map((level) => (
                         <SelectItem key={level} value={level}>
                           {t(`proficiency_${level}`)}
@@ -347,22 +347,22 @@ export function LanguageTab(props: {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                  <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {t(`proficiencyRequirement_${form.proficiencyLevel}`)}
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="h-px bg-gray-100 dark:bg-white/5 my-2" />
+              <div className="h-px bg-border my-2" />
 
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-muted-foreground">
                 {t("optionsTargetLevelTitle")}
               </div>
 
               <div className="space-y-2.5">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                <Label className="text-xs text-muted-foreground">
                   {t("optionsProficiencyScaleLabel")}
                 </Label>
                 <Select
@@ -384,10 +384,10 @@ export function LanguageTab(props: {
                     });
                   }}
                 >
-                  <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                  <SelectTrigger className="h-11 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                  <SelectContent className="bg-popover border-border max-h-60">
                     {getProficiencyScaleOptions({
                       targetLanguage: form.targetLanguage,
                       nativeLanguage: form.nativeLanguage,
@@ -404,7 +404,7 @@ export function LanguageTab(props: {
                 <div className="space-y-2.5">
                   {form.targetProficiencyPreference.standard !== "CET-4" &&
                   form.targetProficiencyPreference.standard !== "CET-6" ? (
-                    <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                    <Label className="text-xs text-muted-foreground">
                       {t("optionsProficiencyScaleValueLabel")}
                     </Label>
                   ) : null}
@@ -424,10 +424,10 @@ export function LanguageTab(props: {
                         });
                       }}
                     >
-                      <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectTrigger className="h-11 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                      <SelectContent className="bg-popover border-border max-h-60">
                         {IELTS_BANDS.map((band) => (
                           <SelectItem key={band} value={band}>
                             {band}
@@ -452,10 +452,10 @@ export function LanguageTab(props: {
                         });
                       }}
                     >
-                      <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectTrigger className="h-11 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                      <SelectContent className="bg-popover border-border">
                         {JLPTLevelSchema.options.map((level) => (
                           <SelectItem key={level} value={level}>
                             {t(`proficiency_${level}`)}
@@ -480,10 +480,10 @@ export function LanguageTab(props: {
                         });
                       }}
                     >
-                      <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                      <SelectTrigger className="h-11 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                      <SelectContent className="bg-popover border-border">
                         {TOPIKLevelSchema.options.map((level) => (
                           <SelectItem key={level} value={String(level)}>
                             {t(`proficiency_TOPIK${level}`)}
@@ -493,20 +493,20 @@ export function LanguageTab(props: {
                     </Select>
                   ) : null}
 
-                  <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                  <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {t("optionsProficiencyDerivedCefr", [
                         form.targetProficiencyLevel,
                       ])}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium mt-1">
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">
                       {t(`proficiencyRequirement_${form.targetProficiencyLevel}`)}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                  <Label className="text-xs text-muted-foreground">
                     {t("optionsTargetLevelTitle")}
                   </Label>
                   <Select
@@ -515,10 +515,10 @@ export function LanguageTab(props: {
                       setForm({ ...form, targetProficiencyLevel: v as CEFRLevel })
                     }
                   >
-                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                    <SelectTrigger className="h-11 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                    <SelectContent className="bg-popover border-border">
                       {CEFRLevelSchema.options.map((level) => (
                         <SelectItem key={level} value={level}>
                           {t(`proficiency_${level}`)}
@@ -526,22 +526,22 @@ export function LanguageTab(props: {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="p-3 rounded-xl bg-gray-50/40 dark:bg-white/5 border border-gray-200/60 dark:border-white/10">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                  <div className="p-3 rounded-lg bg-muted/40 border border-border">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                       {t(`proficiencyRequirement_${form.targetProficiencyLevel}`)}
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="p-4 rounded-xl bg-indigo-50/30 dark:bg-indigo-500/5 border border-indigo-100/50 dark:border-indigo-500/10">
-                <p className="text-xs text-gray-500 dark:text-gray-400 italic leading-relaxed font-medium">
+              <div className="p-4 rounded-lg bg-muted/40 border border-border">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {t("optionsProficiencyHint")}
                 </p>
               </div>
 
               <div className="space-y-2.5">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                <Label className="text-xs text-muted-foreground">
                   {t("optionsPromptStyleLabel")}
                 </Label>
                 <Select
@@ -550,10 +550,10 @@ export function LanguageTab(props: {
                     setForm({ ...form, promptStyle: v as Settings["promptStyle"] })
                   }
                 >
-                  <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                  <SelectTrigger className="h-11 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10 max-h-60">
+                  <SelectContent className="bg-popover border-border max-h-60">
                     {PromptStyleKeySchema.options.map((styleKey) => (
                       <SelectItem key={styleKey} value={styleKey}>
                         {t(`promptStyle_${styleKey}`)}
@@ -561,26 +561,26 @@ export function LanguageTab(props: {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium ml-1">
+                <p className="text-xs text-muted-foreground leading-relaxed ml-1">
                   {t("optionsPromptStyleDesc")}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="md:order-3 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+          <div className="md:order-3 bg-card border border-border rounded-xl p-6 space-y-5">
+            <h4 className="text-sm font-medium">
               {t("optionsWordCardTitle")}
             </h4>
 
             <div className="space-y-5">
-              <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
+              <div className="flex items-center justify-between gap-6 rounded-lg border border-border bg-muted/40 p-4">
                 <div className="space-y-1">
-                  <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-indigo-500" />
+                  <div className="text-sm font-medium flex items-center gap-2">
+                    <Volume2 className="h-4 w-4 text-primary" />
                     {t("optionsWordCardAutoPronounceLabel")}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-muted-foreground">
                     {t("optionsWordCardAutoPronounceDesc")}
                   </div>
                 </div>
@@ -589,12 +589,12 @@ export function LanguageTab(props: {
                   onCheckedChange={(checked) =>
                     setForm({ ...form, wordCardAutoPronounce: checked })
                   }
-                  className="data-[state=checked]:bg-indigo-600"
+                  className="data-[state=checked]:bg-primary"
                 />
               </div>
 
               <div className="space-y-2.5">
-                <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                <Label className="text-xs text-muted-foreground">
                   {t("optionsWordCardEnglishAccentLabel")}
                 </Label>
                 <Select
@@ -606,23 +606,23 @@ export function LanguageTab(props: {
                     })
                   }
                 >
-                  <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                  <SelectTrigger className="h-11 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                  <SelectContent className="bg-popover border-border">
                     <SelectItem value="us">{t("optionsWordCardEnglishAccentUs")}</SelectItem>
                     <SelectItem value="uk">{t("optionsWordCardEnglishAccentUk")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
+              <div className="flex items-center justify-between gap-6 rounded-lg border border-border bg-muted/40 p-4">
                 <div className="space-y-1">
-                  <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <MousePointerClick className="h-4 w-4 text-indigo-500" />
+                  <div className="text-sm font-medium flex items-center gap-2">
+                    <MousePointerClick className="h-4 w-4 text-primary" />
                     {t("optionsWebSelectionExplainLabel")}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-muted-foreground">
                     {t("optionsWebSelectionExplainDesc")}
                   </div>
                 </div>
@@ -631,12 +631,12 @@ export function LanguageTab(props: {
                   onCheckedChange={(checked) =>
                     setForm({ ...form, webSelectionExplainEnabled: checked })
                   }
-                  className="data-[state=checked]:bg-indigo-600"
+                  className="data-[state=checked]:bg-primary"
                 />
               </div>
 
               <div className="space-y-3">
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 ml-1">
+                <div className="text-xs text-muted-foreground ml-1">
                   {t("optionsWordCardOrderLabel")}
                 </div>
                 <div className="space-y-2">
@@ -645,10 +645,10 @@ export function LanguageTab(props: {
                     return (
                       <div
                         key={key}
-                        className="flex items-center justify-between gap-4 rounded-xl border border-gray-200/60 dark:border-white/10 bg-white/60 dark:bg-white/5 px-4 py-3"
+                        className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/20 px-4 py-3"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-bold text-gray-900 dark:text-white">
+                          <div className="text-sm font-medium">
                             {t(labelKey)}
                           </div>
                         </div>
@@ -657,7 +657,7 @@ export function LanguageTab(props: {
                             type="button"
                             variant="outline"
                             size="icon"
-                            className="h-9 w-9 rounded-xl border-gray-200 dark:border-white/10 bg-white/70 dark:bg-black/20"
+                            className="h-9 w-9 rounded-lg border border-border bg-background"
                             disabled={index === 0}
                             onClick={() => {
                               if (index === 0) return;
@@ -675,7 +675,7 @@ export function LanguageTab(props: {
                             type="button"
                             variant="outline"
                             size="icon"
-                            className="h-9 w-9 rounded-xl border-gray-200 dark:border-white/10 bg-white/70 dark:bg-black/20"
+                            className="h-9 w-9 rounded-lg border border-border bg-background"
                             disabled={index === wordCardSectionsOrder.length - 1}
                             onClick={() => {
                               if (index === wordCardSectionsOrder.length - 1) return;
@@ -694,26 +694,26 @@ export function LanguageTab(props: {
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 ml-1">
+                <p className="text-xs text-muted-foreground ml-1">
                   {t("optionsWordCardOrderHint")}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="md:col-span-2 md:order-4 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+          <div className="md:col-span-2 md:order-4 bg-card border border-border rounded-xl p-6 space-y-5">
+            <h4 className="text-sm font-medium">
               {t("optionsWebEnhanceModeLabel")}
             </h4>
 
             <div className="space-y-5">
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 {t("optionsWebEnhanceModeDesc")}
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                  <Label className="text-xs text-muted-foreground">
                     {t("optionsWebEnhanceModeTargetLabel")}
                   </Label>
                   <Select
@@ -722,10 +722,10 @@ export function LanguageTab(props: {
                       setForm({ ...form, webEnhanceMode: v as Settings["webEnhanceMode"] })
                     }
                   >
-                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                    <SelectTrigger className="h-11 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                    <SelectContent className="bg-popover border-border">
                       <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
                       <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
                       <SelectItem value="full">{t("optionsWebEnhanceModeFull")}</SelectItem>
@@ -734,7 +734,7 @@ export function LanguageTab(props: {
                 </div>
 
                 <div className="space-y-2.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                  <Label className="text-xs text-muted-foreground">
                     {t("optionsWebEnhanceModeNativeLabel")}
                   </Label>
                   <Select
@@ -746,15 +746,15 @@ export function LanguageTab(props: {
                       })
                     }
                   >
-                    <SelectTrigger className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium">
+                    <SelectTrigger className="h-11 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-white dark:bg-[#1a1b23] border-gray-200 dark:border-white/10">
+                    <SelectContent className="bg-popover border-border">
                       <SelectItem value="light">{t("optionsWebEnhanceModeLight")}</SelectItem>
                       <SelectItem value="i_plus_1">{t("optionsWebEnhanceModeIPlus1")}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed font-medium ml-1">
+                  <p className="text-xs text-muted-foreground leading-relaxed ml-1">
                     {t("optionsWebEnhanceModeNativeHint")}
                   </p>
                 </div>
@@ -763,18 +763,18 @@ export function LanguageTab(props: {
           </div>
 
           {form.hasCompletedOnboarding ? null : (
-            <div className="md:col-span-2 md:order-5 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-              <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+            <div className="md:col-span-2 md:order-5 bg-card border border-border rounded-xl p-6 space-y-5">
+              <h4 className="text-sm font-medium">
                 {t("openOnboarding")}
               </h4>
 
               <div className="space-y-5">
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {t("optionsOpenOnboardingDesc")}
                 </p>
                 <Button
                   variant="outline"
-                  className="w-full sm:w-auto h-10 rounded-xl border-gray-200 dark:border-white/10 bg-white/70 dark:bg-black/20 font-bold text-xs"
+                  className="w-full sm:w-auto h-10 rounded-lg border border-border bg-background font-medium text-xs"
                   onClick={() => {
                     const url = browser.runtime.getURL("src/ui/onboarding/index.html");
                     globalThis.open?.(url, "_blank");
@@ -787,22 +787,22 @@ export function LanguageTab(props: {
             </div>
           )}
 
-          <div className="md:col-span-2 md:order-6 bg-white dark:bg-[#15161e] border border-gray-200 dark:border-white/10 rounded-2xl p-7 space-y-7 shadow-sm">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400/90">
+          <div className="md:col-span-2 md:order-6 bg-card border border-border rounded-xl p-6 space-y-5">
+            <h4 className="text-sm font-medium">
               {t("optionsEnglishCorrectionTitle")}
             </h4>
 
             <div className="space-y-5">
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 {t("optionsEnglishCorrectionDesc")}
               </p>
 
-              <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
+              <div className="flex items-center justify-between gap-6 rounded-lg border border-border bg-muted/40 p-4">
                 <div className="space-y-1">
-                  <div className="text-sm font-bold text-gray-900 dark:text-white">
+                  <div className="text-sm font-medium">
                     {t("optionsEnglishCorrectionEnabled")}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-muted-foreground">
                     {t("optionsEnglishCorrectionEnabledDesc")}
                   </div>
                 </div>
@@ -824,7 +824,7 @@ export function LanguageTab(props: {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2.5">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                      <Label className="text-xs text-muted-foreground">
                         {t("optionsEnglishCorrectionTriggerTimeout")}
                       </Label>
                       <Input
@@ -843,15 +843,15 @@ export function LanguageTab(props: {
                             },
                           });
                         }}
-                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                        className="h-11 rounded-lg"
                       />
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {t("optionsEnglishCorrectionTriggerTimeoutDesc")}
                       </p>
                     </div>
 
                     <div className="space-y-2.5">
-                      <Label className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 ml-1">
+                      <Label className="text-xs text-muted-foreground">
                         {t("optionsEnglishCorrectionAutoCloseDelay")}
                       </Label>
                       <Input
@@ -870,20 +870,20 @@ export function LanguageTab(props: {
                             },
                           });
                         }}
-                        className="bg-gray-50/50 dark:bg-black/20 border-gray-200 dark:border-white/10 rounded-xl h-11 font-medium"
+                        className="h-11 rounded-lg"
                       />
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {t("optionsEnglishCorrectionAutoCloseDelayDesc")}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-6 rounded-xl border border-gray-200/60 dark:border-white/10 bg-gray-50/40 dark:bg-white/5 p-4">
+                  <div className="flex items-center justify-between gap-6 rounded-lg border border-border bg-muted/40 p-4">
                     <div className="space-y-1">
-                      <div className="text-sm font-bold text-gray-900 dark:text-white">
+                      <div className="text-sm font-medium">
                         {t("optionsEnglishCorrectionShowUndo")}
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="text-xs text-muted-foreground">
                         {t("optionsEnglishCorrectionShowUndoDesc")}
                       </div>
                     </div>

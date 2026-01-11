@@ -75,7 +75,7 @@ export function WordCard({
   }, [data.word, isLearned, onLearnedToggle]);
 
   const getDifficultyStyles = (difficulty?: string) => {
-    if (!difficulty) return "text-gray-400 border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-white/5";
+    if (!difficulty) return "text-muted-foreground border-border bg-muted/20";
     const lower = difficulty.toLowerCase();
     if (lower.includes("easy") || lower === "a1" || lower === "a2") {
       return "text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10";
@@ -86,7 +86,7 @@ export function WordCard({
     if (lower.includes("hard") || lower === "c1" || lower === "c2") {
       return "text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10";
     }
-    return "text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20 bg-indigo-50 dark:bg-indigo-500/10";
+    return "text-primary border-primary/25 bg-primary/10";
   };
 
   return (
@@ -94,13 +94,13 @@ export function WordCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
-      className="relative p-[1px] rounded-2xl bg-gradient-to-b from-gray-200 dark:from-white/10 to-transparent shadow-xl"
+      className="relative p-[1px] rounded-2xl bg-gradient-to-b from-border/70 to-transparent shadow-xl"
     >
-      <Card className="w-full min-w-[300px] max-w-[400px] border-0 bg-white dark:bg-[#12131a] overflow-hidden rounded-[15px] transition-all duration-500">
+      <Card className="w-full min-w-[300px] max-w-[400px] border-0 bg-card overflow-hidden rounded-[15px] transition-all duration-500">
         <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3 pt-6 px-6 relative">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2.5">
-              <h3 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">
+              <h3 className="text-2xl font-black tracking-tight text-foreground">
                 {data.word}
               </h3>
               {data.difficulty && (
@@ -117,8 +117,8 @@ export function WordCard({
             </div>
             {data.phonetic && (
               <div className="flex items-center gap-1.5">
-                 <Sparkles className="h-3 w-3 text-indigo-500/70" />
-                 <p className="text-xs text-gray-500 dark:text-gray-400 font-medium tracking-wide">
+                 <Sparkles className="h-3 w-3 text-primary/70" />
+                 <p className="text-xs text-muted-foreground font-medium tracking-wide">
                   {data.phonetic}
                  </p>
               </div>
@@ -129,7 +129,7 @@ export function WordCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 -mr-1.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-colors"
+              className="h-8 w-8 -mr-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
               onClick={() => {
                 stop();
                 onClose();
@@ -142,24 +142,24 @@ export function WordCard({
         </CardHeader>
 
         <CardContent className="pb-6 pt-2 px-6">
-          <div className="p-4 rounded-xl bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 transition-colors">
-             <p className="text-[13px] leading-relaxed text-gray-700 dark:text-gray-300 font-semibold">
+          <div className="p-4 rounded-xl bg-muted/20 border border-border transition-colors">
+             <p className="text-[13px] leading-relaxed text-foreground/90 font-semibold">
                {data.definition}
              </p>
           </div>
         </CardContent>
 
-        <CardFooter className="flex items-center justify-between p-4 px-6 bg-gray-50/30 dark:bg-black/20 border-t border-gray-100 dark:border-white/5">
+        <CardFooter className="flex items-center justify-between p-4 px-6 bg-muted/10 border-t border-border">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleSpeak}
             disabled={isPlayingAudio}
-            className="h-9 gap-2 px-3 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all font-bold"
+            className="h-9 gap-2 px-3 text-primary hover:text-primary/90 hover:bg-primary/10 rounded-xl transition-all font-bold"
             aria-label={t("wordCard_pronounce")}
           >
             <motion.div animate={isPlayingAudio ? { scale: [1, 1.15, 1] } : {}} transition={{ repeat: Infinity }}>
-              <Volume2 className={cn("h-4 w-4", isPlayingAudio && "text-indigo-500")} />
+              <Volume2 className={cn("h-4 w-4", isPlayingAudio && "text-primary")} />
             </motion.div>
             <span className="text-[10px] font-bold uppercase tracking-widest">
               {t("wordCard_pronounce")}
@@ -175,7 +175,7 @@ export function WordCard({
                 "h-9 w-9 p-0 rounded-xl transition-all",
                 isFavorited
                   ? "text-amber-500 bg-amber-500/10 border border-amber-500/20"
-                  : "text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-white/5 border border-transparent",
+                  : "text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 border border-transparent",
               )}
               aria-label={t("wordCard_favorite")}
             >
@@ -190,7 +190,7 @@ export function WordCard({
                 "h-9 gap-2 px-3 rounded-xl transition-all border font-bold",
                 isLearned
                   ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
-                  : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-white/5 border-transparent",
+                  : "text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10 border-transparent",
               )}
               aria-label={t("wordCard_markLearned")}
             >
