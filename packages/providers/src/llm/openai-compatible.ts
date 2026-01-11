@@ -1,4 +1,5 @@
 import type { ProviderConfig } from '@lexipath/core';
+import { makeCacheKey } from '@lexipath/core/cache-key';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { classifyError, type ProviderError } from '../errors';
 
@@ -79,7 +80,6 @@ export class OpenAICompatibleProvider {
 
   /**
    * Generate cache key for request deduplication.
-   * Uses the standard stableStringify + FNV-1a hash approach.
    */
   private generateCacheKey(messages: ChatMessage[], options: {
     temperature?: number;
@@ -87,45 +87,14 @@ export class OpenAICompatibleProvider {
     thinking?: ThinkingMode;
   }): string {
     const thinking = this.resolveThinkingMode(options);
-    
-    // Use object-based approach for consistency with core cache-key module
-    const keyObject = {
+
+    return makeCacheKey('openai-chat', {
       model: this.config.model ?? '',
       temperature: options.temperature,
       maxTokens: options.maxTokens,
       thinking,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-    };
-    
-    // Stable stringify
-    const json = this.stableStringify(keyObject);
-    
-    // FNV-1a hash
-    return this.fnv1a32Hex(json);
-  }
-
-  private stableStringify(value: unknown): string {
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
-    if (typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) return `[${value.map(v => this.stableStringify(v)).join(',')}]`;
-
-    const record = value as Record<string, unknown>;
-    const keys = Object.keys(record)
-      .filter((key) => record[key] !== undefined)
-      .sort();
-
-    const parts = keys.map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`);
-    return `{${parts.join(',')}}`;
-  }
-
-  private fnv1a32Hex(input: string): string {
-    let hash = 0x811c9dc5;
-    for (let i = 0; i < input.length; i++) {
-      hash ^= input.charCodeAt(i);
-      hash = Math.imul(hash, 0x01000193);
-    }
-    return (hash >>> 0).toString(16).padStart(8, '0');
+      messages: messages.map((message) => ({ role: message.role, content: message.content })),
+    });
   }
 
   private createProviderError(status: number, errorText: string): Error {

@@ -1642,8 +1642,8 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
   const cacheKey = makeCacheKey('ENHANCE_SUBTITLE', {
     v: 4,
     providers: {
-      ...(needsAdapt
-        ? { adapt: routeIdentity(adaptRoute!, settings) }
+      ...(needsAdapt && adaptRoute
+        ? { adapt: routeIdentity(adaptRoute, settings) }
         : { translation: routeIdentity(translateRoute, settings) }),
     },
     params: {
@@ -1698,6 +1698,9 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
         if (!adaptChannel || !adaptProviderInfo) {
           return { value: { line1_final: subtitle }, ok: false };
         }
+        if (!adaptRoute) {
+          return { value: { line1_final: subtitle }, ok: false };
+        }
 
         const provider = getChatProvider(adaptProviderInfo.type, adaptProviderInfo.config);
 
@@ -1733,8 +1736,8 @@ registry.register('ENHANCE_SUBTITLE', async (payload: EnhanceSubtitlePayload) =>
           userInput,
         });
 
-        const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute!.kind);
-        const response = await runWithChannelConcurrency(routeKey(adaptRoute!), adaptLimit, () =>
+        const adaptLimit = getChannelConcurrencyLimit(adaptChannel, adaptRoute.kind);
+        const response = await runWithChannelConcurrency(routeKey(adaptRoute), adaptLimit, () =>
           provider.chat([{ role: 'user', content: prompt }], {
             temperature: 0.2,
             maxTokens: 350,

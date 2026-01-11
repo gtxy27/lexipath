@@ -1,6 +1,8 @@
 import { classifyError, type ProviderError } from '../errors';
+import { mapWithConcurrency } from '../utils/map-with-concurrency';
 
 const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_LIST_CONCURRENCY = 10;
 
 type BingTokenState = {
   subdomain: string;
@@ -132,27 +134,38 @@ function parseBingTranslateResponse(raw: unknown): string {
 
 export class BingTranslateProvider {
   private tokenState: BingTokenState | null = null;
+  private tokenStatePromise: Promise<BingTokenState> | null = null;
 
   private async ensureToken(timeoutMs: number): Promise<BingTokenState> {
     if (this.tokenState && !isTokenExpired(this.tokenState)) return this.tokenState;
 
-    const response = await fetchWithTimeout(
-      'https://www.bing.com/translator',
-      { method: 'GET', credentials: 'include' },
-      timeoutMs
-    );
-    if (!response.ok) {
-      const errorText = await response.text();
-      const error = new Error(`Provider error: ${response.status} - ${errorText}`);
-      (error as any).status = response.status;
-      (error as any).body = errorText;
-      throw error;
-    }
+    if (this.tokenStatePromise) return this.tokenStatePromise;
 
-    const html = await response.text();
-    const state = extractBingToken(html, response.url || 'https://www.bing.com/translator');
-    this.tokenState = state;
-    return state;
+    this.tokenStatePromise = (async () => {
+      const response = await fetchWithTimeout(
+        'https://www.bing.com/translator',
+        { method: 'GET', credentials: 'include' },
+        timeoutMs
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        const error = new Error(`Provider error: ${response.status} - ${errorText}`);
+        (error as any).status = response.status;
+        (error as any).body = errorText;
+        throw error;
+      }
+
+      const html = await response.text();
+      const state = extractBingToken(html, response.url || 'https://www.bing.com/translator');
+      this.tokenState = state;
+      return state;
+    })();
+
+    try {
+      return await this.tokenStatePromise;
+    } finally {
+      this.tokenStatePromise = null;
+    }
   }
 
   async translate(text: string, options: { from: string; to: string; timeout?: number }): Promise<string> {
@@ -203,11 +216,7 @@ export class BingTranslateProvider {
   }
 
   async translateList(texts: string[], options: { from: string; to: string; timeout?: number }): Promise<string[]> {
-    const results: string[] = [];
-    for (const text of texts) {
-      results.push(await this.translate(text, options));
-    }
-    return results;
+    return mapWithConcurrency(texts, DEFAULT_LIST_CONCURRENCY, (text) => this.translate(text, options));
   }
 
   async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {

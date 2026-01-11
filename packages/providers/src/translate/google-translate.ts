@@ -1,6 +1,8 @@
 import { classifyError, type ProviderError } from '../errors';
+import { mapWithConcurrency } from '../utils/map-with-concurrency';
 
 const DEFAULT_TIMEOUT_MS = 15000;
+const DEFAULT_LIST_CONCURRENCY = 10;
 
 function normalizeGoogleLanguageCode(code: string): string {
   if (!code) return code;
@@ -67,11 +69,7 @@ export class GoogleTranslateProvider {
   }
 
   async translateList(texts: string[], options: { from: string; to: string; timeout?: number }): Promise<string[]> {
-    const results: string[] = [];
-    for (const text of texts) {
-      results.push(await this.translate(text, options));
-    }
-    return results;
+    return mapWithConcurrency(texts, DEFAULT_LIST_CONCURRENCY, (text) => this.translate(text, options));
   }
 
   async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {

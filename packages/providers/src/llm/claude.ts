@@ -1,4 +1,5 @@
 import type { ClaudeProviderConfig } from '@lexipath/core';
+import { makeCacheKey } from '@lexipath/core/cache-key';
 import { classifyError, type ProviderError } from '../errors';
 import type { ChatCompletionResponse, ChatMessage, ChatOptions } from './openai-compatible';
 
@@ -90,14 +91,12 @@ export class ClaudeProvider {
   }
 
   private generateCacheKey(messages: ChatMessage[], options: ChatOptions): string {
-    const key = {
-      provider: 'claude',
+    return makeCacheKey('claude-chat', {
       model: this.config.model,
-      messages,
+      messages: messages.map((message) => ({ role: message.role, content: message.content })),
       temperature: options.temperature,
       maxTokens: options.maxTokens,
-    };
-    return JSON.stringify(key);
+    });
   }
 
   private async fetchWithTimeout(

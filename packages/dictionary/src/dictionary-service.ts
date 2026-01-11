@@ -60,6 +60,11 @@ export class DictionaryService {
       await this.init();
     }
 
+    const db = this.db;
+    if (!db) {
+      throw new Error('DictionaryService.init did not initialize IndexedDB');
+    }
+
     const normalized = word.trim().toLowerCase();
     const stripped = normalized.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, '');
 
@@ -101,7 +106,7 @@ export class DictionaryService {
 
     // Parallel lookup in a single transaction
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(this.config.storeName, 'readonly');
+      const transaction = db.transaction(this.config.storeName, 'readonly');
       const store = transaction.objectStore(this.config.storeName);
       const results: Array<WordEntry | null> = new Array(candidates.length).fill(null);
       let completed = 0;
@@ -166,12 +171,17 @@ export class DictionaryService {
       await this.init();
     }
 
+    const db = this.db;
+    if (!db) {
+      throw new Error('DictionaryService.init did not initialize IndexedDB');
+    }
+
     if (words.length === 0) return [];
 
     const normalizedWords = words.map((word) => word.toLowerCase());
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(this.config.storeName, 'readonly');
+      const transaction = db.transaction(this.config.storeName, 'readonly');
       const store = transaction.objectStore(this.config.storeName);
       const results: Array<WordEntry | null> = new Array(normalizedWords.length).fill(null);
 
@@ -200,8 +210,13 @@ export class DictionaryService {
       await this.init();
     }
 
+    const db = this.db;
+    if (!db) {
+      throw new Error('DictionaryService.init did not initialize IndexedDB');
+    }
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(this.config.storeName, 'readwrite');
+      const transaction = db.transaction(this.config.storeName, 'readwrite');
       const store = transaction.objectStore(this.config.storeName);
       const request = store.put({ ...entry, word: entry.word.toLowerCase() });
 
@@ -218,8 +233,13 @@ export class DictionaryService {
       await this.init();
     }
 
+    const db = this.db;
+    if (!db) {
+      throw new Error('DictionaryService.init did not initialize IndexedDB');
+    }
+
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(this.config.storeName, 'readwrite');
+      const transaction = db.transaction(this.config.storeName, 'readwrite');
       const store = transaction.objectStore(this.config.storeName);
 
       transaction.onerror = () => reject(transaction.error);
