@@ -1,5 +1,6 @@
 import { WebEnhanceOutputSchema, type WebEnhanceOutput } from '../types';
 import { fail, ok, type Result } from './result';
+import { z } from 'zod';
 
 const WEB_ENHANCE_FALLBACK: WebEnhanceOutput = {
   content_result: '',
@@ -84,14 +85,31 @@ export function validateWebEnhanceOutput(raw: unknown): Result<WebEnhanceOutput>
   const parsedUnknown = typeof raw === 'string' ? tryParseJson(raw) : raw;
   if (parsedUnknown == null) return fail(WEB_ENHANCE_FALLBACK);
 
-  const parsed = WebEnhanceOutputSchema.safeParse(parsedUnknown);
-  if (!parsed.success) return fail(WEB_ENHANCE_FALLBACK);
+  // Allow `content_result` to be omitted for the fast web_enhance prompt path, since the renderer uses the
+  // original page text directly and echoing it wastes tokens.
+  const WebEnhanceLlmSchema = z.object({
+    content_result: z.string().optional(),
+    convert_word: WebEnhanceOutputSchema.shape.convert_word,
+    highlight_terms: WebEnhanceOutputSchema.shape.highlight_terms,
+    highlight_offsets: WebEnhanceOutputSchema.shape.highlight_offsets,
+  });
 
-  const baselineLength = getBaselineLength(parsedUnknown) ?? parsed.data.content_result.length;
+  const parsed = WebEnhanceLlmSchema.safeParse(parsedUnknown);
+  if (!parsed.success) return fail(WEB_ENHANCE_FALLBACK);
+  if (parsed.data.content_result == null && parsed.data.convert_word == null) return fail(WEB_ENHANCE_FALLBACK);
+
+  const normalized: WebEnhanceOutput = {
+    content_result: parsed.data.content_result ?? '',
+    ...(parsed.data.convert_word != null ? { convert_word: parsed.data.convert_word } : {}),
+    ...(parsed.data.highlight_terms != null ? { highlight_terms: parsed.data.highlight_terms } : {}),
+    ...(parsed.data.highlight_offsets != null ? { highlight_offsets: parsed.data.highlight_offsets } : {}),
+  };
+
+  const baselineLength = getBaselineLength(parsedUnknown) ?? normalized.content_result.length;
   const denom = baselineLength > 0 ? baselineLength : 1;
-  const inflation = parsed.data.content_result.length / denom;
+  const inflation = normalized.content_result.length / denom;
 
   if (!(inflation < 2)) return fail(WEB_ENHANCE_FALLBACK);
 
-  return ok(parsed.data);
+  return ok(normalized);
 }

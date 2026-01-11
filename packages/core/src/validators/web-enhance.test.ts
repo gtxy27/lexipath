@@ -40,11 +40,14 @@ describe('validateWebEnhanceOutput', () => {
     expect(result.fallback).toEqual({ content_result: '' });
   });
 
-  it('returns fallback when content_result is missing', () => {
+  it('accepts output without content_result (content is rendered by host)', () => {
     const raw = JSON.stringify({ convert_word: [] });
     const result = validateWebEnhanceOutput(raw);
 
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.content_result).toBe('');
+    expect(result.value.convert_word).toEqual([]);
   });
 
   it('accepts already-parsed objects', () => {
@@ -75,4 +78,3 @@ describe('validateWebEnhanceOutput', () => {
     expect(result.ok).toBe(true);
   });
 });
-

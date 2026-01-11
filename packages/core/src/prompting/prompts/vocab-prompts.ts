@@ -113,9 +113,16 @@ export function parseWebEnhanceResponse(responseText: string): {
     }
 
     const data = JSON.parse(jsonStr);
+    if (!data || typeof data !== 'object') {
+      throw new Error('Parsed value is not an object');
+    }
+
+    // `content_result` may be omitted in fast web_enhance mode to save tokens.
+    if (typeof (data as any).content_result !== 'string') {
+      (data as any).content_result = '';
+    }
     return data;
   } catch (error) {
     throw new Error(`Failed to parse web enhance response: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
-

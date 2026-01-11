@@ -74,7 +74,6 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('<输出格式>');
     expect(prompt).toContain('<输出说明>');
     expect(prompt).toContain('This is a test sentence.');
-    expect(prompt).toContain('"content_result"');
     expect(prompt).toContain('"convert_word"');
     expect(prompt).toContain('difficultyMin');
     expect(prompt).toContain('maxWords');
@@ -123,28 +122,6 @@ describe('buildPrompt', () => {
     expect(withContext).toContain('bank');
     expect(withContext).toContain('<上下文信息>');
     expect(withContext).toContain('I walked along the river bank.');
-  });
-
-  it('subtitle_enhance: single vs bilingual keys change output format', () => {
-    const single = buildPrompt({
-      agentKey: 'subtitle_enhance_single',
-      sceneKey: 'video_subtitle_enhance',
-      styleKey: 'default',
-      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1', targetLearningLanguageLevel: 'C1' },
-      userInput: 'This is a complex sentence with difficult vocabulary.',
-    });
-    expect(single).toContain('"line1_final"');
-    expect(single).not.toContain('"line2_final"');
-
-    const bilingual = buildPrompt({
-      agentKey: 'subtitle_enhance_bilingual',
-      sceneKey: 'video_subtitle_enhance',
-      styleKey: 'default',
-      userInfo: { motherTongue: 'zh-CN', targetLearningLanguage: 'en', cefrLevel: 'B1', targetLearningLanguageLevel: 'C1' },
-      userInput: 'How are you doing today?',
-    });
-    expect(bilingual).toContain('"line1_final"');
-    expect(bilingual).toContain('"line2_final"');
   });
 
   it('subtitle_adapt: includes subtitle text and JSON output format', () => {
@@ -331,7 +308,6 @@ describe('prompt samples', () => {
     expect(agentKeys.length).toBeGreaterThan(0);
 
     function guessSceneKey(agentKey: string): string {
-      if (agentKey.startsWith('subtitle_enhance')) return 'video_subtitle_enhance';
       if (agentKey === 'subtitle_adapt') return 'video_subtitle';
       if (agentKey === 'keyword_select') return 'keyword_select_subtitle';
       if (agentKey === 'translate_keywords') return 'keyword_translate';
@@ -353,7 +329,6 @@ describe('prompt samples', () => {
           '\n'
         );
       if (agentKey === 'subtitle_adapt') return ['sourceLang: zh', 'targetLang: en', '', '你好，欢迎回来。'].join('\n');
-      if (agentKey.startsWith('subtitle_enhance')) return 'This is a complex sentence with difficult vocabulary.';
       return 'SAMPLE_INPUT';
     }
 
