@@ -5,6 +5,13 @@ import { FloatingButton } from "./floating-button";
 import { Settings } from "@lexipath/core";
 import { isUrlInSiteList } from "@lexipath/core/qualify";
 import { sendMessage } from "../../../shared/messages";
+import {
+  applyTabEnhancePausedFromStorage,
+  ENHANCE_PAUSED_CLASS,
+  setTabEnhancePaused,
+  setTabShowOriginal,
+  SHOW_ORIGINAL_CLASS,
+} from "../../../shared/tab-state";
 
 type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
 type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
@@ -17,10 +24,6 @@ type PageContext = {
   pageLanguage?: string;
 };
 
-const SHOW_ORIGINAL_CLASS = "lexipath-show-original";
-const TAB_SHOW_ORIGINAL_KEY = "lexipath-tab-show-original";
-const ENHANCE_PAUSED_CLASS = "lexipath-enhance-paused";
-const TAB_ENHANCE_PAUSED_KEY = "lexipath-tab-enhance-paused";
 const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
 const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
 
@@ -127,7 +130,7 @@ export class FloatingButtonController {
 
     const rootEl = document.createElement("div");
     rootEl.style.cssText = "pointer-events: auto;";
-    rootEl.className = "lexipath-floating-root";
+    rootEl.className = "lexipath-floating-root text-foreground font-sans antialiased";
     this.shadow.appendChild(rootEl);
     this.rootEl = rootEl;
     this.setupThemeSync();
@@ -136,12 +139,7 @@ export class FloatingButtonController {
     this.root = createRoot(rootEl);
     this.render();
 
-    try {
-      const paused = sessionStorage.getItem(TAB_ENHANCE_PAUSED_KEY) === "1";
-      document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, paused);
-    } catch (error: unknown) {
-      void error;
-    }
+    applyTabEnhancePausedFromStorage();
 
     document.documentElement.appendChild(this.container);
   }
@@ -265,45 +263,6 @@ export class FloatingButtonController {
     return { status: "enabled" };
   }
 
-  private applyOriginalClass(settings: Settings): void {
-    const globalEnabled = Boolean(settings.webShowOriginal);
-    const tabOverride = (() => {
-      try {
-        const raw = sessionStorage.getItem(TAB_SHOW_ORIGINAL_KEY);
-        if (raw === null) return null;
-        return raw === "1";
-      } catch (error: unknown) {
-        void error;
-        return null;
-      }
-    })();
-    const enabled = tabOverride ?? globalEnabled;
-    document.documentElement.classList.toggle(SHOW_ORIGINAL_CLASS, enabled);
-  }
-
-  private setTabShowOriginal(next: boolean): void {
-    const globalEnabled = Boolean(this.settings?.webShowOriginal);
-    try {
-      if (next === globalEnabled) {
-        sessionStorage.removeItem(TAB_SHOW_ORIGINAL_KEY);
-      } else {
-        sessionStorage.setItem(TAB_SHOW_ORIGINAL_KEY, next ? "1" : "0");
-      }
-    } catch (error: unknown) {
-      void error;
-    }
-    document.documentElement.classList.toggle(SHOW_ORIGINAL_CLASS, next);
-  }
-
-  private setTabEnhancePaused(next: boolean): void {
-    try {
-      sessionStorage.setItem(TAB_ENHANCE_PAUSED_KEY, next ? "1" : "0");
-    } catch (error: unknown) {
-      void error;
-    }
-    document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, next);
-  }
-
   private render() {
     if (!this.root) return;
 
@@ -380,11 +339,11 @@ export class FloatingButtonController {
           }
         }}
         onSetTabShowOriginal={(showOriginal) => {
-          this.setTabShowOriginal(showOriginal);
+          setTabShowOriginal(showOriginal, Boolean(this.settings?.webShowOriginal));
           this.render();
         }}
         onSetTabEnhancePaused={(paused) => {
-          this.setTabEnhancePaused(paused);
+          setTabEnhancePaused(paused);
           this.render();
         }}
         onOpenOptions={() => {

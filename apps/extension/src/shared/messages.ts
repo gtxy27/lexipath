@@ -121,10 +121,22 @@ const ReportUsageEventPayloadSchema = z
   })
   .strict();
 
+const WebProcessingStatusSchema = z
+  .object({
+    keywordProviderConfigured: z.boolean(),
+    translationProviderConfigured: z.boolean(),
+    webEnhanceConcurrencyLimit: z.number().int().min(1).max(500),
+  })
+  .strict();
+
 const messageDefinitions = {
   GET_SETTINGS: {
     payloadSchema: z.undefined(),
     valueSchema: SettingsSchema,
+  },
+  GET_WEB_PROCESSING_STATUS: {
+    payloadSchema: z.undefined(),
+    valueSchema: WebProcessingStatusSchema,
   },
   SET_SETTINGS: {
     payloadSchema: SetSettingsPayloadSchema,

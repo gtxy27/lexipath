@@ -11,7 +11,6 @@
 import browser from "webextension-polyfill";
 import type {
   EnhanceWebPayload,
-  ProviderChannel,
   Settings,
   WebEnhanceOutput,
   WordFamiliarity,
@@ -33,6 +32,14 @@ import { getI18nMessage } from "./i18n";
 import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
 import { EnglishCorrectionController } from "./english-correction";
 import { FloatingButtonController } from "../ui/components/ui/floating-button-controller";
+import {
+  applyTabEnhancePausedFromStorage,
+  applyWebShowOriginal,
+  ENHANCE_PAUSED_CLASS,
+  isEnhancePausedNow,
+  SHOW_ORIGINAL_CLASS,
+  toggleTabShowOriginal,
+} from "../shared/tab-state";
 
 const log = createLogger("content");
 
@@ -40,6 +47,12 @@ let subtitleController: SubtitleController | null = null;
 let englishCorrectionController: EnglishCorrectionController | null = null;
 let floatingButtonController: FloatingButtonController | null = null;
 let currentSettings: Settings | null = null;
+type WebProcessingStatus = {
+  keywordProviderConfigured: boolean;
+  translationProviderConfigured: boolean;
+  webEnhanceConcurrencyLimit: number;
+};
+let webProcessingStatus: WebProcessingStatus | null = null;
 let currentSiteQualified = false;
 let observer: MutationObserver | null = null;
 let urlPollTimer: number | null = null;
@@ -53,11 +66,6 @@ const wordExplainCache = new Map<string, WordCardData>();
 const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
 let selectionExplainInjected = false;
 const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
-
-const SHOW_ORIGINAL_CLASS = "lexipath-show-original";
-const TAB_SHOW_ORIGINAL_KEY = "lexipath-tab-show-original";
-const ENHANCE_PAUSED_CLASS = "lexipath-enhance-paused";
-const TAB_ENHANCE_PAUSED_KEY = "lexipath-tab-enhance-paused";
 const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
 
 const FORGOTTEN_MIN_ENCOUNTERS = 2;
@@ -75,53 +83,6 @@ let enhancePauseObserver: MutationObserver | null = null;
 let exposureObserver: IntersectionObserver | null = null;
 const exposureTargets = new WeakMap<Element, string[]>();
 const exposureTimers = new Map<Element, number>();
-
-function getTabShowOriginalOverride(): boolean | null {
-  try {
-    const raw = sessionStorage.getItem(TAB_SHOW_ORIGINAL_KEY);
-    if (raw === null) return null;
-    return raw === "1";
-  } catch (error: unknown) {
-    void error;
-    return null;
-  }
-}
-
-function getEffectiveWebShowOriginal(settings: Settings | null): boolean {
-  if (!settings) return false;
-  const tabOverride = getTabShowOriginalOverride();
-  return tabOverride ?? Boolean(settings.webShowOriginal);
-}
-
-function applyWebShowOriginal(settings: Settings | null): void {
-  const enabled = getEffectiveWebShowOriginal(settings);
-  document.documentElement.classList.toggle(SHOW_ORIGINAL_CLASS, enabled);
-}
-
-function toggleTabShowOriginal(): void {
-  if (!currentSettings) return;
-  const next = !getEffectiveWebShowOriginal(currentSettings);
-  try {
-    sessionStorage.setItem(TAB_SHOW_ORIGINAL_KEY, next ? "1" : "0");
-  } catch (error: unknown) {
-    void error;
-  }
-  applyWebShowOriginal(currentSettings);
-}
-
-function isEnhancePausedNow(): boolean {
-  return document.documentElement.classList.contains(ENHANCE_PAUSED_CLASS);
-}
-
-function applyTabEnhancePausedFromStorage(): void {
-  let paused = false;
-  try {
-    paused = sessionStorage.getItem(TAB_ENHANCE_PAUSED_KEY) === "1";
-  } catch (error: unknown) {
-    void error;
-  }
-  document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, paused);
-}
 
 function forceHideTooltipAndCard(): void {
   tooltipTarget = null;
@@ -445,27 +406,9 @@ const MAX_TEXT_LENGTH = 2000;
 
 // plan15 [NOW][FE] DONE (performance): viewport-prioritized queue + IntersectionObserver + idle scheduling + concurrency cap.
 function getMaxInFlight(): number {
-  // Match user's expectation: content-side in-flight should follow the effective channel concurrency (bounded),
-  // so we can saturate the provider while still avoiding catastrophic DOM jank.
-  const settings = currentSettings;
-
-  const resolveWebEnhanceChannelLimit = (): number => {
-    if (!settings) return 15;
-
-    // Background ENHANCE_WEB uses translate channel when translate is LLM; otherwise it uses select_keywords channel.
-    const translateRoute = resolveRoute("translate", settings);
-    const keywordRoute = resolveChannelRoute("select_keywords", settings);
-    const route = translateRoute.kind === 1 ? translateRoute : keywordRoute;
-    const channel =
-      route.kind === 1 ? resolveChannel(route.channelId, settings) : null;
-    const raw = channel?.concurrencyLimit;
-    if (typeof raw === "number" && Number.isFinite(raw) && raw >= 1) {
-      return Math.min(500, Math.floor(raw));
-    }
-    return 15;
-  };
-
-  const channelLimit = resolveWebEnhanceChannelLimit();
+  // Keep content-side concurrency bounded to avoid DOM jank. Provider-side concurrency is handled in background,
+  // but we still use a hint so we don't under/over-saturate too much.
+  const channelLimit = webProcessingStatus?.webEnhanceConcurrencyLimit ?? 15;
   let base = Math.min(20, Math.max(4, channelLimit));
 
   if (window.matchMedia("(pointer: coarse)").matches) {
@@ -487,74 +430,6 @@ let tooltipInjected = false;
 let tooltipEl: HTMLDivElement | null = null;
 let tooltipTarget: HTMLElement | null = null;
 
-type ResolvedRoute = { kind: 1 | 2 | 3; channelId?: number };
-
-function resolveChannel(
-  channelId: number | undefined,
-  settings: Settings,
-): ProviderChannel | null {
-  if (typeof channelId !== "number" || !Number.isFinite(channelId)) return null;
-  return (
-    settings.channels.find((channel) => channel.channelId === channelId) ?? null
-  );
-}
-
-function firstAvailableChannel(settings: Settings): ProviderChannel | null {
-  let best: ProviderChannel | null = null;
-  for (const channel of settings.channels) {
-    if (!best || channel.channelId < best.channelId) best = channel;
-  }
-  return best;
-}
-
-function fallbackToFirstChannel(settings: Settings): ResolvedRoute {
-  const first = firstAvailableChannel(settings);
-  return { kind: 1, ...(first ? { channelId: first.channelId } : {}) };
-}
-
-function resolveRoute(behaviorKey: string, settings: Settings): ResolvedRoute {
-  const config = settings.behaviorRoutes?.[behaviorKey];
-  if (!config) return fallbackToFirstChannel(settings);
-  if (config.kind === 2 || config.kind === 3) return { kind: config.kind };
-  const channel = resolveChannel(config.channelId, settings);
-  if (channel) return { kind: 1, channelId: channel.channelId };
-  return fallbackToFirstChannel(settings);
-}
-
-function resolveChannelRoute(
-  behaviorKey: string,
-  settings: Settings,
-): ResolvedRoute {
-  const resolved = resolveRoute(behaviorKey, settings);
-  if (resolved.kind !== 1) return fallbackToFirstChannel(settings);
-  return resolved.channelId ? resolved : fallbackToFirstChannel(settings);
-}
-
-function isChannelConfigured(channel: ProviderChannel): boolean {
-  if (!channel.model?.trim()) return false;
-  const cfg = channel.config as Record<string, unknown>;
-  if (channel.typeId === 1) {
-    return typeof cfg.baseUrl === "string" && cfg.baseUrl.trim().length > 0;
-  }
-  if (channel.typeId === 2 || channel.typeId === 3) {
-    return typeof cfg.apiKey === "string" && cfg.apiKey.trim().length > 0;
-  }
-  return false;
-}
-
-function isKeywordProviderConfigured(settings: Settings): boolean {
-  const route = resolveChannelRoute("select_keywords", settings);
-  const channel = resolveChannel(route.channelId, settings);
-  return Boolean(channel && isChannelConfigured(channel));
-}
-
-function isTranslationProviderConfigured(settings: Settings): boolean {
-  const route = resolveRoute("translate", settings);
-  if (route.kind === 2 || route.kind === 3) return true;
-  const channel = resolveChannel(route.channelId, settings);
-  return Boolean(channel && isChannelConfigured(channel));
-}
-
 /**
  * Get current settings from background.
  */
@@ -565,6 +440,22 @@ async function getSettings(): Promise<Settings | null> {
   }
   log.error("Failed to get settings", response.error);
   return null;
+}
+
+async function refreshWebProcessingStatus(): Promise<void> {
+  const response = await sendMessage("GET_WEB_PROCESSING_STATUS", undefined);
+  if (response.ok) {
+    webProcessingStatus = response.value;
+    return;
+  }
+  log.error("Failed to get web processing status", response.error);
+  webProcessingStatus = null;
+}
+
+async function ensureWebProcessingStatus(): Promise<WebProcessingStatus | null> {
+  if (webProcessingStatus) return webProcessingStatus;
+  await refreshWebProcessingStatus();
+  return webProcessingStatus;
 }
 
 /**
@@ -1758,10 +1649,8 @@ async function requestWebEnhanceOnce(): Promise<void> {
   }
 
   if (!currentSettings) return;
-  if (
-    !isKeywordProviderConfigured(currentSettings) ||
-    !isTranslationProviderConfigured(currentSettings)
-  ) {
+  const status = await ensureWebProcessingStatus();
+  if (!status?.keywordProviderConfigured || !status?.translationProviderConfigured) {
     log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
     return;
   }
@@ -1801,10 +1690,8 @@ async function requestWebRewriteOnce(): Promise<void> {
   }
 
   if (!currentSettings) return;
-  if (
-    !isKeywordProviderConfigured(currentSettings) ||
-    !isTranslationProviderConfigured(currentSettings)
-  ) {
+  const status = await ensureWebProcessingStatus();
+  if (!status?.keywordProviderConfigured || !status?.translationProviderConfigured) {
     log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
     return;
   }
@@ -1853,6 +1740,7 @@ async function initForUrl(url: string, token: number): Promise<void> {
     return;
   }
   currentSiteQualified = true;
+  await refreshWebProcessingStatus();
 
   evaluatePageEligibility(currentSettings);
   syncFloatingButtonMeta();
@@ -1876,7 +1764,8 @@ async function initForUrl(url: string, token: number): Promise<void> {
       log.info("Video scenes disabled; skipping subtitle processing");
       return;
     }
-    if (!isTranslationProviderConfigured(currentSettings)) {
+    const status = await ensureWebProcessingStatus();
+    if (!status?.translationProviderConfigured) {
       log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
       return;
     }
@@ -1885,12 +1774,12 @@ async function initForUrl(url: string, token: number): Promise<void> {
     return;
   }
 
-  if (
-    !isKeywordProviderConfigured(currentSettings) ||
-    !isTranslationProviderConfigured(currentSettings)
-  ) {
-    log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
-    return;
+  {
+    const status = await ensureWebProcessingStatus();
+    if (!status?.keywordProviderConfigured || !status?.translationProviderConfigured) {
+      log.warn(getI18nMessage("log_providerNotConfiguredSkipPageProcessing"));
+      return;
+    }
   }
 
   if (!currentSettings.autoEnhance) {
@@ -1941,7 +1830,7 @@ async function init(): Promise<void> {
   await initForUrl(lastKnownUrl, token);
   startUrlWatcher();
 
-  applyWebShowOriginal(currentSettings);
+  applyWebShowOriginal(Boolean(currentSettings?.webShowOriginal));
   applyTabEnhancePausedFromStorage();
   ensureSelectionExplainInjected();
   ensureEnhancePauseObserver();
@@ -1962,10 +1851,11 @@ async function init(): Promise<void> {
     const prevTheme = currentSettings?.theme;
     const prevFloating = currentSettings?.floatingButtonEnabled ?? true;
     currentSettings = nextSettings;
+    void refreshWebProcessingStatus();
 
 	    englishCorrectionController?.setSettings(nextSettings);
 	    floatingButtonController?.updateSettings(nextSettings);
-	    applyWebShowOriginal(nextSettings);
+	    applyWebShowOriginal(Boolean(nextSettings.webShowOriginal));
 	    evaluatePageEligibility(nextSettings);
 	    subtitleController?.setSettings(nextSettings);
 	    syncFloatingButtonMeta();
@@ -1996,7 +1886,8 @@ async function init(): Promise<void> {
 
   browser.runtime?.onMessage?.addListener?.((message: any) => {
     if (message?.type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
-      toggleTabShowOriginal();
+      if (!currentSettings) return;
+      toggleTabShowOriginal(Boolean(currentSettings.webShowOriginal));
       return;
     }
   });
