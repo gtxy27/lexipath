@@ -88,8 +88,7 @@ describe("Popup", () => {
     });
 
     expect(screen.getByText("extensionName")).toBeInTheDocument();
-    expect(screen.getByText("popupStatusLabel")).toBeInTheDocument();
-    expect(screen.getByText("popupModeSmartLearning")).toBeInTheDocument();
+    expect(screen.getByText("popupFloatingButtonLabel")).toBeInTheDocument();
 
     expect(screen.getByText("targetLanguage")).toBeInTheDocument();
     expect(screen.getByText("languageTarget_en")).toBeInTheDocument();
@@ -98,6 +97,7 @@ describe("Popup", () => {
     expect(screen.getByText("proficiency_B1")).toBeInTheDocument();
 
     expect(screen.getByText("openSettings")).toBeInTheDocument();
+    expect(screen.getByText("openOnboarding")).toBeInTheDocument();
   });
 
   it("falls back to i18n placeholder for missing values", async () => {
