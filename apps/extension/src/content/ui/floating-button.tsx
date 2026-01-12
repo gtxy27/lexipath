@@ -10,9 +10,10 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { cn } from "../../shared/ui/utils";
 import browser from "webextension-polyfill";
-import { Button } from "./button";
+import { Button } from "../../shared/ui/button";
+import { t as i18nT } from "../../shared/i18n";
 
 type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
 type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
@@ -67,15 +68,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
   webEnhanceMode = "i_plus_1",
   pageEligible = true,
 }) => {
-  function t(key: string, substitutions?: string | string[]): string {
-    try {
-      const message = browser.i18n.getMessage(key, substitutions as any);
-      return message || key;
-    } catch (error: unknown) {
-      void error;
-      return key;
-    }
-  }
+  const t = (key: string, substitutions?: string | string[]) => i18nT(key, substitutions);
 
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });

@@ -1,5 +1,4 @@
 import React, { useCallback, useState } from "react";
-import browser from "webextension-polyfill";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { speak, stop } from "@lexipath/dictionary";
 import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
@@ -8,12 +7,9 @@ import { Badge } from "./ui/badge";
 import { Volume2, Star, Check, X, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { t } from "../../shared/i18n";
 
 const log = createLogger("ui:WordCard");
-
-function t(key: string): string {
-  return browser.i18n.getMessage(key) || key;
-}
 
 export interface WordCardData {
   word: string;

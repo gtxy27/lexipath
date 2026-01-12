@@ -1,13 +1,9 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
-import browser from "webextension-polyfill"
+import { t } from "../../../shared/i18n"
 
 import { cn } from "../../lib/utils"
-
-function t(key: string): string {
-  return browser.i18n.getMessage(key) || key
-}
 
 const Dialog = DialogPrimitive.Root
 

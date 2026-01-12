@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import browser from "webextension-polyfill";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { WordCard, type WordCardData } from "./WordCard";
 import { sendMessage } from "../../shared/messages";
 import { cn } from "../lib/utils";
+import { t } from "../../shared/i18n";
 
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -57,19 +57,6 @@ function resolveTtsLang(options: {
       return options.nativeLanguage === "zh-TW" ? "zh-TW" : "zh-CN";
     default:
       return "en-US";
-  }
-}
-
-function t(key: string, substitutions?: string | string[]): string {
-  try {
-    const message =
-      substitutions === undefined
-        ? browser.i18n.getMessage(key)
-        : browser.i18n.getMessage(key, substitutions as any);
-    return message || key;
-  } catch (error: unknown) {
-    log.debug("i18n.getMessage threw; falling back to key", { key, message: getErrorMessage(error) });
-    return key;
   }
 }
 

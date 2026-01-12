@@ -3,6 +3,7 @@ import browser from "webextension-polyfill";
 import type { Settings } from "@lexipath/core";
 import { createLogger } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
+import { t } from "../../shared/i18n";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -29,11 +30,6 @@ import {
 } from "lucide-react";
 
 const log = createLogger("ui:Popup");
-
-function t(key: string, substitutions?: string | string[]): string {
-  const message = browser.i18n.getMessage(key, substitutions as any);
-  return message || key;
-}
 
 export function Popup(): React.ReactElement {
   const [settings, setSettings] = useState<Settings | null>(null);

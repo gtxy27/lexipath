@@ -15,3 +15,5 @@ export * from './proficiency';
 export * from './prompting';
 // export * from './validators';
 export * from './cache-key';
+export * from './routing';
+export * from './text';

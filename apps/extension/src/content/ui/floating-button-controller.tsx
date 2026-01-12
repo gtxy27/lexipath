@@ -4,14 +4,15 @@ import browser from "webextension-polyfill";
 import { FloatingButton } from "./floating-button";
 import { Settings } from "@lexipath/core";
 import { isUrlInSiteList } from "@lexipath/core/qualify";
-import { sendMessage } from "../../../shared/messages";
+import { sendMessage } from "../../shared/messages";
 import {
   applyTabEnhancePausedFromStorage,
   ENHANCE_PAUSED_CLASS,
   setTabEnhancePaused,
   setTabShowOriginal,
   SHOW_ORIGINAL_CLASS,
-} from "../../../shared/tab-state";
+} from "../../shared/tab-state";
+import { FLOATING_BUTTON_CONTAINER_ID, FLOATING_HIDE_ONCE_KEY, HAS_ENHANCED_ONCE_KEY } from "./floating-button-constants";
 
 type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
 type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
@@ -23,9 +24,6 @@ type PageContext = {
   pageEligible?: boolean;
   pageLanguage?: string;
 };
-
-const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
-const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
 
 // Theme variables should be owned by the extension, not inherited from the page.
 // These values mirror `apps/extension/src/ui/styles.css` (:root + .dark).
@@ -105,7 +103,7 @@ export class FloatingButtonController {
     if (this.container) return;
 
     this.container = document.createElement("div");
-    this.container.id = "lexipath-floating-button-container";
+    this.container.id = FLOATING_BUTTON_CONTAINER_ID;
     // Keep the host element non-invasive: no size, no blocking clicks.
     // All visible UI is positioned via `position: fixed` inside the ShadowRoot.
     this.container.style.cssText =

@@ -15,12 +15,9 @@ import { Send, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, Me
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApplyTheme } from "../lib/theme";
+import { t } from "../../shared/i18n";
 
 const log = createLogger("ui:sidebar");
-
-function t(key: string): string {
-  return browser.i18n.getMessage(key) || key;
-}
 
 interface ChatMessage {
   id: string;

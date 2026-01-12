@@ -101,40 +101,6 @@ export function createEnhancedElement(
     }))
     .filter((word) => word.originalLower.trim().length > 0);
 
-  const buildOffsetsFromTerms = (text: string, terms: string[]) => {
-    const haystack = lowerForMatch(text);
-    const uniqueTerms = Array.from(new Set(terms.map((t) => t.trim()).filter(Boolean)));
-    uniqueTerms.sort((a, b) => b.length - a.length);
-
-    const taken: Array<{ start: number; end: number }> = [];
-    const offsets: Array<{ start: number; end: number; term: string }> = [];
-    const overlaps = (start: number, end: number) =>
-      taken.some((range) => !(end <= range.start || start >= range.end));
-
-    for (const term of uniqueTerms) {
-      const needleLower = lowerForMatch(term);
-      const len = needleLower.length;
-      if (!len) continue;
-
-      let idx = 0;
-      while (idx < haystack.length) {
-        const found = haystack.indexOf(needleLower, idx);
-        if (found === -1) break;
-        idx = found + len;
-
-        const enforceBoundary = /[A-Za-z]/.test(term);
-        if (enforceBoundary && !hasWordBoundary(found, len)) continue;
-        if (overlaps(found, found + len)) continue;
-
-        taken.push({ start: found, end: found + len });
-        offsets.push({ start: found, end: found + len, term });
-      }
-    }
-
-    offsets.sort((a, b) => a.start - b.start);
-    return offsets;
-  };
-
   const normalizeOffsets = (raw: unknown): Array<{ start: number; end: number; term?: string }> => {
     if (!Array.isArray(raw)) return [];
     const cleaned = raw
@@ -464,18 +430,6 @@ export function createEnhancedRenderer(
     }
   }
 
-  const rawTerms = Array.isArray((enhanced as any).highlight_terms)
-    ? ((enhanced as any).highlight_terms as string[])
-    : words.map((w) => w.original);
-  const uniqueTerms = Array.from(new Set(rawTerms.map((t) => t.trim()).filter(Boolean)));
-  uniqueTerms.sort((a, b) => b.length - a.length);
-  const preparedTerms = uniqueTerms.map((term) => ({
-    term,
-    lower: lowerForMatch(term),
-    len: term.length,
-    enforceBoundary: /[A-Za-z]/.test(term),
-  }));
-
   const isWordCharCode = (code: number) => {
     if (!Number.isFinite(code)) return false;
     return (
@@ -496,35 +450,6 @@ export function createEnhancedRenderer(
       const beforeCode = start > 0 ? currentText.charCodeAt(start - 1) : Number.NaN;
       const afterCode = start + length < currentText.length ? currentText.charCodeAt(start + length) : Number.NaN;
       return !isWordCharCode(beforeCode) && !isWordCharCode(afterCode);
-    };
-
-    const buildOffsetsFromTerms = () => {
-      const haystack = currentLower;
-
-      const taken: Array<{ start: number; end: number }> = [];
-      const offsets: Array<{ start: number; end: number; term: string }> = [];
-      const overlaps = (start: number, end: number) =>
-        taken.some((range) => !(end <= range.start || start >= range.end));
-
-      for (const term of preparedTerms) {
-        if (!term.len) continue;
-
-        let idx = 0;
-        while (idx < haystack.length) {
-          const found = haystack.indexOf(term.lower, idx);
-          if (found === -1) break;
-          idx = found + term.len;
-
-          if (term.enforceBoundary && !hasWordBoundary(found, term.len)) continue;
-          if (overlaps(found, found + term.len)) continue;
-
-          taken.push({ start: found, end: found + term.len });
-          offsets.push({ start: found, end: found + term.len, term: term.term });
-        }
-      }
-
-      offsets.sort((a, b) => a.start - b.start);
-      return offsets;
     };
 
     const normalizeOffsets = (raw: unknown): Array<{ start: number; end: number; term?: string }> => {

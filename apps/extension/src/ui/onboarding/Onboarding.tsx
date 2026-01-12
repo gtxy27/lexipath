@@ -46,6 +46,7 @@ import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { ICON_URL } from "../lib/assets";
+import { t } from "../../shared/i18n";
 
 const log = createLogger("ui:Onboarding");
 
@@ -75,14 +76,6 @@ type OnboardingFormData = {
   targetProficiencyPreference: ProficiencyPreference | undefined;
   webEnhanceMode: WebEnhanceMode;
 };
-
-function t(key: string, substitutions?: string | string[]): string {
-  const message =
-    substitutions === undefined
-      ? browser.i18n.getMessage(key)
-      : browser.i18n.getMessage(key, substitutions);
-  return message || key;
-}
 
 function getProficiencyScaleOptions(input: {
   targetLanguage: SupportedLanguage;

@@ -31,7 +31,8 @@ import {
 import { getI18nMessage } from "./i18n";
 import { SubtitleOverlay, type WordCardData } from "./ui/SubtitleOverlay";
 import { EnglishCorrectionController } from "./english-correction";
-import { FloatingButtonController } from "../ui/components/ui/floating-button-controller";
+import { FloatingButtonController } from "./ui/floating-button-controller";
+import { FLOATING_BUTTON_CONTAINER_ID, FLOATING_HIDE_ONCE_KEY, HAS_ENHANCED_ONCE_KEY } from "./ui/floating-button-constants";
 import {
   applyTabEnhancePausedFromStorage,
   applyWebShowOriginal,
@@ -65,8 +66,6 @@ const HOVER_UPGRADE_DELAY_MS = 800;
 const wordExplainCache = new Map<string, WordCardData>();
 const wordExplainInFlight = new Map<string, Promise<WordCardData>>();
 let selectionExplainInjected = false;
-const HAS_ENHANCED_ONCE_KEY = "lexipath-has-enhanced-once";
-const FLOATING_HIDE_ONCE_KEY = "lexipath-floating-hide-once";
 
 const FORGOTTEN_MIN_ENCOUNTERS = 2;
 const FORGOTTEN_MAX_FAMILIARITY = 30;
@@ -248,7 +247,7 @@ function ensureSelectionExplainInjected(): void {
   const isInsideLexipathUi = (target: EventTarget | null): boolean => {
     if (!(target instanceof Element)) return false;
     if (target.closest("#lexipath-subtitle-overlay")) return true;
-    if (target.closest("#lexipath-floating-button-container")) return true;
+    if (target.closest(`#${FLOATING_BUTTON_CONTAINER_ID}`)) return true;
     if (target.closest("#lexipath-tooltip")) return true;
     return false;
   };
