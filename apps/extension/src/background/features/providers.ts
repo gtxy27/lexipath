@@ -1,10 +1,11 @@
 import browser from 'webextension-polyfill';
 
 import { createLogger } from '@lexipath/core/log';
-import { BingTranslateProvider, ClaudeProvider, GeminiProvider, GoogleTranslateProvider, OpenAICompatibleProvider } from '@lexipath/providers';
+import { ClaudeProvider, GeminiProvider, OpenAICompatibleProvider } from '@lexipath/providers';
 
 import { MessageError, type createMessageHandlerRegistry } from '../../shared/messages';
 
+import { bingTranslateProvider, googleTranslateProvider } from '../lib/providers';
 import { DEFAULT_CLAUDE_URL, DEFAULT_GEMINI_URL, DEFAULT_OPENAI_URL } from '../lib/routing';
 import type { Translator } from '../lib/i18n';
 import { InvalidOriginError, normalizeOriginToHostPattern as normalizeOriginToHostPatternCore } from '../origin';
@@ -12,8 +13,6 @@ import { InvalidOriginError, normalizeOriginToHostPattern as normalizeOriginToHo
 type Registry = ReturnType<typeof createMessageHandlerRegistry>;
 
 const log = createLogger('background:providers');
-const googleTranslateProvider = new GoogleTranslateProvider();
-const bingTranslateProvider = new BingTranslateProvider();
 
 function normalizeOriginToHostPattern(t: Translator, origin: string): string {
   try {

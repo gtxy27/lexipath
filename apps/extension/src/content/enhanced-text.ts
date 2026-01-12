@@ -1,4 +1,4 @@
-import type { CEFRLevel, WebEnhanceMode, WebEnhanceOutput } from '@lexipath/core';
+import { lowerForMatch, type CEFRLevel, type WebEnhanceMode, type WebEnhanceOutput } from '@lexipath/core';
 import { getWordColor } from '../shared/word-colors';
 import { Trie } from './trie';
 
@@ -18,41 +18,6 @@ export type EnhancedTextOptions = {
  * Lowercase in a way that preserves string length (code units) so indexes remain valid for slicing.
  * JS `toLowerCase()` can expand some characters (e.g. U+0130 "İ"), which breaks offset-based matching.
  */
-const lowerForMatch = (input: string): string => {
-  if (!input) return input;
-  const out: string[] = [];
-  for (let i = 0; i < input.length; i++) {
-    const code = input.charCodeAt(i);
-    // Normalize common punctuation to keep matching consistent without changing string length.
-    if (code === 0x2018 || code === 0x2019) {
-      out.push("'");
-      continue;
-    }
-    if (code === 0x201c || code === 0x201d) {
-      out.push('"');
-      continue;
-    }
-    if (code === 0x2013 || code === 0x2014) {
-      out.push('-');
-      continue;
-    }
-    if (code === 0x00a0) {
-      out.push(' ');
-      continue;
-    }
-    if (code >= 0x41 && code <= 0x5a) {
-      out.push(String.fromCharCode(code + 0x20));
-      continue;
-    }
-    if (code === 0x0130) {
-      out.push('i');
-      continue;
-    }
-    out.push(input[i] ?? '');
-  }
-  return out.join('');
-};
-
 const CEFR_ORDER: readonly CEFRLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const cefrRank = (level: CEFRLevel) => {
   const idx = CEFR_ORDER.indexOf(level);
@@ -156,7 +121,7 @@ export function createEnhancedElement(
   // Prefer local, deterministic matching to avoid server-provided offset drift.
   // If offsets include `term` and they match exactly, we can use them; otherwise fall back to Trie matching.
   const offsets = (() => {
-    const rawOffsets = normalizeOffsets((enhanced as any).highlight_offsets).filter(
+    const rawOffsets = normalizeOffsets(enhanced.highlight_offsets).filter(
       (off) => typeof off.term === 'string' && off.term.trim().length > 0,
     );
     if (rawOffsets.length === 0) return [];
@@ -215,10 +180,10 @@ export function createEnhancedElement(
         // plan15: "uncertain" defaults to low-friction out-of-level.
         if (!userLevel) return true;
         const wordLevel =
-          (bestWord as any).difficultyLevel ?? parseCefrLevel((bestWord as any).difficulty);
+          bestWord.difficultyLevel ?? parseCefrLevel(bestWord.difficulty);
         const confidence =
-          typeof (bestWord as any).difficultyConfidence === 'number'
-            ? (bestWord as any).difficultyConfidence
+          typeof bestWord.difficultyConfidence === 'number'
+            ? bestWord.difficultyConfidence
             : 0;
         if (!wordLevel) return true;
         if (confidence < 0.55) return true;
@@ -306,10 +271,10 @@ export function createEnhancedElement(
     span.dataset.converted = bestWord.converted;
     span.dataset.lookup = mode === 'native-to-target' ? bestWord.converted : matchedOriginal;
     span.dataset.difficulty = bestWord.difficulty || '';
-    span.dataset.difficultyLevel = (bestWord as any).difficultyLevel || '';
+    span.dataset.difficultyLevel = bestWord.difficultyLevel || '';
     span.dataset.difficultyConfidence =
-      typeof (bestWord as any).difficultyConfidence === 'number'
-        ? String((bestWord as any).difficultyConfidence)
+      typeof bestWord.difficultyConfidence === 'number'
+        ? String(bestWord.difficultyConfidence)
         : '';
     span.dataset.partOfSpeech = bestWord.partOfSpeech || '';
     span.dataset.renderMode = mode;
@@ -328,10 +293,10 @@ export function createEnhancedElement(
       // plan15: "uncertain" defaults to low-friction out-of-level.
       if (!userLevel) return true;
       const wordLevel =
-        (bestWord as any).difficultyLevel ?? parseCefrLevel((bestWord as any).difficulty);
+        bestWord.difficultyLevel ?? parseCefrLevel(bestWord.difficulty);
       const confidence =
-        typeof (bestWord as any).difficultyConfidence === 'number'
-          ? (bestWord as any).difficultyConfidence
+        typeof bestWord.difficultyConfidence === 'number'
+          ? bestWord.difficultyConfidence
           : 0;
       if (!wordLevel) return true;
       if (confidence < 0.55) return true;
@@ -479,7 +444,7 @@ export function createEnhancedRenderer(
     let plainStart = 0;
 
     const offsets = (() => {
-      const rawOffsets = normalizeOffsets((enhanced as any).highlight_offsets).filter(
+      const rawOffsets = normalizeOffsets(enhanced.highlight_offsets).filter(
         (off) => typeof off.term === 'string' && off.term.trim().length > 0,
       );
       if (rawOffsets.length === 0) return [];
@@ -537,10 +502,10 @@ export function createEnhancedRenderer(
         const isOutOfLevel = (() => {
           if (!userLevel) return true;
           const wordLevel =
-            (bestWord as any).difficultyLevel ?? parseCefrLevel((bestWord as any).difficulty);
+            bestWord.difficultyLevel ?? parseCefrLevel(bestWord.difficulty);
           const confidence =
-            typeof (bestWord as any).difficultyConfidence === 'number'
-              ? (bestWord as any).difficultyConfidence
+            typeof bestWord.difficultyConfidence === 'number'
+              ? bestWord.difficultyConfidence
               : 0;
           if (!wordLevel) return true;
           if (confidence < 0.55) return true;
@@ -628,10 +593,10 @@ export function createEnhancedRenderer(
       span.dataset.converted = bestWord.converted;
       span.dataset.lookup = mode === 'native-to-target' ? bestWord.converted : matchedOriginal;
       span.dataset.difficulty = bestWord.difficulty || '';
-      span.dataset.difficultyLevel = (bestWord as any).difficultyLevel || '';
+      span.dataset.difficultyLevel = bestWord.difficultyLevel || '';
       span.dataset.difficultyConfidence =
-        typeof (bestWord as any).difficultyConfidence === 'number'
-          ? String((bestWord as any).difficultyConfidence)
+        typeof bestWord.difficultyConfidence === 'number'
+          ? String(bestWord.difficultyConfidence)
           : '';
       span.dataset.partOfSpeech = bestWord.partOfSpeech || '';
       span.dataset.renderMode = mode;
@@ -649,10 +614,10 @@ export function createEnhancedRenderer(
       const isOutOfLevel = (() => {
         if (!userLevel) return true;
         const wordLevel =
-          (bestWord as any).difficultyLevel ?? parseCefrLevel((bestWord as any).difficulty);
+          bestWord.difficultyLevel ?? parseCefrLevel(bestWord.difficulty);
         const confidence =
-          typeof (bestWord as any).difficultyConfidence === 'number'
-            ? (bestWord as any).difficultyConfidence
+          typeof bestWord.difficultyConfidence === 'number'
+            ? bestWord.difficultyConfidence
             : 0;
         if (!wordLevel) return true;
         if (confidence < 0.55) return true;
