@@ -75,6 +75,13 @@ export class SubtitleController {
   private debugLastPrefetchSummaryAt = 0;
   private debugLastPrefetchSaturationAt = 0;
 
+  // Prefetch bilingual (native) translations so the 2nd line can keep up in bilingual mode.
+  private bilingualPrefetchQueue: Cue[] = [];
+  private bilingualPrefetchQueuedCueIds = new Set<string>();
+  private bilingualPrefetchInFlight = 0;
+  private maxBilingualPrefetchInFlight = 2;
+  private debugLastBilingualPrefetchSaturationAt = 0;
+
   private platformCaptionsEnabled: boolean | null = null;
   private platformCaptionsWatchToken = 0;
   private platformCaptionsObserver: MutationObserver | null = null;
@@ -112,6 +119,7 @@ export class SubtitleController {
       });
     }
     this.maxPrefetchInFlight = this.getPrefetchConcurrencyLimit();
+    this.maxBilingualPrefetchInFlight = this.getBilingualPrefetchConcurrencyLimit();
   }
 
   private isVideoPaused(): boolean {
@@ -131,6 +139,22 @@ export class SubtitleController {
     // Reserve headroom for user hover/click; prefetch uses ~25% of model concurrency, capped.
     const suggested = Math.floor(channelLimit / 4);
     return Math.min(20, Math.max(2, suggested || 2));
+  }
+
+  private getBilingualPrefetchConcurrencyLimit(): number {
+    const routeConfig = this.settings.behaviorRoutes?.translate;
+    if (!routeConfig) return 2;
+
+    if (routeConfig.kind === 2 || routeConfig.kind === 3) return 4;
+    if (routeConfig.kind !== 1) return 2;
+
+    const channel = this.settings.channels.find((c) => c.channelId === routeConfig.channelId) ?? null;
+    const channelLimit =
+      typeof channel?.concurrencyLimit === 'number' && Number.isFinite(channel.concurrencyLimit) ? channel.concurrencyLimit : 8;
+
+    // Keep this conservative: bilingual prefetch is user-visible and should not starve interactive calls.
+    const suggested = Math.floor(channelLimit / 4);
+    return Math.min(6, Math.max(1, suggested || 1));
   }
 
   /**
@@ -238,6 +262,7 @@ export class SubtitleController {
     this.startPlatformCaptionsWatch();
 
     this.maxPrefetchInFlight = this.getPrefetchConcurrencyLimit();
+    this.maxBilingualPrefetchInFlight = this.getBilingualPrefetchConcurrencyLimit();
 
     // Fetch subtitles
     await this.fetchAndProcessSubtitles();
@@ -260,6 +285,9 @@ export class SubtitleController {
     this.prefetchToken++;
     this.prefetchQueue = [];
     this.prefetchQueuedTerms.clear();
+    this.bilingualPrefetchQueue = [];
+    this.bilingualPrefetchQueuedCueIds.clear();
+    this.bilingualPrefetchInFlight = 0;
     this.stopPlatformCaptionsWatch();
     this.videoSync?.destroy();
     this.videoSync = null;
@@ -961,6 +989,9 @@ export class SubtitleController {
     const token = ++this.prefetchToken;
     this.prefetchQueue = [];
     this.prefetchQueuedTerms.clear();
+    this.bilingualPrefetchQueue = [];
+    this.bilingualPrefetchQueuedCueIds.clear();
+    this.bilingualPrefetchInFlight = 0;
 
     void this.prefetchAhead(token);
   }
@@ -1001,6 +1032,18 @@ export class SubtitleController {
       log.debug(
         `Prefetch window cues=${cuesInWindow.length} nowMs=${Math.round(nowMs)} lookaheadMs=${this.keywordPrefetchLookaheadMs}`
       );
+    }
+
+    // Kick off bilingual (native) subtitle translation prefetch in parallel with keyword requests.
+    // Only applies to cues that do NOT require subtitle adaptation (i.e. cue language matches target learning language).
+    const wantsBilingual = this.mode === 'bilingual' || this.tempBilingualKeyPressed;
+    if (wantsBilingual) {
+      for (const cue of cuesInWindow) {
+        if (!cue) continue;
+        const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
+        if (this.shouldAdaptSubtitle(cueLang)) continue;
+        this.queueBilingualPrefetch(cue, token);
+      }
     }
 
     const keywordLists = await Promise.all(
@@ -1047,6 +1090,65 @@ export class SubtitleController {
     const prefetchElapsedMs = Math.round(performance.now() - prefetchStartedAt);
     if (prefetchElapsedMs >= SLOW_LOG_THRESHOLD_MS) {
       log.debug(`Prefetch keywords ready ms=${prefetchElapsedMs} terms=${termContexts.size}`);
+    }
+  }
+
+  private queueBilingualPrefetch(cue: Cue, token: number): void {
+    if (this.destroyed) return;
+    if (token !== this.prefetchToken) return;
+    if (this.isVideoPaused()) return;
+
+    if (!cue.text || cue.text.trim().length < 2) return;
+    if (this.bilingualPrefetchQueuedCueIds.has(cue.id)) return;
+
+    const existing = this.enhancer?.getEnhanced(cue.id);
+    if (existing && typeof existing.line2_final === 'string' && existing.line2_final.trim()) return;
+
+    this.bilingualPrefetchQueuedCueIds.add(cue.id);
+    this.bilingualPrefetchQueue.push(cue);
+    this.pumpBilingualPrefetchQueue(token);
+  }
+
+  private pumpBilingualPrefetchQueue(token: number): void {
+    if (this.destroyed) return;
+    if (token !== this.prefetchToken) return;
+    if (this.isVideoPaused()) return;
+
+    if (
+      this.bilingualPrefetchInFlight >= this.maxBilingualPrefetchInFlight &&
+      this.bilingualPrefetchQueue.length > 0 &&
+      Date.now() - this.debugLastBilingualPrefetchSaturationAt >= DEBUG_LOG_THROTTLE_MS
+    ) {
+      this.debugLastBilingualPrefetchSaturationAt = Date.now();
+      log.debug(
+        `Bilingual prefetch queue saturated inFlight=${this.bilingualPrefetchInFlight}/${this.maxBilingualPrefetchInFlight} queued=${this.bilingualPrefetchQueue.length}`
+      );
+    }
+
+    while (this.bilingualPrefetchInFlight < this.maxBilingualPrefetchInFlight && this.bilingualPrefetchQueue.length > 0) {
+      const next = this.bilingualPrefetchQueue.shift();
+      if (!next) break;
+
+      // Re-check in case we already filled it while it was queued.
+      const existing = this.enhancer?.getEnhanced(next.id);
+      if (existing && typeof existing.line2_final === 'string' && existing.line2_final.trim()) continue;
+
+      this.bilingualPrefetchInFlight += 1;
+      void (async () => {
+        const enhancer = this.enhancer;
+        if (!enhancer) return;
+        if (this.destroyed || token !== this.prefetchToken) return;
+        await enhancer.ensureBilingual(next);
+      })()
+        .catch((error: unknown) => {
+          log.debug('Bilingual prefetch failed; ignoring', { cueId: next.id, message: getErrorMessage(error) });
+        })
+        .finally(() => {
+          this.bilingualPrefetchInFlight -= 1;
+          if (!this.destroyed && token === this.prefetchToken) {
+            this.pumpBilingualPrefetchQueue(token);
+          }
+        });
     }
   }
 
