@@ -12,6 +12,22 @@ describe('validateSubtitleEnhanceOutput', () => {
     expect(result.value.line2_final).toBeUndefined();
   });
 
+  it('returns ok for plain text subtitles', () => {
+    const result = validateSubtitleEnhanceOutput('Hello world');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.line1_final).toBe('Hello world');
+  });
+
+  it('joins up to 2 non-empty lines for plain text subtitles', () => {
+    const result = validateSubtitleEnhanceOutput('\n  Line 1  \n\n- Line 2\n3. Line 3\n');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.line1_final).toBe('Line 1\nLine 2');
+  });
+
   it('returns ok when optional lines are present', () => {
     const raw = JSON.stringify({
       line1_final: 'Line 1',
@@ -69,8 +85,8 @@ describe('validateSubtitleEnhanceOutput', () => {
     expect(result.fallback.line1_final).toBe('');
   });
 
-  it('returns fallback for invalid JSON', () => {
-    const result = validateSubtitleEnhanceOutput('not valid json');
+  it('returns fallback for broken JSON strings', () => {
+    const result = validateSubtitleEnhanceOutput('{"line1_final":"missing brace"');
 
     expect(result.ok).toBe(false);
     if (result.ok) return;

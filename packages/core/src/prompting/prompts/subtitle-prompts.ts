@@ -23,9 +23,32 @@ export function parseSubtitleEnhanceResponse(responseText: string): {
       line3_final: data.line3_final,
     };
   } catch (error) {
-    throw new Error(
-      `Failed to parse subtitle enhance response: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+    const cleaned = responseText
+      .replace(/```(?:json)?/gi, '')
+      .replace(/```/g, '')
+      .replace(/\r/g, '')
+      .trim();
+
+    // If the model attempted JSON but it's not parseable, fail loudly.
+    if (cleaned.includes('{') || cleaned.includes('}')) {
+      throw new Error(
+        `Failed to parse subtitle enhance response: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+
+    const lines = cleaned
+      .split('\n')
+      .map((line) => line.trim().replace(/^\d+[.)]\s*/, '').replace(/^[-*]\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    const value = lines.join('\n').trim();
+    if (!value) {
+      throw new Error(
+        `Failed to parse subtitle enhance response: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+
+    return { line1_final: value };
   }
 }
-

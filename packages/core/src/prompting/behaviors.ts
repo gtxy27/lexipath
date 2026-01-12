@@ -1,5 +1,5 @@
 import type { PromptBehaviorSnapshot } from './types';
-
+// 关键词选择
 export const PROMPT_BEHAVIORS = {
   keyword_select: {
     role: '你是一个语言重点词汇挑选专家',
@@ -40,7 +40,7 @@ export const PROMPT_BEHAVIORS = {
     ].join('\n'),
   },
 
-
+// 批量翻译
   translate_keywords: {
     role: '你是专业翻译专家',
     task: '任务:将<用户输入>中的词汇列表从<用户信息>中的目标学习语言翻译为<用户信息>中的母语。',
@@ -58,21 +58,23 @@ export const PROMPT_BEHAVIORS = {
     ].join('\n'),
   },
 
+// 通用翻译
   term_translate: {
     role: '你是专业的翻译专家',
     task: [
       '任务:把<用户输入>中的术语从<用户信息>中的目标学习语言翻译为<用户信息>中的母语,',
-      '输出一个 JSON 对象:key 为原术语(与输入完全一致),value 为翻译结果。',
+      '输出与输入行数完全一致的翻译结果，每行一个翻译。',
     ].join('\n'),
-    outputFormat: `{\n  "term": "translation"\n}`,
+    outputFormat: `translation_1\ntranslation_2`,
     outputNotes: [
       '规则(必须遵守):',
-      '1. 只输出一个 JSON 对象;不要 Markdown、不要代码块、不要任何额外文字',
-      '2. key 必须与输入术语完全一致;value 为翻译结果',
+      '1. 不要 JSON;不要 Markdown、不要代码块、不要任何额外文字',
+      '2. 严格按输入顺序输出;每行一个翻译结果;行数必须与输入一致',
       '3. 不要添加或删除术语;必须对每个术语给出一个翻译',
     ].join('\n'),
   },
 
+// 书写纠错
   english_correction: {
     role: '你是专业的语言写作纠错老师',
     task: [
@@ -90,7 +92,7 @@ export const PROMPT_BEHAVIORS = {
       '4. 不要过度纠正,只改明显错误;若原句口语但语法正确,可保持原样,可以在message中提醒并鼓励',
     ].join('\n'),
   },
-
+// 解释单词
   explain_word: {
     role: '你是专业的词汇学习老师',
     task: [
@@ -109,20 +111,20 @@ export const PROMPT_BEHAVIORS = {
       '6. example:给出一个简短例句(目标学习语言);example_translation:例句的母语翻译',
     ].join('\n'),
   },
-
+// 字幕适配
   subtitle_adapt: {
     role: '你是一个外语辅导专家',
     task: [
       '任务:将<用户输入>中的字幕翻译为<用户信息>中的目标学习语言,',
       '并将表达难度调整到<用户信息>中的 CEFR 等级;保持核心含义不变,适合字幕显示。',
     ].join('\n'),
-    outputFormat: `{\n  "line1_final": ""\n}`,
+    outputFormat: `sentence_1\nsentence_2`,
     outputNotes: [
       '规则:',
-      '1. line1_final 必须为目标学习语言的字幕',
+      '1. 输出为目标学习语言的字幕，可为 1~2 行，每行一个句子',
       '2. 难度适配<用户信息>中的 CEFR 等级(词汇与句式尽量符合该水平)',
-      '3. 字幕长度合理(最多 2 行,每行约 40 字符以内)',
-      '4. 只输出一个 JSON 对象;不要 Markdown、不要代码块、不要任何额外文字',
+      '3. 字幕长度合理，不宜过长；保持核心含义不变',
+      '4. 不要 JSON;不要 Markdown、不要代码块、不要任何额外文字',
     ].join('\n'),
   },
 } as const satisfies Record<string, PromptBehaviorSnapshot>;

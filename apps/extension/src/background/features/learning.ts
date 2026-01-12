@@ -414,8 +414,14 @@ async function translateTerms(options: {
   targetLang: string;
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>;
   log: { warn: (...args: any[]) => void };
+  /**
+   * When false, translation failures return empty strings (per term) instead of falling back to the original input.
+   * This is useful for UI flows that want to show an i18n loading state rather than duplicated original text.
+   */
+  fallbackToOriginal?: boolean;
 }): Promise<string[]> {
   const { settings, concurrency, log } = options;
+  const fallbackToOriginal = options.fallbackToOriginal !== false;
   const terms = options.terms.map((t) => t.trim()).filter(Boolean);
   if (terms.length === 0) return [];
 
@@ -429,21 +435,21 @@ async function translateTerms(options: {
           ? googleTranslateProvider.translate(term, { from: String(options.sourceLang), to: String(options.targetLang) })
           : bingTranslateProvider.translate(term, { from: String(options.sourceLang), to: String(options.targetLang) })
       );
-      translated.push(value ?? term);
+      translated.push(value ?? (fallbackToOriginal ? term : ''));
     }
     return translated;
   }
 
   const channel = resolveChannel(route.channelId, settings);
-  if (!channel) return terms;
+  if (!channel) return terms.map((term) => (fallbackToOriginal ? term : ''));
 
   const providerInfo = getChatProviderByChannel(channel);
-  if (!providerInfo) return terms;
+  if (!providerInfo) return terms.map((term) => (fallbackToOriginal ? term : ''));
   const provider = getChatProvider(providerInfo.type, providerInfo.config);
 
   const parsedSourceLang = SupportedLanguageSchema.safeParse(options.sourceLang);
   const parsedTargetLang = NativeLanguageSchema.safeParse(options.targetLang);
-  if (!parsedSourceLang.success || !parsedTargetLang.success) return terms;
+  if (!parsedSourceLang.success || !parsedTargetLang.success) return terms.map((term) => (fallbackToOriginal ? term : ''));
 
   const referenceLine = buildProficiencyReferenceLine({
     sourceLang: parsedSourceLang.data,
@@ -461,8 +467,8 @@ async function translateTerms(options: {
 
   const userInput = terms.join('\n');
   const prompt = buildPrompt({
-    agentKey: 'translate_terms',
-    sceneKey: 'translate_terms',
+    agentKey: 'term_translate',
+    sceneKey: 'term_translate',
     styleKey: pickStyleKey(undefined, settings.promptStyle),
     userInfo,
     userInput,
@@ -475,12 +481,25 @@ async function translateTerms(options: {
     );
 
     const responseText = response.choices?.[0]?.message?.content ?? '';
-    const parsed = parseTermTranslateResponse(responseText);
-    const translations = parsed.translations;
-    return terms.map((term) => translations[term] ?? term);
+
+    const parsedJson = parseTermTranslateResponse(responseText);
+    if (parsedJson.ok && Object.keys(parsedJson.translations).length > 0) {
+      return terms.map((term) => parsedJson.translations[term] ?? (fallbackToOriginal ? term : ''));
+    }
+
+    const parsedLines = parseTranslateKeywordsResponse(responseText, terms.length);
+    if (parsedLines.ok && parsedLines.translations.length === terms.length) {
+      return terms.map((term, index) => {
+        const value = parsedLines.translations[index];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+        return fallbackToOriginal ? term : '';
+      });
+    }
+
+    return terms.map((term) => (fallbackToOriginal ? term : ''));
   } catch (error: unknown) {
     log.warn('TRANSLATE_TERMS failed; returning original terms', error);
-    return terms;
+    return terms.map((term) => (fallbackToOriginal ? term : ''));
   }
 }
 
@@ -1076,6 +1095,9 @@ export function registerLearningFeature(options: {
                 targetLang: String(nativeLang),
                 concurrency,
                 log,
+                // For subtitle bilingual translation, avoid falling back to the original subtitle text.
+                // Missing/empty translation will keep the UI in an i18n loading state instead of duplicating the original.
+                fallbackToOriginal: false,
               });
               return fallback ?? '';
             })();

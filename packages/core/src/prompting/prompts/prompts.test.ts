@@ -42,7 +42,7 @@ describe('buildPrompt', () => {
     expect(withContext).toContain('This is a greeting');
   });
 
-  it('term_translate: includes terms and JSON output format', () => {
+  it('term_translate: includes terms and line-based output format', () => {
     const prompt = buildPrompt({
       agentKey: 'term_translate',
       sceneKey: 'term_translate',
@@ -55,7 +55,7 @@ describe('buildPrompt', () => {
     expect(prompt).toContain('hello');
     expect(prompt).toContain('world');
     expect(prompt).toContain('<输出格式>');
-    expect(prompt).toContain('"term"');
+    expect(prompt).toContain('translation_1');
   });
 
   it('web_enhance: includes content and JSON schema hints', () => {
@@ -124,7 +124,7 @@ describe('buildPrompt', () => {
     expect(withContext).toContain('I walked along the river bank.');
   });
 
-  it('subtitle_adapt: includes subtitle text and JSON output format', () => {
+  it('subtitle_adapt: includes subtitle text and line-based output format', () => {
     const prompt = buildPrompt({
       agentKey: 'subtitle_adapt',
       sceneKey: 'video_subtitle',
@@ -135,7 +135,7 @@ describe('buildPrompt', () => {
 
     expect(prompt).toContain('你好');
     expect(prompt).toContain('<输出格式>');
-    expect(prompt).toContain('"line1_final"');
+    expect(prompt).toContain('sentence_1');
   });
 });
 
