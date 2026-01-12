@@ -303,7 +303,6 @@ async function getKeywordsForText(options: {
         const prompt = buildPrompt({
           agentKey: 'keyword_select',
           sceneKey: scene === 'web' ? 'keyword_select_web' : 'keyword_select_subtitle',
-          styleKey: pickStyleKey(undefined, settings.promptStyle),
           userInfo,
           userInput: text,
         });
@@ -419,7 +418,6 @@ async function translateTerms(options: {
   const prompt = buildPrompt({
     agentKey: 'term_translate',
     sceneKey: 'term_translate',
-    styleKey: pickStyleKey(undefined, settings.promptStyle),
     userInfo,
     userInput,
   });
@@ -544,8 +542,7 @@ async function translateKeywords(options: {
 
             const prompt = buildPrompt({
               agentKey: 'translate_keywords',
-              sceneKey: 'translate_keywords',
-              styleKey: pickStyleKey(undefined, settings.promptStyle),
+              sceneKey: 'keyword_translate',
               userInfo,
               ...(options.context ? { contextInfo: makeContextInfoFromText(options.context) } : {}),
               userInput,
@@ -856,7 +853,6 @@ export function registerLearningFeature(options: {
               const prompt = buildPrompt({
                 agentKey: 'web_enhance',
                 sceneKey: 'web_content',
-                styleKey: pickStyleKey(undefined, settings.promptStyle),
                 userInfo,
                 userInput,
               });
@@ -1086,7 +1082,6 @@ export function registerLearningFeature(options: {
           const prompt = buildPrompt({
             agentKey: 'subtitle_adapt',
             sceneKey: 'video_subtitle',
-            styleKey: pickStyleKey(undefined, settings.promptStyle),
             userInfo,
             userInput,
           });
@@ -1340,7 +1335,6 @@ export function registerLearningFeature(options: {
         const prompt = buildPrompt({
           agentKey: 'explain_word',
           sceneKey: 'word_card',
-          styleKey: pickStyleKey(undefined, settings.promptStyle),
           userInfo,
           ...(context ? { contextInfo: makeContextInfoFromText(context) } : {}),
           userInput,

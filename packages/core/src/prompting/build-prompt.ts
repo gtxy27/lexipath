@@ -53,7 +53,7 @@ function formatContextInfo(context?: PromptContextInfo): string {
 
 /**
  * Build prompt with the fixed blueprint:
- * - Top fixed header (no tags): role → scene → style → task
+ * - Top header (no tags): role → scene → (optional style) → task
  * - Tagged blocks (fixed order):
  *   <用户信息>, optional <上下文信息>, <用户输入>, <输出格式>, <输出说明>
  */
@@ -68,10 +68,10 @@ export function buildPrompt(request: BuildPromptRequest): string {
   // ===========================================================================
  
   const scene = resolvePromptScene(request.sceneKey);
-  const style = resolvePromptStyleValue(request.styleKey);
+  const style = behavior.usesStyle ? resolvePromptStyleValue(request.styleKey) : '';
 
   // ===========================================================================
-  // Phase 3: Build top header (no tags): Role -> Scene -> Style -> Task
+  // Phase 3: Build top header (no tags): Role -> Scene -> (optional Style) -> Task
   // ===========================================================================
   const top = [behavior.role, scene, style, behavior.task].map((v) => String(v ?? '').trim()).filter(Boolean).join('\n');
 

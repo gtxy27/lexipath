@@ -1980,11 +1980,11 @@
     "description": "Test Google Translate button"
   },
   "optionsPromptStyleLabel": {
-    "message": "提示词风格",
+    "message": "纠错输出风格",
     "description": "Options: prompt style label"
   },
   "optionsPromptStyleDesc": {
-    "message": "影响字幕/网页/词卡等提示词的整体表达风格。",
+    "message": "仅影响“英文纠错”的输出语气/表达方式（例如夸人/指出问题的方式），不影响字幕/网页/词卡/翻译等其他任务。",
     "description": "Options: prompt style description"
   },
   "promptStyle_default": {

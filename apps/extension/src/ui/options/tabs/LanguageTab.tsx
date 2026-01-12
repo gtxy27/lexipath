@@ -539,32 +539,6 @@ export function LanguageTab(props: {
                   {t("optionsProficiencyHint")}
                 </p>
               </div>
-
-              <div className="space-y-2.5">
-                <Label className="text-xs text-muted-foreground">
-                  {t("optionsPromptStyleLabel")}
-                </Label>
-                <Select
-                  value={form.promptStyle}
-                  onValueChange={(v) =>
-                    setForm({ ...form, promptStyle: v as Settings["promptStyle"] })
-                  }
-                >
-                  <SelectTrigger className="h-11 rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border max-h-60">
-                    {PromptStyleKeySchema.options.map((styleKey) => (
-                      <SelectItem key={styleKey} value={styleKey}>
-                        {t(`promptStyle_${styleKey}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground leading-relaxed ml-1">
-                  {t("optionsPromptStyleDesc")}
-                </p>
-              </div>
             </div>
           </div>
 
@@ -822,6 +796,32 @@ export function LanguageTab(props: {
 
               {form.englishCorrection.enabled ? (
                 <>
+                  <div className="space-y-2.5">
+                    <Label className="text-xs text-muted-foreground">
+                      {t("optionsPromptStyleLabel")}
+                    </Label>
+                    <Select
+                      value={form.promptStyle}
+                      onValueChange={(v) =>
+                        setForm({ ...form, promptStyle: v as Settings["promptStyle"] })
+                      }
+                    >
+                      <SelectTrigger className="h-11 rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border max-h-60">
+                        {PromptStyleKeySchema.options.map((styleKey) => (
+                          <SelectItem key={styleKey} value={styleKey}>
+                            {t(`promptStyle_${styleKey}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground leading-relaxed ml-1">
+                      {t("optionsPromptStyleDesc")}
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2.5">
                       <Label className="text-xs text-muted-foreground">

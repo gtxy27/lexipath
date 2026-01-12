@@ -843,6 +843,34 @@
     "message": "Target level",
     "description": "Options: target level section title"
   },
+  "optionsPromptStyleLabel": {
+    "message": "Correction output style",
+    "description": "Options: prompt style label"
+  },
+  "optionsPromptStyleDesc": {
+    "message": "Only affects the tone/wording of English correction output. Does not affect subtitles, web enhancement, word cards, or translations.",
+    "description": "Options: prompt style description"
+  },
+  "promptStyle_default": {
+    "message": "Default",
+    "description": "Prompt style option: default"
+  },
+  "promptStyle_anime": {
+    "message": "Anime",
+    "description": "Prompt style option: anime"
+  },
+  "promptStyle_academic": {
+    "message": "Academic",
+    "description": "Prompt style option: academic"
+  },
+  "promptStyle_casual": {
+    "message": "Casual",
+    "description": "Prompt style option: casual"
+  },
+  "promptStyle_concise": {
+    "message": "Concise",
+    "description": "Prompt style option: concise"
+  },
   "optionsLearningRoutingTitle": {
     "message": "Behavior routing",
     "description": "Options: learning routing title"

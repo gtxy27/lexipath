@@ -363,7 +363,7 @@ export const SettingsSchema = z.object({
 
   // Appearance
   theme: ThemeSchema.default('system'),
-  // Prompt style selection (applies when prompt builder supports styles).
+  // Prompt style selection (only applies to prompts that opt into styles, e.g. english correction output).
   promptStyle: PromptStyleKeySchema.default('default'),
 
   // Provider channels (multi-channel, one model per channel)

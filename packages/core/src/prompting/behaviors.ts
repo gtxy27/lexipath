@@ -76,6 +76,7 @@ export const PROMPT_BEHAVIORS = {
 
 // 书写纠错
   english_correction: {
+    usesStyle: true,
     role: '你是专业的语言写作纠错老师',
     task: [
       '任务:检查<用户输入>是否存在语法/拼写/用词错误。',

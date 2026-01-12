@@ -17,7 +17,7 @@ export type PromptContextInfo = {
 
 /**
  * Canonical section order (as discussed).
- * Note: Role/Scene/Style/Task are rendered as a fixed top header (no tags).
+ * Note: Role/Scene/(optional Style)/Task are rendered as a fixed top header (no tags).
  * The remaining sections are rendered as tagged blocks in this order.
  */
 export const PROMPT_SECTION_ORDER = [
@@ -35,13 +35,18 @@ export const PROMPT_SECTION_ORDER = [
 export type PromptSectionKey = typeof PROMPT_SECTION_ORDER[number];
 
 /**
- * The four bound strings owned by an agent behavior.
+ * The bound strings owned by an agent behavior.
+ *
+ * Note: `usesStyle` controls whether the global `styleKey` is rendered into the
+ * prompt header. Most structured-output tasks should keep this disabled to
+ * avoid "tone/style" instructions leaking into parsing-sensitive responses.
  */
 export type PromptBehaviorSnapshot = {
   role: string;
   task: string;
   outputFormat: string;
   outputNotes: string;
+  usesStyle?: boolean | undefined;
 };
 
 export type PromptAgentKey = string;
@@ -55,7 +60,7 @@ export type PromptAgentKey = string;
 export type BuildPromptRequest = {
   agentKey: PromptAgentKey;
   sceneKey: PromptSceneKey | string;
-  styleKey: PromptStyleKey | string;
+  styleKey?: PromptStyleKey | string | undefined;
   userInfo: PromptUserInfo;
   contextInfo?: PromptContextInfo;
   userInput: string;

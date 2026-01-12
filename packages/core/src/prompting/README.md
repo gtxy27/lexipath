@@ -12,10 +12,10 @@
 
 Prompt 的结构是固定的，不允许不同任务随意移动/重排：
 
-1. 顶部无标签（固定四行，顺序固定）：
+1. 顶部无标签（顺序固定；`Style` 为可选行）：
    - `Role`
    - `Scene`
-   - `Style`
+   - `Style`（仅当该 `agentKey` 的 behavior 开启 `usesStyle` 时输出）
    - `Task`
 2. 标签区（顺序固定）：
    - `<用户信息>`
@@ -51,7 +51,6 @@ import { buildPrompt } from "@lexipath/core/prompting";
 const prompt = buildPrompt({
   agentKey: "translate_keywords",
   sceneKey: "keyword_translate",
-  styleKey: "default",
   userInfo: { motherTongue: "zh-CN", targetLearningLanguage: "en", cefrLevel: "B1" },
   contextInfo: { before: ["Some context..."], after: [] }, // 可选
   userInput: "hello\nworld",
@@ -73,7 +72,11 @@ const prompt = buildPrompt({
 
 ## 场景/风格（scene/style）
 
-这两项是“头部四行”的另外两行（除了 role/task），依旧通过 key 映射：
+`Scene` 用来描述“输入所处的场景/上下文约束”（例如：视频字幕、网页内容、输入框纠错等）。
+
+`Style` 只应该描述**输出语气/表达风格**（例如：鼓励/严肃/口语/学术等），不要把“全局输入行为”塞到 style 里。
+
+二者都通过 key 映射：
 
 - `packages/core/src/prompting/scenes.ts`
   - `PromptSceneKey`
@@ -83,6 +86,8 @@ const prompt = buildPrompt({
   - `resolvePromptStyleValue(input)`
 
 调用侧（例如扩展 background）负责决定用哪个 `sceneKey/styleKey`，本模块只负责把它们解析成字符串并拼进固定模板位置。
+
+注意：`styleKey` 是否会被真正渲染，取决于 `behaviors.ts` 中对应 agent 的 `usesStyle` 配置；大部分结构化输出任务建议保持关闭，避免“语气/风格”干扰可解析性。
 
 ---
 
@@ -110,8 +115,7 @@ const prompt = buildPrompt({
 ## 新增一个 agentKey 的步骤（推荐流程）
 
 1. 在 `packages/core/src/prompting/behaviors.ts` 的 `PROMPT_BEHAVIORS` 里新增一项（即新增一个 `agentKey`）
-2. 调用侧改为使用 `buildPrompt({ agentKey, sceneKey, styleKey, userInfo, contextInfo?, userInput })`
+2. 调用侧改为使用 `buildPrompt({ agentKey, sceneKey, styleKey?, userInfo, contextInfo?, userInput })`（`styleKey` 为可选）
 3. 如果这个任务需要解析结构化输出：
    - 在 `packages/core/src/prompting/prompts/*.ts` 中新增/修改对应 `parse*` 函数
 4. 在 `packages/core/src/prompting/prompts/prompts.test.ts` 增加用例（构造 + 解析）
-
