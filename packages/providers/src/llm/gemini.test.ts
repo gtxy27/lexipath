@@ -55,6 +55,37 @@ describe('GeminiProvider', () => {
     }
   });
 
+  it('chatWithThinking() returns content (thinking optional)', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string, _options?: RequestInit) => {
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              finishReason: 'STOP',
+              content: { parts: [{ text: 'OK' }] },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    globalThis.fetch = fetchMock as any;
+
+    try {
+      const provider = new GeminiProvider({
+        model: 'gemini-test',
+        apiKey: 'test-key',
+      });
+
+      const result = await provider.chatWithThinking([{ role: 'user', content: 'Hello' }], { temperature: 0.2, maxTokens: 5 });
+      expect(result.content).toBe('OK');
+      expect(result.thinking).toBeUndefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('cancel() aborts in-flight chat request', async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn((_url: string, options?: RequestInit) => {
@@ -92,4 +123,3 @@ describe('GeminiProvider', () => {
     }
   });
 });
-

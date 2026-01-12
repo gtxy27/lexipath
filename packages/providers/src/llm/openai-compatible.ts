@@ -10,6 +10,18 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatCompletionMessage extends ChatMessage {
+  /**
+   * Optional model "thinking"/reasoning content.
+   *
+   * Notes:
+   * - Not part of the official OpenAI Chat Completions spec.
+   * - Some OpenAI-compatible gateways expose reasoning under fields like
+   *   `reasoning_content`, `reasoning`, or `thinking`.
+   */
+  thinking?: string;
+}
+
 export type ThinkingMode = 'disabled' | 'auto' | 'enabled';
 
 export interface ChatCompletionThinking {
@@ -28,10 +40,17 @@ export interface ChatCompletionRequest {
 export interface ChatCompletionResponse {
   id: string;
   choices: Array<{
-    message: ChatMessage;
+    message: ChatCompletionMessage;
     finish_reason: string;
   }>;
 }
+
+export type ChatWithThinkingResult = {
+  response: ChatCompletionResponse;
+  content: string;
+  thinking?: string;
+  finishReason?: string;
+};
 
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
@@ -179,6 +198,75 @@ export class OpenAICompatibleProvider {
     }
   }
 
+  private extractThinkingFromMessage(message: unknown): string | undefined {
+    if (!message || typeof message !== 'object') return undefined;
+
+    const record = message as Record<string, unknown>;
+
+    const directThinking = record.thinking;
+    if (typeof directThinking === 'string' && directThinking.trim()) {
+      return directThinking;
+    }
+
+    // Common vendor keys seen on OpenAI-compatible gateways.
+    const candidates: Array<unknown> = [
+      record.reasoning_content,
+      record.reasoning,
+      record.thinking_content,
+      record.thought,
+    ];
+
+    for (const value of candidates) {
+      if (typeof value === 'string' && value.trim()) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private normalizeThinkingInResponse(raw: unknown): ChatCompletionResponse {
+    if (!raw || typeof raw !== 'object') {
+      return raw as ChatCompletionResponse;
+    }
+
+    const record = raw as Record<string, unknown>;
+    const choices = record.choices;
+    if (!Array.isArray(choices)) {
+      return raw as ChatCompletionResponse;
+    }
+
+    let changed = false;
+    const normalizedChoices = choices.map((choice) => {
+      if (!choice || typeof choice !== 'object') return choice;
+      const choiceRecord = choice as Record<string, unknown>;
+      const message = choiceRecord.message;
+      const thinking = this.extractThinkingFromMessage(message);
+
+      if (!thinking) return choice;
+      if (!message || typeof message !== 'object') return choice;
+
+      const messageRecord = message as Record<string, unknown>;
+      const existingThinking = messageRecord.thinking;
+      if (typeof existingThinking === 'string' && existingThinking.trim()) return choice;
+
+      changed = true;
+      return {
+        ...choiceRecord,
+        message: {
+          ...messageRecord,
+          thinking,
+        },
+      };
+    });
+
+    if (!changed) return raw as ChatCompletionResponse;
+    return {
+      ...(record as any),
+      choices: normalizedChoices,
+    } as ChatCompletionResponse;
+  }
+
   /**
    * Execute request with exponential backoff retry.
    */
@@ -242,7 +330,8 @@ export class OpenAICompatibleProvider {
           this.supportsThinkingControl = true;
         }
 
-        return await response.json();
+        const json = await response.json();
+        return this.normalizeThinkingInResponse(json);
       } catch (error) {
         const status = typeof (error as any)?.status === 'number' ? (error as any).status : null;
 
@@ -318,6 +407,21 @@ export class OpenAICompatibleProvider {
     });
 
     return promise;
+  }
+
+  async chatWithThinking(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatWithThinkingResult> {
+    const response = await this.chat(messages, options);
+    const choice = response.choices?.[0];
+    const message = choice?.message;
+    const thinking = typeof message?.thinking === 'string' && message.thinking.trim() ? message.thinking : undefined;
+    const finishReason = typeof choice?.finish_reason === 'string' && choice.finish_reason ? choice.finish_reason : undefined;
+
+    return {
+      response,
+      content: message?.content ?? '',
+      ...(thinking ? { thinking } : {}),
+      ...(finishReason ? { finishReason } : {}),
+    };
   }
 
   /**

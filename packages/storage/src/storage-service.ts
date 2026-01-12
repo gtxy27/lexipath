@@ -681,7 +681,7 @@ export class StorageService {
       await requestToPromise(sessionStore.put(merged));
     }
 
-    const existingMessageKeys = new Set<string>();
+    const existingMessagesByKey = new Map<string, ChatMessageRecordWithId>();
     await new Promise<void>((resolve, reject) => {
       const request = messageStore.openCursor();
       request.onerror = () => reject(request.error);
@@ -693,7 +693,10 @@ export class StorageService {
         }
         const parsed = StorageExportSchema.shape.messages.element.safeParse(cursor.value);
         if (parsed.success) {
-          existingMessageKeys.add(messageDedupeKey(parsed.data));
+          const key = messageDedupeKey(parsed.data);
+          if (!existingMessagesByKey.has(key)) {
+            existingMessagesByKey.set(key, parsed.data);
+          }
         }
         cursor.continue();
       };
@@ -703,16 +706,48 @@ export class StorageService {
       const messageSchema = StorageExportSchema.shape.messages.element;
       const parsed = messageSchema.parse(message);
       const key = messageDedupeKey(parsed);
-      if (existingMessageKeys.has(key)) continue;
-      existingMessageKeys.add(key);
+      const existing = existingMessagesByKey.get(key);
+      const incomingThinking =
+        typeof parsed.thinking === 'string' && parsed.thinking.trim() ? parsed.thinking : undefined;
+
+      if (existing) {
+        const existingThinking =
+          typeof existing.thinking === 'string' && existing.thinking.trim() ? existing.thinking : undefined;
+        const shouldUpdateThinking =
+          incomingThinking && (!existingThinking || incomingThinking.length > existingThinking.length);
+
+        if (shouldUpdateThinking) {
+          const updated: ChatMessageStoreRecord = {
+            ...existing,
+            thinking: incomingThinking,
+          };
+          await requestToPromise(messageStore.put(updated));
+          existingMessagesByKey.set(key, { ...existing, thinking: incomingThinking });
+        }
+
+        continue;
+      }
 
       const record: ChatMessageStoreRecord = {
         sessionId: parsed.sessionId,
         role: parsed.role,
         content: parsed.content,
+        ...(incomingThinking ? { thinking: incomingThinking } : {}),
         timestamp: parsed.timestamp,
       };
-      await requestToPromise(messageStore.add(record));
+      const id = await requestToPromise(messageStore.add(record));
+      const numericId = typeof id === 'number' ? id : Number(id);
+      if (!Number.isFinite(numericId)) {
+        throw new Error('Invalid auto-increment message id');
+      }
+      existingMessagesByKey.set(key, {
+        id: numericId,
+        sessionId: record.sessionId,
+        role: record.role,
+        content: record.content,
+        ...(incomingThinking ? { thinking: incomingThinking } : {}),
+        timestamp: record.timestamp,
+      });
     }
 
     for (const record of data.familiarity) {

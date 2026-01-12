@@ -183,4 +183,37 @@ describe('OpenAICompatibleProvider thinking field', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('normalizes reasoning fields into message.thinking', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string, _options?: RequestInit) => {
+      return new Response(
+        JSON.stringify({
+          id: 'test',
+          choices: [
+            {
+              message: { role: 'assistant', content: 'ok', reasoning_content: 'hidden reasoning' },
+              finish_reason: 'stop',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    globalThis.fetch = fetchMock as any;
+    try {
+      const provider = new OpenAICompatibleProvider({
+        baseUrl: 'https://example.com/v1',
+        model: 'gpt-test',
+      });
+
+      const result = await provider.chatWithThinking([{ role: 'user', content: 'Hi' }], { maxTokens: 1, timeout: 10_000 });
+      expect(result.content).toBe('ok');
+      expect(result.thinking).toBe('hidden reasoning');
+      expect(result.response.choices[0]?.message.thinking).toBe('hidden reasoning');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

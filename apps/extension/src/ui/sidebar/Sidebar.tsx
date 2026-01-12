@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
 import type { ChatResponse, Theme } from "@lexipath/core";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
@@ -11,7 +11,8 @@ import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
-import { Send, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, MessageSquare, History, ChevronLeft, Search } from "lucide-react";
+import { Textarea } from "../components/ui/textarea";
+import { ArrowDown, Send, SquareStop, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, MessageSquare, History, ChevronLeft, ChevronDown, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApplyTheme } from "../lib/theme";
@@ -25,6 +26,8 @@ interface ChatMessage {
   content: string;
   timestamp: number;
   isStreaming?: boolean;
+  thinking?: string;
+  isThinkingStreaming?: boolean;
 }
 
 interface ChatSession {
@@ -32,6 +35,10 @@ interface ChatSession {
   keyword: string;
   lastAccessedAt: number;
   createdAt: number;
+}
+
+function makeRandomChatSessionId(): string {
+  return `chat-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
 }
 
 export function Sidebar(): React.ReactElement {
@@ -45,27 +52,28 @@ export function Sidebar(): React.ReactElement {
   const [showSessions, setShowSessions] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [expandedThinkingById, setExpandedThinkingById] = useState<Record<string, boolean>>({});
   
-    useEffect(() => {
-      if (!searchQuery.trim()) {
-        setSearchResults([]);
-        return;
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      const response = await sendMessage("SEARCH_MESSAGES", { query: searchQuery });
+      if (response.ok) {
+        setSearchResults(response.value);
       }
-  
-      const timer = setTimeout(async () => {
-        setIsSearching(true);
-        const response = await sendMessage("SEARCH_MESSAGES", { query: searchQuery });
-        if (response.ok) {
-          setSearchResults(response.value);
-        }
-        setIsSearching(false);
-      }, 300);
-  
-      return () => clearTimeout(timer);
-    }, [searchQuery]);
-  
-    const messagesEndRef = useRef<HTMLDivElement>(null);  const inputRef = useRef<HTMLInputElement>(null);
+      setIsSearching(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamCancelRef = useRef<null | (() => void)>(null);
 
   useApplyTheme(theme);
@@ -90,6 +98,7 @@ export function Sidebar(): React.ReactElement {
         id: String(m.id),
         role: m.role,
         content: m.content,
+        thinking: typeof m.thinking === "string" ? m.thinking : undefined,
         timestamp: m.timestamp
       }));
       setMessages(history);
@@ -135,6 +144,7 @@ export function Sidebar(): React.ReactElement {
     setError(null);
     setIsLoading(false);
     setShowSessions(false);
+    setExpandedThinkingById({});
     inputRef.current?.focus();
   }, []);
 
@@ -149,7 +159,15 @@ export function Sidebar(): React.ReactElement {
       const allowWhileLoading = options?.allowWhileLoading ?? false;
       if (isLoading && !allowWhileLoading) return;
 
-      const targetConvId = options?.conversationId || conversationId;
+      const desiredConversationId = options?.conversationId ?? conversationId;
+      const sessionId =
+        desiredConversationId && desiredConversationId.trim()
+          ? desiredConversationId
+          : makeRandomChatSessionId();
+
+      if (sessionId !== conversationId) {
+        setConversationId(sessionId);
+      }
 
       // Detach the previous UI stream (if any). The background should keep running
       // and persist the final result to storage.
@@ -180,17 +198,39 @@ export function Sidebar(): React.ReactElement {
       setInputValue("");
 
       let contentSoFar = "";
-      let pending = "";
+      let thinkingSoFar = "";
+      let pendingContent = "";
+      let pendingThinking = "";
+      let sawThinking = false;
       let flushTimer: number | null = null;
       let finished = false;
 
       const flush = () => {
-        if (!pending) return;
-        contentSoFar += pending;
-        pending = "";
+        const hasPendingContent = Boolean(pendingContent);
+        const hasPendingThinking = Boolean(pendingThinking);
+        if (!hasPendingContent && !hasPendingThinking) return;
+
+        if (hasPendingContent) {
+          contentSoFar += pendingContent;
+          pendingContent = "";
+        }
+
+        if (hasPendingThinking) {
+          thinkingSoFar += pendingThinking;
+          pendingThinking = "";
+          sawThinking = true;
+        }
+
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === assistantId ? { ...msg, content: contentSoFar, isStreaming: true } : msg,
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: contentSoFar,
+                  isStreaming: true,
+                  ...(sawThinking ? { thinking: thinkingSoFar, isThinkingStreaming: true } : {}),
+                }
+              : msg,
           ),
         );
       };
@@ -204,14 +244,19 @@ export function Sidebar(): React.ReactElement {
       };
 
       const { cancel } = chatStream(
-        { message, conversationId: targetConvId },
+        { message, conversationId: sessionId },
         {
           onChunk: (delta) => {
             if (finished) return;
-            pending += delta;
+            pendingContent += delta;
             scheduleFlush();
           },
-          onDone: ({ reply, conversationId: nextConversationId }) => {
+          onThinking: (delta) => {
+            if (finished) return;
+            pendingThinking += delta;
+            scheduleFlush();
+          },
+          onDone: ({ reply, conversationId: nextConversationId, thinking }) => {
             if (finished) return;
             finished = true;
             if (flushTimer !== null) {
@@ -220,13 +265,28 @@ export function Sidebar(): React.ReactElement {
             }
             flush();
             const finalReply = reply || contentSoFar;
+            const finalThinking =
+              typeof thinking === "string" && thinking.trim()
+                ? thinking
+                : thinkingSoFar.trim()
+                  ? thinkingSoFar
+                  : undefined;
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantId ? { ...msg, content: finalReply, isStreaming: false } : msg,
+                msg.id === assistantId
+                  ? {
+                      ...msg,
+                      content: finalReply,
+                      isStreaming: false,
+                      ...(finalThinking ? { thinking: finalThinking } : {}),
+                      ...(sawThinking || finalThinking ? { isThinkingStreaming: false } : {}),
+                    }
+                  : msg,
               ),
             );
             setConversationId(nextConversationId);
             setIsLoading(false);
+            streamCancelRef.current = null;
             inputRef.current?.focus();
             void loadSessions();
           },
@@ -240,17 +300,47 @@ export function Sidebar(): React.ReactElement {
             flush();
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantId ? { ...msg, content: contentSoFar, isStreaming: false } : msg,
+                msg.id === assistantId
+                  ? { ...msg, content: contentSoFar, isStreaming: false, ...(sawThinking ? { isThinkingStreaming: false } : {}) }
+                  : msg,
               ),
             );
             setError(err.message);
             setIsLoading(false);
+            streamCancelRef.current = null;
             inputRef.current?.focus();
           },
         },
       );
 
-      streamCancelRef.current = cancel;
+      streamCancelRef.current = () => {
+        if (finished) return;
+        finished = true;
+
+        if (flushTimer !== null) {
+          window.clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        flush();
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantId
+              ? { ...msg, content: contentSoFar, isStreaming: false, ...(sawThinking ? { isThinkingStreaming: false } : {}) }
+              : msg,
+          ),
+        );
+
+        setIsLoading(false);
+        inputRef.current?.focus();
+        void loadSessions();
+
+        try {
+          cancel();
+        } finally {
+          streamCancelRef.current = null;
+        }
+      };
     },
     [conversationId, isLoading, loadSessions],
   );
@@ -345,27 +435,100 @@ export function Sidebar(): React.ReactElement {
     checkPendingMessage();
   }, [loadMessages, sendChatText]);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => {
+    if (showSessions) return;
+
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+
+    const thresholdPx = 96;
+    let rafId = 0;
+
+    const update = () => {
+      rafId = 0;
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      setIsAtBottom(distanceFromBottom <= thresholdPx);
+    };
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(update);
+    };
+
+    update();
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      viewport.removeEventListener("scroll", onScroll);
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [showSessions]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const end = messagesEndRef.current;
+    if (!end) return;
+
+    try {
+      end.scrollIntoView({ behavior, block: "end" });
+    } catch (_err) {
+      try {
+        end.scrollIntoView();
+      } catch {
+        // ignore
+      }
+    }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    if (showSessions) return;
+    if (!isAtBottom) return;
+
+    const isStreaming = messages.some((msg) => Boolean(msg.isStreaming));
+    scrollToBottom(isStreaming ? "auto" : "smooth");
+  }, [isAtBottom, messages, scrollToBottom, showSessions]);
 
   const handleSend = useCallback(() => {
     void sendChatText(inputValue);
   }, [inputValue, sendChatText]);
 
+  const handleStop = useCallback(() => {
+    streamCancelRef.current?.();
+  }, []);
+
+  const toggleThinking = useCallback((messageId: string) => {
+    setExpandedThinkingById((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
+  }, []);
+
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey && !(e.nativeEvent as any)?.isComposing) {
         e.preventDefault();
         handleSend();
       }
     },
     [handleSend],
   );
+
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+
+    const minHeightPx = 44;
+    const maxHeightPx = 176;
+
+    el.style.minHeight = `${minHeightPx}px`;
+    el.style.height = "auto";
+
+    if (!inputValue.trim()) {
+      el.style.height = `${minHeightPx}px`;
+      el.style.overflowY = "hidden";
+      return;
+    }
+
+    const nextHeight = Math.min(Math.max(el.scrollHeight, minHeightPx), maxHeightPx);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeightPx ? "auto" : "hidden";
+  }, [inputValue, showSessions]);
 
   const handleClear = useCallback(() => {
     if (messages.length === 0) return;
@@ -375,6 +538,7 @@ export function Sidebar(): React.ReactElement {
       setConversationId(undefined);
       setError(null);
       setIsLoading(false);
+      setExpandedThinkingById({});
     }
   }, [messages.length]);
 
@@ -459,7 +623,14 @@ export function Sidebar(): React.ReactElement {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSearchQuery(next);
+                      if (!next.trim()) {
+                        setIsSearching(false);
+                        setSearchResults([]);
+                      }
+                    }}
                     placeholder={t("chatSearchPlaceholder") || "Search messages..."}
                     className="pl-10 h-10 rounded-xl text-sm bg-card shadow-sm"
                   />
@@ -484,6 +655,8 @@ export function Sidebar(): React.ReactElement {
                             void loadMessages(result.sessionId);
                             setShowSessions(false);
                             setSearchQuery("");
+                            setIsSearching(false);
+                            setSearchResults([]);
                           }}
                           className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
                         >
@@ -548,79 +721,136 @@ export function Sidebar(): React.ReactElement {
               exit={{ opacity: 0 }}
               className="flex-1 overflow-hidden flex flex-col"
             >
-              <ScrollArea className="flex-1 px-4">
-                <div className="flex flex-col gap-6 py-8">
-                  <AnimatePresence initial={false}>
-                    {messages.length === 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex h-[calc(100vh-250px)] flex-col items-center justify-center gap-4 text-center"
-                      >
-                        <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border bg-card shadow-sm overflow-hidden">
-                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 dark:from-primary/6 via-transparent to-transparent opacity-70 dark:opacity-50" />
-                          <Bot className="h-7 w-7 text-primary" />
-                        </div>
-                        <div className="space-y-1 max-w-[260px]">
-                          <p className="text-base font-semibold">{t("chatEmptyTitle")}</p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">{t("chatEmpty")}</p>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      messages.map((msg, index) => (
+              <div className="relative flex-1 overflow-hidden">
+                <ScrollArea viewportRef={scrollViewportRef} className="h-full px-4">
+                  <div className="flex flex-col gap-6 py-8">
+                    <AnimatePresence initial={false}>
+                      {messages.length === 0 ? (
                         <motion.div
-                          key={`${msg.timestamp}-${index}`}
-                          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          transition={{ duration: 0.3 }}
-                          className={cn(
-                            "flex gap-4 max-w-[90%]",
-                            msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto",
-                          )}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex h-[calc(100vh-250px)] flex-col items-center justify-center gap-4 text-center"
                         >
-                          <div className={cn(
-                            "h-9 w-9 mt-1 rounded-xl flex items-center justify-center shrink-0 border shadow-sm",
-                            msg.role === "user" 
-                              ? "bg-primary border-primary/50 text-primary-foreground" 
-                              : "bg-card border-border"
-                          )}>
-                            {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4 text-primary" />}
+                          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border bg-card shadow-sm overflow-hidden">
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/12 dark:from-primary/6 via-transparent to-transparent opacity-70 dark:opacity-50" />
+                            <Bot className="h-7 w-7 text-primary" />
                           </div>
-
-                          <div
-                            className={cn(
-                              "relative rounded-xl px-4 py-3 text-sm leading-relaxed border shadow-sm",
-                              msg.role === "user"
-                                ? "bg-primary text-primary-foreground border-primary/50 rounded-tr-none"
-                                : "bg-card text-foreground border-border rounded-tl-none"
-                            )}
-                          >
-                            {msg.role === "assistant" ? (
-                              <MessageContent content={msg.content} isStreaming={Boolean(msg.isStreaming)} />
-                            ) : (
-                              <div className="whitespace-pre-wrap break-words font-medium">
-                                {msg.content}
-                              </div>
-                            )}
-                            <div
-                              className={cn(
-                                "mt-2 text-xs text-muted-foreground/70",
-                                msg.role === "user" ? "text-right" : "text-left",
-                              )}
-                            >
-                              {new Date(msg.timestamp).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </div>
+                          <div className="space-y-1 max-w-[260px]">
+                            <p className="text-base font-semibold">{t("chatEmptyTitle")}</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{t("chatEmpty")}</p>
                           </div>
                         </motion.div>
-                      ))
-                    )}
-                  </AnimatePresence>
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
+                      ) : (
+                        messages.map((msg, index) => (
+                          <motion.div
+                            key={`${msg.timestamp}-${index}`}
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ duration: 0.3 }}
+                            className={cn(
+                              "flex gap-4 max-w-[90%]",
+                              msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "h-9 w-9 mt-1 rounded-xl flex items-center justify-center shrink-0 border shadow-sm",
+                                msg.role === "user"
+                                  ? "bg-primary border-primary/50 text-primary-foreground"
+                                  : "bg-card border-border",
+                              )}
+                            >
+                              {msg.role === "user" ? (
+                                <User className="h-4 w-4" />
+                              ) : (
+                                <Bot className="h-4 w-4 text-primary" />
+                              )}
+                            </div>
+
+                            <div
+                              className={cn(
+                                "relative rounded-xl px-4 py-3 text-sm leading-relaxed border shadow-sm",
+                                msg.role === "user"
+                                  ? "bg-primary text-primary-foreground border-primary/50 rounded-tr-none"
+                                  : "bg-card text-foreground border-border rounded-tl-none",
+                              )}
+                            >
+                              {msg.role === "assistant" ? (
+                                <>
+                                  {(msg.thinking?.trim() || msg.isThinkingStreaming) && (
+                                    <div className="mb-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleThinking(msg.id)}
+                                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                      >
+                                        <ChevronDown
+                                          className={cn(
+                                            "h-4 w-4 transition-transform",
+                                            expandedThinkingById[msg.id] && "rotate-180",
+                                          )}
+                                        />
+                                        <span>
+                                          {expandedThinkingById[msg.id]
+                                            ? t("chatHideThinking")
+                                            : t("chatShowThinking")}
+                                        </span>
+                                        {msg.isThinkingStreaming && (
+                                          <Loader2 className="h-3 w-3 animate-spin opacity-70" />
+                                        )}
+                                      </button>
+
+                                      {expandedThinkingById[msg.id] && (
+                                        <div className="mt-2 max-h-40 overflow-auto rounded-lg border border-border bg-muted/20 p-3">
+                                          <MessageContent
+                                            content={msg.thinking ?? ""}
+                                            isStreaming={Boolean(msg.isThinkingStreaming)}
+                                            showCursor={false}
+                                            className="text-xs text-muted-foreground leading-relaxed"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  <MessageContent content={msg.content} isStreaming={Boolean(msg.isStreaming)} />
+                                </>
+                              ) : (
+                                <div className="whitespace-pre-wrap break-words font-medium">{msg.content}</div>
+                              )}
+                              <div
+                                className={cn(
+                                  "mt-2 text-xs text-muted-foreground/70",
+                                  msg.role === "user" ? "text-right" : "text-left",
+                                )}
+                              >
+                                {new Date(msg.timestamp).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))
+                      )}
+                    </AnimatePresence>
+                    <div ref={messagesEndRef} />
+                  </div>
+                </ScrollArea>
+
+                {!showSessions && messages.length > 0 && !isAtBottom && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={() => scrollToBottom("smooth")}
+                    aria-label={t("chatScrollToBottom")}
+                    title={t("chatScrollToBottom")}
+                    className="absolute bottom-5 right-5 h-10 w-10 rounded-full border border-border bg-background/90 shadow-md backdrop-blur hover:bg-muted/40"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
 
               {error && (
                 <motion.div 
@@ -634,31 +864,30 @@ export function Sidebar(): React.ReactElement {
               )}
 
               <div className="p-4 border-t border-border bg-muted/15">
-                <div className="flex gap-2 rounded-2xl border border-border bg-muted/15 p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/25 focus-within:ring-offset-2 focus-within:ring-offset-background">
-                  <Input
+                <div className="flex items-end gap-2 rounded-3xl border border-border bg-background/80 p-2 shadow-sm backdrop-blur focus-within:ring-2 focus-within:ring-ring/25 focus-within:ring-offset-2 focus-within:ring-offset-background">
+                  <Textarea
                     ref={inputRef}
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={t("chatPlaceholder")}
                     disabled={isLoading}
-                    className="flex-1 h-11 rounded-xl border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                    rows={1}
+                    style={{ minHeight: 44 }}
+                    className="flex-1 !min-h-[44px] max-h-[176px] resize-none rounded-xl border-0 bg-transparent px-3 py-3 leading-5 focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
                   <Button
-                    onClick={handleSend}
-                    disabled={!inputValue.trim() || isLoading}
-                    aria-label={t("chatSend")}
-                    title={t("chatSend")}
+                    onClick={isLoading ? handleStop : handleSend}
+                    disabled={isLoading ? false : !inputValue.trim()}
+                    variant={isLoading ? "destructive" : "default"}
+                    aria-label={isLoading ? t("chatStop") : t("chatSend")}
+                    title={isLoading ? t("chatStop") : t("chatSend")}
                     className={cn(
-                      "h-11 w-11 shrink-0 rounded-xl shadow-sm",
-                      !inputValue.trim() && !isLoading && "opacity-50 grayscale",
+                      "h-11 w-11 shrink-0 rounded-full shadow-sm",
+                      !isLoading && !inputValue.trim() && "opacity-50 grayscale",
                     )}
                   >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
+                    {isLoading ? <SquareStop className="h-5 w-5" /> : <Send className="h-5 w-5" />}
                   </Button>
                 </div>
               </div>

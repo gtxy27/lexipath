@@ -24,6 +24,7 @@ export const StorageExportSchema = z
           sessionId: z.string().min(1),
           role: z.enum(['user', 'assistant']),
           content: z.string(),
+          thinking: z.string().optional(),
           timestamp: z.number(),
         })
         .strict()
@@ -37,4 +38,3 @@ export type StorageExportData = z.infer<typeof StorageExportSchema>;
 export type ChatSessionRecord = StorageExportData['sessions'][number];
 export type ChatMessageRecord = Omit<StorageExportData['messages'][number], 'id'>;
 export type ChatMessageRecordWithId = StorageExportData['messages'][number];
-

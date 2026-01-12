@@ -58,6 +58,38 @@ describe('ClaudeProvider', () => {
     }
   });
 
+  it('chatWithThinking() returns thinking when present', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (_url: string, _options?: RequestInit) => {
+      return new Response(
+        JSON.stringify({
+          id: 'msg_1',
+          stop_reason: 'end_turn',
+          content: [
+            { type: 'thinking', thinking: 'secret steps' },
+            { type: 'text', text: 'OK' },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    globalThis.fetch = fetchMock as any;
+
+    try {
+      const provider = new ClaudeProvider({
+        model: 'claude-test',
+        apiKey: 'test-key',
+      });
+
+      const result = await provider.chatWithThinking([{ role: 'user', content: 'Hello' }], { maxTokens: 5 });
+      expect(result.content).toBe('OK');
+      expect(result.thinking).toBe('secret steps');
+      expect(result.response.choices[0]?.message.thinking).toBe('secret steps');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('cancel() aborts in-flight chat request', async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn((_url: string, options?: RequestInit) => {
@@ -95,4 +127,3 @@ describe('ClaudeProvider', () => {
     }
   });
 });
-

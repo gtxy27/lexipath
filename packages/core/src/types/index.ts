@@ -616,6 +616,7 @@ export type ChatPayload = z.infer<typeof ChatPayloadSchema>;
 export const ChatResponseSchema = z.object({
   reply: z.string(),
   conversationId: z.string(),
+  thinking: z.string().optional(),
 });
 export type ChatResponse = z.infer<typeof ChatResponseSchema>;
 

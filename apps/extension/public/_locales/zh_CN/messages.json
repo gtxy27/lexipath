@@ -519,6 +519,26 @@
     "message": "发送",
     "description": "发送按钮"
   },
+  "chatStop": {
+    "message": "停止",
+    "description": "停止生成按钮"
+  },
+  "chatScrollToBottom": {
+    "message": "回到底部",
+    "description": "对话：回到底部按钮"
+  },
+  "chatThinking": {
+    "message": "思考中...",
+    "description": "对话：AI 思考提示"
+  },
+  "chatShowThinking": {
+    "message": "显示思考过程",
+    "description": "对话：显示思考过程按钮"
+  },
+  "chatHideThinking": {
+    "message": "隐藏思考过程",
+    "description": "对话：隐藏思考过程按钮"
+  },
   "chatClear": {
     "message": "清空",
     "description": "清空对话按钮"

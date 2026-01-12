@@ -6,7 +6,13 @@
  */
 
 export { OpenAICompatibleProvider } from './llm/openai-compatible';
-export type { ChatMessage, ChatCompletionRequest, ChatCompletionResponse } from './llm/openai-compatible';
+export type {
+  ChatCompletionMessage,
+  ChatCompletionRequest,
+  ChatCompletionResponse,
+  ChatMessage,
+  ChatWithThinkingResult,
+} from './llm/openai-compatible';
 export { ClaudeProvider } from './llm/claude';
 export { GeminiProvider } from './llm/gemini';
 export { GoogleTranslateProvider } from './translate/google-translate';

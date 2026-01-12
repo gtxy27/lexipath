@@ -92,10 +92,10 @@ describe("Sidebar", () => {
     await user.type(screen.getByPlaceholderText("chatPlaceholder"), "hi{enter}");
 
     await waitFor(() => {
-      expect(sendMessageMock).toHaveBeenCalledWith("CHAT", {
-        message: "hi",
-        conversationId: undefined,
-      });
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        "CHAT",
+        expect.objectContaining({ message: "hi", conversationId: expect.any(String) }),
+      );
     });
 
     expect(await screen.findByText("assistantReply")).toBeInTheDocument();

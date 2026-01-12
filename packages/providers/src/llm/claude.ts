@@ -1,7 +1,7 @@
 import type { ClaudeProviderConfig } from '@lexipath/core';
 import { makeCacheKey } from '@lexipath/core/cache-key';
 import { classifyError, type ProviderError } from '../errors';
-import type { ChatCompletionResponse, ChatMessage, ChatOptions } from './openai-compatible';
+import type { ChatCompletionResponse, ChatMessage, ChatOptions, ChatWithThinkingResult } from './openai-compatible';
 
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
@@ -48,13 +48,27 @@ function toChatCompletionResponse(input: unknown): ChatCompletionResponse {
   const content = record.content;
 
   let text = '';
+  let thinking = '';
   if (Array.isArray(content)) {
     for (const part of content) {
       if (!part || typeof part !== 'object') continue;
       const partRecord = part as Record<string, unknown>;
-      if (partRecord.type !== 'text') continue;
-      const chunk = typeof partRecord.text === 'string' ? partRecord.text : '';
-      if (chunk) text += chunk;
+      if (partRecord.type === 'text') {
+        const chunk = typeof partRecord.text === 'string' ? partRecord.text : '';
+        if (chunk) text += chunk;
+        continue;
+      }
+
+      // Anthropic "thinking" blocks (when enabled) are separate from the user-facing answer.
+      if (partRecord.type === 'thinking') {
+        const chunk =
+          typeof (partRecord as any).thinking === 'string'
+            ? String((partRecord as any).thinking)
+            : typeof (partRecord as any).text === 'string'
+              ? String((partRecord as any).text)
+              : '';
+        if (chunk) thinking += chunk;
+      }
     }
   } else if (typeof content === 'string') {
     text = content;
@@ -64,7 +78,7 @@ function toChatCompletionResponse(input: unknown): ChatCompletionResponse {
     id,
     choices: [
       {
-        message: { role: 'assistant', content: text },
+        message: { role: 'assistant', content: text, ...(thinking.trim() ? { thinking } : {}) },
         finish_reason: stopReason,
       },
     ],
@@ -209,6 +223,21 @@ export class ClaudeProvider {
 
     this.inFlightRequests.set(cacheKey, { promise, timestamp: Date.now(), controller });
     return promise;
+  }
+
+  async chatWithThinking(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatWithThinkingResult> {
+    const response = await this.chat(messages, options);
+    const choice = response.choices?.[0];
+    const message = choice?.message;
+    const thinking = typeof message?.thinking === 'string' && message.thinking.trim() ? message.thinking : undefined;
+    const finishReason = typeof choice?.finish_reason === 'string' && choice.finish_reason ? choice.finish_reason : undefined;
+
+    return {
+      response,
+      content: message?.content ?? '',
+      ...(thinking ? { thinking } : {}),
+      ...(finishReason ? { finishReason } : {}),
+    };
   }
 
   async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {

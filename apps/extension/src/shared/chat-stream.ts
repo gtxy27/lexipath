@@ -5,7 +5,8 @@ import { sendMessage } from "./messages";
 
 export type ChatStreamClientEvent =
   | { type: "CHUNK"; delta: string }
-  | { type: "DONE"; reply: string; conversationId: string }
+  | { type: "THINKING"; delta: string }
+  | { type: "DONE"; reply: string; conversationId: string; thinking?: string }
   | { type: "ERROR"; error: { code: string; message: string } };
 
 export type ChatStreamServerMessage = { type: "START"; payload: ChatPayload };
@@ -17,7 +18,8 @@ export function chatStream(
   payload: ChatPayload,
   handlers: {
     onChunk: (delta: string) => void;
-    onDone: (result: { reply: string; conversationId: string }) => void;
+    onThinking?: (delta: string) => void;
+    onDone: (result: { reply: string; conversationId: string; thinking?: string }) => void;
     onError: (error: { code: string; message: string }) => void;
   }
 ): { cancel: () => void } {
@@ -38,6 +40,7 @@ export function chatStream(
         handlers.onDone({
           reply: response.value.reply,
           conversationId: response.value.conversationId,
+          ...(typeof (response.value as any).thinking === "string" ? { thinking: (response.value as any).thinking } : {}),
         });
       } catch (error) {
         log.error("CHAT fallback request failed", { message: getErrorMessage(error) });
@@ -63,13 +66,21 @@ export function chatStream(
       handlers.onChunk(msg.delta);
       return;
     }
+    if (msg.type === "THINKING" && typeof msg.delta === "string") {
+      handlers.onThinking?.(msg.delta);
+      return;
+    }
     if (
       msg.type === "DONE" &&
       typeof msg.reply === "string" &&
       typeof msg.conversationId === "string"
     ) {
       finished = true;
-      handlers.onDone({ reply: msg.reply, conversationId: msg.conversationId });
+      handlers.onDone({
+        reply: msg.reply,
+        conversationId: msg.conversationId,
+        ...(typeof msg.thinking === "string" ? { thinking: msg.thinking } : {}),
+      });
       return;
     }
     if (

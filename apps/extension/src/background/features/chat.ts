@@ -162,6 +162,7 @@ async function streamOpenAICompatibleChat(options: {
   temperature: number;
   maxTokens: number;
   onDelta: (delta: string) => void;
+  onThinkingDelta?: (delta: string) => void;
   signal?: AbortSignal;
   log: { debug: (...args: any[]) => void };
 }): Promise<string> {
@@ -202,9 +203,25 @@ async function streamOpenAICompatibleChat(options: {
       if (data === '[DONE]') return;
       try {
         const parsed = JSON.parse(data);
+        const deltaRecord = parsed?.choices?.[0]?.delta;
+
+        const thinkingDelta =
+          deltaRecord?.reasoning_content ??
+          deltaRecord?.reasoning ??
+          deltaRecord?.thinking_content ??
+          deltaRecord?.thinking ??
+          deltaRecord?.thought ??
+          parsed?.choices?.[0]?.message?.thinking ??
+          parsed?.choices?.[0]?.message?.reasoning_content ??
+          parsed?.choices?.[0]?.message?.reasoning ??
+          '';
+        if (typeof thinkingDelta === 'string' && thinkingDelta) {
+          options.onThinkingDelta?.(thinkingDelta);
+        }
+
         const delta =
-          parsed?.choices?.[0]?.delta?.content ??
-          parsed?.choices?.[0]?.delta?.text ??
+          deltaRecord?.content ??
+          deltaRecord?.text ??
           parsed?.choices?.[0]?.message?.content ??
           '';
         if (typeof delta === 'string' && delta) {
@@ -247,6 +264,7 @@ async function streamClaudeChat(options: {
   temperature: number;
   maxTokens: number;
   onDelta: (delta: string) => void;
+  onThinkingDelta?: (delta: string) => void;
   signal?: AbortSignal;
   log: { debug: (...args: any[]) => void };
 }): Promise<string> {
@@ -282,6 +300,8 @@ async function streamClaudeChat(options: {
     throw new MessageError({ code: 'PROVIDER_ERROR', message: `Provider error: ${response.status} - ${errorText}` });
   }
 
+  const blockTypeByIndex: Record<number, string> = {};
+
   let accumulated = '';
   await parseSseStream(response, {
     ...(options.signal ? { signal: options.signal } : {}),
@@ -289,16 +309,50 @@ async function streamClaudeChat(options: {
       try {
         const parsed = JSON.parse(data);
         const type = typeof parsed?.type === 'string' ? parsed.type : '';
+        const index = typeof parsed?.index === 'number' ? parsed.index : null;
+
         if (type === 'content_block_delta') {
-          const delta = parsed?.delta?.text;
-          if (typeof delta === 'string' && delta) {
-            accumulated += delta;
-            options.onDelta(delta);
+          const blockType = index !== null ? blockTypeByIndex[index] : '';
+          const deltaText = parsed?.delta?.text;
+          const deltaThinking = parsed?.delta?.thinking;
+
+          if (typeof deltaThinking === 'string' && deltaThinking) {
+            options.onThinkingDelta?.(deltaThinking);
+            return;
+          }
+
+          if (typeof deltaText === 'string' && deltaText) {
+            if (blockType === 'thinking') {
+              options.onThinkingDelta?.(deltaText);
+              return;
+            }
+
+            accumulated += deltaText;
+            options.onDelta(deltaText);
           }
           return;
         }
         if (type === 'content_block_start') {
-          const text = parsed?.content_block?.text;
+          const contentBlock = parsed?.content_block;
+          const contentBlockType = typeof contentBlock?.type === 'string' ? contentBlock.type : '';
+          if (index !== null && contentBlockType) {
+            blockTypeByIndex[index] = contentBlockType;
+          }
+
+          if (contentBlockType === 'thinking') {
+            const thinking =
+              typeof contentBlock?.thinking === 'string'
+                ? contentBlock.thinking
+                : typeof contentBlock?.text === 'string'
+                  ? contentBlock.text
+                  : '';
+            if (thinking) {
+              options.onThinkingDelta?.(thinking);
+            }
+            return;
+          }
+
+          const text = contentBlock?.text;
           if (typeof text === 'string' && text) {
             accumulated += text;
             options.onDelta(text);
@@ -354,6 +408,7 @@ async function streamGeminiChat(options: {
   temperature: number;
   maxTokens: number;
   onDelta: (delta: string) => void;
+  onThinkingDelta?: (delta: string) => void;
   signal?: AbortSignal;
   log: { debug: (...args: any[]) => void };
 }): Promise<string> {
@@ -391,6 +446,7 @@ async function streamGeminiChat(options: {
   }
 
   let accumulated = '';
+  let accumulatedThinking = '';
   await parseSseStream(response, {
     ...(options.signal ? { signal: options.signal } : {}),
     onData: (data) => {
@@ -402,16 +458,39 @@ async function streamGeminiChat(options: {
         const parts = content?.parts;
         if (!Array.isArray(parts)) return;
         let text = '';
+        let thinkingText = '';
         for (const part of parts) {
           const chunk = part?.text;
           if (typeof chunk === 'string') text += chunk;
+
+          const thinkingChunk =
+            typeof part?.thinking === 'string'
+              ? part.thinking
+              : typeof part?.thought === 'string'
+                ? part.thought
+                : typeof part?.reasoning === 'string'
+                  ? part.reasoning
+                  : '';
+          if (thinkingChunk) thinkingText += thinkingChunk;
         }
 
-        if (!text) return;
-        const delta = text.startsWith(accumulated) ? text.slice(accumulated.length) : text;
-        if (!delta) return;
-        accumulated += delta;
-        options.onDelta(delta);
+        if (text) {
+          const delta = text.startsWith(accumulated) ? text.slice(accumulated.length) : text;
+          if (delta) {
+            accumulated += delta;
+            options.onDelta(delta);
+          }
+        }
+
+        if (thinkingText) {
+          const thinkingDelta = thinkingText.startsWith(accumulatedThinking)
+            ? thinkingText.slice(accumulatedThinking.length)
+            : thinkingText;
+          if (thinkingDelta) {
+            accumulatedThinking += thinkingDelta;
+            options.onThinkingDelta?.(thinkingDelta);
+          }
+        }
       } catch (error: unknown) {
         options.log.debug('Gemini SSE chunk parse failed; ignoring chunk', { message: getErrorMessage(error) });
       }
@@ -426,8 +505,8 @@ async function runChatStream(
   log: { warn: (...args: any[]) => void; debug: (...args: any[]) => void },
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>,
   payload: { message: string; conversationId?: string },
-  options: { onDelta: (delta: string) => void; signal?: AbortSignal }
-): Promise<{ reply: string; conversationId: string }> {
+  options: { onDelta: (delta: string) => void; onThinkingDelta?: (delta: string) => void; signal?: AbortSignal }
+): Promise<{ reply: string; conversationId: string; thinking?: string }> {
   await ensureChatMigrated(log);
 
   const settings = await getSettings();
@@ -467,6 +546,12 @@ async function runChatStream(
   });
 
   const history = await storageService.getMessages(sessionId, { limit: CHAT_MAX_HISTORY_MESSAGES });
+  let accumulatedThinking = '';
+  const handleThinkingDelta = (delta: string) => {
+    if (!delta) return;
+    accumulatedThinking += delta;
+    options.onThinkingDelta?.(delta);
+  };
 
   const systemMessage = {
     role: 'system' as const,
@@ -476,7 +561,13 @@ async function runChatStream(
         : settings.nativeLanguage === 'zh-TW'
           ? 'Traditional Chinese'
           : 'English'
-    }).`,
+    }).
+
+Format your responses for readability:
+- Use Markdown.
+- Prefer short sections, lists, and examples.
+- Use fenced code blocks for code.
+- Ask clarifying questions at the end if needed.`,
   };
 
   try {
@@ -495,6 +586,7 @@ async function runChatStream(
             temperature: 0.7,
             maxTokens: 1000,
             onDelta: options.onDelta,
+            onThinkingDelta: handleThinkingDelta,
             ...(options.signal ? { signal: options.signal } : {}),
             log,
           });
@@ -505,6 +597,7 @@ async function runChatStream(
             temperature: 0.7,
             maxTokens: 1000,
             onDelta: options.onDelta,
+            onThinkingDelta: handleThinkingDelta,
             ...(options.signal ? { signal: options.signal } : {}),
             log,
           });
@@ -515,6 +608,7 @@ async function runChatStream(
             temperature: 0.7,
             maxTokens: 1000,
             onDelta: options.onDelta,
+            onThinkingDelta: handleThinkingDelta,
             ...(options.signal ? { signal: options.signal } : {}),
             log,
           });
@@ -529,14 +623,17 @@ async function runChatStream(
       });
     }
 
+    const thinking = accumulatedThinking.trim() ? accumulatedThinking : undefined;
+
     await storageService.addMessage({
       sessionId,
       role: 'assistant',
       content: assistantReply,
+      ...(thinking ? { thinking } : {}),
       timestamp: Date.now(),
     });
 
-    return { reply: assistantReply, conversationId: sessionId };
+    return { reply: assistantReply, conversationId: sessionId, ...(thinking ? { thinking } : {}) };
   } catch (error) {
     try {
       await storageService.deleteMessage(userMessageId);
@@ -591,7 +688,11 @@ export function registerChatFeature(options: {
         },
       }
     );
-    return { reply: result.reply || reply, conversationId: result.conversationId };
+    return {
+      reply: result.reply || reply,
+      conversationId: result.conversationId,
+      ...(result.thinking ? { thinking: result.thinking } : {}),
+    };
   });
 
   browser.runtime.onConnect.addListener((port) => {
@@ -614,6 +715,7 @@ export function registerChatFeature(options: {
       void (async () => {
         try {
           let reply = '';
+          let thinking = '';
           const result = await runChatStream(
             t,
             log,
@@ -628,6 +730,14 @@ export function registerChatFeature(options: {
                   log.debug('Failed to post CHUNK to chat stream port; ignoring', { message: getErrorMessage(postError) });
                 }
               },
+              onThinkingDelta: (delta) => {
+                thinking += delta;
+                try {
+                  port.postMessage({ type: 'THINKING', delta });
+                } catch (postError: unknown) {
+                  log.debug('Failed to post THINKING to chat stream port; ignoring', { message: getErrorMessage(postError) });
+                }
+              },
             }
           );
 
@@ -636,6 +746,11 @@ export function registerChatFeature(options: {
               type: 'DONE',
               reply: result.reply || reply,
               conversationId: result.conversationId,
+              ...(typeof result.thinking === 'string' && result.thinking.trim()
+                ? { thinking: result.thinking }
+                : thinking.trim()
+                  ? { thinking }
+                  : {}),
             });
           } catch (postError: unknown) {
             log.debug('Failed to post DONE to chat stream port; ignoring', { message: getErrorMessage(postError) });

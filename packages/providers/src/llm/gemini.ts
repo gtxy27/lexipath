@@ -1,7 +1,7 @@
 import type { GeminiProviderConfig } from '@lexipath/core';
 import { makeCacheKey } from '@lexipath/core/cache-key';
 import { classifyError, type ProviderError } from '../errors';
-import type { ChatCompletionResponse, ChatMessage, ChatOptions } from './openai-compatible';
+import type { ChatCompletionResponse, ChatMessage, ChatOptions, ChatWithThinkingResult } from './openai-compatible';
 
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
@@ -79,12 +79,24 @@ function toChatCompletionResponse(input: unknown): ChatCompletionResponse {
   const parts = contentRecord.parts;
 
   let text = '';
+  let thinking = '';
   if (Array.isArray(parts)) {
     for (const part of parts) {
       if (!part || typeof part !== 'object') continue;
       const partRecord = part as Record<string, unknown>;
       const chunk = typeof partRecord.text === 'string' ? partRecord.text : '';
       if (chunk) text += chunk;
+
+      // Best-effort: some gateways may return separate fields for reasoning.
+      const thinkingChunk =
+        typeof (partRecord as any).thinking === 'string'
+          ? String((partRecord as any).thinking)
+          : typeof (partRecord as any).thought === 'string'
+            ? String((partRecord as any).thought)
+            : typeof (partRecord as any).reasoning === 'string'
+              ? String((partRecord as any).reasoning)
+              : '';
+      if (thinkingChunk) thinking += thinkingChunk;
     }
   }
 
@@ -92,7 +104,7 @@ function toChatCompletionResponse(input: unknown): ChatCompletionResponse {
     id: 'gemini',
     choices: [
       {
-        message: { role: 'assistant', content: text },
+        message: { role: 'assistant', content: text, ...(thinking.trim() ? { thinking } : {}) },
         finish_reason: finishReason,
       },
     ],
@@ -245,6 +257,21 @@ export class GeminiProvider {
 
     this.inFlightRequests.set(cacheKey, { promise, timestamp: Date.now(), controller });
     return promise;
+  }
+
+  async chatWithThinking(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatWithThinkingResult> {
+    const response = await this.chat(messages, options);
+    const choice = response.choices?.[0];
+    const message = choice?.message;
+    const thinking = typeof message?.thinking === 'string' && message.thinking.trim() ? message.thinking : undefined;
+    const finishReason = typeof choice?.finish_reason === 'string' && choice.finish_reason ? choice.finish_reason : undefined;
+
+    return {
+      response,
+      content: message?.content ?? '',
+      ...(thinking ? { thinking } : {}),
+      ...(finishReason ? { finishReason } : {}),
+    };
   }
 
   async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {

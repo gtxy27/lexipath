@@ -1,6 +1,8 @@
 import React from "react";
 import Markdown from "markdown-to-jsx";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
+import { t } from "../../shared/i18n";
+import { cn } from "../lib/utils";
 
 const log = createLogger("ui:MessageContent");
 
@@ -17,12 +19,28 @@ function isExternalHref(href: string): boolean {
 export const MessageContent = React.memo(function MessageContent(props: {
   content: string;
   isStreaming?: boolean;
+  className?: string;
+  showCursor?: boolean;
 }) {
   const content = props.content ?? "";
   const isStreaming = Boolean(props.isStreaming);
+  const showCursor = props.showCursor ?? true;
+
+  if (isStreaming && !content.trim()) {
+    return (
+      <div
+        className={cn("flex items-center gap-1.5 text-sm text-muted-foreground", props.className)}
+        aria-label={t("chatThinking")}
+      >
+        <span className="h-2 w-2 rounded-full bg-muted-foreground/35 animate-pulse" style={{ animationDelay: "0ms" }} />
+        <span className="h-2 w-2 rounded-full bg-muted-foreground/35 animate-pulse" style={{ animationDelay: "180ms" }} />
+        <span className="h-2 w-2 rounded-full bg-muted-foreground/35 animate-pulse" style={{ animationDelay: "360ms" }} />
+      </div>
+    );
+  }
 
   return (
-    <div className="text-sm leading-relaxed">
+    <div className={cn("text-sm leading-relaxed", props.className)}>
       <Markdown
         options={{
           disableParsingRawHTML: true,
@@ -57,9 +75,19 @@ export const MessageContent = React.memo(function MessageContent(props: {
               },
             },
             code: {
-              props: {
-                className:
-                  "rounded bg-muted/40 px-1 py-0.5 font-mono text-[0.85em]",
+              props: (props: any) => {
+                const children = props.children;
+                const isBlock = typeof children === "string" && children.includes("\n");
+
+                return {
+                  ...props,
+                  className: cn(
+                    isBlock
+                      ? "block bg-transparent p-0 font-mono text-[0.85em] leading-relaxed"
+                      : "rounded bg-muted/40 px-1 py-0.5 font-mono text-[0.85em]",
+                    props.className,
+                  ),
+                };
               },
             },
             table: {
@@ -91,7 +119,7 @@ export const MessageContent = React.memo(function MessageContent(props: {
       >
         {content}
       </Markdown>
-      {isStreaming && (
+      {isStreaming && showCursor && (
         <span
           aria-hidden="true"
           className="ml-0.5 inline-block w-[0.5ch] animate-pulse select-none align-baseline"

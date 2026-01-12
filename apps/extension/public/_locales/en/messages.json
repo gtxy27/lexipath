@@ -503,6 +503,26 @@
     "message": "Send",
     "description": "Send button"
   },
+  "chatStop": {
+    "message": "Stop",
+    "description": "Stop generating button"
+  },
+  "chatScrollToBottom": {
+    "message": "Scroll to bottom",
+    "description": "Chat: scroll to bottom button"
+  },
+  "chatThinking": {
+    "message": "Thinking...",
+    "description": "Chat: assistant thinking placeholder"
+  },
+  "chatShowThinking": {
+    "message": "Show reasoning",
+    "description": "Chat: show reasoning button"
+  },
+  "chatHideThinking": {
+    "message": "Hide reasoning",
+    "description": "Chat: hide reasoning button"
+  },
   "chatClear": {
     "message": "Clear",
     "description": "Clear chat button"
