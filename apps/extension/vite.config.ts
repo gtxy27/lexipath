@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
   // process.env.VITE_BROWSER at module top-level.
   const isFirefox = mode === 'firefox' || process.env.VITE_BROWSER === 'firefox';
   const browser: 'firefox' | 'chrome' = isFirefox ? 'firefox' : 'chrome';
+  const isDev = mode === 'development';
 
   return {
     plugins: [react(), copyManifestPlugin({ isFirefox, browser })],
@@ -29,7 +30,6 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           background: resolve(__dirname, 'src/background/index.ts'),
-          content: resolve(__dirname, 'src/content/index.ts'),
           popup: resolve(__dirname, 'src/ui/popup/index.html'),
           options: resolve(__dirname, 'src/ui/options/index.html'),
           onboarding: resolve(__dirname, 'src/ui/onboarding/index.html'),
@@ -47,8 +47,8 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      minify: process.env.NODE_ENV === 'production',
-      sourcemap: process.env.NODE_ENV !== 'production',
+      minify: !isDev,
+      sourcemap: isDev,
     },
     resolve: {
       alias: {

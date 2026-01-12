@@ -8,13 +8,14 @@ export default defineConfig(({ mode }) => {
   const isFirefox = mode === 'firefox' || process.env.VITE_BROWSER === 'firefox';
   const browser: 'firefox' | 'chrome' = isFirefox ? 'firefox' : 'chrome';
   const outDir = isFirefox ? 'dist/firefox' : 'dist/chrome';
+  const isDev = mode === 'development';
 
   return {
     build: {
       outDir,
       emptyOutDir: false,
-      sourcemap: process.env.NODE_ENV !== 'production',
-      minify: process.env.NODE_ENV === 'production',
+      sourcemap: isDev,
+      minify: !isDev,
       rollupOptions: {
         input: {
           content: resolve(__dirname, 'src/content/index.ts'),
