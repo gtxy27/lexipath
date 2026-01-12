@@ -124,4 +124,49 @@
       0% { background-position: -200% 0; }
       100% { background-position: 200% 0; }
     }
+
+    /* Lexipath UI polish helpers (used across extension pages + Shadow DOM UI). */
+
+    .lx-surface-popover {
+      background: hsl(var(--popover) / 0.98);
+      border: 1px solid hsl(var(--border) / 0.9);
+    }
+
+    .lx-surface-group {
+      background: hsl(var(--muted) / 0.22);
+      border: 1px solid hsl(var(--border) / 0.7);
+    }
+
+    .lx-shadow-float {
+      box-shadow:
+        0 24px 60px -40px rgba(0, 0, 0, 0.55),
+        0 12px 28px -22px rgba(0, 0, 0, 0.28),
+        0 1px 0 rgba(255, 255, 255, 0.22) inset;
+    }
+
+    .lx-shadow-fab {
+      box-shadow:
+        0 18px 44px -28px rgba(0, 0, 0, 0.55),
+        0 10px 24px -18px rgba(0, 0, 0, 0.28),
+        0 1px 0 rgba(255, 255, 255, 0.24) inset;
+    }
+
+    .lx-item {
+      background: hsl(var(--card) / 0.96);
+      border: 1px solid hsl(var(--border) / 0.82);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.18) inset,
+        0 1px 2px rgba(0, 0, 0, 0.08);
+      transition:
+        background-color 150ms ease,
+        border-color 150ms ease,
+        box-shadow 150ms ease;
+    }
+    .lx-item:hover {
+      background: hsl(var(--card) / 1);
+      border-color: hsl(var(--border) / 1);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.22) inset,
+        0 14px 34px -28px rgba(0, 0, 0, 0.35);
+    }
 }

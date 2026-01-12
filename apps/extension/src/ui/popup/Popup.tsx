@@ -22,7 +22,6 @@ import {
   Languages,
   GraduationCap,
   ChevronRight,
-  Zap,
   Sparkles,
   Moon,
   Sun,
@@ -117,7 +116,7 @@ export function Popup(): React.ReactElement {
       animate={{ opacity: 1, y: 0 }}
       className="w-[340px] overflow-hidden bg-background text-foreground"
     >
-      <Card className="rounded-none border-0 shadow-none">
+        <Card className="rounded-none border-0 shadow-none">
         <CardHeader className="relative flex-row items-center justify-between gap-3 border-b border-border px-5 py-4 overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
           <div className="flex items-center gap-3">
@@ -128,14 +127,6 @@ export function Popup(): React.ReactElement {
               <CardTitle className="text-sm font-semibold leading-5 relative">
                 {t("extensionName")}
               </CardTitle>
-              <div className="mt-1 inline-flex items-center gap-2 rounded-full border bg-background/70 dark:bg-card/60 px-2.5 py-1 text-xs text-muted-foreground shadow-sm relative">
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    isEnabled ? "bg-emerald-500" : "bg-muted-foreground/40"
-                  }`}
-                />
-                <span className="truncate">{isEnabled ? t("on") : t("off")}</span>
-              </div>
             </div>
           </div>
 
@@ -166,25 +157,6 @@ export function Popup(): React.ReactElement {
         </CardHeader>
 
         <CardContent className="space-y-3 px-5 py-4">
-          <div className="relative flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm overflow-hidden">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-60 dark:opacity-45" />
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-md ${
-                isEnabled
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              <Zap className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 relative">
-              <div className="text-xs text-muted-foreground">{t("popupStatusLabel")}</div>
-              <div className="truncate text-sm font-medium">
-                {t("popupModeSmartLearning")}
-              </div>
-            </div>
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border bg-card p-3 shadow-sm">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">

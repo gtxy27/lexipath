@@ -337,9 +337,9 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 	        <AnimatePresence>
 	          {isOpen && (
 	            <motion.div
-	              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-	              animate={{ opacity: 1, scale: 1, y: -10 }}
-	              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+	              initial={{ opacity: 0, scale: 0.98, y: 8 }}
+	              animate={{ opacity: 1, scale: 1, y: 0 }}
+	              exit={{ opacity: 0, scale: 0.98, y: 8 }}
 	              className={cn(
 	                "absolute bottom-full mb-4",
 	                isOnLeft ? "left-0" : "right-0",
@@ -349,7 +349,8 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 	                className={cn(
 	                  "relative overflow-hidden",
 	                  "w-[340px] max-w-[calc(100vw-24px)]",
-	                  "rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl shadow-black/10 dark:shadow-black/50",
+	                  "rounded-2xl text-popover-foreground",
+	                  "lx-surface-popover lx-shadow-float",
 	                  "p-3.5",
 	                )}
 	              >
@@ -398,7 +399,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                      <div
 		                        key={section.key}
 		                        className={cn(
-		                          "rounded-xl border border-border bg-muted/25 dark:bg-muted/35",
+		                          "rounded-xl lx-surface-group",
 		                          "p-3.5",
 		                        )}
 		                      >
@@ -427,12 +428,11 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                }}
 		                                className={cn(
 		                                  "w-full text-left transition-colors",
-		                                  "rounded-xl border border-border shadow-sm",
+		                                  "rounded-xl",
 		                                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-		                                  "hover:shadow-md",
 		                                  isPrimary
-		                                    ? "bg-primary text-primary-foreground hover:bg-primary/90 border-primary/50"
-		                                    : "bg-card hover:bg-muted/30 dark:hover:bg-muted/60",
+		                                    ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-primary/50 shadow-sm"
+		                                    : "lx-item",
 		                                  isPrimary ? "px-4 py-3" : "px-3 py-2.5",
 		                                )}
 		                              >
@@ -442,7 +442,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 		                                      "mt-0.5 flex items-center justify-center rounded-xl border",
 		                                      isPrimary
 		                                        ? "h-10 w-10 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
-		                                        : "h-8 w-8 bg-card border-border shadow-sm",
+		                                        : "h-8 w-8 bg-card/70 border-border shadow-sm",
 		                                      !isPrimary && item.color,
 		                                    )}
 		                                  >
@@ -496,7 +496,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               }}
               className={cn(
                 "fixed z-[2147483647] pointer-events-auto",
-                "bg-popover text-popover-foreground border border-border shadow-2xl shadow-black/10 dark:shadow-black/50",
+                "text-popover-foreground lx-surface-popover lx-shadow-float",
                 "rounded-2xl",
                 "w-[320px] max-w-[calc(100vw-24px)]",
                 "p-4 overflow-hidden relative",
@@ -554,7 +554,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
         </AnimatePresence>
 
         {/* Main Toggle Button */}
-        <motion.div whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.98 }}>
+        <motion.div whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }}>
           <Button
             ref={buttonRef}
             variant="ghost"
@@ -565,7 +565,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
               setIsOpen((prev) => !prev);
             }}
             className={cn(
-              "relative h-12 rounded-full shadow-xl shadow-black/10 dark:shadow-black/50 transition-colors border",
+              "relative h-12 rounded-full lx-shadow-fab transition-colors border",
               "px-3.5",
               isEnhanceActive
                 ? "bg-primary border-primary/50 text-primary-foreground hover:bg-primary/90"
