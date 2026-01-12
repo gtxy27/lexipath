@@ -6,19 +6,17 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/gtxy27/lexipath?style=social)](https://github.com/gtxy27/lexipath/stargazers)
 
-## Star 趋势
 
-[![Star History Chart](https://api.star-history.com/svg?repos=gtxy27/lexipath&type=Date)](https://star-history.com/#gtxy27/lexipath&Date)
 
 ## 项目特点
 
-- **Web Enhancement（网页 i+1 增强）**：把网页文本改写为更适合你当前水平的目标语言输入；可随时切回原文
+- **Web Enhancement（网页 同i+1 增强）**：把网页文本改写为更适合你当前水平的目标语言输入；可随时切回原文
 - **视频字幕增强**：支持 **YouTube + Bilibili**，单语/双语模式切换
-- **字幕关键字**：从字幕中挑选高价值词/短语，并对未来 ~15 秒的内容进行预取解释（更顺滑）
-- **单词学习**：单词卡片、熟悉度追踪、TTS 发音
-- **AI 可配置**：支持 OpenAI-compatible 网关；并提供 `Claude` / `Gemini` / `Google Translate` / `Bing Translate` 等适配
-- **跨浏览器**：Chrome/Edge + Firefox
-- **质量兜底**：Zod 校验 + 回退规则（宁可不渲染，也不展示“垃圾输出”）
+- **关键词智能选择**： LLM 智能选择根据用户水平选择关键词，使用不同的翻译服务进行网页，视频字幕 场景的增强
+- **单词学习**：单词卡片、熟悉度追踪、TTS 发音配置
+- **AI 可配置**：支持 OpenAI-compatible 网关；并提供 `Claude` / `Gemini` 三大主流AI格式设置。
+- **跨端支持**：支持移动版与桌面端浏览器edge/Firefox（ps：手机端需要审核，暂时无法提供）
+- **跨浏览器**：Chrome/Edge + Firefox 
 
 ## 项目结构
 
@@ -50,6 +48,18 @@ bun install
 ```bash
 bun run test
 bun run typecheck
+```
+
+### 本地字典数据构建
+
+构建字典数据为 `JSON + gzip` 格式，用于离线 IndexedDB 导入。
+
+```bash
+# 下载源数据（ECDICT + JMdict + Kaikki）
+bun run dict:download
+
+# 一次性构建：解析 -> 合并 -> 压缩 -> 复制到 apps/extension/public/data
+bun run dict:build
 ```
 
 ### 构建
@@ -130,3 +140,8 @@ bun run dev
 ## License
 
 MIT
+
+
+## Star 趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=gtxy27/lexipath&type=Date)](https://star-history.com/#gtxy27/lexipath&Date)
