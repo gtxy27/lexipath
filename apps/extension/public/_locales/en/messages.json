@@ -899,6 +899,34 @@
     "message": "Advanced: choose the engine used for each learning action.",
     "description": "Options: learning routing description"
   },
+  "optionsLlmContextTitle": {
+    "message": "Context window",
+    "description": "Options: LLM context window section title"
+  },
+  "optionsLlmContextDesc": {
+    "message": "Controls how much surrounding text is included for internal AI behaviors.",
+    "description": "Options: LLM context window section description"
+  },
+  "optionsLlmContextEnableTitle": {
+    "message": "Enable context window",
+    "description": "Options: LLM context window enable title"
+  },
+  "optionsLlmContextEnableDesc": {
+    "message": "Include N sentences/lines before and after the current one when sending requests.",
+    "description": "Options: LLM context window enable description"
+  },
+  "optionsLlmContextSizeTitle": {
+    "message": "Window size",
+    "description": "Options: LLM context window size title"
+  },
+  "optionsLlmContextSizeDesc": {
+    "message": "Counts are per side (before + after).",
+    "description": "Options: LLM context window size description"
+  },
+  "optionsLlmContextSentencesLabel": {
+    "message": "±$1 sentences",
+    "description": "Options: LLM context window option label, $1=count per side"
+  },
   "optionsAiRequiredTitle": {
     "message": "AI configuration required",
     "description": "Options: AI required title"

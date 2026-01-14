@@ -49,6 +49,7 @@ export type FormState = {
   targetProficiencyPreference?: Settings["targetProficiencyPreference"];
   theme: Settings["theme"];
   promptStyle: Settings["promptStyle"];
+  llmContextSentences: Settings["llmContextSentences"];
   enabled: boolean;
   autoEnhance: boolean;
   webEnhanceMode: Settings["webEnhanceMode"];

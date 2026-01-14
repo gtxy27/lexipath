@@ -671,6 +671,34 @@
     "message": "高级：决定每个学习行为使用哪个引擎（渠道 / Google / Bing）。",
     "description": "学习：行为路由描述"
   },
+  "optionsLlmContextTitle": {
+    "message": "上下文窗口",
+    "description": "设置：LLM 上下文窗口标题"
+  },
+  "optionsLlmContextDesc": {
+    "message": "控制内部 AI 行为请求时附带的上下文范围。",
+    "description": "设置：LLM 上下文窗口描述"
+  },
+  "optionsLlmContextEnableTitle": {
+    "message": "启用上下文",
+    "description": "设置：LLM 上下文窗口开关标题"
+  },
+  "optionsLlmContextEnableDesc": {
+    "message": "在发送请求时，附带当前句子/行前后各 N 句/行。",
+    "description": "设置：LLM 上下文窗口开关描述"
+  },
+  "optionsLlmContextSizeTitle": {
+    "message": "窗口大小",
+    "description": "设置：LLM 上下文窗口大小标题"
+  },
+  "optionsLlmContextSizeDesc": {
+    "message": "按单侧计数（前 N + 后 N）。",
+    "description": "设置：LLM 上下文窗口大小描述"
+  },
+  "optionsLlmContextSentencesLabel": {
+    "message": "前后各 $1 句/行",
+    "description": "设置：LLM 上下文窗口选项文案，$1=单侧数量"
+  },
   "optionsAiRequiredTitle": {
     "message": "需要配置 AI",
     "description": "AI 需要配置标题"

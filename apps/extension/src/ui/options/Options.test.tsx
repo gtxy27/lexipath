@@ -188,4 +188,45 @@ describe("Options", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[1]).toEqual({ type: "google" });
   });
+
+  it("saves llmContextSentences from the learning tab", async () => {
+    render(<Options />);
+    const user = userEvent.setup();
+
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
+    });
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!);
+
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {
+        selector: "#channel-1-base-url",
+      })[0]!,
+      "https://api.openai.com/v1",
+    );
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderModelLabel/, {
+        selector: "#channel-1-model",
+      })[0]!,
+      "gpt-4o-mini",
+    );
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_learning" })[0]!);
+
+    const toggle = await screen.findByTestId("llm-context-enabled");
+    await user.click(toggle);
+    await user.click(toggle);
+
+    await user.click(screen.getByTestId("llm-context-size"));
+    await user.click(await screen.findByText("optionsLlmContextSentencesLabel:3"));
+
+    await user.click(screen.getAllByRole("button", { name: "optionsSaveButton" })[0]!);
+
+    const setCalls = sendMessageMock.mock.calls.filter((call) => call[0] === "SET_SETTINGS");
+    expect(setCalls).toHaveLength(1);
+
+    const payload = setCalls[0]?.[1] as any;
+    expect(payload.llmContextSentences).toBe(3);
+  });
 });

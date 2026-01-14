@@ -343,6 +343,11 @@ export function settingsToFormState(settings: Settings): FormState {
     targetProficiencyPreference,
     theme: settings.theme,
     promptStyle: settings.promptStyle,
+    llmContextSentences:
+      typeof settings.llmContextSentences === "number" &&
+      Number.isFinite(settings.llmContextSentences)
+        ? Math.max(0, Math.min(6, Math.trunc(settings.llmContextSentences)))
+        : 1,
 	    enabled: settings.enabled,
 	    autoEnhance: settings.autoEnhance,
 	    webEnhanceMode: settings.webEnhanceMode,
@@ -707,6 +712,7 @@ export function buildSettingsPatch(
     targetProficiencyPreference: form.targetProficiencyPreference,
     theme: form.theme,
     promptStyle: form.promptStyle,
+    llmContextSentences: form.llmContextSentences,
 	    enabled: form.enabled,
 	    autoEnhance: form.autoEnhance,
 	    webEnhanceMode: form.webEnhanceMode,
