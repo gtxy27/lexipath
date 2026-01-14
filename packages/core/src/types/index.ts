@@ -366,6 +366,10 @@ export const SettingsSchema = z.object({
   // Prompt style selection (only applies to prompts that opt into styles, e.g. english correction output).
   promptStyle: PromptStyleKeySchema.default('default'),
 
+  // Prompt context window (applies to internal LLM tasks like keyword selection/translation/word explain).
+  // Interpreted as the number of surrounding sentences/lines to include on each side (before/after).
+  llmContextSentences: z.number().int().min(0).max(6).default(1),
+
   // Provider channels (multi-channel, one model per channel)
   channels: ProviderChannelsSchema,
 
@@ -501,6 +505,8 @@ export const EnhanceSubtitlePayloadSchema = z
     targetLang: NativeLanguageSchema.optional(),
     difficultyLevel: CEFRLevelSchema.optional(),
     mode: z.enum(['single', 'bilingual']).optional(),
+    contextBefore: z.array(z.string().min(1)).optional(),
+    contextAfter: z.array(z.string().min(1)).optional(),
   })
   .strict();
 export type EnhanceSubtitlePayload = z.infer<typeof EnhanceSubtitlePayloadSchema>;
@@ -549,6 +555,8 @@ export const TranslateKeywordsPayloadSchema = z
   .object({
     keywords: z.array(z.string().min(1)).min(1),
     context: z.string().optional(),
+    contextBefore: z.array(z.string().min(1)).optional(),
+    contextAfter: z.array(z.string().min(1)).optional(),
     sourceLang: z.string().min(1),
     targetLang: z.string().min(1),
   })
@@ -628,6 +636,8 @@ export const ExplainWordPayloadSchema = z
   .object({
     word: z.string().min(1),
     context: z.string().min(1).optional(),
+    contextBefore: z.array(z.string().min(1)).optional(),
+    contextAfter: z.array(z.string().min(1)).optional(),
   })
   .strict();
 export type ExplainWordPayload = z.infer<typeof ExplainWordPayloadSchema>;
