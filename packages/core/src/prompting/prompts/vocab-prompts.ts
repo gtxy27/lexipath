@@ -16,12 +16,65 @@ function tryParseJsonArray(input: string): string[] | null {
   }
 }
 
-function extractFirstJsonArray(text: string): string | null {
-  const start = text.indexOf('[');
-  if (start === -1) return null;
-  const end = text.lastIndexOf(']');
-  if (end === -1 || end <= start) return null;
-  return text.slice(start, end + 1);
+function extractJsonArrays(text: string, limit = 3): string[] {
+  const results: string[] = [];
+
+  const len = text.length;
+  let index = 0;
+
+  while (index < len && results.length < limit) {
+    const start = text.indexOf('[', index);
+    if (start === -1) break;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = start; i < len; i += 1) {
+      const ch = text[i] ?? '';
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === '[') {
+        depth += 1;
+        continue;
+      }
+
+      if (ch === ']') {
+        depth -= 1;
+        if (depth === 0) {
+          results.push(text.slice(start, i + 1));
+          index = i + 1;
+          break;
+        }
+      }
+    }
+
+    // If we hit the end without closing brackets, stop scanning to avoid infinite loops.
+    if (results.length === 0 || index <= start) {
+      break;
+    }
+  }
+
+  return results;
 }
 
 function normalizeKeyword(raw: string): string {
@@ -33,13 +86,12 @@ export function parseKeywordSelectResponse(response: string): { keywords: string
   if (!cleaned) return { keywords: [], ok: false };
 
   const direct = tryParseJsonArray(cleaned);
-  const parsed =
-    direct ??
-    (() => {
-      const extracted = extractFirstJsonArray(cleaned);
-      if (!extracted) return null;
-      return tryParseJsonArray(extracted);
-    })();
+  const extractedArrays = direct ? [] : extractJsonArrays(cleaned, 3);
+  const parsedArrays = extractedArrays.map((candidate) => tryParseJsonArray(candidate)).filter(Boolean) as string[][];
+
+  // The keyword_select prompt may return multiple arrays (e.g. a second "too hard" bucket).
+  // For now we only consume the first array and ignore the rest.
+  const parsed = direct ?? parsedArrays[0] ?? null;
 
   if (!parsed) return { keywords: [], ok: false };
 

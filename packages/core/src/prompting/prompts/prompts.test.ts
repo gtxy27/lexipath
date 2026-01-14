@@ -191,6 +191,12 @@ describe('parseKeywordSelectResponse', () => {
     expect(result.keywords).toEqual(['take off', 'get used to', 'subtitle']);
   });
 
+  it('parses the first JSON array when multiple arrays are returned', () => {
+    const result = parseKeywordSelectResponse('["alpha","beta"]\n["hard_one","hard_two"]');
+    expect(result.ok).toBe(true);
+    expect(result.keywords).toEqual(['alpha', 'beta']);
+  });
+
   it('parses JSON wrapped in code fences', () => {
     const result = parseKeywordSelectResponse('```json\n["a","b"]\n```');
     expect(result.ok).toBe(true);
