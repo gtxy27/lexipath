@@ -242,6 +242,44 @@ describe('SubtitleController', () => {
       expect(fetchYouTubeSubtitles).toHaveBeenCalledWith('dQw4w9WgXcQ', 'en', { additionalParams: 'potc=1' });
     });
 
+    it('passes keywordTranslations to overlay in enhanced mode (context window enabled)', async () => {
+      paused = true;
+
+      const mockCues: Cue[] = [
+        {
+          id: 'youtube:test:0-1000:0',
+          startMs: 0,
+          endMs: 1000,
+          text: 'Hello world',
+          lang: 'en',
+          source: 'youtube',
+        },
+      ];
+
+      vi.mocked(getVideoId).mockReturnValue('test123');
+      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
+
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: ['world'] };
+        if (type === 'TRANSLATE_KEYWORDS') return { ok: true, value: ['world-cn'] };
+        if (type === 'EXPLAIN_WORD') return { ok: true, value: { word: 'world', definition: 'definition' } as any };
+        return { ok: true, value: { line1_final: 'Hello world' } as SubtitleEnhanceOutput };
+      });
+
+      await controller.init('https://www.youtube.com/watch?v=test123');
+
+      // Flush promise chains for SELECT_KEYWORDS -> TRANSLATE_KEYWORDS -> updateSubtitleDisplay.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const displayCalls = vi.mocked(SubtitleOverlay.prototype.display).mock.calls.map((call) => call[0] as any);
+      expect(
+        displayCalls.some(
+          (item) => item?.mode === 'enhanced' && item?.showKeywordTranslations === true && item?.keywordTranslations?.world === 'world-cn'
+        )
+      ).toBe(true);
+    });
+
     it('shows native translation in bilingual mode', async () => {
       const mockCues: Cue[] = [
         {

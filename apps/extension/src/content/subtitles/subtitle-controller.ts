@@ -545,16 +545,32 @@ export class SubtitleController {
       void this.ensureCueKeywords(cue.id, keywordText, this.currentCueIndex);
     }
 
-    const keywordSignature = keywordText ? this.computeTextSignature(keywordText) : '';
+    const trimmedKeywordText = keywordText.trim();
+    const cueIndex = this.currentCueIndex;
+    const contextWindow =
+      trimmedKeywordText && cueIndex >= 0
+        ? this.buildCueContextWindow(cueIndex, trimmedKeywordText)
+        : trimmedKeywordText
+          ? { before: [trimmedKeywordText], after: [] }
+          : { before: [], after: [] };
+    const contextSig = trimmedKeywordText ? this.computeContextSignature(contextWindow) : '';
+    const keywordSignatureBase = trimmedKeywordText ? this.computeTextSignature(trimmedKeywordText) : '';
+    const keywordSignature = contextSig ? `${keywordSignatureBase}|ctx:${contextSig}` : keywordSignatureBase;
     const keywords =
-      keywordText && this.cueKeywordSignatures.get(cue.id) === keywordSignature ? this.cueKeywords.get(cue.id) : undefined;
+      trimmedKeywordText && this.cueKeywordSignatures.get(cue.id) === keywordSignature
+        ? this.cueKeywords.get(cue.id)
+        : undefined;
 
     if (keywordText && keywords && keywords.length > 0) {
       void this.ensureCueKeywordTranslations(cue.id, keywordText, keywords, this.currentCueIndex);
     }
 
+    const translationSignatureBase =
+      trimmedKeywordText && keywords && keywords.length > 0
+        ? this.computeKeywordTranslationSignature(trimmedKeywordText, keywords)
+        : '';
     const translationSignature =
-      keywordText && keywords && keywords.length > 0 ? this.computeKeywordTranslationSignature(keywordText, keywords) : '';
+      translationSignatureBase && contextSig ? `${translationSignatureBase}|ctx:${contextSig}` : translationSignatureBase;
     const keywordTranslations =
       translationSignature && this.cueKeywordTranslationSignatures.get(cue.id) === translationSignature
         ? this.cueKeywordTranslations.get(cue.id)
