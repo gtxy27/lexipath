@@ -2274,5 +2274,17 @@
   "summaryDetailsMetric_apiEvents": {
     "message": "API \u8c03\u7528",
     "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_operations": {
+    "message": "\u64cd\u4f5c\u6b21\u6570",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_success": {
+    "message": "\u6210\u529f",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_failure": {
+    "message": "\u5931\u8d25",
+    "description": "Options summary: details metric label"
   }
 }

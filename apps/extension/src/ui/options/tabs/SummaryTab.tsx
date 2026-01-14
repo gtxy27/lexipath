@@ -44,6 +44,17 @@ type DailyUsageSummary = {
 };
 type UsageSummaryResponse = { today: DailyUsageSummary; recentDays: DailyUsageSummary[] };
 
+type EnglishCorrectionOutcomeBucket = { requests: number; correct: number; incorrect: number };
+type DailyEnglishCorrectionOutcomeSummary = {
+  date: string;
+  updatedAt: number;
+  totals: EnglishCorrectionOutcomeBucket;
+};
+type EnglishCorrectionOutcomeSummaryResponse = {
+  today: DailyEnglishCorrectionOutcomeSummary;
+  recentDays: DailyEnglishCorrectionOutcomeSummary[];
+};
+
 const VISIBLE_TASK_KEYS = new Set([
   "exposure_valid",
   "word_card_opened",
@@ -72,6 +83,7 @@ function clamp01(value: number): number {
 }
 
 type DetailMetricKey = "words" | "events" | "apiEvents";
+type EnglishCorrectionDetailMetricKey = "success" | "failure" | "operations";
 
 function toShortDateLabel(date: string): string {
   // Expect YYYY-MM-DD; keep it resilient.
@@ -318,17 +330,30 @@ export function SummaryTab(): React.ReactElement {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<UsageSummaryResponse | null>(null);
+  const [englishCorrectionOutcomes, setEnglishCorrectionOutcomes] =
+    useState<EnglishCorrectionOutcomeSummaryResponse | null>(null);
   const [detailTaskKey, setDetailTaskKey] = useState<string | null>(null);
   const [detailMetric, setDetailMetric] = useState<DetailMetricKey>("words");
+  const [englishCorrectionDetailMetric, setEnglishCorrectionDetailMetric] =
+    useState<EnglishCorrectionDetailMetricKey>("operations");
 
   async function load() {
     setError(null);
-    const response = await sendMessage("GET_USAGE_SUMMARY", undefined);
-    if (!response.ok) {
-      setError(response.error.message);
+    const [usageResponse, outcomeResponse] = await Promise.all([
+      sendMessage("GET_USAGE_SUMMARY", undefined),
+      sendMessage("GET_ENGLISH_CORRECTION_OUTCOME_SUMMARY", { days: 7 }),
+    ]);
+
+    if (!usageResponse.ok) {
+      setError(usageResponse.error.message);
       return;
     }
-    setData(response.value);
+
+    setData(usageResponse.value);
+
+    if (outcomeResponse.ok) {
+      setEnglishCorrectionOutcomes(outcomeResponse.value);
+    }
   }
 
   useEffect(() => {
@@ -417,6 +442,19 @@ export function SummaryTab(): React.ReactElement {
       }));
   }, [data?.recentDays, detailTaskKey]);
 
+  const englishCorrectionDetailSeries = useMemo(() => {
+    const days = englishCorrectionOutcomes?.recentDays ?? [];
+    return days
+      .slice()
+      .reverse()
+      .map((day) => ({
+        date: day.date,
+        operations: day.totals?.requests ?? 0,
+        success: day.totals?.correct ?? 0,
+        failure: day.totals?.incorrect ?? 0,
+      }));
+  }, [englishCorrectionOutcomes?.recentDays]);
+
   const detailMax = useMemo(() => {
     return detailSeries.reduce(
       (acc, row) => ({
@@ -428,6 +466,17 @@ export function SummaryTab(): React.ReactElement {
     );
   }, [detailSeries]);
 
+  const englishCorrectionDetailMax = useMemo(() => {
+    return englishCorrectionDetailSeries.reduce(
+      (acc, row) => ({
+        operations: Math.max(acc.operations, row.operations),
+        success: Math.max(acc.success, row.success),
+        failure: Math.max(acc.failure, row.failure),
+      }),
+      { operations: 0, success: 0, failure: 0 },
+    );
+  }, [englishCorrectionDetailSeries]);
+
   const detailMetricSeries = useMemo(() => {
     return detailSeries.map((row) => ({
       date: row.date,
@@ -435,8 +484,19 @@ export function SummaryTab(): React.ReactElement {
     }));
   }, [detailMetric, detailSeries]);
 
+  const englishCorrectionDetailMetricSeries = useMemo(() => {
+    return englishCorrectionDetailSeries.map((row) => ({
+      date: row.date,
+      value: row[englishCorrectionDetailMetric] ?? 0,
+    }));
+  }, [englishCorrectionDetailMetric, englishCorrectionDetailSeries]);
+
   useEffect(() => {
     if (!detailTaskKey) return;
+    if (detailTaskKey === "english_correction") {
+      setEnglishCorrectionDetailMetric("operations");
+      return;
+    }
     // Defaults: exposure is "words"; most other tasks are "events".
     setDetailMetric(detailTaskKey === "exposure_valid" ? "words" : "events");
   }, [detailTaskKey]);
@@ -464,6 +524,12 @@ export function SummaryTab(): React.ReactElement {
   const detailTodayBucket = detailTaskKey
     ? today?.tasks?.[detailTaskKey] ?? { events: 0, apiEvents: 0, words: 0 }
     : { events: 0, apiEvents: 0, words: 0 };
+  const isEnglishCorrectionDetail = detailTaskKey === "english_correction";
+  const englishCorrectionToday = englishCorrectionOutcomes?.today?.totals ?? {
+    requests: 0,
+    correct: 0,
+    incorrect: 0,
+  };
 
   const metricLabel = (metric: DetailMetricKey): string => {
     switch (metric) {
@@ -473,6 +539,19 @@ export function SummaryTab(): React.ReactElement {
         return t("summaryDetailsMetric_events");
       case "apiEvents":
         return t("summaryDetailsMetric_apiEvents");
+      default:
+        return metric;
+    }
+  };
+
+  const englishCorrectionMetricLabel = (metric: EnglishCorrectionDetailMetricKey): string => {
+    switch (metric) {
+      case "success":
+        return t("summaryDetailsMetric_success");
+      case "failure":
+        return t("summaryDetailsMetric_failure");
+      case "operations":
+        return t("summaryDetailsMetric_operations");
       default:
         return metric;
     }
@@ -763,68 +842,108 @@ export function SummaryTab(): React.ReactElement {
             <div className="grid gap-4 sm:grid-cols-3">
               <Card className="shadow-none">
                 <CardHeader className="p-4 pb-2">
-                  <CardDescription className="text-xs">{t("summaryDetailsStat_words")}</CardDescription>
+                  <CardDescription className="text-xs">
+                    {isEnglishCorrectionDetail ? t("summaryDetailsStat_success") : t("summaryDetailsStat_words")}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="text-xl font-semibold tracking-tight tabular-nums">
-                    {formatInt(detailTodayBucket.words)}
+                    {isEnglishCorrectionDetail
+                      ? formatInt(englishCorrectionToday.correct)
+                      : formatInt(detailTodayBucket.words)}
                   </div>
                 </CardContent>
               </Card>
               <Card className="shadow-none">
                 <CardHeader className="p-4 pb-2">
-                  <CardDescription className="text-xs">{t("summaryDetailsStat_events")}</CardDescription>
+                  <CardDescription className="text-xs">
+                    {isEnglishCorrectionDetail ? t("summaryDetailsStat_failure") : t("summaryDetailsStat_events")}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="text-xl font-semibold tracking-tight tabular-nums">
-                    {formatInt(detailTodayBucket.events)}
+                    {isEnglishCorrectionDetail
+                      ? formatInt(englishCorrectionToday.incorrect)
+                      : formatInt(detailTodayBucket.events)}
                   </div>
                 </CardContent>
               </Card>
               <Card className="shadow-none">
                 <CardHeader className="p-4 pb-2">
-                  <CardDescription className="text-xs">{t("summaryDetailsStat_apiEvents")}</CardDescription>
+                  <CardDescription className="text-xs">
+                    {isEnglishCorrectionDetail ? t("summaryDetailsStat_operations") : t("summaryDetailsStat_apiEvents")}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <div className="text-xl font-semibold tracking-tight tabular-nums">
-                    {formatInt(detailTodayBucket.apiEvents)}
+                    {isEnglishCorrectionDetail
+                      ? formatInt(englishCorrectionOutcomes?.today ? englishCorrectionToday.requests : detailTodayBucket.events)
+                      : formatInt(detailTodayBucket.apiEvents)}
                   </div>
                 </CardContent>
               </Card>
             </div>
           ) : null}
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="text-sm font-medium">{t("summaryDetailsLast7Days")}</div>
-              <ToggleGroup
-                type="single"
-                value={detailMetric}
-                onValueChange={(value) => {
-                  if (value === "words" || value === "events" || value === "apiEvents") {
-                    setDetailMetric(value);
-                  }
-                }}
-                variant="outline"
-                size="sm"
-                className="justify-end"
-              >
-                <ToggleGroupItem value="words" className="h-9 px-3 rounded-lg text-xs">
-                  {metricLabel("words")}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="events" className="h-9 px-3 rounded-lg text-xs">
-                  {metricLabel("events")}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="apiEvents" className="h-9 px-3 rounded-lg text-xs">
-                  {metricLabel("apiEvents")}
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm font-medium">{t("summaryDetailsLast7Days")}</div>
+                {isEnglishCorrectionDetail ? (
+                  <ToggleGroup
+                    type="single"
+                    value={englishCorrectionDetailMetric}
+                    onValueChange={(value) => {
+                      if (value === "success" || value === "failure" || value === "operations") {
+                        setEnglishCorrectionDetailMetric(value);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="justify-end"
+                  >
+                    <ToggleGroupItem value="success" className="h-9 px-3 rounded-lg text-xs">
+                      {englishCorrectionMetricLabel("success")}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="failure" className="h-9 px-3 rounded-lg text-xs">
+                      {englishCorrectionMetricLabel("failure")}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="operations" className="h-9 px-3 rounded-lg text-xs">
+                      {englishCorrectionMetricLabel("operations")}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                ) : (
+                  <ToggleGroup
+                    type="single"
+                    value={detailMetric}
+                    onValueChange={(value) => {
+                      if (value === "words" || value === "events" || value === "apiEvents") {
+                        setDetailMetric(value);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="justify-end"
+                  >
+                    <ToggleGroupItem value="words" className="h-9 px-3 rounded-lg text-xs">
+                      {metricLabel("words")}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="events" className="h-9 px-3 rounded-lg text-xs">
+                      {metricLabel("events")}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="apiEvents" className="h-9 px-3 rounded-lg text-xs">
+                      {metricLabel("apiEvents")}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                )}
+              </div>
 
-            {detailSeries.length === 0 ? (
+            {(isEnglishCorrectionDetail ? englishCorrectionDetailSeries : detailSeries).length === 0 ? (
               <div className="text-sm text-muted-foreground">{t("summaryTrendEmpty")}</div>
             ) : (
-              <TrendChart series={detailMetricSeries} tone="primary" />
+              <TrendChart
+                series={isEnglishCorrectionDetail ? englishCorrectionDetailMetricSeries : detailMetricSeries}
+                tone="primary"
+              />
             )}
 
             <div className="space-y-2">

@@ -815,6 +815,18 @@
     "message": "API calls",
     "description": "Options summary: details metric label"
   },
+  "summaryDetailsMetric_operations": {
+    "message": "Operations",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_success": {
+    "message": "Success",
+    "description": "Options summary: details metric label"
+  },
+  "summaryDetailsMetric_failure": {
+    "message": "Failure",
+    "description": "Options summary: details metric label"
+  },
   "optionsDisplayDesc": {
     "message": "Customize appearance, overlay behavior, and highlight styles.",
     "description": "Options tab: display description"
