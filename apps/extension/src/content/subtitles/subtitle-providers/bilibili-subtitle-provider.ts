@@ -2,7 +2,7 @@ import type { Settings } from '@lexipath/core';
 import { createLogger } from '@lexipath/core/log';
 import { fetchBilibiliSubtitles, getBilibiliAvailableTracks, getCid, parseVideoInfo, SubtitleHttpError } from '@lexipath/subtitles';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
-import { getI18nMessage } from '../i18n';
+import { getI18nMessage } from '../../i18n';
 
 const log = createLogger('subtitle-provider:bilibili');
 

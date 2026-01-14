@@ -76,4 +76,3 @@ describe('YouTubeSubtitleProvider', () => {
     expect(result.statusMessage).toBe('subtitle_requiresPremium');
   });
 });
-

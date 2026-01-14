@@ -8,14 +8,15 @@
 import browser from 'webextension-polyfill';
 import type { Cue, Settings, SupportedLanguage } from '@lexipath/core';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
-import { sendMessage } from '../shared/messages';
-import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from './ui/SubtitleOverlay';
+import { sendMessage } from '../../shared/messages';
+import { SubtitleOverlay, type SubtitleMode, type SubtitleLine, type WordCardData } from '../ui';
 import { createSubtitleProvider } from './subtitle-providers/create-subtitle-provider';
 import type { SubtitleProvider } from './subtitle-providers/subtitle-provider';
-import { getI18nMessage } from './i18n';
+import { getI18nMessage } from '../i18n';
 import { SubtitleVideoSync } from './subtitle-video-sync';
 import { SubtitleEnhancer } from './subtitle-enhancer';
 import { BilibiliDanmuManager } from './bilibili-danmu-manager';
+import { resolveWordCardTtsLang } from '../wordcard';
 
 export { detectPlatform } from './subtitle-platform';
 export type { Platform } from './subtitle-platform';
@@ -23,19 +24,6 @@ export type { Platform } from './subtitle-platform';
 const SLOW_LOG_THRESHOLD_MS = 800;
 const DEBUG_LOG_THROTTLE_MS = 1500;
 const log = createLogger('subtitle-controller');
-
-function resolveWordCardTtsLang(settings: Settings): string {
-  const targetLanguage = settings.targetLanguage;
-  if (targetLanguage === 'en') {
-    return settings.wordCardEnglishAccent === 'uk' ? 'en-GB' : 'en-US';
-  }
-  if (targetLanguage === 'ja') return 'ja-JP';
-  if (targetLanguage === 'ko') return 'ko-KR';
-  if (targetLanguage === 'fr') return 'fr-FR';
-  if (targetLanguage === 'de') return 'de-DE';
-  if (targetLanguage === 'zh') return settings.nativeLanguage === 'zh-TW' ? 'zh-TW' : 'zh-CN';
-  return 'en-US';
-}
 
 /**
  * Subtitle Controller
@@ -206,6 +194,7 @@ export class SubtitleController {
       isPaused: () => this.isVideoPaused(),
       sendEnhanceSubtitle: (payload) => sendMessage('ENHANCE_SUBTITLE', payload),
       getSourceLang: (cue, subtitleLanguage) => this.getCueSourceLanguage(cue, subtitleLanguage),
+      getContextWindowSize: () => this.clampContextSentences(this.settings.llmContextSentences),
       onCueEnhanced: (cueId) => {
         const currentCue = this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : null;
         if (currentCue?.id === cueId) {
@@ -553,7 +542,7 @@ export class SubtitleController {
     this.currentSubtitleContext = keywordText || cue.text;
 
     if (keywordText) {
-      void this.ensureCueKeywords(cue.id, keywordText);
+      void this.ensureCueKeywords(cue.id, keywordText, this.currentCueIndex);
     }
 
     const keywordSignature = keywordText ? this.computeTextSignature(keywordText) : '';
@@ -561,7 +550,7 @@ export class SubtitleController {
       keywordText && this.cueKeywordSignatures.get(cue.id) === keywordSignature ? this.cueKeywords.get(cue.id) : undefined;
 
     if (keywordText && keywords && keywords.length > 0) {
-      void this.ensureCueKeywordTranslations(cue.id, keywordText, keywords);
+      void this.ensureCueKeywordTranslations(cue.id, keywordText, keywords, this.currentCueIndex);
     }
 
     const translationSignature =
@@ -865,11 +854,53 @@ export class SubtitleController {
     return `${normalized.length}:${hash >>> 0}`;
   }
 
-  private ensureCueKeywords(cueId: string, text: string): Promise<string[]> {
+  private clampContextSentences(raw: unknown): number {
+    const n = typeof raw === 'number' && Number.isFinite(raw) ? Math.floor(raw) : 0;
+    return Math.max(0, Math.min(6, n));
+  }
+
+  private buildCueContextWindow(centerIndex: number, centerText: string): { before: string[]; after: string[] } {
+    const windowSize = this.clampContextSentences(this.settings.llmContextSentences);
+    if (windowSize <= 0) return { before: [], after: [] };
+
+    const before: string[] = [];
+    const after: string[] = [];
+
+    const start = Math.max(0, centerIndex - windowSize);
+    const end = Math.min(this.cues.length - 1, centerIndex + windowSize);
+
+    for (let i = start; i <= end; i += 1) {
+      if (i === centerIndex) continue;
+      const cue = this.cues[i];
+      const text = cue?.text?.trim?.() ?? '';
+      if (!text) continue;
+      if (i < centerIndex) before.push(text);
+      else after.push(text);
+    }
+
+    // Always include the current line in context to disambiguate senses.
+    const center = centerText.trim();
+    if (center) {
+      before.push(center);
+    }
+
+    return { before, after };
+  }
+
+  private computeContextSignature(window: { before: string[]; after: string[] }): string {
+    const joined = [...window.before, '||', ...window.after].join('\n').trim();
+    if (!joined) return '';
+    return this.computeTextSignature(joined);
+  }
+
+  private ensureCueKeywords(cueId: string, text: string, cueIndex?: number): Promise<string[]> {
     const trimmed = text.trim();
     if (!trimmed) return Promise.resolve([]);
 
-    const signature = this.computeTextSignature(trimmed);
+    const idx = typeof cueIndex === 'number' ? cueIndex : this.cues.findIndex((cue) => cue?.id === cueId);
+    const contextWindow = idx >= 0 ? this.buildCueContextWindow(idx, trimmed) : { before: [trimmed], after: [] };
+    const contextSig = this.computeContextSignature(contextWindow);
+    const signature = contextSig ? `${this.computeTextSignature(trimmed)}|ctx:${contextSig}` : this.computeTextSignature(trimmed);
     if (this.cueKeywordSignatures.get(cueId) === signature && this.cueKeywords.has(cueId)) {
       return Promise.resolve(this.cueKeywords.get(cueId) ?? []);
     }
@@ -880,7 +911,13 @@ export class SubtitleController {
 
     const promise = (async () => {
       const startedAt = performance.now();
-      const response = await sendMessage('SELECT_KEYWORDS', { text: trimmed, scene: 'subtitle' });
+      const response = await sendMessage('SELECT_KEYWORDS', {
+        text: trimmed,
+        scene: 'subtitle',
+        ...((contextWindow.before.length || contextWindow.after.length)
+          ? { contextBefore: contextWindow.before, contextAfter: contextWindow.after }
+          : {}),
+      });
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (elapsedMs >= SLOW_LOG_THRESHOLD_MS) {
         log.debug(`SELECT_KEYWORDS slow cueId=${cueId} ms=${elapsedMs}`);
@@ -892,7 +929,7 @@ export class SubtitleController {
         this.cueKeywords.set(cueId, keywords);
         this.cueKeywordSignatures.set(cueId, signature);
         if (keywords.length > 0) {
-          void this.ensureCueKeywordTranslations(cueId, trimmed, keywords);
+          void this.ensureCueKeywordTranslations(cueId, trimmed, keywords, idx);
         }
         const currentCue = this.cues[this.currentCueIndex];
         if (currentCue?.id === cueId) {
@@ -921,13 +958,18 @@ export class SubtitleController {
   private ensureCueKeywordTranslations(
     cueId: string,
     contextText: string,
-    keywords: string[]
+    keywords: string[],
+    cueIndex?: number
   ): Promise<Record<string, string>> {
     const trimmedContext = contextText.trim();
     if (!trimmedContext) return Promise.resolve({});
     if (keywords.length === 0) return Promise.resolve({});
 
-    const signature = this.computeKeywordTranslationSignature(trimmedContext, keywords);
+    const idx = typeof cueIndex === 'number' ? cueIndex : this.cues.findIndex((cue) => cue?.id === cueId);
+    const contextWindow = idx >= 0 ? this.buildCueContextWindow(idx, trimmedContext) : { before: [trimmedContext], after: [] };
+    const contextSig = this.computeContextSignature(contextWindow);
+    const signatureBase = this.computeKeywordTranslationSignature(trimmedContext, keywords);
+    const signature = contextSig ? `${signatureBase}|ctx:${contextSig}` : signatureBase;
     if (this.cueKeywordTranslationSignatures.get(cueId) === signature && this.cueKeywordTranslations.has(cueId)) {
       return Promise.resolve(this.cueKeywordTranslations.get(cueId) ?? {});
     }
@@ -939,7 +981,9 @@ export class SubtitleController {
     const promise = (async () => {
       const response = await sendMessage('TRANSLATE_KEYWORDS', {
         keywords,
-        context: trimmedContext,
+        ...(contextWindow.before.length || contextWindow.after.length
+          ? { contextBefore: contextWindow.before, contextAfter: contextWindow.after }
+          : { context: trimmedContext }),
         sourceLang: this.settings.targetLanguage,
         targetLang: this.settings.nativeLanguage,
       });
@@ -1050,12 +1094,12 @@ export class SubtitleController {
       cuesInWindow.map((cue) => {
         const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
         if (!this.shouldAdaptSubtitle(cueLang)) {
-          return this.ensureCueKeywords(cue.id, cue.text);
+          return this.ensureCueKeywords(cue.id, cue.text, this.cues.indexOf(cue));
         }
 
         const adapted = this.enhancer?.getEnhanced(cue.id)?.line1_final?.trim() ?? '';
         if (!adapted) return Promise.resolve([]);
-        return this.ensureCueKeywords(cue.id, adapted);
+        return this.ensureCueKeywords(cue.id, adapted, this.cues.indexOf(cue));
       })
     );
     if (this.destroyed) return;
@@ -1235,12 +1279,19 @@ export class SubtitleController {
 
     this.overlay.showWordCardLoading(normalized, anchorRect, options);
 
-    const card = await this.getWordCardData(normalized, this.currentSubtitleContext);
+    const cueIndex = this.currentCueIndex;
+    const contextWindow =
+      cueIndex >= 0 ? this.buildCueContextWindow(cueIndex, this.currentSubtitleContext || normalized) : { before: [], after: [] };
+    const card = await this.getWordCardData(normalized, this.currentSubtitleContext, contextWindow);
     this.wordExplainCache.set(normalized, card);
     this.overlay.showWordCard(card, anchorRect, options);
   }
 
-  private async getWordCardData(normalizedWord: string, context?: string): Promise<WordCardData> {
+  private async getWordCardData(
+    normalizedWord: string,
+    context?: string,
+    contextWindow?: { before: string[]; after: string[] }
+  ): Promise<WordCardData> {
     const cached = this.wordExplainCache.get(normalizedWord);
     if (cached) return cached;
 
@@ -1251,7 +1302,9 @@ export class SubtitleController {
       const startedAt = performance.now();
       const response = await sendMessage('EXPLAIN_WORD', {
         word: normalizedWord,
-        ...(context && context.trim() ? { context: context.trim() } : {}),
+        ...(contextWindow && (contextWindow.before.length || contextWindow.after.length)
+          ? { contextBefore: contextWindow.before, contextAfter: contextWindow.after }
+          : (context && context.trim() ? { context: context.trim() } : {})),
       });
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (elapsedMs >= SLOW_LOG_THRESHOLD_MS) {

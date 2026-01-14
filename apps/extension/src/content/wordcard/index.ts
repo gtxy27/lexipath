@@ -1,0 +1,2 @@
+export { resolveWordCardTtsLang } from "./tts";
+

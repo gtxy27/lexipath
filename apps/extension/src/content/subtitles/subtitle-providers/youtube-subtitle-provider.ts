@@ -3,7 +3,7 @@ import browser from 'webextension-polyfill';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { fetchYouTubeSubtitles, getVideoId as getYouTubeVideoId, SubtitleHttpError } from '@lexipath/subtitles';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
-import { getI18nMessage } from '../i18n';
+import { getI18nMessage } from '../../i18n';
 
 const CAPTIONS_KICK_DEBOUNCE_MS = 1500;
 const ADDITIONAL_PARAMS_POLL_DELAY_MS = 500;

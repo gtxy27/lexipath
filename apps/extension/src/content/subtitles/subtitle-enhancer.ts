@@ -11,6 +11,7 @@ export class SubtitleEnhancer {
 
   private cues: Cue[] = [];
   private cuesToken = 0;
+  private cueIndexById = new Map<string, number>();
 
   private subtitleLanguage = '';
 
@@ -28,6 +29,7 @@ export class SubtitleEnhancer {
   private readonly getSourceLang: (cue: Cue, subtitleLanguage: string) => SupportedLanguage;
   private readonly isPaused: () => boolean;
   private readonly onCueEnhanced: ((cueId: string) => void) | undefined;
+  private readonly getContextWindowSize: (() => number) | undefined;
 
   constructor(options: {
     maxInFlight?: number;
@@ -35,12 +37,14 @@ export class SubtitleEnhancer {
     sendEnhanceSubtitle: (payload: EnhanceSubtitlePayload) => Promise<Response<SubtitleEnhanceOutput>>;
     getSourceLang: (cue: Cue, subtitleLanguage: string) => SupportedLanguage;
     onCueEnhanced?: (cueId: string) => void;
+    getContextWindowSize?: () => number;
   }) {
     this.maxInFlight = options.maxInFlight ?? 2;
     this.isPaused = options.isPaused;
     this.sendEnhanceSubtitle = options.sendEnhanceSubtitle;
     this.getSourceLang = options.getSourceLang;
     this.onCueEnhanced = options.onCueEnhanced;
+    this.getContextWindowSize = options.getContextWindowSize;
   }
 
   destroy(): void {
@@ -48,6 +52,7 @@ export class SubtitleEnhancer {
     this.started = false;
     this.cues = [];
     this.cuesToken++;
+    this.cueIndexById.clear();
     this.inFlight = 0;
     this.queueIndex = 0;
     this.enhancedCueCount = 0;
@@ -60,6 +65,7 @@ export class SubtitleEnhancer {
     this.cues = cues;
     this.cuesToken = options.token;
     this.subtitleLanguage = options.subtitleLanguage;
+    this.cueIndexById = new Map(cues.map((cue, idx) => [cue.id, idx] as const));
 
     this.queueIndex = 0;
     this.inFlight = 0;
@@ -72,11 +78,43 @@ export class SubtitleEnhancer {
   appendCues(cues: Cue[], options: { subtitleLanguage: string }): void {
     this.cues = cues;
     this.subtitleLanguage = options.subtitleLanguage;
+    this.cueIndexById = new Map(cues.map((cue, idx) => [cue.id, idx] as const));
 
     // Do not reset enhanced results; allow the pipeline to keep running and
     // continue from the current queueIndex.
     this.queueIndex = Math.min(this.queueIndex, cues.length);
     this.pump();
+  }
+
+  private clampContextWindowSize(): number {
+    const n = this.getContextWindowSize?.();
+    const v = typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : 0;
+    return Math.max(0, Math.min(6, v));
+  }
+
+  private buildCueContextWindow(cueIndex: number, centerText: string): { before: string[]; after: string[] } {
+    const windowSize = this.clampContextWindowSize();
+    if (windowSize <= 0) return { before: [], after: [] };
+
+    const before: string[] = [];
+    const after: string[] = [];
+
+    const start = Math.max(0, cueIndex - windowSize);
+    const end = Math.min(this.cues.length - 1, cueIndex + windowSize);
+
+    for (let i = start; i <= end; i += 1) {
+      if (i === cueIndex) continue;
+      const cue = this.cues[i];
+      const text = cue?.text?.trim?.() ?? '';
+      if (!text) continue;
+      if (i < cueIndex) before.push(text);
+      else after.push(text);
+    }
+
+    const center = centerText.trim();
+    if (center) before.push(center);
+
+    return { before, after };
   }
 
   start(): void {
@@ -98,6 +136,7 @@ export class SubtitleEnhancer {
     if (this.isPaused()) return;
 
     while (this.inFlight < this.maxInFlight && this.queueIndex < this.cues.length) {
+      const cueIndex = this.queueIndex;
       const cue = this.cues[this.queueIndex++];
       if (!cue) continue;
       if (this.enhanced.has(cue.id)) continue;
@@ -105,7 +144,7 @@ export class SubtitleEnhancer {
 
       this.inFlight++;
       const token = this.cuesToken;
-      void this.enhanceCue(cue, token)
+      void this.enhanceCue(cue, cueIndex, token)
         .catch((error: unknown) => {
           log.warn('enhanceCue threw; keeping pipeline moving', { cueId: cue.id, message: getErrorMessage(error) });
         })
@@ -138,10 +177,15 @@ export class SubtitleEnhancer {
 
     const token = this.cuesToken;
     const promise = (async () => {
+      const cueIndex = this.cueIndexById.get(cue.id) ?? -1;
+      const contextWindow = cueIndex >= 0 ? this.buildCueContextWindow(cueIndex, cue.text) : { before: [], after: [] };
       const response = await this.sendEnhanceSubtitle({
         subtitle: cue.text,
         sourceLang: this.getSourceLang(cue, this.subtitleLanguage),
         mode: 'bilingual',
+        ...((contextWindow.before.length || contextWindow.after.length)
+          ? { contextBefore: contextWindow.before, contextAfter: contextWindow.after }
+          : {}),
       });
 
       if (!response.ok) return;
@@ -161,13 +205,17 @@ export class SubtitleEnhancer {
     return promise;
   }
 
-  private async enhanceCue(cue: Cue, token: number): Promise<void> {
+  private async enhanceCue(cue: Cue, cueIndex: number, token: number): Promise<void> {
     const startMs = performance.now();
     try {
+      const contextWindow = this.buildCueContextWindow(cueIndex, cue.text);
       const response = await this.sendEnhanceSubtitle({
         subtitle: cue.text,
         sourceLang: this.getSourceLang(cue, this.subtitleLanguage),
         mode: 'single',
+        ...((contextWindow.before.length || contextWindow.after.length)
+          ? { contextBefore: contextWindow.before, contextAfter: contextWindow.after }
+          : {}),
       });
 
       if (!response.ok) {

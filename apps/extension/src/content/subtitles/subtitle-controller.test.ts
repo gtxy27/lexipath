@@ -13,7 +13,7 @@ import { createSubtitleProvider } from './subtitle-providers/create-subtitle-pro
 import { YouTubeSubtitleProvider } from './subtitle-providers/youtube-subtitle-provider';
 
 // Mock dependencies
-vi.mock('../shared/messages', () => ({
+vi.mock('../../shared/messages', () => ({
   sendMessage: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ vi.mock('@lexipath/subtitles', () => ({
   getBilibiliAvailableTracks: vi.fn(),
 }));
 
-vi.mock('./ui/SubtitleOverlay', () => {
+vi.mock('../ui', () => {
   const SubtitleOverlay = vi.fn();
   SubtitleOverlay.prototype.mount = vi.fn(() => true);
   SubtitleOverlay.prototype.unmount = vi.fn();
@@ -57,7 +57,7 @@ vi.mock('./ui/SubtitleOverlay', () => {
 });
 
 // Import mocked modules
-import { sendMessage } from '../shared/messages';
+import { sendMessage } from '../../shared/messages';
 import {
   getVideoId,
   fetchYouTubeSubtitles,
@@ -66,7 +66,7 @@ import {
   fetchBilibiliSubtitles,
   getBilibiliAvailableTracks,
 } from '@lexipath/subtitles';
-import { SubtitleOverlay } from './ui/SubtitleOverlay';
+import { SubtitleOverlay } from '../ui';
 
 describe('detectPlatform', () => {
   it('detects YouTube from various URLs', () => {
@@ -151,6 +151,7 @@ describe('SubtitleController', () => {
       targetProficiencyLevel: 'B2',
       theme: 'system',
       promptStyle: 'default',
+      llmContextSentences: 1,
       channels: [
         {
           channelId: 1,
@@ -475,16 +476,22 @@ describe('SubtitleController', () => {
       // Should start enhancing cues (concurrency-limited, but 2 cues should both start)
       const enhanceCalls = vi.mocked(sendMessage).mock.calls.filter(([type]) => type === 'ENHANCE_SUBTITLE');
       expect(enhanceCalls).toHaveLength(2);
-      expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
-        subtitle: 'First subtitle',
-        sourceLang: 'zh',
-        mode: 'single',
-      });
-      expect(sendMessage).toHaveBeenCalledWith('ENHANCE_SUBTITLE', {
-        subtitle: 'Second subtitle',
-        sourceLang: 'zh',
-        mode: 'single',
-      });
+      expect(sendMessage).toHaveBeenCalledWith(
+        'ENHANCE_SUBTITLE',
+        expect.objectContaining({
+          subtitle: 'First subtitle',
+          sourceLang: 'zh',
+          mode: 'single',
+        })
+      );
+      expect(sendMessage).toHaveBeenCalledWith(
+        'ENHANCE_SUBTITLE',
+        expect.objectContaining({
+          subtitle: 'Second subtitle',
+          sourceLang: 'zh',
+          mode: 'single',
+        })
+      );
     });
 
     it('handles enhancement failures gracefully', async () => {
