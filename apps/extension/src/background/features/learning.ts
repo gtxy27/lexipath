@@ -252,6 +252,8 @@ async function getKeywordsForText(options: {
   userLevel: CEFRLevel;
   scene: 'subtitle' | 'web';
   maxItems?: number;
+  contextBefore?: string[];
+  contextAfter?: string[];
   t: Translator;
   log: { warn: (...args: any[]) => void };
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>;
@@ -271,6 +273,8 @@ async function getKeywordsForText(options: {
     provider: routeIdentity(route, settings),
     prompt: {
       text,
+      contextBefore: options.contextBefore ?? [],
+      contextAfter: options.contextAfter ?? [],
       sourceLang,
       targetLang,
       userLevel,
@@ -304,6 +308,9 @@ async function getKeywordsForText(options: {
           agentKey: 'keyword_select',
           sceneKey: scene === 'web' ? 'keyword_select_web' : 'keyword_select_subtitle',
           userInfo,
+          ...((options.contextBefore?.length ?? 0) > 0 || (options.contextAfter?.length ?? 0) > 0
+            ? { contextInfo: { before: options.contextBefore ?? [], after: options.contextAfter ?? [] } }
+            : {}),
           userInput: text,
         });
 
@@ -455,6 +462,8 @@ async function translateKeywords(options: {
   settings: Settings;
   keywords: string[];
   context?: string;
+  contextBefore?: string[];
+  contextAfter?: string[];
   sourceLang: string;
   targetLang: string;
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>;
@@ -500,6 +509,8 @@ async function translateKeywords(options: {
     params: {
       keywords: normalizedKeywords.join('|'),
       context: options.context ?? '',
+      contextBefore: (options.contextBefore ?? []).join('\n'),
+      contextAfter: (options.contextAfter ?? []).join('\n'),
       sourceLang: options.sourceLang,
       targetLang: options.targetLang,
     },
@@ -544,7 +555,11 @@ async function translateKeywords(options: {
               agentKey: 'translate_keywords',
               sceneKey: 'keyword_translate',
               userInfo,
-              ...(options.context ? { contextInfo: makeContextInfoFromText(options.context) } : {}),
+              ...(options.context
+                ? { contextInfo: makeContextInfoFromText(options.context) }
+                : ((options.contextBefore?.length ?? 0) > 0 || (options.contextAfter?.length ?? 0) > 0
+                    ? { contextInfo: { before: options.contextBefore ?? [], after: options.contextAfter ?? [] } }
+                    : {})),
               userInput,
             });
 
@@ -627,6 +642,8 @@ export function registerLearningFeature(options: {
       targetLang,
       userLevel,
       scene,
+      ...(payload.contextBefore ? { contextBefore: payload.contextBefore } : {}),
+      ...(payload.contextAfter ? { contextAfter: payload.contextAfter } : {}),
       t,
       log,
       concurrency,
@@ -642,6 +659,8 @@ export function registerLearningFeature(options: {
       settings,
       keywords,
       ...(payload.context ? { context: payload.context } : {}),
+      ...(payload.contextBefore ? { contextBefore: payload.contextBefore } : {}),
+      ...(payload.contextAfter ? { contextAfter: payload.contextAfter } : {}),
       sourceLang: payload.sourceLang,
       targetLang: payload.targetLang,
       concurrency,
@@ -987,7 +1006,7 @@ export function registerLearningFeature(options: {
     const difficultyLevel = payload.difficultyLevel ?? settings.proficiencyLevel;
     const mode = payload.mode ?? 'bilingual';
 
-    const translateRoute = resolveRoute('translate', settings);
+    const translateKeywordsRoute = resolveRoute('translate_keywords', settings);
     const nativeLang = payload.targetLang ?? settings.nativeLanguage;
     const needsAdapt = sourceLang !== settings.targetLanguage;
 
@@ -996,9 +1015,11 @@ export function registerLearningFeature(options: {
     const adaptProviderInfo = adaptChannel ? getChatProviderByChannel(adaptChannel) : null;
 
     const cacheKey = makeCacheKey('ENHANCE_SUBTITLE', {
-      v: 4,
+      v: 5,
       providers: {
-        ...(needsAdapt && adaptRoute ? { adapt: routeIdentity(adaptRoute, settings) } : { translation: routeIdentity(translateRoute, settings) }),
+        ...(needsAdapt && adaptRoute
+          ? { adapt: routeIdentity(adaptRoute, settings) }
+          : { translation: routeIdentity(translateKeywordsRoute, settings) }),
       },
       params: {
         subtitle,
@@ -1021,36 +1042,38 @@ export function registerLearningFeature(options: {
             }
 
             const translated = await (async () => {
-              if (translateRoute.kind === 2) {
-                const limit = concurrency.getChannelConcurrencyLimit(null, translateRoute.kind);
-                return concurrency.runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
-                  googleTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(nativeLang) })
-                );
-              }
-              if (translateRoute.kind === 3) {
-                const limit = concurrency.getChannelConcurrencyLimit(null, translateRoute.kind);
-                return concurrency.runWithChannelConcurrency(routeKey(translateRoute), limit, () =>
-                  bingTranslateProvider.translate(subtitle, { from: String(sourceLang), to: String(nativeLang) })
-                );
-              }
+              const rawLines = subtitle.replace(/\r/g, '').split('\n');
+              const sourceLines = rawLines.map((line) => line.trim()).filter(Boolean);
+              if (sourceLines.length === 0) return '';
 
-              const [fallback] = await translateTerms({
+              const mapping = await translateKeywords({
                 settings,
-                terms: [subtitle],
+                keywords: sourceLines,
+                ...(payload.contextBefore ? { contextBefore: payload.contextBefore } : {}),
+                ...(payload.contextAfter ? { contextAfter: payload.contextAfter } : {}),
                 sourceLang: String(sourceLang),
                 targetLang: String(nativeLang),
                 concurrency,
                 log,
-                // For subtitle bilingual translation, avoid falling back to the original subtitle text.
-                // Missing/empty translation will keep the UI in an i18n loading state instead of duplicating the original.
-                fallbackToOriginal: false,
               });
-              return fallback ?? '';
+
+              const translatedLines = sourceLines.map((line) => {
+                const valueRaw = mapping[line];
+                const value = typeof valueRaw === 'string' ? valueRaw.trim() : '';
+
+                // Avoid duplicating the original subtitle text on translation failure.
+                // Missing/empty translations keep the UI in an i18n loading state.
+                if (!value) return '';
+                if (value.toLowerCase() === line.toLowerCase()) return '';
+                return value;
+              });
+
+              return translatedLines.join('\n');
             })();
 
             return {
-              value: { line1_final: subtitle, ...(translated ? { line2_final: translated } : {}) },
-              ok: Boolean(translated),
+              value: { line1_final: subtitle, ...(translated && translated.trim() ? { line2_final: translated.trim() } : {}) },
+              ok: Boolean(translated && translated.trim()),
             };
           }
 
@@ -1229,7 +1252,7 @@ export function registerLearningFeature(options: {
     const dictionaryProviderInfo = dictionaryChannel ? getChatProviderByChannel(dictionaryChannel) : null;
 
     const cacheKey = makeCacheKey('EXPLAIN_WORD', {
-      v: 4,
+      v: 5,
       provider: routeIdentity(dictionaryRoute, settings),
       word,
       sourceLang,
@@ -1237,6 +1260,8 @@ export function registerLearningFeature(options: {
       userLevel,
       proficiencyPreference: settings.proficiencyPreference ?? null,
       context: context ?? '',
+      contextBefore: (payload.contextBefore ?? []).join('\n'),
+      contextAfter: (payload.contextAfter ?? []).join('\n'),
     });
 
     const cached = explainWordCache.get(cacheKey);
@@ -1336,7 +1361,11 @@ export function registerLearningFeature(options: {
           agentKey: 'explain_word',
           sceneKey: 'word_card',
           userInfo,
-          ...(context ? { contextInfo: makeContextInfoFromText(context) } : {}),
+          ...(context
+            ? { contextInfo: makeContextInfoFromText(context) }
+            : ((payload.contextBefore?.length ?? 0) > 0 || (payload.contextAfter?.length ?? 0) > 0
+                ? { contextInfo: { before: payload.contextBefore ?? [], after: payload.contextAfter ?? [] } }
+                : {})),
           userInput,
         });
 

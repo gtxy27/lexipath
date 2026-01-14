@@ -170,6 +170,8 @@ const messageDefinitions = {
         sourceLang: SupportedLanguageSchema.optional(),
         targetLang: NativeLanguageSchema.optional(),
         userLevel: CEFRLevelSchema.optional(),
+        contextBefore: z.array(z.string().min(1)).optional(),
+        contextAfter: z.array(z.string().min(1)).optional(),
       })
       .strict(),
     valueSchema: z.array(z.string()),
