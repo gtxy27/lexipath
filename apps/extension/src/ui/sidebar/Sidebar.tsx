@@ -177,7 +177,8 @@ export function Sidebar(): React.ReactElement {
   }, []);
 
   const loadMessages = useCallback(async (sessionId: string) => {
-    const response = await sendMessage("GET_CHAT_MESSAGES", { sessionId });
+    // Loading an unbounded history can be slow with large sessions; keep UI responsive.
+    const response = await sendMessage("GET_CHAT_MESSAGES", { sessionId, limit: 80 });
     if (response.ok) {
       const history = (response.value as any[]).map(m => ({
         id: String(m.id),
