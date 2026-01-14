@@ -48,6 +48,7 @@ import { makeContextInfoFromText, makePromptUserInfo, nextCefrLevel, pickStyleKe
 import { dictionaryService } from '../services/dictionary';
 import { createExpiringLruCache, dedupeInFlight, getOrRunCachedTask, makeCacheKey } from '../pipeline';
 import { bumpDailyUsage } from '../usage-summary';
+import { bumpEnglishCorrectionOutcome } from '../english-correction-outcome-summary';
 import { filterSelectedKeywords } from '../keyword-filter';
 
 type Registry = ReturnType<typeof createMessageHandlerRegistry>;
@@ -1230,6 +1231,7 @@ export function registerLearningFeature(options: {
     });
 
     void bumpDailyUsage({ task: 'english_correction', provider: providerInfo.type, apiEvent, words: 0 });
+    void bumpEnglishCorrectionOutcome({ hasError: result.hasError });
     return result;
   });
 

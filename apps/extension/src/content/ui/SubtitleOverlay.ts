@@ -103,6 +103,7 @@ export class SubtitleOverlay {
   private wordCardLastWord: string | null = null;
   private wordCardTempTtsLang: string | null = null;
   private wordCardSpeakToken = 0;
+  private lastDisplayLines: SubtitleLine[] = [];
 
   constructor(
     platform: 'youtube' | 'bilibili',
@@ -363,6 +364,7 @@ export class SubtitleOverlay {
 
     this.mode = options.mode;
     const { lines } = options;
+    this.lastDisplayLines = Array.isArray(lines) ? lines.map((line) => ({ ...line })) : [];
     this.updateModeLabel();
 
     if (lines.length === 0) {
@@ -388,6 +390,27 @@ export class SubtitleOverlay {
       this.scheduleKeywordTranslationPlacement();
     }
     this.subtitleElement.classList.add('visible');
+  }
+
+  private getVideoTitle(): string {
+    const title = typeof document?.title === 'string' ? document.title.trim() : '';
+    if (!title) return '';
+    return title.replace(/\s+-\s+YouTube\s*$/i, '').trim();
+  }
+
+  private getVideoTimestampSec(): number | null {
+    const container = this.videoContainer;
+    if (!container) return null;
+    const video = container.querySelector('video');
+    if (!(video instanceof HTMLVideoElement)) return null;
+    const t = typeof video.currentTime === 'number' ? video.currentTime : NaN;
+    if (!Number.isFinite(t) || t < 0) return null;
+    return t;
+  }
+
+  private getSubtitleContextLines(): string[] {
+    const raw = (this.lastDisplayLines ?? []).map((l) => String(l.text ?? '').trim()).filter(Boolean);
+    return raw.slice(0, 4).map((line) => (line.length > 240 ? `${line.slice(0, 240)}…` : line));
   }
 
   /**
@@ -737,7 +760,22 @@ export class SubtitleOverlay {
     chatButton.addEventListener('click', (e) => {
       e.stopPropagation();
       const prompt = `Please explain the usage of the word "${data.word}" in this context${data.example ? `: "${data.example}"` : ''}.`;
-      sendMessage('OPEN_SIDEBAR', { initialMessage: prompt, keyword: data.word, isAutoSend: true });
+      const title = this.getVideoTitle();
+      const timestampSec = this.getVideoTimestampSec();
+      const lines = this.getSubtitleContextLines();
+
+      sendMessage('OPEN_SIDEBAR', {
+        initialMessage: prompt,
+        keyword: data.word,
+        isAutoSend: true,
+        contextInfo: {
+          kind: 'subtitle',
+          platform: this.platform,
+          ...(title ? { title } : {}),
+          ...(typeof timestampSec === 'number' ? { timestampSec } : {}),
+          ...(lines.length ? { lines } : {}),
+        },
+      });
       this.hideWordCard();
     });
     footer.appendChild(chatButton);

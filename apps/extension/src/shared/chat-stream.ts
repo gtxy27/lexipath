@@ -31,6 +31,7 @@ export function chatStream(
         const response = await sendMessage("CHAT", {
           message: payload.message,
           ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
+          ...(payload.backgroundInfo ? { backgroundInfo: payload.backgroundInfo } : {}),
         });
         if (cancelled) return;
         if (!response.ok) {

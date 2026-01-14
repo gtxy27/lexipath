@@ -113,6 +113,29 @@ const UsageSummaryResponseSchema = z
   })
   .strict();
 
+const EnglishCorrectionOutcomeBucketSchema = z
+  .object({
+    requests: z.number().int().min(0),
+    correct: z.number().int().min(0),
+    incorrect: z.number().int().min(0),
+  })
+  .strict();
+
+const DailyEnglishCorrectionOutcomeSummarySchema = z
+  .object({
+    date: z.string().min(1),
+    updatedAt: z.number().int().min(0),
+    totals: EnglishCorrectionOutcomeBucketSchema,
+  })
+  .strict();
+
+const EnglishCorrectionOutcomeSummaryResponseSchema = z
+  .object({
+    today: DailyEnglishCorrectionOutcomeSummarySchema,
+    recentDays: z.array(DailyEnglishCorrectionOutcomeSummarySchema),
+  })
+  .strict();
+
 const ReportUsageEventPayloadSchema = z
   .object({
     event: z.enum(['word_card_opened']),
@@ -145,6 +168,10 @@ const messageDefinitions = {
   GET_USAGE_SUMMARY: {
     payloadSchema: z.undefined(),
     valueSchema: UsageSummaryResponseSchema,
+  },
+  GET_ENGLISH_CORRECTION_OUTCOME_SUMMARY: {
+    payloadSchema: z.object({ days: z.number().int().min(1).max(365).optional() }).optional(),
+    valueSchema: EnglishCorrectionOutcomeSummaryResponseSchema,
   },
   REPORT_USAGE_EVENT: {
     payloadSchema: ReportUsageEventPayloadSchema,
@@ -230,6 +257,15 @@ const messageDefinitions = {
         initialMessage: z.string().optional(),
         keyword: z.string().optional(),
         isAutoSend: z.boolean().optional(),
+        contextInfo: z
+          .object({
+            kind: z.literal('subtitle'),
+            platform: z.string().optional(),
+            title: z.string().optional(),
+            timestampSec: z.number().optional(),
+            lines: z.array(z.string()).optional(),
+          })
+          .optional(),
       })
       .optional(),
     valueSchema: z.object({ ok: z.literal(true) }),

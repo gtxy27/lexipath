@@ -1,6 +1,7 @@
 import type { createMessageHandlerRegistry } from '../../shared/messages';
 import { getSettings, setSettings } from '../../shared/storage';
 import { resolveChannel, resolveChannelRoute, resolveRoute } from '../lib/routing';
+import { getEnglishCorrectionOutcomeSummary } from '../english-correction-outcome-summary';
 import { bumpDailyUsage, getUsageSummary } from '../usage-summary';
 
 type Registry = ReturnType<typeof createMessageHandlerRegistry>;
@@ -63,6 +64,10 @@ export function registerSettingsFeature(options: { registry: Registry }) {
 
   registry.register('GET_USAGE_SUMMARY', async () => {
     return getUsageSummary({ days: 7 });
+  });
+
+  registry.register('GET_ENGLISH_CORRECTION_OUTCOME_SUMMARY', async (payload) => {
+    return getEnglishCorrectionOutcomeSummary({ days: payload?.days ?? 7 });
   });
 
   registry.register('REPORT_USAGE_EVENT', async (payload) => {

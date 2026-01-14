@@ -504,7 +504,7 @@ async function runChatStream(
   t: Translator,
   log: { warn: (...args: any[]) => void; debug: (...args: any[]) => void },
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>,
-  payload: { message: string; conversationId?: string },
+  payload: { message: string; conversationId?: string; backgroundInfo?: string },
   options: { onDelta: (delta: string) => void; onThinkingDelta?: (delta: string) => void; signal?: AbortSignal }
 ): Promise<{ reply: string; conversationId: string; thinking?: string }> {
   await ensureChatMigrated(log);
@@ -547,6 +547,7 @@ async function runChatStream(
 
   const history = await storageService.getMessages(sessionId, { limit: CHAT_MAX_HISTORY_MESSAGES });
   let accumulatedThinking = '';
+  const backgroundInfo = typeof payload.backgroundInfo === 'string' ? payload.backgroundInfo.trim() : '';
   const handleThinkingDelta = (delta: string) => {
     if (!delta) return;
     accumulatedThinking += delta;
@@ -569,6 +570,10 @@ Format your responses for readability:
 - Use fenced code blocks for code.
 - Ask clarifying questions at the end if needed.`,
   };
+
+  if (backgroundInfo) {
+    systemMessage.content += `\n\nBackground information:\n${backgroundInfo}\n`;
+  }
 
   try {
     const limit = concurrency.getChannelConcurrencyLimit(chatChannel, chatRoute.kind);
@@ -681,6 +686,7 @@ export function registerChatFeature(options: {
       {
         message: payload.message,
         ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
+        ...(payload.backgroundInfo ? { backgroundInfo: payload.backgroundInfo } : {}),
       },
       {
         onDelta: (delta) => {
@@ -705,10 +711,11 @@ export function registerChatFeature(options: {
       if (!message || typeof message !== 'object') return;
       const record = message as any;
       if (record.type !== 'START' || !record.payload) return;
-      const payload = record.payload as { message?: string; conversationId?: string };
+      const payload = record.payload as { message?: string; conversationId?: string; backgroundInfo?: string };
       if (typeof payload.message !== 'string' || !payload.message.trim()) return;
       const startMessage: string = payload.message;
       const startConversationId = payload.conversationId;
+      const startBackgroundInfo = payload.backgroundInfo;
 
       started = true;
 
@@ -720,7 +727,11 @@ export function registerChatFeature(options: {
             t,
             log,
             concurrency,
-            { message: startMessage, ...(startConversationId ? { conversationId: startConversationId } : {}) },
+            {
+              message: startMessage,
+              ...(startConversationId ? { conversationId: startConversationId } : {}),
+              ...(startBackgroundInfo ? { backgroundInfo: startBackgroundInfo } : {}),
+            },
             {
               onDelta: (delta) => {
                 reply += delta;

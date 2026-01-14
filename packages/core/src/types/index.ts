@@ -55,6 +55,7 @@ export const MessageTypeSchema = z.enum([
   'GET_WEB_PROCESSING_STATUS',
   'SET_SETTINGS',
   'GET_USAGE_SUMMARY',
+  'GET_ENGLISH_CORRECTION_OUTCOME_SUMMARY',
   'REPORT_USAGE_EVENT',
   'REQUEST_HOST_PERMISSION',
   'TEST_PROVIDER_CONNECTION',
@@ -618,6 +619,7 @@ export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 export const ChatPayloadSchema = z.object({
   message: z.string().min(1),
   conversationId: z.string().optional(),
+  backgroundInfo: z.string().min(1).optional(),
 });
 export type ChatPayload = z.infer<typeof ChatPayloadSchema>;
 

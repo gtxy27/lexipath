@@ -21,6 +21,7 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
         lexipath_sidebar_pending_message: {
           text: payload.initialMessage,
           keyword: typeof payload.keyword === 'string' ? payload.keyword : undefined,
+          contextInfo: payload.contextInfo,
           timestamp: Date.now(),
           isAutoSend: payload.isAutoSend ?? false,
         },
