@@ -2,6 +2,14 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { copyFileSync } from 'fs';
 
+function shouldIgnoreRollupWarning(warning: any): boolean {
+  return (
+    warning?.code === 'MODULE_LEVEL_DIRECTIVE' &&
+    typeof warning?.message === 'string' &&
+    warning.message.includes('"use client"')
+  );
+}
+
 // Content scripts must be classic scripts in many extension contexts.
 // Build a dedicated IIFE bundle to avoid top-level `import`.
 export default defineConfig(({ mode }) => {
@@ -17,6 +25,10 @@ export default defineConfig(({ mode }) => {
       sourcemap: isDev,
       minify: !isDev,
       rollupOptions: {
+        onwarn(warning, warn) {
+          if (shouldIgnoreRollupWarning(warning)) return;
+          warn(warning);
+        },
         input: {
           content: resolve(__dirname, 'src/content/index.ts'),
         },

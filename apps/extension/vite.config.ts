@@ -15,6 +15,17 @@ function copyManifestPlugin(params: { isFirefox: boolean; browser: 'firefox' | '
   };
 }
 
+function shouldIgnoreRollupWarning(warning: any): boolean {
+  // Some deps (e.g. framer-motion) ship Next.js "use client" directives in ESM builds.
+  // These directives are irrelevant in our extension bundles and Rollup reports them as
+  // "module level directives"; suppress to keep build output readable.
+  return (
+    warning?.code === 'MODULE_LEVEL_DIRECTIVE' &&
+    typeof warning?.message === 'string' &&
+    warning.message.includes('"use client"')
+  );
+}
+
 export default defineConfig(({ mode }) => {
   // Vite only injects .env[.mode] after config loading starts. Avoid reading
   // process.env.VITE_BROWSER at module top-level.
@@ -28,6 +39,10 @@ export default defineConfig(({ mode }) => {
       outDir: isFirefox ? 'dist/firefox' : 'dist/chrome',
       emptyOutDir: true,
       rollupOptions: {
+        onwarn(warning, warn) {
+          if (shouldIgnoreRollupWarning(warning)) return;
+          warn(warning);
+        },
         input: {
           background: resolve(__dirname, 'src/background/index.ts'),
           popup: resolve(__dirname, 'src/ui/popup/index.html'),
