@@ -192,7 +192,8 @@ export function Sidebar(): React.ReactElement {
     }
   }, []);
 
-  const loadLatestSession = useCallback(async () => {
+  const loadLatestSession = useCallback(
+    async (options?: { skipMessages?: boolean }) => {
     const response = await sendMessage("GET_CHAT_SESSIONS", {});
     if (response.ok) {
       const allSessions = response.value as ChatSession[];
@@ -201,12 +202,14 @@ export function Sidebar(): React.ReactElement {
         // Sort by lastAccessedAt desc
         const sorted = [...allSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
         const latest = sorted[0];
-        if (latest) {
+        if (latest && !options?.skipMessages) {
           await loadMessages(latest.sessionId);
         }
       }
     }
-  }, [loadMessages]);
+    },
+    [loadMessages],
+  );
 
   useEffect(() => {
     async function init() {
@@ -218,7 +221,13 @@ export function Sidebar(): React.ReactElement {
       } catch (error: unknown) {
         log.warn("Failed to load sidebar theme from settings; using default theme", { message: getErrorMessage(error) });
       }
-      await loadLatestSession();
+
+      const pendingData = await browser.storage.local.get("lexipath_sidebar_pending_message");
+      const pending = pendingData.lexipath_sidebar_pending_message as unknown as { timestamp?: unknown } | undefined;
+      const pendingTimestamp = typeof pending?.timestamp === "number" ? pending.timestamp : 0;
+      const hasRecentPendingMessage = pendingTimestamp > 0 && Date.now() - pendingTimestamp < 10000;
+
+      await loadLatestSession({ skipMessages: hasRecentPendingMessage });
     }
     init();
   }, [loadLatestSession]);
@@ -496,10 +505,8 @@ export function Sidebar(): React.ReactElement {
                 const sessionId =
                   sessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
 
+                setSessions(sessions);
                 setConversationId(sessionId);
-                if (sessions.length > 0) {
-                  await loadMessages(sessionId);
-                }
 
                 await sendChatText(pending.text, {
                   conversationId: sessionId,
@@ -556,10 +563,8 @@ export function Sidebar(): React.ReactElement {
             const sessionId =
               sessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
 
+            setSessions(sessions);
             setConversationId(sessionId);
-            if (sessions.length > 0) {
-              await loadMessages(sessionId);
-            }
 
             await sendChatText(pending.text, {
               conversationId: sessionId,
