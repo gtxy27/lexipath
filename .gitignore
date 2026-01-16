@@ -56,5 +56,11 @@ apps/extension/src/background/dictionary-seed.ts
 *.tmp
 *.temp
 
+# Local tooling
+.opencode/
+openspec/
+AGENTS.md
+
+
 # Prompting: generated prompt samples (local, from tests)
 packages/core/src/prompting/prompt-samples.txt

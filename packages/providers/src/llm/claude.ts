@@ -1,7 +1,10 @@
 import type { ClaudeProviderConfig } from '@lexipath/core';
 import { makeCacheKey } from '@lexipath/core/cache-key';
 import { classifyError, type ProviderError } from '../errors';
-import type { ChatCompletionResponse, ChatMessage, ChatOptions, ChatWithThinkingResult } from './openai-compatible';
+import type { ChatCompletionResponse, ChatMessage, ChatOptions, ChatWithThinkingResult, ChatProvider } from './openai-compatible';
+import { parseSseStream } from './sse';
+import type { StreamChatOptions, StreamChatResult } from './stream';
+
 
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
@@ -85,7 +88,8 @@ function toChatCompletionResponse(input: unknown): ChatCompletionResponse {
   };
 }
 
-export class ClaudeProvider {
+export class ClaudeProvider implements ChatProvider {
+
   private config: ClaudeProviderConfig;
   private inFlightRequests = new Map<string, InFlightRequest>();
 
@@ -239,6 +243,135 @@ export class ClaudeProvider {
       ...(finishReason ? { finishReason } : {}),
     };
   }
+
+  async streamChat(messages: ChatMessage[], options: StreamChatOptions): Promise<StreamChatResult> {
+    const baseUrl = this.config.baseUrl ?? 'https://api.anthropic.com/v1';
+    const url = joinUrl(baseUrl, '/messages');
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'anthropic-version': ANTHROPIC_VERSION,
+      'x-api-key': this.config.apiKey,
+      ...this.config.customHeaders,
+    };
+
+    const controller = new AbortController();
+    const abortListener = () => controller.abort();
+    const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        controller.abort();
+      } else {
+        options.signal.addEventListener('abort', abortListener, { once: true });
+      }
+    }
+
+    try {
+      const { system, messages: anthropicMessages } = extractSystemPrompt(messages);
+      const body: Record<string, unknown> = {
+        model: this.config.model,
+        max_tokens: options.maxTokens,
+        temperature: options.temperature,
+        stream: true,
+        ...(system ? { system } : {}),
+        messages: anthropicMessages,
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw this.createProviderError(response.status, errorText);
+      }
+
+      const blockTypeByIndex: Record<number, string> = {};
+      let content = '';
+      let thinking = '';
+
+      await parseSseStream(response, {
+        signal: controller.signal,
+        onData: (data) => {
+          try {
+            const parsed = JSON.parse(data);
+            const type = typeof parsed?.type === 'string' ? parsed.type : '';
+            const index = typeof parsed?.index === 'number' ? parsed.index : null;
+
+            if (type === 'content_block_delta') {
+              const blockType = index !== null ? blockTypeByIndex[index] : '';
+              const deltaText = parsed?.delta?.text;
+              const deltaThinking = parsed?.delta?.thinking;
+
+              if (typeof deltaThinking === 'string' && deltaThinking) {
+                thinking += deltaThinking;
+                options.onThinkingDelta?.(deltaThinking);
+                return;
+              }
+
+              if (typeof deltaText === 'string' && deltaText) {
+                if (blockType === 'thinking') {
+                  thinking += deltaText;
+                  options.onThinkingDelta?.(deltaText);
+                  return;
+                }
+
+                content += deltaText;
+                options.onDelta(deltaText);
+              }
+              return;
+            }
+
+            if (type === 'content_block_start') {
+              const contentBlock = parsed?.content_block;
+              const contentBlockType = typeof contentBlock?.type === 'string' ? contentBlock.type : '';
+              if (index !== null && contentBlockType) {
+                blockTypeByIndex[index] = contentBlockType;
+              }
+
+              if (contentBlockType === 'thinking') {
+                const initialThinking =
+                  typeof contentBlock?.thinking === 'string'
+                    ? contentBlock.thinking
+                    : typeof contentBlock?.text === 'string'
+                      ? contentBlock.text
+                      : '';
+                if (initialThinking) {
+                  thinking += initialThinking;
+                  options.onThinkingDelta?.(initialThinking);
+                }
+                return;
+              }
+
+              const text = contentBlock?.text;
+              if (typeof text === 'string' && text) {
+                content += text;
+                options.onDelta(text);
+              }
+            }
+          } catch {
+            // Ignore malformed chunks.
+          }
+        },
+      });
+
+      return {
+        content,
+        ...(thinking.trim() ? { thinking } : {}),
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      if (options.signal) {
+        options.signal.removeEventListener('abort', abortListener);
+      }
+    }
+  }
+
 
   async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {
     try {

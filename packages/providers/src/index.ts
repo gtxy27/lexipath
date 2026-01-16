@@ -15,6 +15,9 @@ export type {
 } from './llm/openai-compatible';
 export { ClaudeProvider } from './llm/claude';
 export { GeminiProvider } from './llm/gemini';
+export type { LLMChatProvider as ChatProvider } from '@lexipath/core';
+export type { StreamChatOptions, StreamChatResult, StreamChatHandlers } from './llm/stream';
+
 export { GoogleTranslateProvider } from './translate/google-translate';
 export { BingTranslateProvider } from './translate/bing-translate';
 export * from './dictionary';

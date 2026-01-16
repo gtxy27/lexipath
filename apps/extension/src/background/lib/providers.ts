@@ -10,13 +10,15 @@ import {
   GeminiProvider,
   GoogleTranslateProvider,
   OpenAICompatibleProvider,
+  type ChatProvider,
 } from '@lexipath/providers';
+
 
 import { stableStringify } from '../pipeline';
 
-export type ChatProvider = OpenAICompatibleProvider | ClaudeProvider | GeminiProvider;
-
+// Store the concrete instances, but expose the narrow interface type to callers.
 const chatProviders = new Map<string, ChatProvider>();
+
 
 function providerKey(
   type: LLMProviderChannel,

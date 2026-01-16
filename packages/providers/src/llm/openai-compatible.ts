@@ -1,28 +1,35 @@
-import type { ProviderConfig } from '@lexipath/core';
+import type {
+  LLMChatCompletionResponse,
+  LLMChatMessage,
+  LLMChatCompletionMessage,
+  LLMChatOptions,
+  LLMChatProvider,
+  LLMChatWithThinkingResult,
+  ProviderConfig,
+  ThinkingMode,
+} from '@lexipath/core';
+
 import { makeCacheKey } from '@lexipath/core/cache-key';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { classifyError, type ProviderError } from '../errors';
+import { parseSseStream } from './sse';
+import type { StreamChatOptions, StreamChatResult } from './stream';
+
+export type ChatMessage = LLMChatMessage;
+export type ChatOptions = LLMChatOptions;
+export type ChatCompletionResponse = LLMChatCompletionResponse;
+export type ChatWithThinkingResult = LLMChatWithThinkingResult;
+export type ChatProvider = LLMChatProvider;
+
 
 const log = createLogger('providers:openai-compatible');
 
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
 
-export interface ChatCompletionMessage extends ChatMessage {
-  /**
-   * Optional model "thinking"/reasoning content.
-   *
-   * Notes:
-   * - Not part of the official OpenAI Chat Completions spec.
-   * - Some OpenAI-compatible gateways expose reasoning under fields like
-   *   `reasoning_content`, `reasoning`, or `thinking`.
-   */
-  thinking?: string;
-}
 
-export type ThinkingMode = 'disabled' | 'auto' | 'enabled';
+export type ChatCompletionMessage = LLMChatCompletionMessage;
+
+
+
 
 export interface ChatCompletionThinking {
   type: ThinkingMode;
@@ -33,24 +40,18 @@ export interface ChatCompletionRequest {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  stream?: boolean;
   // Vendor extension (e.g. Volcano/Ark). Most OpenAI-compatible gateways ignore unknown fields.
   thinking?: ChatCompletionThinking;
 }
 
-export interface ChatCompletionResponse {
-  id: string;
-  choices: Array<{
-    message: ChatCompletionMessage;
-    finish_reason: string;
-  }>;
-}
 
-export type ChatWithThinkingResult = {
-  response: ChatCompletionResponse;
-  content: string;
-  thinking?: string;
-  finishReason?: string;
-};
+
+
+
+// Public provider surface area. Other packages should depend on this interface,
+// not on concrete provider classes.
+
 
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
@@ -64,12 +65,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const DEFAULT_THINKING_MODE: ThinkingMode = 'disabled';
 
-export interface ChatOptions {
-  temperature?: number;
-  maxTokens?: number;
-  timeout?: number;
-  thinking?: ThinkingMode;
-}
+
 
 /**
  * OpenAI-compatible provider adapter.
@@ -80,7 +76,10 @@ export interface ChatOptions {
  * - Exponential backoff retry logic (max 3 attempts)
  * - Request deduplication by cache key
  */
-export class OpenAICompatibleProvider {
+
+export class OpenAICompatibleProvider implements ChatProvider {
+
+
   private config: ProviderConfig;
   private inFlightRequests = new Map<string, InFlightRequest>();
   private supportsThinkingControl: boolean | null = null;
@@ -423,6 +422,109 @@ export class OpenAICompatibleProvider {
       ...(finishReason ? { finishReason } : {}),
     };
   }
+
+  async streamChat(messages: ChatMessage[], options: StreamChatOptions): Promise<StreamChatResult> {
+    const url = `${this.resolveBaseUrl().replace(/\/+$/, '')}/chat/completions`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.config.customHeaders,
+    };
+
+    if (this.config.apiKey) {
+      headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    }
+
+    const controller = new AbortController();
+    const abortListener = () => controller.abort();
+    const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        controller.abort();
+      } else {
+        options.signal.addEventListener('abort', abortListener, { once: true });
+      }
+    }
+
+    try {
+      const body: ChatCompletionRequest = {
+        model: this.config.model,
+        messages,
+        stream: true,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw this.createProviderError(response.status, errorText);
+      }
+
+      let content = '';
+      let thinking = '';
+
+      await parseSseStream(response, {
+        signal: controller.signal,
+        onData: (data) => {
+          if (data === '[DONE]') return;
+
+          try {
+            const parsed = JSON.parse(data);
+            const deltaRecord = parsed?.choices?.[0]?.delta;
+
+            const thinkingDelta =
+              deltaRecord?.reasoning_content ??
+              deltaRecord?.reasoning ??
+              deltaRecord?.thinking_content ??
+              deltaRecord?.thinking ??
+              deltaRecord?.thought ??
+              parsed?.choices?.[0]?.message?.thinking ??
+              parsed?.choices?.[0]?.message?.reasoning_content ??
+              parsed?.choices?.[0]?.message?.reasoning ??
+              '';
+
+            if (typeof thinkingDelta === 'string' && thinkingDelta) {
+              thinking += thinkingDelta;
+              options.onThinkingDelta?.(thinkingDelta);
+            }
+
+            const delta =
+              deltaRecord?.content ??
+              deltaRecord?.text ??
+              parsed?.choices?.[0]?.message?.content ??
+              '';
+
+            if (typeof delta === 'string' && delta) {
+              content += delta;
+              options.onDelta(delta);
+            }
+          } catch (error: unknown) {
+            log.debug('OpenAI SSE chunk parse failed; ignoring chunk', { message: getErrorMessage(error) });
+          }
+        },
+      });
+
+      return {
+        content,
+        ...(thinking.trim() ? { thinking } : {}),
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      if (options.signal) {
+        options.signal.removeEventListener('abort', abortListener);
+      }
+    }
+  }
+
 
   /**
    * Test connection to the provider.

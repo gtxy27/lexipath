@@ -108,7 +108,10 @@ export type Response<T> = SuccessResponse<T> | ErrorResponse;
 // Provider Configuration
 // =============================================================================
 
+export * from './llm';
+
 export const ProviderConfigSchema = z.object({
+
   baseUrl: z.string().url().optional(),
   model: z.string().min(1),
   apiKey: z.string().optional(),

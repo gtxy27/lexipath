@@ -1,7 +1,8 @@
 import type { ExplainWordOutput } from '@lexipath/core';
 import { parseExplainWordResponse } from '@lexipath/core/prompting';
-import type { ChatOptions } from '../llm/openai-compatible';
-import type { ChatProvider, ExplainWordPromptBuilder, ExplainWordRequest } from './types';
+import type { ChatOptions, ChatProvider } from '../llm/openai-compatible';
+import type { ExplainWordPromptBuilder, ExplainWordRequest } from './types';
+
 
 export class LLMDictionaryProvider {
   private readonly provider: ChatProvider;

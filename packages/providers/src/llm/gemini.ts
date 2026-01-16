@@ -1,7 +1,10 @@
 import type { GeminiProviderConfig } from '@lexipath/core';
 import { makeCacheKey } from '@lexipath/core/cache-key';
 import { classifyError, type ProviderError } from '../errors';
-import type { ChatCompletionResponse, ChatMessage, ChatOptions, ChatWithThinkingResult } from './openai-compatible';
+import type { ChatCompletionResponse, ChatMessage, ChatOptions, ChatWithThinkingResult, ChatProvider } from './openai-compatible';
+import { parseSseStream } from './sse';
+import type { StreamChatOptions, StreamChatResult } from './stream';
+
 
 interface InFlightRequest {
   promise: Promise<ChatCompletionResponse>;
@@ -111,7 +114,8 @@ function toChatCompletionResponse(input: unknown): ChatCompletionResponse {
   };
 }
 
-export class GeminiProvider {
+export class GeminiProvider implements ChatProvider {
+
   private config: GeminiProviderConfig;
   private inFlightRequests = new Map<string, InFlightRequest>();
 
@@ -273,6 +277,127 @@ export class GeminiProvider {
       ...(finishReason ? { finishReason } : {}),
     };
   }
+
+  async streamChat(messages: ChatMessage[], options: StreamChatOptions): Promise<StreamChatResult> {
+    const baseUrl = this.config.baseUrl ?? 'https://generativelanguage.googleapis.com/v1beta';
+    const model = normalizeGeminiModel(this.config.model);
+    const url = new URL(joinUrl(baseUrl, `${model}:streamGenerateContent`));
+    url.searchParams.set('key', this.config.apiKey);
+    url.searchParams.set('alt', 'sse');
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.config.customHeaders,
+    };
+
+    const controller = new AbortController();
+    const abortListener = () => controller.abort();
+    const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT_MS;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    if (options.signal) {
+      if (options.signal.aborted) {
+        controller.abort();
+      } else {
+        options.signal.addEventListener('abort', abortListener, { once: true });
+      }
+    }
+
+    try {
+      const { systemInstruction, contents } = extractSystemPrompt(messages);
+      const body: Record<string, unknown> = {
+        ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction }] } } : {}),
+        contents,
+        generationConfig: {
+          temperature: options.temperature,
+          maxOutputTokens: options.maxTokens,
+        },
+      };
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw this.createProviderError(response.status, errorText);
+      }
+
+      let content = '';
+      let thinking = '';
+      let accumulatedThinking = '';
+
+      await parseSseStream(response, {
+        signal: controller.signal,
+        onData: (data) => {
+          try {
+            const parsed = JSON.parse(data);
+            const candidates = parsed?.candidates;
+            if (!Array.isArray(candidates) || candidates.length === 0) return;
+
+            const candidate = candidates[0] as Record<string, unknown>;
+            const contentRecord = (candidate.content ?? {}) as Record<string, unknown>;
+            const parts = contentRecord.parts;
+            if (!Array.isArray(parts)) return;
+
+            let text = '';
+            let thinkingText = '';
+
+            for (const part of parts) {
+              const chunk = (part as any)?.text;
+              if (typeof chunk === 'string') text += chunk;
+
+              const thinkingChunk =
+                typeof (part as any)?.thinking === 'string'
+                  ? (part as any).thinking
+                  : typeof (part as any)?.thought === 'string'
+                    ? (part as any).thought
+                    : typeof (part as any)?.reasoning === 'string'
+                      ? (part as any).reasoning
+                      : '';
+              if (thinkingChunk) thinkingText += thinkingChunk;
+            }
+
+            if (text) {
+              const delta = text.startsWith(content) ? text.slice(content.length) : text;
+              if (delta) {
+                content += delta;
+                options.onDelta(delta);
+              }
+            }
+
+            if (thinkingText) {
+              const thinkingDelta = thinkingText.startsWith(accumulatedThinking)
+                ? thinkingText.slice(accumulatedThinking.length)
+                : thinkingText;
+
+              if (thinkingDelta) {
+                accumulatedThinking += thinkingDelta;
+                thinking += thinkingDelta;
+                options.onThinkingDelta?.(thinkingDelta);
+              }
+            }
+          } catch {
+            // Ignore malformed chunks.
+          }
+        },
+      });
+
+      return {
+        content,
+        ...(thinking.trim() ? { thinking } : {}),
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      if (options.signal) {
+        options.signal.removeEventListener('abort', abortListener);
+      }
+    }
+  }
+
 
   async testConnection(): Promise<{ ok: true } | { ok: false; error: ProviderError }> {
     try {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LLMDictionaryProvider } from './llm-dictionary';
-import type { ChatProvider } from './types';
+import type { ChatProvider } from '../llm/openai-compatible';
+
 
 describe('LLMDictionaryProvider', () => {
   it('builds prompt and parses response', async () => {
@@ -22,6 +23,22 @@ describe('LLMDictionaryProvider', () => {
           },
         ],
       })),
+      chatWithThinking: vi.fn(async () => ({
+        response: {
+          id: '1',
+          choices: [
+            {
+              message: {
+                role: 'assistant' as const,
+                content: 'OK',
+              },
+              finish_reason: 'stop' as const,
+            },
+          ],
+        },
+        content: 'OK',
+      })),
+      streamChat: vi.fn(async () => ({ content: '' })),
     };
 
     const buildPrompt = vi.fn(() => 'PROMPT');
@@ -53,7 +70,21 @@ describe('LLMDictionaryProvider', () => {
           { message: { role: 'assistant' as const, content: 'not-json' }, finish_reason: 'stop' as const },
         ],
       })),
+      chatWithThinking: vi.fn(async () => ({
+        response: {
+          id: '1',
+          choices: [
+            {
+              message: { role: 'assistant' as const, content: 'not-json' },
+              finish_reason: 'stop' as const,
+            },
+          ],
+        },
+        content: 'not-json',
+      })),
+      streamChat: vi.fn(async () => ({ content: '' })),
     };
+
 
     const dictionary = new LLMDictionaryProvider({ provider, buildPrompt: () => 'PROMPT' });
 
