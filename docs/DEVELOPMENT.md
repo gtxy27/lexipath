@@ -276,7 +276,7 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 
 - 扩展页面（popup/options/onboarding/sidebar）使用 React + Tailwind。
 - content script 注入 UI 必须隔离样式（推荐 Shadow DOM），避免污染网页或被网页污染。
-- UI 文本走 i18n key（不要硬编码字符串），保证可本地化。
+- 仅 UI 文本走 i18n key（不要硬编码字符串），保证可本地化。
 
 ---
 
@@ -299,7 +299,7 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 ### 13.1 通用
 
 - 缩进：2 空格
-- 换行：LF
+- 换行：建议使用 LF（Windows 开发允许 CRLF；仓库不强制）
 - 语言：TS rewrite 区域全部使用 TypeScript
 - 命名：
   - 变量/函数：`camelCase`
@@ -312,7 +312,7 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 - 公共接口（跨包导出）必须：
   - 有明确类型
   - 有 Zod schema（或至少与 schema 同步设计）
-- `any` 禁止（除非在隔离层，且有注释说明为什么无法避免）。
+- `any` 禁止（除非在隔离层：与外部/无类型边界交互的小段代码，如 browser API/DOM/第三方 JSON；且有注释说明为什么无法避免）。
 - `unknown` 优于 `any`；外部输入先校验再使用。
 - 不要为了"省事"写复杂的类型体操；以可读性与稳定性优先。
 
@@ -465,7 +465,7 @@ DoD（完成标准）：
 
 注意事项：
 - UI 只负责展示与发送消息；所有输入必须走 Zod 校验（尤其是 provider 配置）。
-- i18n key 必须统一管理，禁止直接写中文/英文硬编码到代码里。
+- 仅 UI 文本要求 i18n key 统一管理；非 UI（例如 prompt、站点适配 selector）允许硬编码，但需保持可维护与可解释。
 
 DoD：
 - Chrome + Firefox：页面可打开、配置可保存、权限弹窗可用、错误可见。
