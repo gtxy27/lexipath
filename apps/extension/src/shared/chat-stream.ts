@@ -23,7 +23,7 @@ export function chatStream(
     onError: (error: { code: string; message: string }) => void;
   }
 ): { cancel: () => void } {
-  const connect = (browser as any)?.runtime?.connect;
+  const connect = browser.runtime?.connect;
   if (typeof connect !== "function") {
     let cancelled = false;
     void (async () => {
@@ -41,7 +41,7 @@ export function chatStream(
         handlers.onDone({
           reply: response.value.reply,
           conversationId: response.value.conversationId,
-          ...(typeof (response.value as any).thinking === "string" ? { thinking: (response.value as any).thinking } : {}),
+          ...(typeof response.value.thinking === "string" ? { thinking: response.value.thinking } : {}),
         });
       } catch (error) {
         log.error("CHAT fallback request failed", { message: getErrorMessage(error) });
@@ -62,7 +62,7 @@ export function chatStream(
 
   const handleMessage = (raw: unknown) => {
     if (!raw || typeof raw !== "object") return;
-    const msg = raw as any;
+    const msg = raw as Record<string, unknown>;
     if (msg.type === "CHUNK" && typeof msg.delta === "string") {
       handlers.onChunk(msg.delta);
       return;
@@ -87,11 +87,13 @@ export function chatStream(
     if (
       msg.type === "ERROR" &&
       msg.error &&
-      typeof msg.error.code === "string" &&
-      typeof msg.error.message === "string"
+      typeof msg.error === "object" &&
+      typeof (msg.error as Record<string, unknown>).code === "string" &&
+      typeof (msg.error as Record<string, unknown>).message === "string"
     ) {
       finished = true;
-      handlers.onError({ code: msg.error.code, message: msg.error.message });
+      const error = msg.error as Record<string, unknown>;
+      handlers.onError({ code: String(error.code), message: String(error.message) });
       return;
     }
   };
