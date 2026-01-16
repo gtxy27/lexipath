@@ -6,7 +6,7 @@
 export interface TrieNode<TWordData = unknown> {
   children: Map<string, TrieNode<TWordData>>;
   isEndOfWord: boolean;
-  wordData?: TWordData; // Store associated word metadata
+  wordData?: TWordData;
 }
 
 export class Trie<TWordData = unknown> {
@@ -49,8 +49,8 @@ export class Trie<TWordData = unknown> {
    * Find all matches starting at a given position in the text.
    * Returns an array of {length, wordData} for all matching words.
    */
-  findMatchesAt(text: string, startPos: number): Array<{ length: number; wordData: TWordData | undefined }> {
-    const matches: Array<{ length: number; wordData: TWordData | undefined }> = [];
+  findMatchesAt(text: string, startPos: number): Array<{ length: number; wordData?: TWordData }> {
+    const matches: Array<{ length: number; wordData?: TWordData }> = [];
     let node = this.root;
     let pos = startPos;
 
@@ -65,10 +65,11 @@ export class Trie<TWordData = unknown> {
       pos++;
 
       if (node.isEndOfWord) {
-        matches.push({
-          length: pos - startPos,
-          wordData: node.wordData,
-        });
+        const match: { length: number; wordData?: TWordData } = { length: pos - startPos };
+        if (node.wordData !== undefined) {
+          match.wordData = node.wordData;
+        }
+        matches.push(match);
       }
     }
 
@@ -78,22 +79,23 @@ export class Trie<TWordData = unknown> {
   /**
    * Search for a complete word in the trie.
    */
-  search(word: string): { found: boolean; wordData: TWordData | undefined } {
-    if (!word) return { found: false, wordData: undefined };
+  search(word: string): { found: boolean; wordData?: TWordData } {
+    if (!word) return { found: false };
 
     let node = this.root;
     for (let i = 0; i < word.length; i++) {
       const char = word[i];
-      if (!char) return { found: false, wordData: undefined };
+      if (!char) return { found: false };
 
       const next = node.children.get(char);
-      if (!next) return { found: false, wordData: undefined };
+      if (!next) return { found: false };
       node = next;
     }
 
-    return {
-      found: node.isEndOfWord,
-      wordData: node.wordData,
-    };
+    const result: { found: boolean; wordData?: TWordData } = { found: node.isEndOfWord };
+    if (node.wordData !== undefined) {
+      result.wordData = node.wordData;
+    }
+    return result;
   }
 }
