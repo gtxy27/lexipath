@@ -34,6 +34,15 @@
     --ring: 221.2 83.2% 53.3%;
 
     --radius: 0.5rem;
+
+    /* Code highlighting (highlight.js token colors; scoped in `.lx-message-markdown`). */
+    --lx-code-fg: 222.2 84% 4.9%;
+    --lx-code-comment: 215.4 16.3% 46.9%;
+    --lx-code-keyword: 221.2 83.2% 53.3%;
+    --lx-code-string: 142.1 76.2% 36.3%;
+    --lx-code-number: 24.6 95% 53.1%;
+    --lx-code-title: 262.1 83.3% 57.8%;
+    --lx-code-built-in: 199.3 89% 48%;
   }
 
   .dark {
@@ -66,6 +75,15 @@
     --border: 233.3 11% 22%;
     --input: 233.3 11% 22%;
     --ring: 224.3 76.3% 48%;
+
+    /* Code highlighting (tuned for dark surfaces). */
+    --lx-code-fg: 210 40% 98%;
+    --lx-code-comment: 215 20.2% 70%;
+    --lx-code-keyword: 217.2 91.2% 59.8%;
+    --lx-code-string: 142.1 70.6% 45.3%;
+    --lx-code-number: 34.1 100% 65.1%;
+    --lx-code-title: 262.1 83.3% 70%;
+    --lx-code-built-in: 199.3 95% 70%;
   }
 }
 
@@ -169,4 +187,69 @@
         0 1px 0 rgba(255, 255, 255, 0.22) inset,
         0 14px 34px -28px rgba(0, 0, 0, 0.35);
     }
+}
+
+@layer components {
+  .lx-message-markdown {
+    @apply break-words;
+  }
+
+  .lx-message-markdown pre code.hljs {
+    color: hsl(var(--lx-code-fg));
+    background: transparent;
+  }
+
+  .lx-message-markdown pre code.hljs .hljs-comment,
+  .lx-message-markdown pre code.hljs .hljs-quote {
+    color: hsl(var(--lx-code-comment));
+    font-style: italic;
+  }
+
+  .lx-message-markdown pre code.hljs .hljs-keyword,
+  .lx-message-markdown pre code.hljs .hljs-selector-tag,
+  .lx-message-markdown pre code.hljs .hljs-type,
+  .lx-message-markdown pre code.hljs .hljs-doctag,
+  .lx-message-markdown pre code.hljs .hljs-meta {
+    color: hsl(var(--lx-code-keyword));
+  }
+
+  .lx-message-markdown pre code.hljs .hljs-string,
+  .lx-message-markdown pre code.hljs .hljs-regexp,
+  .lx-message-markdown pre code.hljs .hljs-symbol {
+    color: hsl(var(--lx-code-string));
+  }
+
+  .lx-message-markdown pre code.hljs .hljs-number,
+  .lx-message-markdown pre code.hljs .hljs-literal {
+    color: hsl(var(--lx-code-number));
+  }
+
+  .lx-message-markdown pre code.hljs .hljs-title,
+  .lx-message-markdown pre code.hljs .hljs-section,
+  .lx-message-markdown pre code.hljs .hljs-function .hljs-title {
+    color: hsl(var(--lx-code-title));
+  }
+
+  .lx-message-markdown pre code.hljs .hljs-built_in,
+  .lx-message-markdown pre code.hljs .hljs-builtin-name {
+    color: hsl(var(--lx-code-built-in));
+  }
+
+  .lx-message-markdown .katex {
+    font-size: 0.95em;
+  }
+
+  .lx-message-markdown .katex-display {
+    margin: 0.5rem 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-align: left;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lx-message-markdown .katex-display > .katex {
+    display: inline-block;
+    padding: 0.25rem 0;
+  }
 }

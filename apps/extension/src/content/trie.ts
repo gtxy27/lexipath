@@ -3,14 +3,14 @@
  * Used for word highlighting in enhanced text.
  */
 
-export interface TrieNode {
-  children: Map<string, TrieNode>;
+export interface TrieNode<TWordData = unknown> {
+  children: Map<string, TrieNode<TWordData>>;
   isEndOfWord: boolean;
-  wordData?: any; // Store associated word metadata
+  wordData?: TWordData;
 }
 
-export class Trie {
-  private root: TrieNode;
+export class Trie<TWordData = unknown> {
+  private root: TrieNode<TWordData>;
 
   constructor() {
     this.root = {
@@ -22,7 +22,7 @@ export class Trie {
   /**
    * Insert a word into the trie with optional metadata.
    */
-  insert(word: string, wordData?: any): void {
+  insert(word: string, wordData?: TWordData): void {
     if (!word) return;
 
     let node = this.root;
@@ -49,8 +49,8 @@ export class Trie {
    * Find all matches starting at a given position in the text.
    * Returns an array of {length, wordData} for all matching words.
    */
-  findMatchesAt(text: string, startPos: number): Array<{ length: number; wordData: any }> {
-    const matches: Array<{ length: number; wordData: any }> = [];
+  findMatchesAt(text: string, startPos: number): Array<{ length: number; wordData?: TWordData }> {
+    const matches: Array<{ length: number; wordData?: TWordData }> = [];
     let node = this.root;
     let pos = startPos;
 
@@ -65,10 +65,11 @@ export class Trie {
       pos++;
 
       if (node.isEndOfWord) {
-        matches.push({
-          length: pos - startPos,
-          wordData: node.wordData,
-        });
+        const match: { length: number; wordData?: TWordData } = { length: pos - startPos };
+        if (node.wordData !== undefined) {
+          match.wordData = node.wordData;
+        }
+        matches.push(match);
       }
     }
 
@@ -78,7 +79,7 @@ export class Trie {
   /**
    * Search for a complete word in the trie.
    */
-  search(word: string): { found: boolean; wordData?: any } {
+  search(word: string): { found: boolean; wordData?: TWordData } {
     if (!word) return { found: false };
 
     let node = this.root;
@@ -91,9 +92,10 @@ export class Trie {
       node = next;
     }
 
-    return {
-      found: node.isEndOfWord,
-      wordData: node.wordData,
-    };
+    const result: { found: boolean; wordData?: TWordData } = { found: node.isEndOfWord };
+    if (node.wordData !== undefined) {
+      result.wordData = node.wordData;
+    }
+    return result;
   }
 }

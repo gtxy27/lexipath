@@ -12,7 +12,7 @@ export function createTranslator(log: LoggerLike): Translator {
       const message =
         substitutions === undefined
           ? browser.i18n?.getMessage?.(key)
-          : browser.i18n?.getMessage?.(key, substitutions as any);
+          : browser.i18n?.getMessage?.(key, substitutions);
       if (typeof message === 'string' && message.trim()) return message;
     } catch (error: unknown) {
       log.debug('i18n.getMessage threw; falling back', { key, error });
@@ -31,7 +31,7 @@ export function getI18nMessage(key: string, substitutions?: string | string[], f
     const message =
       substitutions === undefined
         ? browser.i18n?.getMessage?.(key)
-        : browser.i18n?.getMessage?.(key, substitutions as any);
+        : browser.i18n?.getMessage?.(key, substitutions);
     if (typeof message === 'string' && message.trim()) return message;
   } catch {
     // Keep this helper side-effect free by default.

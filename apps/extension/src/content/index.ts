@@ -9,7 +9,7 @@
  */
 
 import browser from "webextension-polyfill";
-import type { Settings } from "@lexipath/core";
+import { SettingsSchema, type Settings } from "@lexipath/core";
 import { qualifySite } from "@lexipath/core/qualify";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../shared/messages";
@@ -40,7 +40,8 @@ let currentSiteQualified = false;
 
 let webWordCardManager: WebWordCardManager | null = null;
 let webEnhancer: WebEnhancer | null = null;
-let pendingPageContext: Record<string, any> | null = null;
+type PageContextUpdate = Parameters<FloatingButtonController["updatePageContext"]>[0];
+let pendingPageContext: PageContextUpdate | null = null;
 
 let urlPollTimer: number | null = null;
 let navigationToken = 0;
@@ -73,7 +74,7 @@ function getWebEnhancer(): WebEnhancer {
       getWordCardManager: getWebWordCardManager,
       onPageContextUpdate: (update) => {
         pendingPageContext = { ...(pendingPageContext ?? {}), ...update };
-        floatingButtonController?.updatePageContext?.(update as any);
+        floatingButtonController?.updatePageContext?.(update);
       },
     });
   }
@@ -98,7 +99,7 @@ async function getWebProcessingStatus(): Promise<
   | null
 > {
   const response = await sendMessage("GET_WEB_PROCESSING_STATUS", undefined);
-  if (response.ok) return response.value as any;
+  if (response.ok) return response.value;
   log.error("Failed to get web processing status", response.error);
   return null;
 }
@@ -262,13 +263,14 @@ async function init(): Promise<void> {
     floatingButtonController.mount();
   }
   if (pendingPageContext) {
-    floatingButtonController.updatePageContext(pendingPageContext as any);
+    floatingButtonController.updatePageContext(pendingPageContext);
   }
 
-  browser.storage?.onChanged?.addListener?.((changes: any, area: string) => {
+  browser.storage?.onChanged?.addListener?.((changes: Record<string, browser.Storage.StorageChange>, area: string) => {
     if (area !== "local") return;
-    const nextSettings = changes?.settings?.newValue;
-    if (!nextSettings) return;
+    const parsed = SettingsSchema.safeParse(changes.settings?.newValue);
+    if (!parsed.success) return;
+    const nextSettings = parsed.data;
 
     const prevFloating = currentSettings?.floatingButtonEnabled ?? true;
     currentSettings = nextSettings;
@@ -291,8 +293,8 @@ async function init(): Promise<void> {
     }
   });
 
-  browser.runtime?.onMessage?.addListener?.((message: any) => {
-    if (message?.type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
+  browser.runtime?.onMessage?.addListener?.((message: unknown) => {
+    if (message && typeof message === "object" && (message as Record<string, unknown>).type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
       if (!currentSettings) return;
       toggleTabShowOriginal(Boolean(currentSettings.webShowOriginal));
       return;

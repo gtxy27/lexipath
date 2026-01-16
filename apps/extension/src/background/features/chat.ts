@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill';
 import { z } from 'zod';
 
+import { ChatPayloadSchema } from '@lexipath/core';
 import type { ClaudeProviderConfig, GeminiProviderConfig, ProviderConfig } from '@lexipath/core';
 import { getErrorMessage } from '@lexipath/core/log';
 
@@ -21,6 +22,13 @@ type StructuredStreamError = { code: string; message: string };
 
 const CHAT_SESSIONS_LEGACY_STORAGE_KEY = 'lexipath_chat_sessions_v1';
 const CHAT_MAX_HISTORY_MESSAGES = 20; // Max messages to keep in prompt history (10 pairs)
+
+const ChatStreamStartMessageSchema = z
+  .object({
+    type: z.literal('START'),
+    payload: ChatPayloadSchema,
+  })
+  .strict();
 
 const LegacyChatSessionSchema = z
   .object({
@@ -46,7 +54,7 @@ const LegacyStoredChatSessionsSchema = z
 
 let chatMigrationPromise: Promise<void> | null = null;
 
-async function ensureChatMigrated(log: { warn: (...args: any[]) => void }): Promise<void> {
+async function ensureChatMigrated(log: { warn: (...args: unknown[]) => void }): Promise<void> {
   if (chatMigrationPromise) return chatMigrationPromise;
 
   chatMigrationPromise = (async () => {
@@ -164,7 +172,7 @@ async function streamOpenAICompatibleChat(options: {
   onDelta: (delta: string) => void;
   onThinkingDelta?: (delta: string) => void;
   signal?: AbortSignal;
-  log: { debug: (...args: any[]) => void };
+  log: { debug: (...args: unknown[]) => void };
 }): Promise<string> {
   const baseUrl = options.config.baseUrl ?? DEFAULT_OPENAI_URL;
   const url = joinUrl(baseUrl, '/chat/completions');
@@ -266,7 +274,7 @@ async function streamClaudeChat(options: {
   onDelta: (delta: string) => void;
   onThinkingDelta?: (delta: string) => void;
   signal?: AbortSignal;
-  log: { debug: (...args: any[]) => void };
+  log: { debug: (...args: unknown[]) => void };
 }): Promise<string> {
   const baseUrl = options.config.baseUrl ?? DEFAULT_CLAUDE_URL;
   const url = joinUrl(baseUrl, '/messages');
@@ -410,7 +418,7 @@ async function streamGeminiChat(options: {
   onDelta: (delta: string) => void;
   onThinkingDelta?: (delta: string) => void;
   signal?: AbortSignal;
-  log: { debug: (...args: any[]) => void };
+  log: { debug: (...args: unknown[]) => void };
 }): Promise<string> {
   const baseUrl = options.config.baseUrl ?? DEFAULT_GEMINI_URL;
   const model = normalizeGeminiModel(options.config.model);
@@ -502,7 +510,7 @@ async function streamGeminiChat(options: {
 
 async function runChatStream(
   t: Translator,
-  log: { warn: (...args: any[]) => void; debug: (...args: any[]) => void },
+  log: { warn: (...args: unknown[]) => void; debug: (...args: unknown[]) => void },
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>,
   payload: { message: string; conversationId?: string; backgroundInfo?: string },
   options: { onDelta: (delta: string) => void; onThinkingDelta?: (delta: string) => void; signal?: AbortSignal }
@@ -655,7 +663,7 @@ Format your responses for readability:
 export function registerChatFeature(options: {
   registry: Registry;
   t: Translator;
-  log: { warn: (...args: any[]) => void; debug: (...args: any[]) => void };
+  log: { warn: (...args: unknown[]) => void; debug: (...args: unknown[]) => void };
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>;
 }) {
   const { registry, t, log, concurrency } = options;
@@ -708,12 +716,10 @@ export function registerChatFeature(options: {
 
     port.onMessage.addListener((message) => {
       if (started) return;
-      if (!message || typeof message !== 'object') return;
-      const record = message as any;
-      if (record.type !== 'START' || !record.payload) return;
-      const payload = record.payload as { message?: string; conversationId?: string; backgroundInfo?: string };
-      if (typeof payload.message !== 'string' || !payload.message.trim()) return;
-      const startMessage: string = payload.message;
+      const parsed = ChatStreamStartMessageSchema.safeParse(message);
+      if (!parsed.success) return;
+      const payload = parsed.data.payload;
+      const startMessage = payload.message;
       const startConversationId = payload.conversationId;
       const startBackgroundInfo = payload.backgroundInfo;
 

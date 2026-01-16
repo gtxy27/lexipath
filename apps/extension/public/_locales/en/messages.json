@@ -27,6 +27,10 @@
     "message": "Bilingual (hold)",
     "description": "Subtitle: mode label (bilingual, hold)"
   },
+  "subtitle_modeBilingualHoldCode": {
+    "message": "$1 (hold)",
+    "description": "Subtitle: bilingual-temp label with language pair code ($1: e.g. ENZH)"
+  },
   "wordCard_loading": {
     "message": "Loading…",
     "description": "Word card: loading placeholder"
@@ -522,6 +526,18 @@
   "chatHideThinking": {
     "message": "Hide reasoning",
     "description": "Chat: hide reasoning button"
+  },
+  "chatCodeBlock": {
+    "message": "Code",
+    "description": "Chat: code block label"
+  },
+  "chatCopyCode": {
+    "message": "Copy code",
+    "description": "Chat: copy code button"
+  },
+  "chatCopiedCode": {
+    "message": "Copied",
+    "description": "Chat: copied code feedback"
   },
   "chatClear": {
     "message": "Clear",

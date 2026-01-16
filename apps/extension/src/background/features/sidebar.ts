@@ -21,11 +21,14 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
   registry.register('OPEN_SIDEBAR', async (payload, sender) => {
     const tabId = sender?.tab?.id;
 
-    // Start persisting the pending message as early as possible, but never block opening the sidebar on storage failures.
+    // Start persisting the pending message as early as possible, but do not await it before attempting
+    // to open the side panel. Chrome requires `sidePanel.open()` to be called in response to a user gesture,
+    // and awaiting storage can break the user activation chain.
     const pendingWritePromise = payload?.initialMessage
       ? browser.storage.local
           .set({
             lexipath_sidebar_pending_message: {
+              nonce: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
               text: payload.initialMessage,
               keyword: typeof payload.keyword === 'string' ? payload.keyword : undefined,
               contextInfo: payload.contextInfo,
@@ -34,16 +37,16 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
             },
           })
           .catch((error: unknown) => {
-            // Never block opening the sidebar on storage failures (quota / serialization / etc.).
             log.warn('Failed to persist pending sidebar message; opening sidebar anyway', { tabId, error });
           })
       : Promise.resolve();
 
+    // IMPORTANT: `sidePanel.open()` must be called in response to a user gesture.
+    // Keep it as early as possible to avoid losing user activation.
     await openSidePanel(tabId).catch((error: unknown) => {
       log.warn('Failed to open side panel', { tabId, error });
     });
 
-    // Ensure the pending message write has had a chance to finish before resolving OPEN_SIDEBAR.
     await pendingWritePromise;
     return { ok: true };
   });
@@ -68,6 +71,7 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
       const pendingWritePromise = browser.storage.local
         .set({
           lexipath_sidebar_pending_message: {
+            nonce: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             text: prompt,
             timestamp: Date.now(),
             isAutoSend: true,

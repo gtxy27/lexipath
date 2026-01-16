@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { createLogger } from '@lexipath/core/log';
 import { Sidebar } from './Sidebar';
 import '../styles.css';
+import "katex/dist/katex.min.css";
 import { t } from '../../shared/i18n';
 import { startThemeSync } from '../lib/theme-sync';
 

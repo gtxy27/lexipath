@@ -1,16 +1,20 @@
-import type {
-  EnhanceWebPayload,
-  Settings,
-  WebEnhanceOutput,
-  WordFamiliarity,
-} from "@lexipath/core";
+import { SupportedLanguageSchema, type EnhanceWebPayload, type Settings, type WebEnhanceOutput } from "@lexipath/core";
 import { detectPrimaryLanguage } from "@lexipath/core/qualify";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
+import { createExposureTracker } from "./web-enhancer-exposure";
+import { createFamiliarityTracker } from "./web-enhancer-familiarity";
+import {
+  computeTextSignature,
+  extractTextContent,
+  getResolvedTheme,
+  normalizeWordKey,
+} from "./web-enhancer-utils";
 import { getI18nMessage } from "../i18n";
 import { isEnhancePausedNow } from "../../shared/tab-state";
 import { HAS_ENHANCED_ONCE_KEY } from "../ui/floating-button-constants";
 import { detectPlatform } from "../platform";
+import type { WordRenderMode } from "../enhanced-text";
 import type { WebWordCardManager } from "./web-word-card";
 import { injectFullParagraph, injectInlineWords } from "./dom-injector";
 import { getWebSiteAdapter } from "./site-adapters";
@@ -54,41 +58,7 @@ const MAX_TEXT_LENGTH = 2000;
 
 const PUMP_IDLE_TIMEOUT_MS = 50;
 
-function computeTextSignature(text: string): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) return "";
 
-  let hash = 5381;
-  for (let i = 0; i < normalized.length; i++) {
-    hash = (hash << 5) + hash + normalized.charCodeAt(i);
-    hash |= 0;
-  }
-
-  return `${normalized.length}:${hash >>> 0}`;
-}
-
-function extractTextContent(element: Element): string {
-  const stored = (element as HTMLElement | null)?.dataset?.lxOriginalText;
-  const text =
-    (typeof stored === "string" && stored.trim()
-      ? stored.trim()
-      : element.textContent?.trim()) || "";
-  return text.slice(0, MAX_TEXT_LENGTH);
-}
-
-function normalizeWordKey(raw: string): string {
-  return raw.trim().toLowerCase();
-}
-
-function getResolvedTheme(settings: Settings | null): "light" | "dark" {
-  if (!settings) return "dark";
-  if (settings.theme === "system") {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  }
-  return settings.theme === "dark" ? "dark" : "light";
-}
 
 export function createWebEnhancer(options: {
   getSettings: () => Settings | null;
@@ -102,16 +72,23 @@ export function createWebEnhancer(options: {
   let pagePrimaryLanguage: string | null = null;
   let pageEligibleForLearning = true;
 
-  const wordFamiliarityCache = new Map<string, WordFamiliarityLite>();
-  const pageForgottenWords = new Map<
-    string,
-    { word: string; familiarity: number; encounters: number }
-  >();
   const exposureSentWords = new Set<string>();
   const pageTranslatedWords = new Set<string>();
 
+
+  const familiarityTracker = createFamiliarityTracker({
+    normalizeWordKey,
+    sendMessage: (type, payload) => sendMessage(type, payload),
+    emitContext: (update) => emitContext(update),
+    thresholds: {
+      minEncounters: FORGOTTEN_MIN_ENCOUNTERS,
+      maxFamiliarity: FORGOTTEN_MAX_FAMILIARITY,
+    },
+  });
+
   let observer: MutationObserver | null = null;
   let enhancePauseObserver: MutationObserver | null = null;
+
 
   let pageProcessingToken = 0;
   let processedElementSignature = new WeakMap<Element, string>();
@@ -126,10 +103,6 @@ export function createWebEnhancer(options: {
   let pumpScheduled = false;
 
   let intersectionObserver: IntersectionObserver | null = null;
-  let exposureObserver: IntersectionObserver | null = null;
-  const exposureTargets = new WeakMap<Element, string[]>();
-  const exposureTimers = new Map<Element, number>();
-
   let manualEnhanceInFlight = false;
   let manualForceEnhanceMode: EnhanceWebPayload["mode"] | null = null;
   let manualForceEnhanceModeToken = 0;
@@ -153,9 +126,9 @@ export function createWebEnhancer(options: {
       pagePrimaryLanguage === nativeDetected &&
       nativeDetected === "zh"
     ) {
-      return (settings.webEnhanceModeNative ?? "i_plus_1") as any;
+      return settings.webEnhanceModeNative ?? "i_plus_1";
     }
-    return (settings.webEnhanceMode ?? "i_plus_1") as any;
+    return settings.webEnhanceMode ?? "i_plus_1";
   };
 
   const syncFloatingMeta = () => {
@@ -237,8 +210,10 @@ export function createWebEnhancer(options: {
       return;
     }
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(run, { timeout: PUMP_IDLE_TIMEOUT_MS });
+    type RequestIdleCallback = (callback: () => void, options?: { timeout: number }) => number;
+    const requestIdleCallback = (window as Window & { requestIdleCallback?: RequestIdleCallback }).requestIdleCallback;
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(run, { timeout: PUMP_IDLE_TIMEOUT_MS });
       return;
     }
     setTimeout(run, PUMP_IDLE_TIMEOUT_MS);
@@ -268,50 +243,12 @@ export function createWebEnhancer(options: {
     );
   };
 
-  const ensureExposureObserver = () => {
-    if (exposureObserver) return;
-    if (typeof IntersectionObserver === "undefined") return;
+  const exposureTracker = createExposureTracker({
+    sendMessage,
+    emitContext: (update) => emitContext(update),
+    exposureSentWords,
+  });
 
-    exposureObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const el = entry.target;
-          if (!(el instanceof Element)) continue;
-
-          const existingTimer = exposureTimers.get(el);
-          if (!entry.isIntersecting) {
-            if (existingTimer) {
-              clearTimeout(existingTimer);
-              exposureTimers.delete(el);
-            }
-            continue;
-          }
-
-          if (existingTimer) continue;
-
-          const timer = window.setTimeout(() => {
-            exposureTimers.delete(el);
-            const words = exposureTargets.get(el) ?? [];
-            const toSend = words.filter((w) => !exposureSentWords.has(w));
-            if (toSend.length === 0) return;
-
-            for (const w of toSend) exposureSentWords.add(w);
-            emitContext({ seenCount: exposureSentWords.size });
-            void sendMessage("RECORD_EXPOSURE_VALID", { words: toSend });
-          }, 2000);
-          exposureTimers.set(el, timer);
-        }
-      },
-      { root: null, rootMargin: "0px", threshold: 0.35 },
-    );
-  };
-
-  const registerExposure = (element: Element, normalizedWords: string[]) => {
-    if (normalizedWords.length === 0) return;
-    ensureExposureObserver();
-    exposureTargets.set(element, normalizedWords);
-    exposureObserver?.observe(element);
-  };
 
   const queueElements = (
     elements: Element[],
@@ -393,18 +330,10 @@ export function createWebEnhancer(options: {
       intersectionObserver = null;
     }
 
-    if (exposureObserver) {
-      exposureObserver.disconnect();
-      exposureObserver = null;
-    }
-    for (const timer of exposureTimers.values()) {
-      clearTimeout(timer);
-    }
-    exposureTimers.clear();
+    exposureTracker.disconnect();
 
-    exposureSentWords.clear();
     pageTranslatedWords.clear();
-    pageForgottenWords.clear();
+    familiarityTracker.resetPageTracking();
     emitContext({ forgottenWords: [], translatedCount: 0, seenCount: 0 });
   };
 
@@ -430,7 +359,7 @@ export function createWebEnhancer(options: {
       for (let i = 0; i < maxEls; i++) {
         const el = els[i];
         if (!el) continue;
-        const text = extractTextContent(el);
+        const text = extractTextContent(el, MAX_TEXT_LENGTH);
         if (!text) continue;
         sample += ` ${text.slice(0, 220)}`;
         if (sample.length >= 2200) break;
@@ -460,84 +389,7 @@ export function createWebEnhancer(options: {
     }
   };
 
-  const getFamiliarityForWords = async (
-    words: string[],
-  ): Promise<Record<string, WordFamiliarityLite>> => {
-    const normalized = Array.from(
-      new Set(words.map(normalizeWordKey).filter(Boolean)),
-    );
-    if (normalized.length === 0) return {};
 
-    const missing = normalized.filter((w) => !wordFamiliarityCache.has(w));
-    if (missing.length > 0) {
-      const response = await sendMessage("BATCH_GET_WORD_FAMILIARITY", {
-        words: missing,
-      });
-      if (response.ok) {
-        const seen = new Set<string>();
-        for (const record of response.value as WordFamiliarity[]) {
-          const key = normalizeWordKey(record.word);
-          if (!key) continue;
-          seen.add(key);
-          wordFamiliarityCache.set(key, {
-            familiarity: record.familiarity ?? 0,
-            encounters: record.encounters ?? 0,
-          });
-        }
-        for (const key of missing) {
-          if (seen.has(normalizeWordKey(key))) continue;
-          wordFamiliarityCache.set(key, { familiarity: 0, encounters: 0 });
-        }
-      } else {
-        for (const key of missing) {
-          wordFamiliarityCache.set(key, { familiarity: 0, encounters: 0 });
-        }
-      }
-    }
-
-    const out: Record<string, WordFamiliarityLite> = {};
-    for (const key of normalized) {
-      out[key] = wordFamiliarityCache.get(key) ?? { familiarity: 0, encounters: 0 };
-    }
-    return out;
-  };
-
-  const updateForgottenWordsForPage = (
-    surfaceWords: string[],
-    familiarityByWord: Record<string, WordFamiliarityLite>,
-  ) => {
-    let changed = false;
-    for (const surface of surfaceWords) {
-      const key = normalizeWordKey(surface);
-      if (!key) continue;
-      const record = familiarityByWord[key];
-      if (!record) continue;
-
-      const isForgotten =
-        record.encounters >= FORGOTTEN_MIN_ENCOUNTERS &&
-        record.familiarity < FORGOTTEN_MAX_FAMILIARITY;
-      if (!isForgotten) continue;
-
-      if (!pageForgottenWords.has(key)) {
-        pageForgottenWords.set(key, {
-          word: surface,
-          familiarity: record.familiarity,
-          encounters: record.encounters,
-        });
-        changed = true;
-      }
-    }
-
-    if (!changed) return;
-
-    const list = Array.from(pageForgottenWords.values()).sort(
-      (a, b) =>
-        a.familiarity - b.familiarity ||
-        b.encounters - a.encounters ||
-        a.word.localeCompare(b.word),
-    );
-    emitContext({ forgottenWords: list });
-  };
 
   const processTextElement = async (element: Element, token: number) => {
     if (token !== pageProcessingToken) return;
@@ -547,7 +399,7 @@ export function createWebEnhancer(options: {
     const adapter = getWebSiteAdapter(currentUrl);
     if (!adapter.shouldProcessElement(element)) return;
 
-    const text = extractTextContent(element);
+    const text = extractTextContent(element, MAX_TEXT_LENGTH);
     if (text.length < MIN_TEXT_LENGTH) return;
 
     try {
@@ -588,7 +440,7 @@ export function createWebEnhancer(options: {
 
       const enhancePayload: EnhanceWebPayload = { content: text };
 
-      let renderMode: any = "target-to-native";
+      let renderMode: WordRenderMode = "target-to-native";
       let sourceLang: EnhanceWebPayload["sourceLang"] =
         currentSettings?.targetLanguage;
       let targetLang: EnhanceWebPayload["targetLang"] =
@@ -633,8 +485,11 @@ export function createWebEnhancer(options: {
           detected.language !== "en" &&
           detected.language !== "unknown"
         ) {
-          sourceLang = detected.language as any;
-          targetLang = "en";
+          const parsed = SupportedLanguageSchema.safeParse(detected.language);
+          if (parsed.success) {
+            sourceLang = parsed.data;
+            targetLang = "en";
+          }
         }
       }
 
@@ -649,18 +504,18 @@ export function createWebEnhancer(options: {
         return;
       }
 
-      const enhanced = response.value as WebEnhanceOutput;
+      const enhanced = response.value satisfies WebEnhanceOutput;
 
       const surfaceWords = (enhanced.convert_word ?? [])
-        .map((w: any) => String(w?.original ?? "").trim())
+        .map((w) => w.original.trim())
         .filter(Boolean);
       const normalizedSurfaceWords = Array.from(
         new Set(surfaceWords.map(normalizeWordKey).filter(Boolean)),
       );
 
-      const familiarityByWord = await getFamiliarityForWords(normalizedSurfaceWords);
-      updateForgottenWordsForPage(surfaceWords, familiarityByWord);
-      registerExposure(element, normalizedSurfaceWords);
+      const familiarityByWord = await familiarityTracker.getFamiliarityForWords(normalizedSurfaceWords);
+      familiarityTracker.updateForgottenWordsForPage(surfaceWords, familiarityByWord);
+      exposureTracker.registerExposure(element, normalizedSurfaceWords);
 
       const prevTranslatedCount = pageTranslatedWords.size;
       for (const key of normalizedSurfaceWords) pageTranslatedWords.add(key);
@@ -709,7 +564,7 @@ export function createWebEnhancer(options: {
         );
         processedElementSignature.set(
           element,
-          computeTextSignature(extractTextContent(element)),
+          computeTextSignature(extractTextContent(element, MAX_TEXT_LENGTH)),
         );
         return;
       }
@@ -730,7 +585,7 @@ export function createWebEnhancer(options: {
 
       processedElementSignature.set(
         element,
-        computeTextSignature(extractTextContent(element)),
+        computeTextSignature(extractTextContent(element, MAX_TEXT_LENGTH)),
       );
     } catch (error: unknown) {
       log.error("Processing error", { message: getErrorMessage(error) });

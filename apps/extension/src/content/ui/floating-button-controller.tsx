@@ -113,10 +113,22 @@ export class FloatingButtonController {
     this.shadow = this.container.attachShadow({ mode: "open" });
 
     // Load the extension's Tailwind/theme CSS inside the ShadowRoot so shadcn/ui classes work.
-    const themeLink = document.createElement("link");
-    themeLink.rel = "stylesheet";
-    themeLink.href = browser.runtime.getURL("assets/theme.css");
-    this.shadow.appendChild(themeLink);
+    // We run two Vite builds (UI + content) into the same `dist/*` folder, so Rollup may deconflict
+    // same-named CSS assets as `theme.css`, `theme2.css`, etc. Load the common candidates, but don't
+    // fail if an extra CSS file isn't present.
+    for (const href of ["assets/theme.css", "assets/theme2.css"]) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = browser.runtime.getURL(href);
+      link.addEventListener("error", () => {
+        try {
+          link.remove();
+        } catch {
+          // ignore
+        }
+      });
+      this.shadow.appendChild(link);
+    }
 
     // Inject styles from the main document (lexipath-styles) into shadow DOM
     const mainStyle = document.getElementById("lexipath-styles");
