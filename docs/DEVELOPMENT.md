@@ -408,9 +408,9 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 - `docs: update TS rewrite development guide`
 
 提交粒度：
-- 一次提交只做一类事情，避免"功能 + 格式化 + 重构"混杂。
-- 必须要包含变更摘要（subject），不能只写"fix"或"feat"。 
-- 必须要有修改说明，说明你的思路或者你更改的详细，使用md 格式化每一点
+- 一次提交只做一类事情，避免"功能 + 格式化 + 重构"混杂（例如：UI 调整 + 删除调试代码，必须拆成两个提交）。
+- 必须要包含变更摘要（subject），不能只写"fix"或"feat"。
+- Commit message 必须包含 body，使用 Markdown 分点说明变更动机与关键决策（不能只写一句总结）。
 - 如必须大规模格式化，请单独提交，并在 subject 中标明 `format`。
 
 ### 14.4 禁止提交的内容
