@@ -219,7 +219,7 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
   private findYouTubeCaptionsButton(): HTMLElement | null {
     const selectors = [
       '.ytp-subtitles-button',
-      // Shorts often renders a different button surface with aria labels.
+      // Shorts often renders a different button surface with localized aria labels (e.g. Chinese "字幕").
       'ytd-reel-player-overlay-renderer button[aria-label*="字幕"]',
       'ytd-reel-player-overlay-renderer button[aria-label*="Subtitles"]',
       'button[aria-label*="字幕"]',

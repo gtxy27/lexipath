@@ -799,39 +799,9 @@ export class SubtitleController {
     const overlay = this.overlay;
     if (!overlay) return;
 
-    const uiLang = (() => {
-      try {
-        return browser.i18n.getUILanguage?.() ?? navigator.language ?? 'en';
-      } catch (error: unknown) {
-        log.debug('browser.i18n.getUILanguage threw; falling back to navigator.language', { message: getErrorMessage(error) });
-        return navigator.language ?? 'en';
-      }
-    })();
-
-    const isZh = uiLang.toLowerCase().startsWith('zh');
-
     const labelFor = (lang: SupportedLanguage): { full: string; short: string } => {
-      if (isZh) {
-        const map: Record<SupportedLanguage, { full: string; short: string }> = {
-          en: { full: '英文', short: '英' },
-          zh: { full: '中文', short: '中' },
-          ja: { full: '日语', short: '日' },
-          ko: { full: '韩语', short: '韩' },
-          fr: { full: '法语', short: '法' },
-          de: { full: '德语', short: '德' },
-        };
-        return map[lang] ?? { full: lang, short: lang.toUpperCase() };
-      }
-
-      const map: Record<SupportedLanguage, { full: string; short: string }> = {
-        en: { full: 'English', short: 'EN' },
-        zh: { full: 'Chinese', short: 'ZH' },
-        ja: { full: 'Japanese', short: 'JA' },
-        ko: { full: 'Korean', short: 'KO' },
-        fr: { full: 'French', short: 'FR' },
-        de: { full: 'German', short: 'DE' },
-      };
-      return map[lang] ?? { full: lang.toUpperCase(), short: lang.toUpperCase() };
+      const full = getI18nMessage(`languageTarget_${lang}`, undefined, lang.toUpperCase());
+      return { full, short: lang.toUpperCase() };
     };
 
     const target = labelFor(this.settings.targetLanguage);
@@ -840,12 +810,12 @@ export class SubtitleController {
     const native = labelFor(nativeLang);
 
     const bilingual = `${native.short}${target.short}`;
-    const holdSuffix = isZh ? '(按住)' : ' (hold)';
+    const bilingualTemp = getI18nMessage('subtitle_modeBilingualHoldCode', [bilingual], bilingual);
 
     overlay.setModeLabels({
       enhanced: target.full,
       bilingual,
-      bilingualTemp: `${bilingual}${holdSuffix}`,
+      bilingualTemp,
     });
   }
 

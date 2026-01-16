@@ -27,6 +27,10 @@
     "message": "双语(按住)",
     "description": "字幕：模式按钮（双语，按住）"
   },
+  "subtitle_modeBilingualHoldCode": {
+    "message": "$1(按住)",
+    "description": "字幕：按住临时双语标签（$1: 例如 ENZH）"
+  },
   "wordCard_loading": {
     "message": "加载中…",
     "description": "单词卡：加载中占位符"
@@ -538,6 +542,18 @@
   "chatHideThinking": {
     "message": "隐藏思考过程",
     "description": "对话：隐藏思考过程按钮"
+  },
+  "chatCodeBlock": {
+    "message": "代码",
+    "description": "对话：代码块标签"
+  },
+  "chatCopyCode": {
+    "message": "复制代码",
+    "description": "对话：复制代码按钮"
+  },
+  "chatCopiedCode": {
+    "message": "已复制",
+    "description": "对话：已复制提示"
   },
   "chatClear": {
     "message": "清空",
