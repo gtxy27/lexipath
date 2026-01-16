@@ -119,7 +119,7 @@ function buildChatBackgroundInfo(
 export function Sidebar(): React.ReactElement {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme | null>(null);
@@ -136,10 +136,15 @@ export function Sidebar(): React.ReactElement {
   const [draftContextInfo, setDraftContextInfo] = useState<SidebarContextInfo | null>(null);
   const [draftContextSelection, setDraftContextSelection] = useState<SidebarContextSelection>(DEFAULT_CONTEXT_SELECTION);
 
-  const activeContextInfo = conversationId ? (contextBySessionId[conversationId] ?? null) : draftContextInfo;
+  // While switching sessions (or before contextBySessionId is populated), fall back to the draft
+  // context so the chips don't flicker/disappear.
+  const activeContextInfo = conversationId ? (contextBySessionId[conversationId] ?? draftContextInfo) : draftContextInfo;
   const activeContextSelection = conversationId
     ? (contextSelectionBySessionId[conversationId] ?? DEFAULT_CONTEXT_SELECTION)
     : draftContextSelection;
+  // Keep UI simple and stable: any active UI stream counts as "loading".
+  // Session switching explicitly detaches the stream, so this won't leak across sessions.
+  const isLoading = Boolean(loadingSessionId);
   
   useEffect(() => {
     if (!searchQuery.trim()) return;
@@ -160,6 +165,13 @@ export function Sidebar(): React.ReactElement {
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamCancelRef = useRef<null | (() => void)>(null);
+  // Tracks whether the UI currently has an active stream attached.
+  // We use a ref (not state) to avoid async race conditions where history loads
+  // can clobber in-flight stream UI before React state updates apply.
+  const uiStreamActiveRef = useRef(false);
+  const historyLoadTokenRef = useRef(0);
+  const pendingProcessTokenRef = useRef(0);
+  const pendingHandledKeyRef = useRef("");
 
   useApplyTheme(theme);
 
@@ -172,41 +184,63 @@ export function Sidebar(): React.ReactElement {
   const loadSessions = useCallback(async () => {
     const response = await sendMessage("GET_CHAT_SESSIONS", {});
     if (response.ok) {
-      setSessions(response.value as ChatSession[]);
+      setSessions(response.value);
     }
   }, []);
 
-  const loadMessages = useCallback(async (sessionId: string) => {
+  const fetchChatMessages = useCallback(async (sessionId: string, limit = 80): Promise<ChatMessage[] | null> => {
     // Loading an unbounded history can be slow with large sessions; keep UI responsive.
-    const response = await sendMessage("GET_CHAT_MESSAGES", { sessionId, limit: 80 });
-    if (response.ok) {
-      const history = (response.value as any[]).map(m => ({
-        id: String(m.id),
-        role: m.role,
-        content: m.content,
-        thinking: typeof m.thinking === "string" ? m.thinking : undefined,
-        timestamp: m.timestamp
-      }));
-      setMessages(history);
-      setConversationId(sessionId);
-    }
+    const response = await sendMessage("GET_CHAT_MESSAGES", { sessionId, limit });
+    if (!response.ok) return null;
+    return response.value.map((m) => ({
+      id: String(m.id),
+      role: m.role,
+      content: m.content,
+      ...(typeof m.thinking === "string" ? { thinking: m.thinking } : {}),
+      timestamp: m.timestamp,
+    }));
   }, []);
+
+  const applySessionHistory = useCallback((sessionId: string, history: ChatMessage[]) => {
+    setMessages(history);
+    setConversationId(sessionId);
+    setExpandedThinkingById({});
+    setError(null);
+  }, []);
+
+  const loadMessages = useCallback(
+    async (sessionId: string) => {
+      const startedWhileStreaming = uiStreamActiveRef.current;
+      const token = ++historyLoadTokenRef.current;
+      const history = await fetchChatMessages(sessionId, 80);
+      if (historyLoadTokenRef.current !== token) return;
+      // If a UI stream was active when this load started (or became active later),
+      // do not apply history - it can overwrite the in-flight bubbles and make it
+      // look like "no request was sent" even though the worker is running.
+      if (startedWhileStreaming || uiStreamActiveRef.current) return;
+      if (history) {
+        applySessionHistory(sessionId, history);
+      }
+    },
+    [applySessionHistory, fetchChatMessages],
+  );
 
   const loadLatestSession = useCallback(
     async (options?: { skipMessages?: boolean }) => {
-    const response = await sendMessage("GET_CHAT_SESSIONS", {});
-    if (response.ok) {
-      const allSessions = response.value as ChatSession[];
-      setSessions(allSessions);
-      if (allSessions.length > 0) {
-        // Sort by lastAccessedAt desc
-        const sorted = [...allSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
-        const latest = sorted[0];
-        if (latest && !options?.skipMessages) {
-          await loadMessages(latest.sessionId);
+      const startedWhileStreaming = uiStreamActiveRef.current;
+      const response = await sendMessage("GET_CHAT_SESSIONS", {});
+      if (response.ok) {
+        const allSessions = response.value;
+        setSessions(allSessions);
+        if (allSessions.length > 0) {
+          // Sort by lastAccessedAt desc
+          const sorted = [...allSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
+          const latest = sorted[0];
+          if (latest && !options?.skipMessages && !startedWhileStreaming && !uiStreamActiveRef.current) {
+            await loadMessages(latest.sessionId);
+          }
         }
       }
-    }
     },
     [loadMessages],
   );
@@ -222,10 +256,20 @@ export function Sidebar(): React.ReactElement {
         log.warn("Failed to load sidebar theme from settings; using default theme", { message: getErrorMessage(error) });
       }
 
-      const pendingData = await browser.storage.local.get("lexipath_sidebar_pending_message");
-      const pending = pendingData.lexipath_sidebar_pending_message as unknown as { timestamp?: unknown } | undefined;
-      const pendingTimestamp = typeof pending?.timestamp === "number" ? pending.timestamp : 0;
-      const hasRecentPendingMessage = pendingTimestamp > 0 && Date.now() - pendingTimestamp < 10000;
+      const readPending = async () => {
+        const pendingData = await browser.storage.local.get("lexipath_sidebar_pending_message");
+        const pending = pendingData.lexipath_sidebar_pending_message as unknown as { timestamp?: unknown } | undefined;
+        const pendingTimestamp = typeof pending?.timestamp === "number" ? pending.timestamp : 0;
+        return { pendingTimestamp, hasRecentPendingMessage: pendingTimestamp > 0 && Date.now() - pendingTimestamp < 10000 };
+      };
+
+      // The side panel may open before the background finished writing the pending message.
+      // Give storage a short moment to catch up to avoid loading history that will immediately be replaced.
+      let { hasRecentPendingMessage } = await readPending();
+      if (!hasRecentPendingMessage) {
+        await new Promise((r) => setTimeout(r, 150));
+        ({ hasRecentPendingMessage } = await readPending());
+      }
 
       await loadLatestSession({ skipMessages: hasRecentPendingMessage });
     }
@@ -234,14 +278,22 @@ export function Sidebar(): React.ReactElement {
 
   const handleNewChat = useCallback(() => {
     streamCancelRef.current?.();
+    uiStreamActiveRef.current = false;
+    historyLoadTokenRef.current += 1;
     setMessages([]);
     setConversationId(undefined);
     setError(null);
-    setIsLoading(false);
+    setLoadingSessionId(null);
     setShowSessions(false);
     setExpandedThinkingById({});
     setDraftContextSelection(DEFAULT_CONTEXT_SELECTION);
     inputRef.current?.focus();
+  }, []);
+
+  const detachUiStream = useCallback(() => {
+    streamCancelRef.current?.();
+    uiStreamActiveRef.current = false;
+    setLoadingSessionId(null);
   }, []);
 
   const sendChatText = useCallback(
@@ -253,7 +305,7 @@ export function Sidebar(): React.ReactElement {
       if (!message) return;
 
       const allowWhileLoading = options?.allowWhileLoading ?? false;
-      if (isLoading && !allowWhileLoading) return;
+      if (loadingSessionId && !allowWhileLoading) return;
 
       const desiredConversationId = options?.conversationId ?? conversationId;
       const sessionId =
@@ -291,9 +343,10 @@ export function Sidebar(): React.ReactElement {
 
       // Detach the previous UI stream (if any). The background should keep running
       // and persist the final result to storage.
+      historyLoadTokenRef.current += 1;
       streamCancelRef.current?.();
       setError(null);
-      setIsLoading(true);
+      setLoadingSessionId(sessionId);
 
       const now = Date.now();
       const userId = `${now}-user-${Math.random().toString(16).slice(2)}`;
@@ -316,6 +369,15 @@ export function Sidebar(): React.ReactElement {
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInputValue("");
+      // Always bring the latest messages into view when sending; otherwise the request can be running
+      // (and even complete) while the user is reading older history and thinks nothing happened.
+      window.requestAnimationFrame(() => {
+        try {
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+        } catch {
+          // ignore
+        }
+      });
 
       let contentSoFar = "";
       let thinkingSoFar = "";
@@ -364,6 +426,7 @@ export function Sidebar(): React.ReactElement {
       };
 
       const backgroundInfo = buildChatBackgroundInfo(contextInfoForSession, selectionForSession);
+      uiStreamActiveRef.current = true;
       const { cancel } = chatStream(
         { message, conversationId: sessionId, ...(backgroundInfo ? { backgroundInfo } : {}) },
         {
@@ -377,13 +440,14 @@ export function Sidebar(): React.ReactElement {
             pendingThinking += delta;
             scheduleFlush();
           },
-          onDone: ({ reply, conversationId: nextConversationId, thinking }) => {
-            if (finished) return;
-            finished = true;
-            if (flushTimer !== null) {
-              window.clearTimeout(flushTimer);
-              flushTimer = null;
-            }
+           onDone: ({ reply, conversationId: nextConversationId, thinking }) => {
+             if (finished) return;
+             finished = true;
+             uiStreamActiveRef.current = false;
+             if (flushTimer !== null) {
+               window.clearTimeout(flushTimer);
+               flushTimer = null;
+             }
             flush();
             const finalReply = reply || contentSoFar;
             const finalThinking =
@@ -405,19 +469,20 @@ export function Sidebar(): React.ReactElement {
                   : msg,
               ),
             );
-            setConversationId(nextConversationId);
-            setIsLoading(false);
-            streamCancelRef.current = null;
-            inputRef.current?.focus();
-            void loadSessions();
-          },
-          onError: (err) => {
-            if (finished) return;
-            finished = true;
-            if (flushTimer !== null) {
-              window.clearTimeout(flushTimer);
-              flushTimer = null;
-            }
+             setConversationId(nextConversationId);
+             setLoadingSessionId(null);
+             streamCancelRef.current = null;
+             inputRef.current?.focus();
+             void loadSessions();
+           },
+           onError: (err) => {
+             if (finished) return;
+             finished = true;
+             uiStreamActiveRef.current = false;
+             if (flushTimer !== null) {
+               window.clearTimeout(flushTimer);
+               flushTimer = null;
+             }
             flush();
             setMessages((prev) =>
               prev.map((msg) =>
@@ -426,17 +491,18 @@ export function Sidebar(): React.ReactElement {
                   : msg,
               ),
             );
-            setError(err.message);
-            setIsLoading(false);
-            streamCancelRef.current = null;
-            inputRef.current?.focus();
-          },
-        },
+             setError(err.message);
+             setLoadingSessionId(null);
+             streamCancelRef.current = null;
+             inputRef.current?.focus();
+           },
+         },
       );
 
       streamCancelRef.current = () => {
         if (finished) return;
         finished = true;
+        uiStreamActiveRef.current = false;
 
         if (flushTimer !== null) {
           window.clearTimeout(flushTimer);
@@ -452,7 +518,7 @@ export function Sidebar(): React.ReactElement {
           ),
         );
 
-        setIsLoading(false);
+        setLoadingSessionId(null);
         inputRef.current?.focus();
         void loadSessions();
 
@@ -469,122 +535,148 @@ export function Sidebar(): React.ReactElement {
       conversationId,
       draftContextInfo,
       draftContextSelection,
-      isLoading,
+      loadingSessionId,
       loadSessions,
     ],
   );
 
+  const normalizePromptForDedup = useCallback((text: string) => text.trim().replace(/\s+/g, " "), []);
+
+  const hasAnsweredLastPrompt = useCallback((history: ChatMessage[], prompt: string) => {
+    const normalizedPrompt = normalizePromptForDedup(prompt);
+    if (!normalizedPrompt) return false;
+
+    // Only consider the most recent user turn. If the same prompt was asked earlier (not the last),
+    // we still allow auto-send so the user can ask again in a later context.
+    let lastUserIndex = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msg = history[i];
+      if (!msg) continue;
+      if (msg.role !== "user") continue;
+      lastUserIndex = i;
+      break;
+    }
+    if (lastUserIndex < 0) return false;
+
+    const lastUser = history[lastUserIndex];
+    if (!lastUser) return false;
+    if (normalizePromptForDedup(lastUser.content) !== normalizedPrompt) return false;
+
+    for (let j = lastUserIndex + 1; j < history.length; j++) {
+      const next = history[j];
+      if (!next) continue;
+      if (next.role === "assistant" && next.content.trim()) return true;
+    }
+
+    return false;
+  }, [normalizePromptForDedup]);
+
+  const consumePendingMessage = useCallback(
+    async (pending: any) => {
+      if (!pending || typeof pending !== "object") return;
+      const pendingTimestamp = typeof pending.timestamp === "number" ? pending.timestamp : 0;
+      if (!pendingTimestamp || Date.now() - pendingTimestamp >= 10000) return;
+
+      const pendingKeyRaw =
+        typeof pending.nonce === "string" && pending.nonce.trim()
+          ? pending.nonce.trim()
+          : `${pendingTimestamp}:${typeof pending.text === "string" ? pending.text : ""}:${typeof pending.keyword === "string" ? pending.keyword : ""}`;
+      if (pendingKeyRaw === pendingHandledKeyRef.current) return;
+      pendingHandledKeyRef.current = pendingKeyRaw;
+
+      // Only bump the process token after we've accepted this pending message as "new".
+      // This prevents duplicate consumers (storage listener + initial check) from canceling each other.
+      const processToken = ++pendingProcessTokenRef.current;
+
+      await browser.storage.local.remove("lexipath_sidebar_pending_message").catch(() => {});
+      if (pendingProcessTokenRef.current !== processToken) return;
+
+      const pendingText = typeof pending.text === "string" ? pending.text : "";
+      const pendingContextInfo =
+        pending?.contextInfo?.kind === "subtitle" ? (pending.contextInfo as SidebarContextInfo) : null;
+
+      if (pendingContextInfo) {
+        setDraftContextInfo(pendingContextInfo);
+      }
+
+      if (!pending.isAutoSend) {
+        setInputValue(pendingText);
+        inputRef.current?.focus();
+        return;
+      }
+
+      const keywordRaw = typeof pending.keyword === "string" ? pending.keyword : "";
+      const keyword = keywordRaw.trim();
+
+      // Detach any existing UI stream to avoid leaking "loading" across sessions.
+      detachUiStream();
+      setError(null);
+      setShowSessions(false);
+      setExpandedThinkingById({});
+
+      if (keyword) {
+        // Cancel any in-flight history loads from initial mount so they can't overwrite the chat UI.
+        historyLoadTokenRef.current += 1;
+
+        const normalizedKeyword = normalizeChatKeyword(keyword);
+        const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
+        if (pendingProcessTokenRef.current !== processToken) return;
+        const keywordSessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
+        const sessionId = keywordSessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
+
+        setSessions(keywordSessions);
+
+        const history = await fetchChatMessages(sessionId, 80);
+        if (pendingProcessTokenRef.current !== processToken) return;
+
+        if (history) {
+          applySessionHistory(sessionId, history);
+          // If the same prompt has already been answered in this session, don't auto-send again.
+          if (pendingText && hasAnsweredLastPrompt(history, pendingText)) {
+            inputRef.current?.focus();
+            return;
+          }
+        } else {
+          // If history can't be loaded, still switch session for consistency.
+          setConversationId(sessionId);
+        }
+
+        await sendChatText(pendingText, {
+          conversationId: sessionId,
+          allowWhileLoading: true,
+          ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
+        });
+        return;
+      }
+
+      await sendChatText(pendingText, {
+        allowWhileLoading: true,
+        ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
+      });
+    },
+    [applySessionHistory, detachUiStream, fetchChatMessages, hasAnsweredLastPrompt, sendChatText],
+  );
+
   useEffect(() => {
     const handleStorageChange = (changes: Record<string, browser.Storage.StorageChange>) => {
-      if (changes.lexipath_sidebar_pending_message?.newValue) {
-        const pending = changes.lexipath_sidebar_pending_message.newValue;
-        if (Date.now() - pending.timestamp < 10000) {
-          void browser.storage.local.remove("lexipath_sidebar_pending_message");
-          const pendingContextInfo =
-            pending?.contextInfo?.kind === "subtitle" ? (pending.contextInfo as SidebarContextInfo) : null;
-          if (pendingContextInfo) {
-            setDraftContextInfo(pendingContextInfo);
-          }
-          if (pending.isAutoSend) {
-            const keywordRaw = typeof pending.keyword === "string" ? pending.keyword : "";
-            const keyword = keywordRaw.trim();
-
-            if (keyword) {
-              void (async () => {
-                // Immediate UI switch: stop streaming in the UI, but let the background
-                // continue and persist the final assistant message to storage.
-                streamCancelRef.current?.();
-                setError(null);
-                setIsLoading(false);
-                setMessages([]);
-                setShowSessions(false);
-
-                const normalizedKeyword = normalizeChatKeyword(keyword);
-                const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
-                const sessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
-                const sessionId =
-                  sessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
-
-                setSessions(sessions);
-                setConversationId(sessionId);
-
-                await sendChatText(pending.text, {
-                  conversationId: sessionId,
-                  allowWhileLoading: true,
-                  ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
-                });
-              })();
-            } else {
-              void sendChatText(pending.text, {
-                allowWhileLoading: true,
-                ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
-              });
-            }
-          } else {
-            setInputValue(pending.text);
-            if (pendingContextInfo) setDraftContextInfo(pendingContextInfo);
-          }
-        }
-      }
+      const pending = changes.lexipath_sidebar_pending_message?.newValue;
+      if (!pending) return;
+      void consumePendingMessage(pending);
     };
 
     browser.storage.onChanged.addListener(handleStorageChange);
     return () => browser.storage.onChanged.removeListener(handleStorageChange);
-  }, [loadMessages, sendChatText]);
+  }, [consumePendingMessage]);
 
   useEffect(() => {
     async function checkPendingMessage() {
       const data = await browser.storage.local.get("lexipath_sidebar_pending_message");
       const pending = data.lexipath_sidebar_pending_message;
-      
-      if (pending && Date.now() - pending.timestamp < 10000) {
-        await browser.storage.local.remove("lexipath_sidebar_pending_message");
-        const pendingContextInfo =
-          pending?.contextInfo?.kind === "subtitle" ? (pending.contextInfo as SidebarContextInfo) : null;
-        if (pendingContextInfo) {
-          setDraftContextInfo(pendingContextInfo);
-        }
-        
-        if (pending.isAutoSend) {
-          const keywordRaw = typeof pending.keyword === "string" ? pending.keyword : "";
-          const keyword = keywordRaw.trim();
-
-          if (keyword) {
-            // Same behavior as the storage change listener.
-            streamCancelRef.current?.();
-            setError(null);
-            setIsLoading(false);
-            setMessages([]);
-            setShowSessions(false);
-
-            const normalizedKeyword = normalizeChatKeyword(keyword);
-            const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
-            const sessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
-            const sessionId =
-              sessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
-
-            setSessions(sessions);
-            setConversationId(sessionId);
-
-            await sendChatText(pending.text, {
-              conversationId: sessionId,
-              allowWhileLoading: true,
-              ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
-            });
-          } else {
-            await sendChatText(pending.text, {
-              allowWhileLoading: true,
-              ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
-            });
-          }
-        } else {
-          setInputValue(pending.text);
-          if (pendingContextInfo) setDraftContextInfo(pendingContextInfo);
-        }
-      }
+      if (!pending) return;
+      await consumePendingMessage(pending);
     }
     checkPendingMessage();
-  }, [loadMessages, sendChatText]);
+  }, [consumePendingMessage]);
 
   useEffect(() => {
     if (showSessions) return;
@@ -643,8 +735,9 @@ export function Sidebar(): React.ReactElement {
   }, [inputValue, sendChatText]);
 
   const handleStop = useCallback(() => {
+    if (!isLoading) return;
     streamCancelRef.current?.();
-  }, []);
+  }, [isLoading]);
 
   const toggleThinking = useCallback((messageId: string) => {
     setExpandedThinkingById((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
@@ -666,7 +759,7 @@ export function Sidebar(): React.ReactElement {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey && !(e.nativeEvent as any)?.isComposing) {
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         handleSend();
       }
@@ -699,10 +792,12 @@ export function Sidebar(): React.ReactElement {
     if (messages.length === 0) return;
     if (confirm(t("chatClearConfirm"))) {
       streamCancelRef.current?.();
+      uiStreamActiveRef.current = false;
+      historyLoadTokenRef.current += 1;
       setMessages([]);
       setConversationId(undefined);
       setError(null);
-      setIsLoading(false);
+      setLoadingSessionId(null);
       setExpandedThinkingById({});
     }
   }, [messages.length]);
@@ -814,14 +909,15 @@ export function Sidebar(): React.ReactElement {
                       </div>
                     ) : (
                       searchResults.map((result) => (
-                        <button
-                          key={result.id}
-                          onClick={() => {
-                            void loadMessages(result.sessionId);
-                            setShowSessions(false);
-                            setSearchQuery("");
-                            setIsSearching(false);
-                            setSearchResults([]);
+                          <button
+                            key={result.id}
+                            onClick={() => {
+                              detachUiStream();
+                              void loadMessages(result.sessionId);
+                              setShowSessions(false);
+                              setSearchQuery("");
+                              setIsSearching(false);
+                              setSearchResults([]);
                           }}
                           className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
                         >
@@ -850,6 +946,7 @@ export function Sidebar(): React.ReactElement {
                         <button
                           key={session.sessionId}
                           onClick={() => {
+                            detachUiStream();
                             void loadMessages(session.sessionId);
                             setShowSessions(false);
                           }}
