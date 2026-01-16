@@ -1,9 +1,4 @@
-import type {
-  EnhanceWebPayload,
-  Settings,
-  WebEnhanceOutput,
-  WordFamiliarity,
-} from "@lexipath/core";
+import { SupportedLanguageSchema, type EnhanceWebPayload, type Settings, type WebEnhanceOutput, type WordFamiliarity } from "@lexipath/core";
 import { detectPrimaryLanguage } from "@lexipath/core/qualify";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
@@ -11,6 +6,7 @@ import { getI18nMessage } from "../i18n";
 import { isEnhancePausedNow } from "../../shared/tab-state";
 import { HAS_ENHANCED_ONCE_KEY } from "../ui/floating-button-constants";
 import { detectPlatform } from "../platform";
+import type { WordRenderMode } from "../enhanced-text";
 import type { WebWordCardManager } from "./web-word-card";
 import { injectFullParagraph, injectInlineWords } from "./dom-injector";
 import { getWebSiteAdapter } from "./site-adapters";
@@ -153,9 +149,9 @@ export function createWebEnhancer(options: {
       pagePrimaryLanguage === nativeDetected &&
       nativeDetected === "zh"
     ) {
-      return (settings.webEnhanceModeNative ?? "i_plus_1") as any;
+      return settings.webEnhanceModeNative ?? "i_plus_1";
     }
-    return (settings.webEnhanceMode ?? "i_plus_1") as any;
+    return settings.webEnhanceMode ?? "i_plus_1";
   };
 
   const syncFloatingMeta = () => {
@@ -237,8 +233,10 @@ export function createWebEnhancer(options: {
       return;
     }
 
-    if (typeof (window as any).requestIdleCallback === "function") {
-      (window as any).requestIdleCallback(run, { timeout: PUMP_IDLE_TIMEOUT_MS });
+    type RequestIdleCallback = (callback: () => void, options?: { timeout: number }) => number;
+    const requestIdleCallback = (window as Window & { requestIdleCallback?: RequestIdleCallback }).requestIdleCallback;
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(run, { timeout: PUMP_IDLE_TIMEOUT_MS });
       return;
     }
     setTimeout(run, PUMP_IDLE_TIMEOUT_MS);
@@ -588,7 +586,7 @@ export function createWebEnhancer(options: {
 
       const enhancePayload: EnhanceWebPayload = { content: text };
 
-      let renderMode: any = "target-to-native";
+      let renderMode: WordRenderMode = "target-to-native";
       let sourceLang: EnhanceWebPayload["sourceLang"] =
         currentSettings?.targetLanguage;
       let targetLang: EnhanceWebPayload["targetLang"] =
@@ -633,8 +631,11 @@ export function createWebEnhancer(options: {
           detected.language !== "en" &&
           detected.language !== "unknown"
         ) {
-          sourceLang = detected.language as any;
-          targetLang = "en";
+          const parsed = SupportedLanguageSchema.safeParse(detected.language);
+          if (parsed.success) {
+            sourceLang = parsed.data;
+            targetLang = "en";
+          }
         }
       }
 
@@ -649,10 +650,10 @@ export function createWebEnhancer(options: {
         return;
       }
 
-      const enhanced = response.value as WebEnhanceOutput;
+      const enhanced = response.value satisfies WebEnhanceOutput;
 
       const surfaceWords = (enhanced.convert_word ?? [])
-        .map((w: any) => String(w?.original ?? "").trim())
+        .map((w) => w.original.trim())
         .filter(Boolean);
       const normalizedSurfaceWords = Array.from(
         new Set(surfaceWords.map(normalizeWordKey).filter(Boolean)),

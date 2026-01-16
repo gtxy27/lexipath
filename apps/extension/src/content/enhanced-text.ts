@@ -69,14 +69,22 @@ export function createEnhancedElement(
   const normalizeOffsets = (raw: unknown): Array<{ start: number; end: number; term?: string }> => {
     if (!Array.isArray(raw)) return [];
     const cleaned = raw
-      .map((item) => item as any)
-      .filter((item) => item && Number.isFinite(item.start) && Number.isFinite(item.end))
-      .map((item) => ({
-        start: Math.max(0, Math.floor(item.start)),
-        end: Math.max(0, Math.floor(item.end)),
-        ...(typeof item.term === 'string' && item.term.trim() ? { term: item.term.trim() } : {}),
-      }))
-      .filter((item) => item.end > item.start && item.end <= currentText.length)
+      .map((item): { start: number; end: number; term?: string } | null => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const startRaw = record.start;
+        const endRaw = record.end;
+        if (typeof startRaw !== 'number' || !Number.isFinite(startRaw)) return null;
+        if (typeof endRaw !== 'number' || !Number.isFinite(endRaw)) return null;
+
+        const start = Math.max(0, Math.floor(startRaw));
+        const end = Math.max(0, Math.floor(endRaw));
+        if (end <= start || end > currentText.length) return null;
+
+        const term = typeof record.term === 'string' && record.term.trim() ? record.term.trim() : undefined;
+        return { start, end, ...(term ? { term } : {}) };
+      })
+      .filter((item): item is { start: number; end: number; term?: string } => Boolean(item))
       .sort((a, b) => a.start - b.start);
 
     const out: Array<{ start: number; end: number; term?: string }> = [];
@@ -105,7 +113,7 @@ export function createEnhancedElement(
   };
 
   // Build Trie for O(n) matching instead of O(n*m)
-  const trie = new Trie();
+  const trie = new Trie<(typeof words)[number]>();
   const wordByLower = new Map<string, (typeof words)[number]>();
   
   for (const word of words) {
@@ -386,7 +394,7 @@ export function createEnhancedRenderer(
   }
 
   // Build Trie once for O(n) matching instead of O(n*m).
-  const trie = new Trie();
+  const trie = new Trie<(typeof words)[number]>();
   const wordByLower = new Map<string, (typeof words)[number]>();
   for (const word of words) {
     trie.insert(word.originalLower, word);
@@ -420,14 +428,22 @@ export function createEnhancedRenderer(
     const normalizeOffsets = (raw: unknown): Array<{ start: number; end: number; term?: string }> => {
       if (!Array.isArray(raw)) return [];
       const cleaned = raw
-        .map((item) => item as any)
-        .filter((item) => item && Number.isFinite(item.start) && Number.isFinite(item.end))
-        .map((item) => ({
-          start: Math.max(0, Math.floor(item.start)),
-          end: Math.max(0, Math.floor(item.end)),
-          ...(typeof item.term === 'string' && item.term.trim() ? { term: item.term.trim() } : {}),
-        }))
-        .filter((item) => item.end > item.start && item.end <= currentText.length)
+        .map((item): { start: number; end: number; term?: string } | null => {
+          if (!item || typeof item !== "object") return null;
+          const record = item as Record<string, unknown>;
+          const startRaw = record.start;
+          const endRaw = record.end;
+          if (typeof startRaw !== "number" || !Number.isFinite(startRaw)) return null;
+          if (typeof endRaw !== "number" || !Number.isFinite(endRaw)) return null;
+
+          const start = Math.max(0, Math.floor(startRaw));
+          const end = Math.max(0, Math.floor(endRaw));
+          if (end <= start || end > currentText.length) return null;
+
+          const term = typeof record.term === "string" && record.term.trim() ? record.term.trim() : undefined;
+          return { start, end, ...(term ? { term } : {}) };
+        })
+        .filter((item): item is { start: number; end: number; term?: string } => Boolean(item))
         .sort((a, b) => a.start - b.start);
 
       const out: Array<{ start: number; end: number; term?: string }> = [];
