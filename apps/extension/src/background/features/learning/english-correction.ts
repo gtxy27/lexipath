@@ -37,7 +37,7 @@ const englishCorrectionStats: EnglishCorrectionStats = {
   hasErrorFalse: 0,
 };
 
-(globalThis as any).__lexipathEnglishCorrectionStats = englishCorrectionStats;
+
 
 export async function handleEnglishCorrection(options: {
   payload: EnglishCorrectionPayload;

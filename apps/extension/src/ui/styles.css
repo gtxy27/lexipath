@@ -72,7 +72,17 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 233.3 11% 22%;
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+
+    --warning: 48 96% 89%;
+    --warning-foreground: 38 92% 50%;
+
+    --info: 199 89% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Slightly lighter border for better separation in dark mode */
+    --border: 233.3 11% 28%;
     --input: 233.3 11% 22%;
     --ring: 224.3 76.3% 48%;
 
