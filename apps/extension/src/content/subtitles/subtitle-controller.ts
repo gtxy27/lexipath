@@ -17,6 +17,16 @@ import { SubtitleVideoSync } from './subtitle-video-sync';
 import { SubtitleEnhancer } from './subtitle-enhancer';
 import { BilibiliDanmuManager } from './bilibili-danmu-manager';
 import { resolveWordCardTtsLang } from '../wordcard';
+import { PlatformCaptionsWatcher } from './platform-captions-watcher';
+import {
+  buildCueContextWindow,
+  clampContextSentences,
+  computeContextSignature,
+  computeKeywordTranslationSignature,
+  computeTextSignature,
+  normalizeSupportedLanguageCode,
+  normalizeTerm,
+} from './subtitle-utils';
 
 export { detectPlatform } from './subtitle-platform';
 export type { Platform } from './subtitle-platform';
@@ -71,10 +81,7 @@ export class SubtitleController {
   private debugLastBilingualPrefetchSaturationAt = 0;
 
   private platformCaptionsEnabled: boolean | null = null;
-  private platformCaptionsWatchToken = 0;
-  private platformCaptionsObserver: MutationObserver | null = null;
-  private platformCaptionsPollTimer: number | null = null;
-  private platformCaptionsButton: HTMLElement | null = null;
+  private platformCaptionsWatcher: PlatformCaptionsWatcher | null = null;
   private danmuManager: BilibiliDanmuManager | null = null;
 
   constructor(private settings: Settings) {}
@@ -592,148 +599,44 @@ export class SubtitleController {
   }
 
   private startPlatformCaptionsWatch(): void {
-    this.stopPlatformCaptionsWatch();
-    const token = ++this.platformCaptionsWatchToken;
+    this.platformCaptionsWatcher?.stop();
 
-    const poll = () => {
+    const provider = this.provider;
+    if (!provider) return;
+    if (provider.platform !== 'youtube' && provider.platform !== 'bilibili') return;
+
+    this.platformCaptionsWatcher = new PlatformCaptionsWatcher(provider.platform, (enabled) => {
       if (this.destroyed) return;
-      if (token !== this.platformCaptionsWatchToken) return;
+      if (this.platformCaptionsEnabled === enabled) return;
 
-      const button = this.findPlatformCaptionsButton();
-      if (!button) {
-        this.platformCaptionsPollTimer = window.setTimeout(poll, 1000);
-        return;
+      this.platformCaptionsEnabled = enabled;
+      if (!enabled) {
+        this.provider?.showNativeCaptions?.();
+      } else if (this.cues.length > 0) {
+        const cue = (this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : this.cues[0]) ?? null;
+        const cueLang = cue ? this.getCueSourceLanguage(cue, this.subtitleLanguage) : null;
+        const sceneEnabled = cueLang ? this.isSubtitleSceneEnabled(cueLang) : true;
+        if (sceneEnabled) {
+          this.provider?.hideNativeCaptions?.();
+        } else {
+          this.provider?.showNativeCaptions?.();
+        }
+      } else {
+        // Subtitles were previously gated by the platform caption toggle (notably Bilibili).
+        // Once the user enables captions, fetch cues so the overlay can start working.
+        void this.fetchAndProcessSubtitles();
       }
 
-      this.platformCaptionsButton = button;
-      this.platformCaptionsPollTimer = null;
+      this.updateSubtitleDisplay();
+    });
 
-      const update = () => {
-        this.refreshPlatformCaptionsEnabled();
-      };
-
-      update();
-      this.platformCaptionsObserver = new MutationObserver(update);
-      this.platformCaptionsObserver.observe(button, {
-        attributes: true,
-        attributeFilter: ['aria-pressed', 'aria-checked', 'class'],
-      });
-    };
-
-    poll();
+    this.platformCaptionsWatcher.start();
   }
 
   private stopPlatformCaptionsWatch(): void {
-    this.platformCaptionsWatchToken++;
-    if (this.platformCaptionsPollTimer !== null) {
-      window.clearTimeout(this.platformCaptionsPollTimer);
-      this.platformCaptionsPollTimer = null;
-    }
-    if (this.platformCaptionsObserver) {
-      this.platformCaptionsObserver.disconnect();
-      this.platformCaptionsObserver = null;
-    }
-    this.platformCaptionsButton = null;
+    this.platformCaptionsWatcher?.stop();
+    this.platformCaptionsWatcher = null;
     this.platformCaptionsEnabled = null;
-  }
-
-  private findPlatformCaptionsButton(): HTMLElement | null {
-    const provider = this.provider;
-    if (!provider) return null;
-
-    if (provider.platform === 'youtube') {
-      const button = document.querySelector('.ytp-subtitles-button');
-      return button instanceof HTMLElement ? button : null;
-    }
-
-    if (provider.platform === 'bilibili') {
-      const selectors = [
-        '.bpx-player-ctrl-subtitle',
-        '.bpx-player-ctrl-btn.bpx-player-ctrl-subtitle',
-        '.bilibili-player-video-btn-subtitle',
-      ];
-
-      for (const selector of selectors) {
-        const button = document.querySelector(selector);
-        if (button instanceof HTMLElement) return button;
-      }
-    }
-
-    return null;
-  }
-
-  private getCaptionsEnabledFromButton(button: HTMLElement): boolean | null {
-    const ariaPressed = button.getAttribute('aria-pressed');
-    if (ariaPressed === 'true') return true;
-    if (ariaPressed === 'false') return false;
-
-    const ariaChecked = button.getAttribute('aria-checked');
-    if (ariaChecked === 'true') return true;
-    if (ariaChecked === 'false') return false;
-
-    if (
-      button.classList.contains('bpx-player-ctrl-btn-active') ||
-      button.classList.contains('bilibili-player-video-btn-subtitle-on') ||
-      button.classList.contains('active')
-    ) {
-      return true;
-    }
-
-    if (button.classList.contains('bilibili-player-video-btn-subtitle-off')) {
-      return false;
-    }
-
-    // For Bilibili, check if there's an active subtitle selection in the menu
-    const isLikelyBilibiliButton =
-      button.classList.contains('bpx-player-ctrl-subtitle') || button.classList.contains('bilibili-player-video-btn-subtitle');
-    if (isLikelyBilibiliButton) {
-      // Check if the "close" switch is NOT active (meaning subtitles are on)
-      const closeSwitch = button.querySelector('.bpx-player-ctrl-subtitle-close-switch');
-      if (closeSwitch && !closeSwitch.classList.contains('bpx-state-active')) {
-        return true;
-      }
-
-      // Also check if bilibili subtitle is actually visible on page
-      const subtitleWrap = document.querySelector('.bpx-player-subtitle-wrap');
-      if (subtitleWrap instanceof HTMLElement) {
-        const display = window.getComputedStyle(subtitleWrap).display;
-        if (display !== 'none') return true;
-      }
-
-      // Fail-closed: if no active subtitle is detected, assume subtitles are off
-      return false;
-    }
-
-    return null;
-  }
-
-  private refreshPlatformCaptionsEnabled(): void {
-    const button = this.platformCaptionsButton;
-    if (!button) return;
-
-    const enabled = this.getCaptionsEnabledFromButton(button);
-    if (enabled === null) return;
-    if (this.platformCaptionsEnabled === enabled) return;
-
-    this.platformCaptionsEnabled = enabled;
-    if (!enabled) {
-      this.provider?.showNativeCaptions?.();
-    } else if (this.cues.length > 0) {
-      const cue = (this.currentCueIndex >= 0 ? this.cues[this.currentCueIndex] : this.cues[0]) ?? null;
-      const cueLang = cue ? this.getCueSourceLanguage(cue, this.subtitleLanguage) : null;
-      const sceneEnabled = cueLang ? this.isSubtitleSceneEnabled(cueLang) : true;
-      if (sceneEnabled) {
-        this.provider?.hideNativeCaptions?.();
-      } else {
-        this.provider?.showNativeCaptions?.();
-      }
-    } else {
-      // Subtitles were previously gated by the platform caption toggle (notably Bilibili).
-      // Once the user enables captions, fetch cues so the overlay can start working.
-      void this.fetchAndProcessSubtitles();
-    }
-
-    this.updateSubtitleDisplay();
   }
 
   private async ensureCueBilingual(cue: Cue): Promise<void> {
@@ -741,33 +644,11 @@ export class SubtitleController {
     this.updateSubtitleDisplay();
   }
 
-  private normalizeSupportedLanguageCode(languageCode: string): SupportedLanguage | null {
-    const normalized = languageCode.trim().toLowerCase();
-    if (!normalized) return null;
-
-    const parts = normalized.split(/[-_]/).filter(Boolean);
-    for (const part of parts) {
-      switch (part) {
-        case 'en':
-        case 'ja':
-        case 'ko':
-        case 'fr':
-        case 'de':
-        case 'zh':
-          return part;
-        default:
-          break;
-      }
-    }
-
-    return null;
-  }
-
   private getCueSourceLanguage(cue: Cue, subtitleLanguage: string): SupportedLanguage {
     const candidates = [subtitleLanguage, cue.lang, this.settings.targetLanguage];
     for (const candidate of candidates) {
       if (!candidate) continue;
-      const normalized = this.normalizeSupportedLanguageCode(candidate);
+      const normalized = normalizeSupportedLanguageCode(candidate);
       if (normalized) return normalized;
     }
     return this.settings.targetLanguage;
@@ -776,10 +657,10 @@ export class SubtitleController {
   private isSubtitleSceneEnabled(subtitleLang: SupportedLanguage): boolean {
     const scenes = this.settings.scenesEnabled;
     if (!scenes) return true;
-
+ 
     const nativeLang =
-      this.normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
-
+      normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
+ 
     if (subtitleLang === nativeLang) return scenes.videoNative !== false;
     if (subtitleLang === this.settings.targetLanguage) return scenes.videoTarget !== false;
     return true;
@@ -787,11 +668,11 @@ export class SubtitleController {
 
   private shouldAdaptSubtitle(subtitleLang: SupportedLanguage): boolean {
     if (subtitleLang === this.settings.targetLanguage) return false;
-
+ 
     const nativeLang =
-      this.normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
+      normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
     if (subtitleLang === nativeLang) return true;
-
+ 
     return true;
   }
 
@@ -806,7 +687,7 @@ export class SubtitleController {
 
     const target = labelFor(this.settings.targetLanguage);
     const nativeLang =
-      this.normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
+      normalizeSupportedLanguageCode(this.settings.nativeLanguage) ?? this.settings.targetLanguage;
     const native = labelFor(nativeLang);
 
     const bilingual = `${native.short}${target.short}`;
@@ -819,64 +700,29 @@ export class SubtitleController {
     });
   }
 
-  private normalizeTerm(term: string): string {
-    return term
-      .replace(/\u2019/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-  }
-
-  private computeTextSignature(text: string): string {
-    const normalized = text.replace(/\s+/g, ' ').trim();
-    if (!normalized) return '';
-
-    let hash = 5381;
-    for (let i = 0; i < normalized.length; i++) {
-      hash = ((hash << 5) + hash) + normalized.charCodeAt(i);
-      hash |= 0;
-    }
-
-    return `${normalized.length}:${hash >>> 0}`;
-  }
-
   private clampContextSentences(raw: unknown): number {
-    const n = typeof raw === 'number' && Number.isFinite(raw) ? Math.floor(raw) : 0;
-    return Math.max(0, Math.min(6, n));
+    return clampContextSentences(raw, 6);
   }
 
   private buildCueContextWindow(centerIndex: number, centerText: string): { before: string[]; after: string[] } {
-    const windowSize = this.clampContextSentences(this.settings.llmContextSentences);
-    if (windowSize <= 0) return { before: [], after: [] };
-
-    const before: string[] = [];
-    const after: string[] = [];
-
-    const start = Math.max(0, centerIndex - windowSize);
-    const end = Math.min(this.cues.length - 1, centerIndex + windowSize);
-
-    for (let i = start; i <= end; i += 1) {
-      if (i === centerIndex) continue;
-      const cue = this.cues[i];
-      const text = cue?.text?.trim?.() ?? '';
-      if (!text) continue;
-      if (i < centerIndex) before.push(text);
-      else after.push(text);
-    }
-
-    // Always include the current line in context to disambiguate senses.
-    const center = centerText.trim();
-    if (center) {
-      before.push(center);
-    }
-
-    return { before, after };
+    return buildCueContextWindow({
+      cues: this.cues,
+      centerIndex,
+      centerText,
+      windowSize: this.clampContextSentences(this.settings.llmContextSentences),
+    });
   }
 
   private computeContextSignature(window: { before: string[]; after: string[] }): string {
-    const joined = [...window.before, '||', ...window.after].join('\n').trim();
-    if (!joined) return '';
-    return this.computeTextSignature(joined);
+    return computeContextSignature(window);
+  }
+
+  private normalizeTerm(term: string): string {
+    return normalizeTerm(term);
+  }
+
+  private computeTextSignature(text: string): string {
+    return computeTextSignature(text);
   }
 
   private ensureCueKeywords(cueId: string, text: string, cueIndex?: number): Promise<string[]> {
@@ -936,9 +782,7 @@ export class SubtitleController {
   }
 
   private computeKeywordTranslationSignature(text: string, keywords: string[]): string {
-    const normalizedKeywords = keywords.map((term) => this.normalizeTerm(term)).filter(Boolean);
-    normalizedKeywords.sort((a, b) => a.localeCompare(b));
-    return `${this.computeTextSignature(text)}|${normalizedKeywords.join('|')}`;
+    return computeKeywordTranslationSignature(text, keywords);
   }
 
   private ensureCueKeywordTranslations(
