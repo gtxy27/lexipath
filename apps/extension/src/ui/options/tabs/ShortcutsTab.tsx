@@ -122,14 +122,12 @@ export function ShortcutsTab(): React.ReactElement {
               <div className="text-sm text-muted-foreground">{t("optionsShortcutsEmpty")}</div>
             ) : (
               rows.map((cmd) => {
+                const title = cmd.description?.trim();
+                if (!title) return null;
+
                 const binding = cmd.shortcut?.trim() ? cmd.shortcut : t("optionsShortcutsNotSet");
-                const desc = cmd.description?.trim() ? cmd.description : cmd.name;
                 return (
-                  <OptionsRow
-                    key={cmd.name}
-                    title={desc}
-                    description={cmd.name}
-                  >
+                  <OptionsRow key={cmd.name} title={title}>
                     <div className="font-mono text-xs px-2.5 py-1.5 rounded-md border border-border bg-background">
                       {binding}
                     </div>
