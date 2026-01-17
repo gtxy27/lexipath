@@ -612,6 +612,15 @@ export function createWebEnhancer(options: {
       inFlightElements.add(el);
       inFlightCount += 1;
 
+      // Once a node is dequeued for processing, stop tracking it in the IntersectionObserver
+      // to keep long-lived pages from accumulating thousands of observed targets.
+      try {
+        intersectionObserver?.unobserve(el);
+      } catch {
+        // Ignore observer errors; processing should proceed.
+      }
+
+
       void (async () => {
         try {
           await processTextElement(el, token);

@@ -1,6 +1,4 @@
 import type { SidebarContextInfo, SidebarContextSelection, SubtitleContextInfo, WebContextInfo } from './types';
-import { makeSubtitleAnchorKey, makeWebAnchorKey } from '../../shared/chat-anchor';
-
 
 export function formatTimestampLabel(timestampSec: number): string {
   const total = Math.max(0, Math.floor(timestampSec));
@@ -11,22 +9,6 @@ export function formatTimestampLabel(timestampSec: number): string {
   const ss = String(s).padStart(2, '0');
   if (h > 0) return `${String(h).padStart(2, '0')}:${mm}:${ss}`;
   return `${mm}:${ss}`;
-}
-
-export async function computeContextAnchorKey(context: SidebarContextInfo | null): Promise<string> {
-  if (!context) return '';
-
-  if (context.kind === 'web') {
-    const url = typeof context.url === 'string' ? context.url.trim() : '';
-    return url ? await makeWebAnchorKey(url) : '';
-  }
-
-  if (context.kind === 'subtitle') {
-    const anchorId = typeof context.anchorId === 'string' ? context.anchorId.trim() : '';
-    return anchorId ? await makeSubtitleAnchorKey(anchorId) : '';
-  }
-
-  return '';
 }
 
 

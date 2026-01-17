@@ -208,10 +208,7 @@ async function runChatStream(
     // reuse the most recent session for that anchor.
     const wantsReuse = Boolean(requestedAnchorKey) && requestedMeta?.forceNewSession !== true;
     if (wantsReuse) {
-      const allSessions = await storageService.listAllSessions();
-      const reuse = allSessions
-        .filter((s) => s.anchorKey === requestedAnchorKey)
-        .sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)[0];
+      const reuse = await storageService.getMostRecentSessionByAnchorKey(requestedAnchorKey);
 
       if (reuse) {
         // Continue the existing session instead of creating a new one.
@@ -227,6 +224,7 @@ async function runChatStream(
         );
       }
     }
+
 
     await storageService.upsertSession({
       sessionId,

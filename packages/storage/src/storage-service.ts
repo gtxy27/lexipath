@@ -396,6 +396,42 @@ export class StorageService {
     return results.sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
   }
 
+  async getMostRecentSessionByAnchorKey(anchorKey: string): Promise<ChatSessionRecord | null> {
+    const key = anchorKey.trim();
+    if (!key) return null;
+
+    const db = await this.getDb();
+    const tx = db.transaction('chat_sessions', 'readonly');
+    const store = tx.objectStore('chat_sessions');
+    const index = store.index('anchorKey');
+    const range = IDBKeyRange.only(key);
+
+    let best: ChatSessionRecord | null = null;
+
+    await new Promise<void>((resolve, reject) => {
+      const request = index.openCursor(range);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+        const parsed = StorageExportSchema.shape.sessions.element.safeParse(cursor.value);
+        if (parsed.success) {
+          const session = parsed.data;
+          if (!best || session.lastAccessedAt > best.lastAccessedAt) {
+            best = session;
+          }
+        }
+        cursor.continue();
+      };
+    });
+
+    await transactionDone(tx);
+    return best;
+  }
+
   async addMessage(message: ChatMessageRecord): Promise<number> {
     return this.addMessageInternal(message, { touchSession: true });
   }

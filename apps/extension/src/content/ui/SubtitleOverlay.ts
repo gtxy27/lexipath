@@ -768,10 +768,31 @@ export class SubtitleOverlay {
     normalizedTerms: string[]
   ): Array<{ start: number; end: number; term: string }> {
     const normalizedText = text.replace(/\u2019/g, "'").toLowerCase();
+
+    // Keep selected ranges sorted by start so overlap checks are O(log n).
     const selected: Array<{ start: number; end: number; term: string }> = [];
 
-    const terms = Array.from(new Set(normalizedTerms))
-      .sort((a, b) => b.length - a.length || a.localeCompare(b));
+    const tryInsertNonOverlapping = (candidate: { start: number; end: number; term: string }) => {
+      let lo = 0;
+      let hi = selected.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        const midStart = selected[mid]?.start ?? 0;
+        if (midStart < candidate.start) lo = mid + 1;
+        else hi = mid;
+      }
+
+      const prev = lo > 0 ? selected[lo - 1] : undefined;
+      if (prev && candidate.start < prev.end) return false;
+
+      const next = lo < selected.length ? selected[lo] : undefined;
+      if (next && candidate.end > next.start) return false;
+
+      selected.splice(lo, 0, candidate);
+      return true;
+    };
+
+    const terms = Array.from(new Set(normalizedTerms)).sort((a, b) => b.length - a.length || a.localeCompare(b));
 
     for (const term of terms) {
       if (!term) continue;
@@ -787,16 +808,13 @@ export class SubtitleOverlay {
 
         if (!this.matchRespectsBoundary(normalizedText, start, end, term)) continue;
 
-        const overlaps = selected.some((range) => start < range.end && end > range.start);
-        if (overlaps) continue;
-
-        selected.push({ start, end, term });
+        tryInsertNonOverlapping({ start, end, term });
       }
     }
 
-    selected.sort((a, b) => a.start - b.start || b.end - a.end);
     return selected;
   }
+
 
   /**
    * Find video container element

@@ -38,7 +38,7 @@ describe('storage settings migration', () => {
         provider: {
           baseUrl: 'https://api.openai.com/v1',
           model: 'gpt-4o-mini',
-          apiKey: 'sk-test',
+          apiKey: 'test-key',
         },
         modelConcurrencyLimits: {
           'https://api.openai.com/v1|gpt-4o-mini': 42,
@@ -56,7 +56,7 @@ describe('storage settings migration', () => {
     expect(settings.channels[0]?.model).toBe('gpt-4o-mini');
     const channelConfig = (settings.channels[0]?.config ?? {}) as Record<string, unknown>;
     expect(channelConfig['baseUrl']).toBe('https://api.openai.com/v1');
-    expect(channelConfig['apiKey']).toBe('sk-test');
+    expect(channelConfig['apiKey']).toBe('test-key');
     expect(settings.channels[0]?.concurrencyLimit).toBe(15);
 
     const selectKeywords = settings.behaviorRoutes.select_keywords;

@@ -36,16 +36,33 @@ export function createExposureTracker(options: {
 
           if (existingTimer) continue;
 
-          const timer = window.setTimeout(() => {
-            exposureTimers.delete(el);
-            const words = exposureTargets.get(el) ?? [];
-            const toSend = words.filter((w) => !options.exposureSentWords.has(w));
-            if (toSend.length === 0) return;
+           const timer = window.setTimeout(() => {
+             exposureTimers.delete(el);
+             const words = exposureTargets.get(el) ?? [];
+             const toSend = words.filter((w) => !options.exposureSentWords.has(w));
+             if (toSend.length === 0) {
+               // No new words to report; stop tracking this element.
+               try {
+                 exposureObserver?.unobserve(el);
+               } catch {
+                 // Ignore.
+               }
+               return;
+             }
 
-            for (const w of toSend) options.exposureSentWords.add(w);
-            options.emitContext({ seenCount: options.exposureSentWords.size });
-            void options.sendMessage("RECORD_EXPOSURE_VALID", { words: toSend });
-          }, 2000);
+
+             for (const w of toSend) options.exposureSentWords.add(w);
+             options.emitContext({ seenCount: options.exposureSentWords.size });
+             void options.sendMessage("RECORD_EXPOSURE_VALID", { words: toSend });
+
+             // Reporting is per-element, one-shot; unobserve to avoid long-lived observer churn.
+             try {
+               exposureObserver?.unobserve(el);
+             } catch {
+               // Ignore.
+             }
+           }, 2000);
+
           exposureTimers.set(el, timer);
         }
       },

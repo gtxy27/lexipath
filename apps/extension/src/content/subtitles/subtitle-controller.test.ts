@@ -154,7 +154,7 @@ describe('SubtitleController', () => {
           typeId: 1,
           name: 'Test OpenAI',
           model: 'gpt-4o-mini',
-          config: { baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-test' },
+          config: { baseUrl: 'https://api.openai.com/v1', apiKey: 'test-key' },
           concurrencyLimit: 15,
           extra: {},
         },

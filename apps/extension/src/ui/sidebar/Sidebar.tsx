@@ -53,7 +53,7 @@ import type {
   WebContextInfo,
 } from "./types";
 import { DEFAULT_CONTEXT_SELECTION } from "./types";
-import { buildChatBackgroundInfo, computeContextAnchorKey, formatTimestampLabel } from "./context";
+import { buildChatBackgroundInfo, formatTimestampLabel } from "./context";
 import { parsePendingSidebarMessage } from "./pending";
 
 import { useAutoResizeTextarea } from "./hooks/useAutoResizeTextarea";
@@ -509,14 +509,12 @@ export function Sidebar(): React.ReactElement {
         const isWebOrSubtitle = contextInfoForSession.kind === "web" || contextInfoForSession.kind === "subtitle";
         if (!isWebOrSubtitle) return undefined;
 
-        const anchorKey = await computeContextAnchorKey(contextInfoForSession);
+        const isWebStudy = contextInfoForSession.kind === "web" && contextInfoForSession.source === "study";
 
-        const isWebStudy =
-          contextInfoForSession.kind === "web" && (contextInfoForSession as any).source === "study";
-
-        // Selection-based web assistance stays general (spec); only persist anchorKey for explicit web study sessions.
+        // Spec: only explicit "study" web sessions and subtitle sessions are anchored.
+        // The background computes and stores anchorKey from meta.url/meta.anchorId.
         const shouldPersistAnchorKey = isNewSession && (contextInfoForSession.kind === "subtitle" || isWebStudy);
-        void anchorKey;
+
 
         const meta: {
           kind?: ChatSessionKind;
@@ -530,8 +528,8 @@ export function Sidebar(): React.ReactElement {
         if (contextInfoForSession.kind === "web") {
           // Spec: selection-based web assistance keeps the session `general`.
           // Only explicit "study" turns create/label a `web` session and anchorKey.
-          const source = (contextInfoForSession as any).source;
-          const isStudy = source === "study";
+          const isStudy = contextInfoForSession.source === "study";
+
 
           if (isStudy) {
             meta.kind = "web";
@@ -574,11 +572,10 @@ export function Sidebar(): React.ReactElement {
                   ...(sessionMeta.kind ? { kind: sessionMeta.kind } : {}),
                   ...(sessionMeta.label ? { label: sessionMeta.label } : {}),
                   ...(sessionMeta.anchorKey ? { anchorKey: sessionMeta.anchorKey } : {}),
-                  ...(typeof (sessionMeta as any).url === "string" ? { url: String((sessionMeta as any).url) } : {}),
-                  ...(typeof (sessionMeta as any).anchorId === "string" ? { anchorId: String((sessionMeta as any).anchorId) } : {}),
-                  ...(typeof sessionMeta.forceNewSession === "boolean"
-                    ? { forceNewSession: sessionMeta.forceNewSession }
-                    : {}),
+                  ...(typeof sessionMeta.url === "string" ? { url: sessionMeta.url } : {}),
+                  ...(typeof sessionMeta.anchorId === "string" ? { anchorId: sessionMeta.anchorId } : {}),
+                  ...(typeof sessionMeta.forceNewSession === "boolean" ? { forceNewSession: sessionMeta.forceNewSession } : {}),
+
                 },
               }
             : {}),
@@ -760,7 +757,7 @@ export function Sidebar(): React.ReactElement {
 
       // Whole-page study opt-in: the content script attaches a bounded excerpt (when available)
       // via contextInfo.selectedText. The sidebar shows a preview before sending.
-      if (pendingContextInfo?.kind === "web" && (pendingContextInfo as any).source === "study") {
+      if (pendingContextInfo?.kind === "web" && pendingContextInfo.source === "study") {
         // Treat "Study this page" as a fresh entry point.
         // We intentionally clear the active session so the background can either:
         // - reuse the most recent session for the same anchorKey, or
@@ -896,7 +893,7 @@ export function Sidebar(): React.ReactElement {
 
   const handleSend = useCallback(() => {
     const isWebStudy =
-      activeContextInfo?.kind === "web" && (activeContextInfo as any).source === "study";
+      activeContextInfo?.kind === "web" && activeContextInfo.source === "study";
 
     // No modal preview: study context is controlled via chips.
     // For "study" entrypoints, ensure we don't accidentally continue an unrelated session.

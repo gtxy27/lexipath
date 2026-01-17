@@ -921,17 +921,19 @@ export class SubtitleController {
     }
 
     const keywordLists = await Promise.all(
-      cuesInWindow.map((cue) => {
+      cuesInWindow.map((cue, idx) => {
+        const cueIndex = startIndex + idx;
         const cueLang = this.getCueSourceLanguage(cue, this.subtitleLanguage);
         if (!this.shouldAdaptSubtitle(cueLang)) {
-          return this.ensureCueKeywords(cue.id, cue.text, this.cues.indexOf(cue));
+          return this.ensureCueKeywords(cue.id, cue.text, cueIndex);
         }
 
         const adapted = this.enhancer?.getEnhanced(cue.id)?.line1_final?.trim() ?? '';
         if (!adapted) return Promise.resolve([]);
-        return this.ensureCueKeywords(cue.id, adapted, this.cues.indexOf(cue));
+        return this.ensureCueKeywords(cue.id, adapted, cueIndex);
       })
     );
+
     if (this.destroyed) return;
     if (token !== this.prefetchToken) {
       log.debug(

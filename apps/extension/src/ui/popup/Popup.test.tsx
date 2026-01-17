@@ -87,8 +87,10 @@ describe("Popup", () => {
       expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
     });
 
-    expect(screen.getByText("extensionName")).toBeInTheDocument();
+    // Wait for the post-load UI (not the loading spinner state).
+    expect(await screen.findByText("extensionName")).toBeInTheDocument();
     expect(screen.getByText("popupFloatingButtonLabel")).toBeInTheDocument();
+
 
     expect(screen.getByText("targetLanguage")).toBeInTheDocument();
     expect(screen.getByText("languageTarget_en")).toBeInTheDocument();
