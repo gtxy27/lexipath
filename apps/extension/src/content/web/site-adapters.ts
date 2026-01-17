@@ -1,8 +1,20 @@
+import { WEB_SITE_ADAPTERS } from "./site-adapters/index";
+
 export type WebSiteAdapter = Readonly<{
   id: string;
   textSelector: string;
   shouldQueueElement: (element: Element) => boolean;
   shouldProcessElement: (element: Element) => boolean;
+}>;
+
+export type WebSiteAdapterFactory = Readonly<{
+  id: string;
+  /**
+   * Whether this adapter applies to the given URL.
+   * Must be fast and side-effect free.
+   */
+  matches: (url: URL) => boolean;
+  create: () => WebSiteAdapter;
 }>;
 
 const DEFAULT_TEXT_SELECTOR = [
@@ -60,23 +72,34 @@ function defaultShouldProcessElement(element: Element): boolean {
   return true;
 }
 
-export function getWebSiteAdapter(url: string): WebSiteAdapter {
-  const hostname = (() => {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return "";
-    }
-  })();
+const defaultAdapter: WebSiteAdapter = Object.freeze({
+  id: "default",
+  textSelector: DEFAULT_TEXT_SELECTOR,
+  shouldQueueElement: defaultShouldQueueElement,
+  shouldProcessElement: defaultShouldProcessElement,
+});
 
-  // Future: add per-site overrides here.
-  void hostname;
-
-  return Object.freeze({
-    id: "default",
-    textSelector: DEFAULT_TEXT_SELECTOR,
-    shouldQueueElement: defaultShouldQueueElement,
-    shouldProcessElement: defaultShouldProcessElement,
-  });
+function safeParseUrl(raw: string): URL | null {
+  try {
+    return new URL(raw);
+  } catch {
+    return null;
+  }
 }
 
+export function getWebSiteAdapter(url: string): WebSiteAdapter {
+  const parsed = safeParseUrl(url);
+  if (!parsed) return defaultAdapter;
+
+  for (const factory of WEB_SITE_ADAPTERS) {
+    try {
+      if (factory.matches(parsed)) {
+        return Object.freeze(factory.create());
+      }
+    } catch {
+      // Ignore adapter failures; fall back to default.
+    }
+  }
+
+  return defaultAdapter;
+}
