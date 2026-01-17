@@ -101,11 +101,17 @@ export function setupLifecycleListeners(log: LoggerLike) {
 
   browser.commands?.onCommand?.addListener?.(async (command: string, tab?: browser.Tabs.Tab) => {
     if (command === 'toggle-sidebar') {
-      // `commands.onCommand` doesn't reliably provide a tab (Chrome doesn't). Resolve the active tab
-      // first; `sidePanel.open({ tabId })` is the most compatible way to open the panel.
-      const tabId = await resolveTabId(tab);
-      if (typeof tabId !== 'number') return;
-      toggleSidePanel(tabId);
+      // Attempt to preserve user activation by opening/closing immediately, without awaiting extra work.
+      const directTabId = tab?.id;
+      toggleSidePanel(typeof directTabId === 'number' ? directTabId : undefined);
+
+      // If no tab id was provided, best-effort retry using a query.
+      if (typeof directTabId !== 'number') {
+        void (async () => {
+          const resolved = await resolveTabId(undefined);
+          if (typeof resolved === 'number') toggleSidePanel(resolved);
+        })();
+      }
       return;
     }
 
