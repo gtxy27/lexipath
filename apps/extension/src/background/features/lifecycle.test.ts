@@ -23,6 +23,7 @@ const { browserMock, getSettingsMock, setSettingsMock } = vi.hoisted(() => {
       },
       sidePanel: {
         open: vi.fn(async () => undefined),
+        setOptions: vi.fn(async () => undefined),
       },
     },
     getSettingsMock: vi.fn(async () => ({ floatingButtonEnabled: true, channels: [], hasCompletedOnboarding: true })),
@@ -84,5 +85,18 @@ describe("setupLifecycleListeners (commands)", () => {
 
     const cb = (browserMock as any).__listeners[0];
     await expect(cb("toggle-original", undefined)).resolves.toBeUndefined();
+  });
+
+  it("best-effort toggles side panel by calling open then disabling on second press", async () => {
+    const log = { warn: vi.fn(), debug: vi.fn() };
+    setupLifecycleListeners(log);
+
+    const cb = (browserMock as any).__listeners[0];
+
+    await cb("toggle-sidebar", { id: 9 });
+    expect(browserMock.sidePanel.open).toHaveBeenCalled();
+
+    await cb("toggle-sidebar", { id: 9 });
+    expect(browserMock.sidePanel.setOptions).toHaveBeenCalledWith({ tabId: 9, enabled: false });
   });
 });
