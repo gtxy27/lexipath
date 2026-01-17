@@ -57,8 +57,6 @@ export function setupLifecycleListeners(log: LoggerLike) {
     }
   }
 
-  const sidePanelOpenWantedByTabId = new Map<number, boolean>();
-
   async function openSidePanel(tabId?: number): Promise<void> {
     if (typeof (browser as any).sidePanel?.open !== 'function') return;
     try {
@@ -70,46 +68,17 @@ export function setupLifecycleListeners(log: LoggerLike) {
     }
   }
 
-  async function setSidePanelEnabled(tabId: number, enabled: boolean): Promise<void> {
-    if (typeof (browser as any).sidePanel?.setOptions !== 'function') return;
-    try {
-      await (browser as any).sidePanel.setOptions({ tabId, enabled });
-    } catch (error: unknown) {
-      log.debug('Failed to set side panel options via shortcut; continuing', { message: getErrorMessage(error) });
-    }
-  }
-
-  function toggleSidePanel(tabId?: number): void {
-    // Chrome sidePanel API has no "close" method. Best-effort toggle by enabling/disabling per-tab.
-    if (typeof tabId !== 'number') {
-      void openSidePanel(undefined);
-      return;
-    }
-
-    const isOpenWanted = sidePanelOpenWantedByTabId.get(tabId) ?? false;
-    if (isOpenWanted) {
-      void setSidePanelEnabled(tabId, false);
-      sidePanelOpenWantedByTabId.set(tabId, false);
-      return;
-    }
-
-    // Ensure it's enabled before opening (if we previously disabled it).
-    void setSidePanelEnabled(tabId, true);
-    void openSidePanel(tabId);
-    sidePanelOpenWantedByTabId.set(tabId, true);
-  }
-
   browser.commands?.onCommand?.addListener?.(async (command: string, tab?: browser.Tabs.Tab) => {
     if (command === 'toggle-sidebar') {
-      // Attempt to preserve user activation by opening/closing immediately, without awaiting extra work.
+      // Attempt to preserve user activation by opening immediately, without awaiting extra work.
       const directTabId = tab?.id;
-      toggleSidePanel(typeof directTabId === 'number' ? directTabId : undefined);
+      void openSidePanel(typeof directTabId === 'number' ? directTabId : undefined);
 
       // If no tab id was provided, best-effort retry using a query.
       if (typeof directTabId !== 'number') {
         void (async () => {
           const resolved = await resolveTabId(undefined);
-          if (typeof resolved === 'number') toggleSidePanel(resolved);
+          if (typeof resolved === 'number') await openSidePanel(resolved);
         })();
       }
       return;
