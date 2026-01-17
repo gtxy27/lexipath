@@ -683,6 +683,26 @@
     "message": "\u672a\u627e\u5230\u547d\u4ee4\u3002",
     "description": "\u5feb\u6377\u952e\uff1a\u7a7a\u5217\u8868\u72b6\u6001"
   },
+  "command_toggleSidebar": {
+    "message": "\u5207\u6362\u4fa7\u8fb9\u680f",
+    "description": "\u547d\u4ee4\uff1a\u5207\u6362\u4fa7\u8fb9\u680f"
+  },
+  "command_toggleOriginal": {
+    "message": "\u5207\u6362\u663e\u793a\u539f\u6587",
+    "description": "\u547d\u4ee4\uff1a\u5207\u6362\u539f\u6587"
+  },
+  "command_toggleEnhancePaused": {
+    "message": "\u6682\u505c/\u6062\u590d\u7f51\u9875\u589e\u5f3a\uff08\u5f53\u524d\u9875\u9762\uff09",
+    "description": "\u547d\u4ee4\uff1a\u6682\u505c\u589e\u5f3a"
+  },
+  "command_toggleFloatingButton": {
+    "message": "\u5207\u6362\u60ac\u6d6e\u6309\u94ae",
+    "description": "\u547d\u4ee4\uff1a\u5207\u6362\u60ac\u6d6e\u6309\u94ae"
+  },
+  "command_toggleSubtitleBilingual": {
+    "message": "\u5207\u6362\u5b57\u5e55\u53cc\u8bed\u6a21\u5f0f",
+    "description": "\u547d\u4ee4\uff1a\u5207\u6362\u53cc\u8bed\u5b57\u5e55"
+  },
   "optionsDisplayDesc": {
     "message": "自定义外观、叠加层行为和高亮样式。",
     "description": "显示 Tab 描述"

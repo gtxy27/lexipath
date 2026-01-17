@@ -48,19 +48,19 @@
         "default": "Alt+Shift+L",
         "mac": "Command+Shift+L"
       },
-      "description": "Toggle sidebar"
+      "description": "__MSG_command_toggleSidebar__"
     },
     "toggle-original": {
-      "description": "Toggle original text"
+      "description": "__MSG_command_toggleOriginal__"
     },
     "toggle-enhance-paused": {
-      "description": "Pause/resume web enhancement on current tab"
+      "description": "__MSG_command_toggleEnhancePaused__"
     },
     "toggle-floating-button": {
-      "description": "Toggle floating button"
+      "description": "__MSG_command_toggleFloatingButton__"
     },
     "toggle-subtitle-bilingual": {
-      "description": "Toggle subtitle bilingual mode"
+      "description": "__MSG_command_toggleSubtitleBilingual__"
     }
   },
   "web_accessible_resources": [

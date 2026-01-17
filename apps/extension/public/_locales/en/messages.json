@@ -655,6 +655,26 @@
     "message": "No commands found.",
     "description": "Options shortcuts: empty list state"
   },
+  "command_toggleSidebar": {
+    "message": "Toggle sidebar",
+    "description": "Command: toggle sidebar"
+  },
+  "command_toggleOriginal": {
+    "message": "Toggle original text",
+    "description": "Command: toggle original"
+  },
+  "command_toggleEnhancePaused": {
+    "message": "Pause/resume web enhancement (current tab)",
+    "description": "Command: toggle enhance paused"
+  },
+  "command_toggleFloatingButton": {
+    "message": "Toggle floating button",
+    "description": "Command: toggle floating button"
+  },
+  "command_toggleSubtitleBilingual": {
+    "message": "Toggle subtitle bilingual mode",
+    "description": "Command: toggle subtitle bilingual"
+  },
   "optionsTab_language": {
     "message": "Language",
     "description": "Options tab: language"
