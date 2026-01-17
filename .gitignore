@@ -58,6 +58,7 @@ apps/extension/src/background/dictionary-seed.ts
 
 # Local tooling
 .opencode/
+.claude/
 openspec/
 AGENTS.md
 
