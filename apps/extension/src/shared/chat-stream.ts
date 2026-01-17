@@ -32,6 +32,7 @@ export function chatStream(
           message: payload.message,
           ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
           ...(payload.backgroundInfo ? { backgroundInfo: payload.backgroundInfo } : {}),
+          ...(payload.sessionMeta ? { sessionMeta: payload.sessionMeta } : {}),
         });
         if (cancelled) return;
         if (!response.ok) {
