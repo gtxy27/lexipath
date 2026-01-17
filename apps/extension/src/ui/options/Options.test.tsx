@@ -109,6 +109,7 @@ describe("Options", () => {
     expect(screen.getAllByText("optionsTab_general")[0]).toBeTruthy();
     expect(screen.getAllByText("optionsTab_learning")[0]).toBeTruthy();
     expect(screen.getAllByText("optionsTab_channels")[0]).toBeTruthy();
+    expect(screen.getAllByText("optionsTab_shortcuts")[0]).toBeTruthy();
 
     const user = userEvent.setup();
     await user.click(screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!);

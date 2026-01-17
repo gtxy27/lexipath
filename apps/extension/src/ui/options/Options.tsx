@@ -7,19 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import {
-  BarChart3,
-  Languages,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
+import { BarChart3, Keyboard, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { ICON_URL } from "../lib/assets";
-import { BackupTab } from "./tabs/BackupTab";
 import { ChannelsTab } from "./tabs/ChannelsTab";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { LearningTab } from "./tabs/LearningTab";
+import { ShortcutsTab } from "./tabs/ShortcutsTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import {
   buildSettingsPatch,
@@ -129,6 +124,14 @@ export function Options(): React.ReactElement {
   const hasAiConfigured = currentForm.channels.some(channelIsConfigured);
   const openChannelsTab = () => setActiveTab("channels");
 
+  const navItems = [
+    { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
+    { value: "learning", label: t("optionsTab_learning"), icon: Languages },
+    { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
+    { value: "shortcuts", label: t("optionsTab_shortcuts"), icon: Keyboard },
+    { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground relative font-sans">
       <Toaster />
@@ -148,13 +151,8 @@ export function Options(): React.ReactElement {
             </h1>
           </div>
 
-	          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
-	            {[
-	              { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
-	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-	            ].map((tab) => (
+          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
+            {navItems.map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
@@ -172,9 +170,7 @@ export function Options(): React.ReactElement {
                 <div
                   className={cn(
                     "h-2 w-2 rounded-full",
-                    form.enabled
-                      ? "bg-emerald-500"
-                      : "bg-muted-foreground/40",
+                    form.enabled ? "bg-emerald-500" : "bg-muted-foreground/40",
                   )}
                 />
                 <span className="text-xs text-muted-foreground">
@@ -187,7 +183,9 @@ export function Options(): React.ReactElement {
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
+                {saving ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                ) : null}
                 {t("optionsSaveButton")}
               </Button>
             </div>
@@ -198,7 +196,9 @@ export function Options(): React.ReactElement {
           <div className="lg:hidden flex justify-between items-center mb-6">
             <div className="flex items-center gap-3">
               <img src={ICON_URL} className="h-6 w-6" alt={t("extensionName")} />
-              <h1 className="text-base font-semibold tracking-tight">{t("extensionName")}</h1>
+              <h1 className="text-base font-semibold tracking-tight">
+                {t("extensionName")}
+              </h1>
             </div>
             <Button
               size="sm"
@@ -211,56 +211,58 @@ export function Options(): React.ReactElement {
             </Button>
           </div>
 
-	          <TabsContent
-	            value="summary"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <SummaryTab />
-	          </TabsContent>
+          <TabsContent
+            value="summary"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <SummaryTab />
+          </TabsContent>
 
-	          <TabsContent
-	            value="learning"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <LearningTab
-	              form={currentForm}
-	              setForm={setFormState}
-	              errors={errors}
-	              aiEnabled={hasAiConfigured}
-	              onOpenChannels={openChannelsTab}
-	            />
-	          </TabsContent>
+          <TabsContent
+            value="learning"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <LearningTab
+              form={currentForm}
+              setForm={setFormState}
+              errors={errors}
+              aiEnabled={hasAiConfigured}
+              onOpenChannels={openChannelsTab}
+            />
+          </TabsContent>
 
-	          <TabsContent
-	            value="channels"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
-	          </TabsContent>
+          <TabsContent
+            value="channels"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
+          </TabsContent>
 
-	          <TabsContent
-	            value="general"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <GeneralTab
-	              form={currentForm}
-	              setForm={setFormState}
-	              errors={errors}
-	              aiEnabled={hasAiConfigured}
-	              onOpenChannels={openChannelsTab}
-	              onReloadSettings={reloadSettings}
-	            />
-	          </TabsContent>
-	        </div>
+          <TabsContent
+            value="shortcuts"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <ShortcutsTab />
+          </TabsContent>
 
-	        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border px-2 pb-safe pt-2 z-50">
-	          <TabsList className="flex h-auto bg-transparent border-0 p-0">
-	            {[
-	              { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
-	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-	            ].map((tab) => (
+          <TabsContent
+            value="general"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <GeneralTab
+              form={currentForm}
+              setForm={setFormState}
+              errors={errors}
+              aiEnabled={hasAiConfigured}
+              onOpenChannels={openChannelsTab}
+              onReloadSettings={reloadSettings}
+            />
+          </TabsContent>
+        </div>
+
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border px-2 pb-safe pt-2 z-50">
+          <TabsList className="flex h-auto bg-transparent border-0 p-0">
+            {navItems.map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}

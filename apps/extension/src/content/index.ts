@@ -27,6 +27,7 @@ import { createWebEnhancer, type WebEnhancer } from "./web";
 import {
   applyTabEnhancePausedFromStorage,
   applyWebShowOriginal,
+  toggleTabEnhancePaused,
   toggleTabShowOriginal,
 } from "../shared/tab-state";
 
@@ -294,9 +295,23 @@ async function init(): Promise<void> {
   });
 
   browser.runtime?.onMessage?.addListener?.((message: unknown) => {
-    if (message && typeof message === "object" && (message as Record<string, unknown>).type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
+    if (!message || typeof message !== "object") return;
+    const type = (message as Record<string, unknown>).type;
+
+    if (type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
       if (!currentSettings) return;
       toggleTabShowOriginal(Boolean(currentSettings.webShowOriginal));
+      return;
+    }
+
+    if (type === "LEXIPATH_TOGGLE_ENHANCE_PAUSED_TAB") {
+      if (!currentSettings) return;
+      toggleTabEnhancePaused();
+      return;
+    }
+
+    if (type === "LEXIPATH_TOGGLE_SUBTITLE_BILINGUAL") {
+      subtitleController?.toggleBilingualMode();
       return;
     }
   });

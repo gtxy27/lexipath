@@ -628,8 +628,60 @@
     "description": "设置页 Tab：备份"
   },
   "optionsTab_display": {
-    "message": "显示",
-    "description": "设置页 Tab：显示"
+    "message": "\u663e\u793a",
+    "description": "\u8bbe\u7f6e\u9875 Tab\uff1a\u663e\u793a"
+  },
+  "optionsTab_shortcuts": {
+    "message": "\u5feb\u6377\u952e",
+    "description": "\u8bbe\u7f6e\u9875 Tab\uff1a\u5feb\u6377\u952e"
+  },
+  "optionsShortcutsTitle": {
+    "message": "\u952e\u76d8\u5feb\u6377\u952e",
+    "description": "\u5feb\u6377\u952e\uff1a\u9875\u9762\u6807\u9898"
+  },
+  "optionsShortcutsDesc": {
+    "message": "\u67e5\u770b\u5e76\u914d\u7f6e\u5168\u5c40\u952e\u76d8\u5feb\u6377\u952e\u3002",
+    "description": "\u5feb\u6377\u952e\uff1a\u9875\u9762\u63cf\u8ff0"
+  },
+  "optionsShortcutsManageTitle": {
+    "message": "\u7ba1\u7406",
+    "description": "\u5feb\u6377\u952e\uff1a\u7ba1\u7406\u533a\u6807\u9898"
+  },
+  "optionsShortcutsManageDesc": {
+    "message": "\u5feb\u6377\u952e\u7ed1\u5b9a\u7531\u6d4f\u89c8\u5668\u7edf\u4e00\u7ba1\u7406\u3002",
+    "description": "\u5feb\u6377\u952e\uff1a\u7ba1\u7406\u533a\u63cf\u8ff0"
+  },
+  "optionsShortcutsConfigureButton": {
+    "message": "\u914d\u7f6e\u5feb\u6377\u952e",
+    "description": "\u5feb\u6377\u952e\uff1a\u6253\u5f00\u914d\u7f6e\u9875\u6309\u94ae"
+  },
+  "optionsShortcutsHintChrome": {
+    "message": "Chrome/\u7c7b Chromium\uff1a\u6253\u5f00 $1",
+    "description": "\u5feb\u6377\u952e\uff1aChrome \u63d0\u793a\uff08$1=url\uff09"
+  },
+  "optionsShortcutsHintFirefox": {
+    "message": "Firefox\uff1a\u6253\u5f00\u6269\u5c55\u7ba1\u7406\uff0c\u67e5\u627e \"\u7ba1\u7406\u6269\u5c55\u5feb\u6377\u952e\"\u3002",
+    "description": "\u5feb\u6377\u952e\uff1aFirefox \u63d0\u793a"
+  },
+  "optionsShortcutsOpenBlocked": {
+    "message": "\u6d4f\u89c8\u5668\u963b\u6b62\u4e86\u6253\u5f00\u9875\u9762\uff0c\u8bf7\u624b\u52a8\u6253\u5f00\uff1a$1",
+    "description": "\u5feb\u6377\u952e\uff1a\u963b\u6b62\u6253\u5f00\u540e\u7684\u5907\u9009\u6587\u6848\uff08$1=url\uff09"
+  },
+  "optionsShortcutsListTitle": {
+    "message": "\u53ef\u7528\u547d\u4ee4",
+    "description": "\u5feb\u6377\u952e\uff1a\u547d\u4ee4\u5217\u8868\u6807\u9898"
+  },
+  "optionsShortcutsListDesc": {
+    "message": "\u672a\u7ed1\u5b9a\u7684\u547d\u4ee4\u5c06\u663e\u793a\u4e3a\u201c\u672a\u8bbe\u7f6e\u201d\u3002",
+    "description": "\u5feb\u6377\u952e\uff1a\u547d\u4ee4\u5217\u8868\u63cf\u8ff0"
+  },
+  "optionsShortcutsNotSet": {
+    "message": "\u672a\u8bbe\u7f6e",
+    "description": "\u5feb\u6377\u952e\uff1a\u672a\u8bbe\u7f6e\u6807\u7b7e"
+  },
+  "optionsShortcutsEmpty": {
+    "message": "\u672a\u627e\u5230\u547d\u4ee4\u3002",
+    "description": "\u5feb\u6377\u952e\uff1a\u7a7a\u5217\u8868\u72b6\u6001"
   },
   "optionsDisplayDesc": {
     "message": "自定义外观、叠加层行为和高亮样式。",

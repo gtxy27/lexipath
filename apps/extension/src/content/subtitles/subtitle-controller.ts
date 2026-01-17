@@ -1269,6 +1269,12 @@ export class SubtitleController {
     }
   };
 
+  toggleBilingualMode(): void {
+    if (this.destroyed) return;
+    this.mode = this.mode === 'enhanced' ? 'bilingual' : 'enhanced';
+    this.updateSubtitleDisplay();
+  }
+
   private handleVideoPause = (): void => {
     // Stop scheduling new background work while paused; let in-flight requests finish.
     this.prefetchToken++;
