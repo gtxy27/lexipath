@@ -656,8 +656,8 @@
     "description": "Options shortcuts: empty list state"
   },
   "command_toggleSidebar": {
-    "message": "Toggle sidebar",
-    "description": "Command: toggle sidebar"
+    "message": "Activate sidebar",
+    "description": "Command: activate sidebar"
   },
   "command_toggleOriginal": {
     "message": "Toggle original text",

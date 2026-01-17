@@ -684,8 +684,8 @@
     "description": "\u5feb\u6377\u952e\uff1a\u7a7a\u5217\u8868\u72b6\u6001"
   },
   "command_toggleSidebar": {
-    "message": "\u5207\u6362\u4fa7\u8fb9\u680f",
-    "description": "\u547d\u4ee4\uff1a\u5207\u6362\u4fa7\u8fb9\u680f"
+    "message": "\u6fc0\u6d3b\u4fa7\u8fb9\u680f",
+    "description": "\u547d\u4ee4\uff1a\u6fc0\u6d3b\u4fa7\u8fb9\u680f"
   },
   "command_toggleOriginal": {
     "message": "\u5207\u6362\u663e\u793a\u539f\u6587",
