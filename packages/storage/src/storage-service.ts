@@ -33,7 +33,7 @@ type DbConfig = {
 
 const DEFAULT_CONFIG: DbConfig = {
   dbName: 'lexipath-storage',
-  version: 1,
+  version: 2,
 };
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
@@ -119,7 +119,10 @@ export class StorageService {
       };
 
       request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
+        const request = event.target as IDBOpenDBRequest;
+        const db = request.result;
+        const tx = request.transaction;
+        const oldVersion = typeof event.oldVersion === 'number' ? event.oldVersion : 0;
 
         if (!db.objectStoreNames.contains('meta')) {
           db.createObjectStore('meta', { keyPath: 'key' });
@@ -133,7 +136,54 @@ export class StorageService {
           const store = db.createObjectStore('chat_sessions', { keyPath: 'sessionId' });
           store.createIndex('keyword', 'keyword', { unique: false });
           store.createIndex('lastAccessedAt', 'lastAccessedAt', { unique: false });
+          store.createIndex('kind', 'kind', { unique: false });
+          store.createIndex('anchorKey', 'anchorKey', { unique: false });
+        } else if (tx) {
+          const store = tx.objectStore('chat_sessions');
+          if (!store.indexNames.contains('keyword')) {
+            store.createIndex('keyword', 'keyword', { unique: false });
+          }
+          if (!store.indexNames.contains('lastAccessedAt')) {
+            store.createIndex('lastAccessedAt', 'lastAccessedAt', { unique: false });
+          }
+          if (!store.indexNames.contains('kind')) {
+            store.createIndex('kind', 'kind', { unique: false });
+          }
+          if (!store.indexNames.contains('anchorKey')) {
+            store.createIndex('anchorKey', 'anchorKey', { unique: false });
+          }
+
+          // v2: persist session metadata (kind/label/anchorKey)
+          if (oldVersion < 2) {
+            store.openCursor().onsuccess = (cursorEvent) => {
+              const cursor = (cursorEvent.target as IDBRequest<IDBCursorWithValue | null>).result;
+              if (!cursor) return;
+
+              const raw = cursor.value as Record<string, unknown>;
+              const keyword = typeof raw.keyword === 'string' ? raw.keyword : '';
+              const hasKind = typeof raw.kind === 'string';
+              const hasLabel = typeof raw.label === 'string';
+              const hasAnchorKey = typeof raw.anchorKey === 'string';
+              if (hasKind && hasLabel && hasAnchorKey) {
+                cursor.continue();
+                return;
+              }
+
+              const kind = keyword.trim() ? 'keyword' : 'general';
+              const label = kind === 'keyword' ? keyword : 'General';
+              const anchorKey = '';
+
+              cursor.update({
+                ...raw,
+                kind,
+                label,
+                anchorKey,
+              });
+              cursor.continue();
+            };
+          }
         }
+
 
         if (!db.objectStoreNames.contains('chat_messages')) {
           const store = db.createObjectStore('chat_messages', {
@@ -397,6 +447,9 @@ export class StorageService {
           conversationIndex: 0,
           createdAt: now,
           lastAccessedAt: now,
+          kind: 'general',
+          label: 'General',
+          anchorKey: '',
         };
       })();
       await requestToPromise(sessionStore.put(baseSession));
@@ -677,6 +730,9 @@ export class StorageService {
         conversationIndex: Math.max(existingParsed.data.conversationIndex, session.conversationIndex),
         createdAt: Math.min(existingParsed.data.createdAt, session.createdAt),
         lastAccessedAt: Math.max(existingParsed.data.lastAccessedAt, session.lastAccessedAt),
+        kind: existingParsed.data.kind ?? session.kind,
+        label: existingParsed.data.label?.trim() ? existingParsed.data.label : session.label,
+        anchorKey: existingParsed.data.anchorKey ?? session.anchorKey,
       };
       await requestToPromise(sessionStore.put(merged));
     }

@@ -63,6 +63,8 @@ export const MessageTypeSchema = z.enum([
   'TRANSLATE_KEYWORDS',
   'ENHANCE_WEB',
   'ENHANCE_SUBTITLE',
+  'FETCH_SUBTITLES',
+  'GET_CAPTION_REQUEST_INFO',
   'ENGLISH_CORRECTION',
   'EXPLAIN_WORD',
   'BATCH_GET_WORD_FAMILIARITY',
@@ -77,6 +79,12 @@ export const MessageTypeSchema = z.enum([
   'TEST_WEBDAV_CONNECTION',
   'WEBDAV_UPLOAD',
   'WEBDAV_DOWNLOAD',
+
+  // Reserved scaffolding for future tool execution + HTTP stream.
+  'REQUEST_TOOL_EXECUTION',
+  'RESPOND_TOOL_APPROVAL',
+  'OPEN_HTTP_STREAM',
+  'CLOSE_HTTP_STREAM',
 ]);
 export type MessageType = z.infer<typeof MessageTypeSchema>;
 
@@ -410,6 +418,9 @@ export const SettingsSchema = z.object({
 
   // Backup (Cloud)
   webdav: WebDAVConfigSchema.optional(),
+
+  // Reserved scaffolding for future tool execution.
+  toolExecutionEnabled: z.boolean().default(false),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
@@ -619,12 +630,31 @@ export const ChatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
+export const ChatSessionKindSchema = z.enum(['general', 'keyword', 'web', 'subtitle']);
+export type ChatSessionKind = z.infer<typeof ChatSessionKindSchema>;
+
+export const ChatSessionMetaSchema = z
+  .object({
+    kind: ChatSessionKindSchema.optional(),
+    label: z.string().min(1).optional(),
+    anchorKey: z.string().min(1).optional(),
+    forceNewSession: z.boolean().optional(),
+    // Used only to compute a hashed anchorKey in the background; never persisted.
+    url: z.string().min(1).optional(),
+    // Used only to compute a hashed anchorKey in the background; never persisted.
+    anchorId: z.string().min(1).optional(),
+  })
+  .strict();
+export type ChatSessionMeta = z.infer<typeof ChatSessionMetaSchema>;
+
 export const ChatPayloadSchema = z.object({
   message: z.string().min(1),
   conversationId: z.string().optional(),
   backgroundInfo: z.string().min(1).optional(),
+  sessionMeta: ChatSessionMetaSchema.optional(),
 });
 export type ChatPayload = z.infer<typeof ChatPayloadSchema>;
+
 
 export const ChatResponseSchema = z.object({
   reply: z.string(),
