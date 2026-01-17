@@ -14,7 +14,10 @@ import { registerProviderFeature } from './features/providers';
 import { registerSettingsFeature } from './features/settings';
 import { registerSidebarFeature } from './features/sidebar';
 import { registerStorageFeature } from './features/storage';
-import { maybeHandleCaptionRequestInfoMessage, setupYouTubeTimedtextInterception } from './features/youtube-captions';
+import { registerToolExecutionFeature } from './features/tool-execution';
+import { registerHttpStreamFeature } from './features/http-stream';
+import { registerSubtitlesFeature } from './features/subtitles';
+import { registerYouTubeCaptionsFeature, setupYouTubeTimedtextInterception } from './features/youtube-captions';
 
 const registry = createMessageHandlerRegistry();
 const log = createLogger('background');
@@ -29,10 +32,15 @@ registerProviderFeature({ registry, t });
 registerLearningFeature({ registry, t, log, concurrency });
 registerChatFeature({ registry, t, log, concurrency });
 registerSidebarFeature({ registry, t });
+registerYouTubeCaptionsFeature({ registry });
+registerSubtitlesFeature({ registry });
+
+
+// Reserved scaffolding for future capabilities.
+registerToolExecutionFeature({ registry });
+registerHttpStreamFeature({ registry });
 
 browser.runtime.onMessage.addListener((message, sender) => {
-  const captionResponse = maybeHandleCaptionRequestInfoMessage(message);
-  if (captionResponse) return captionResponse;
   return registry.handleIncomingMessage(message, sender);
 });
 

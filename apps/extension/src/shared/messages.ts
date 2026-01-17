@@ -6,6 +6,7 @@ import {
   CEFRLevelSchema,
   ChatPayloadSchema,
   ChatResponseSchema,
+  CueSchema,
   EnglishCorrectionOutputSchema,
   EnglishCorrectionPayloadSchema,
   EnhanceSubtitlePayloadSchema,
@@ -215,6 +216,28 @@ const messageDefinitions = {
     payloadSchema: EnhanceSubtitlePayloadSchema,
     valueSchema: SubtitleEnhanceOutputSchema,
   },
+  FETCH_SUBTITLES: {
+    payloadSchema: z
+      .object({
+        platform: z.enum(['youtube', 'bilibili']),
+        url: z.string().min(1),
+        targetLanguage: z.string().min(1),
+        additionalParams: z.string().optional(),
+        live: z.boolean().optional(),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        cues: z.array(CueSchema),
+        lang: z.string().optional(),
+        statusMessage: z.string().optional(),
+      })
+      .strict(),
+  },
+  GET_CAPTION_REQUEST_INFO: {
+    payloadSchema: z.object({ videoId: z.string().min(1) }).strict(),
+    valueSchema: z.object({ params: z.string() }).strict(),
+  },
   ENGLISH_CORRECTION: {
     payloadSchema: EnglishCorrectionPayloadSchema,
     valueSchema: EnglishCorrectionOutputSchema,
@@ -258,14 +281,33 @@ const messageDefinitions = {
         keyword: z.string().optional(),
         isAutoSend: z.boolean().optional(),
         contextInfo: z
-          .object({
-            kind: z.literal('subtitle'),
-            platform: z.string().optional(),
-            title: z.string().optional(),
-            timestampSec: z.number().optional(),
-            lines: z.array(z.string()).optional(),
-          })
+          .discriminatedUnion('kind', [
+            z
+              .object({
+                kind: z.literal('subtitle'),
+                platform: z.string().optional(),
+                title: z.string().optional(),
+                timestampSec: z.number().optional(),
+                lines: z.array(z.string()).optional(),
+                anchorId: z.string().optional(),
+                url: z.string().optional(),
+              })
+              .strict(),
+            z
+               .object({
+                 kind: z.literal('web'),
+                 source: z.enum(['selection', 'study']).optional(),
+                 title: z.string().optional(),
+                 domain: z.string().optional(),
+                 url: z.string().optional(),
+                 selectedText: z.string().optional(),
+                 beforeText: z.string().optional(),
+                 afterText: z.string().optional(),
+               })
+              .strict(),
+          ])
           .optional(),
+
       })
       .optional(),
     valueSchema: z.object({ ok: z.literal(true) }),
@@ -293,6 +335,90 @@ const messageDefinitions = {
   WEBDAV_DOWNLOAD: {
     payloadSchema: WebDAVConfigSchema,
     valueSchema: z.object({ ok: z.literal(true) }),
+  },
+
+  // ---------------------------------------------------------------------------
+  // Tool execution scaffolding (disabled-by-default)
+  // ---------------------------------------------------------------------------
+  REQUEST_TOOL_EXECUTION: {
+    payloadSchema: z
+      .object({
+        requestId: z.string().min(1),
+        toolId: z.string().min(1),
+        // Persisted identifiers should avoid raw URLs (spec: no raw URL persistence).
+        targetId: z.string().min(1).optional(),
+        // Human-readable hint for UI; should be sanitized/redacted by caller.
+        description: z.string().max(500).optional(),
+        // Bounded payload to avoid prompt-injection amplification.
+        payload: z.record(z.unknown()).optional(),
+        // Signals whether the tool *may* reach the network.
+        network: z.boolean().optional(),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        requestId: z.string().min(1),
+        status: z.enum(['REJECTED', 'APPROVAL_REQUIRED']),
+        error: z
+          .object({
+            code: z.string().min(1),
+            message: z.string().min(1),
+          })
+          .optional(),
+      })
+      .strict(),
+  },
+  RESPOND_TOOL_APPROVAL: {
+    payloadSchema: z
+      .object({
+        requestId: z.string().min(1),
+        approved: z.boolean(),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        ok: z.literal(true),
+      })
+      .strict(),
+  },
+
+  // ---------------------------------------------------------------------------
+  // HTTP stream scaffolding (no network calls)
+  // ---------------------------------------------------------------------------
+  OPEN_HTTP_STREAM: {
+    payloadSchema: z
+      .object({
+        streamId: z.string().min(1),
+        // Persisted identifiers should avoid raw URLs.
+        targetId: z.string().min(1).optional(),
+        kind: z.enum(['SSE', 'HTTP']).optional(),
+        maxPayloadBytes: z.number().int().min(1).max(1024 * 1024).optional(),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        streamId: z.string().min(1),
+        status: z.enum(['DISABLED']),
+        error: z
+          .object({
+            code: z.string().min(1),
+            message: z.string().min(1),
+          })
+          .optional(),
+      })
+      .strict(),
+  },
+  CLOSE_HTTP_STREAM: {
+    payloadSchema: z
+      .object({
+        streamId: z.string().min(1),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        ok: z.literal(true),
+      })
+      .strict(),
   },
 } satisfies Record<
   MessageType,

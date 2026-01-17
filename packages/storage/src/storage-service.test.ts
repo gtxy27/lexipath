@@ -12,13 +12,37 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
-function openDb(name: string, version = 1): Promise<IDBDatabase> {
+function openDb(name: string, version = 2): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(name, version);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
   });
 }
+
+function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+function openDbWithUpgrade(
+  name: string,
+  version: number,
+  onUpgrade: (db: IDBDatabase, tx: IDBTransaction | null, oldVersion: number) => void
+): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(name, version);
+    request.onerror = () => reject(request.error);
+    request.onupgradeneeded = (event) => {
+      const req = event.target as IDBOpenDBRequest;
+      onUpgrade(req.result, req.transaction, typeof event.oldVersion === 'number' ? event.oldVersion : 0);
+    };
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
 
 function deleteDb(name: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -92,7 +116,11 @@ describe('StorageService', () => {
         conversationIndex: 0,
         createdAt: 1000,
         lastAccessedAt: 1000,
+        kind: 'general',
+        label: 'General',
+        anchorKey: '',
       });
+
 
       nowSpy.mockReturnValue(2000);
       const id2 = await service.addMessage({
@@ -192,6 +220,50 @@ describe('StorageService', () => {
     }
   });
 
+  it('upgrades chat_sessions from v1 to v2 with kind/label/anchorKey', async () => {
+    const dbName = createDbName('test-storage-upgrade');
+
+    try {
+      const dbV1 = await openDbWithUpgrade(dbName, 1, (db) => {
+        const sessions = db.createObjectStore('chat_sessions', { keyPath: 'sessionId' });
+        sessions.createIndex('keyword', 'keyword', { unique: false });
+        sessions.createIndex('lastAccessedAt', 'lastAccessedAt', { unique: false });
+
+        db.createObjectStore('chat_messages', {
+          keyPath: 'id',
+          autoIncrement: true,
+        });
+      });
+
+      const tx = dbV1.transaction('chat_sessions', 'readwrite');
+      const store = tx.objectStore('chat_sessions');
+      await requestToPromise(
+        store.put({
+          sessionId: 's1',
+          keyword: 'Hello',
+          conversationIndex: 0,
+          createdAt: 1,
+          lastAccessedAt: 2,
+        })
+      );
+      await transactionDone(tx);
+      dbV1.close();
+
+      const service = new StorageService({ dbName });
+      const upgraded = await service.getSession('s1');
+      expect(upgraded).toMatchObject({
+        sessionId: 's1',
+        keyword: 'Hello',
+        kind: 'keyword',
+        label: 'Hello',
+        anchorKey: '',
+      });
+      service.close();
+    } finally {
+      await deleteDb(dbName);
+    }
+  });
+
   it('importAll (merge) keeps local settings, merges sessions, dedupes messages, and max-merges familiarity', async () => {
     const dbName = createDbName('test-storage-merge');
     const service = new StorageService({ dbName });
@@ -204,7 +276,11 @@ describe('StorageService', () => {
         conversationIndex: 5,
         createdAt: 100,
         lastAccessedAt: 500,
+        kind: 'keyword',
+        label: 'local',
+        anchorKey: '',
       });
+
       await service.upsertWordFamiliarity({
         word: 'hello',
         familiarity: 10,
@@ -237,6 +313,9 @@ describe('StorageService', () => {
             conversationIndex: 3,
             createdAt: 50,
             lastAccessedAt: 600,
+            kind: 'keyword',
+            label: 'remote',
+            anchorKey: '',
           },
           {
             sessionId: 's2',
@@ -244,8 +323,12 @@ describe('StorageService', () => {
             conversationIndex: 0,
             createdAt: 1,
             lastAccessedAt: 2,
+            kind: 'general',
+            label: 'General',
+            anchorKey: '',
           },
         ],
+
         messages: [
           {
             id: 101,
@@ -285,7 +368,11 @@ describe('StorageService', () => {
         conversationIndex: 5,
         createdAt: 50,
         lastAccessedAt: 600,
+        kind: 'keyword',
+        label: 'local',
+        anchorKey: '',
       });
+
 
       const allMessages = await service.getMessages('s1');
       expect(allMessages).toHaveLength(2);

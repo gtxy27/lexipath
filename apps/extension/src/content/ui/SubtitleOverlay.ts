@@ -197,17 +197,18 @@ export class SubtitleOverlay {
     this.subtitleModeButton = modeButton;
     this.wordCardElement = wordCardEl;
 
-    this.wordCardController = new WordCardController({
-      container: this.container,
-      wordCardElement: wordCardEl,
-      platform: this.platform,
-      wordCardConfig: this.wordCardConfig,
-      onWordClick: this.onWordClick,
-      onWordHover: this.onWordHover,
-      getVideoTitle: () => this.getVideoTitle(),
-      getVideoTimestampSec: () => this.getVideoTimestampSec(),
-      getSubtitleContextLines: () => this.getSubtitleContextLines(),
-    });
+      this.wordCardController = new WordCardController({
+        container: this.container,
+        wordCardElement: wordCardEl,
+        platform: this.platform,
+        wordCardConfig: this.wordCardConfig,
+        onWordClick: this.onWordClick,
+        onWordHover: this.onWordHover,
+        getVideoTitle: () => this.getVideoTitle(),
+        getVideoTimestampSec: () => this.getVideoTimestampSec(),
+        getSubtitleContextLines: () => this.getSubtitleContextLines(),
+        getSubtitleAnchorId: () => this.getSubtitleAnchorId(),
+      });
 
     // Setup click handler for mode switching
     if (this.subtitleElement) {
@@ -425,6 +426,48 @@ export class SubtitleOverlay {
     const raw = (this.lastDisplayLines ?? []).map((l) => String(l.text ?? '').trim()).filter(Boolean);
     return raw.slice(0, 4).map((line) => (line.length > 240 ? `${line.slice(0, 240)}…` : line));
   }
+
+  private getSubtitleAnchorId(): string {
+    // Keep it stable enough for grouping, but avoid leaking full URLs.
+    // Background will hash this into an anchorKey.
+    if (this.platform === 'youtube') {
+      const id = this.tryGetYouTubeVideoId();
+      return id ? `youtube:${id}` : '';
+    }
+    if (this.platform === 'bilibili') {
+      const id = this.tryGetBilibiliVideoId();
+      return id ? `bilibili:${id}` : '';
+    }
+    return '';
+  }
+
+  private tryGetYouTubeVideoId(): string {
+    try {
+      const url = new URL(window.location.href);
+      const v = url.searchParams.get('v');
+      if (v && v.trim()) return v.trim();
+      const pathname = url.pathname;
+      const shorts = /^\/shorts\/([^/?#]+)/i.exec(pathname);
+      if (shorts?.[1]) return shorts[1];
+      const live = /^\/live\/([^/?#]+)/i.exec(pathname);
+      if (live?.[1]) return live[1];
+      return '';
+    } catch {
+      return '';
+    }
+  }
+
+  private tryGetBilibiliVideoId(): string {
+    try {
+      const url = new URL(window.location.href);
+      const m = /\/video\/(BV[0-9A-Za-z]+)/.exec(url.pathname);
+      if (m?.[1]) return m[1];
+      return '';
+    } catch {
+      return '';
+    }
+  }
+
 
   /**
    * Clear subtitle display

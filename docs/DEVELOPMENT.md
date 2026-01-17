@@ -278,6 +278,40 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 - content script 注入 UI 必须隔离样式（推荐 Shadow DOM），避免污染网页或被网页污染。
 - 仅 UI 文本走 i18n key（不要硬编码字符串），保证可本地化。
 
+### 11.1 Web 站点适配器（site adapters）
+
+目的：对不同网站的 DOM 结构做小幅、可控的差异适配（例如正文选择器、过滤规则）。
+
+约定：
+- 入口：`apps/extension/src/content/web/site-adapters.ts`
+- 内置适配器列表：`apps/extension/src/content/web/site-adapters/index.ts`
+- 默认行为必须稳定：即使没有任何适配器，或适配器抛错，也必须回退到默认 adapter（不得导致网页增强崩溃）。
+- `id` 必须全局唯一（便于日志/排查）；不要复用。
+- 匹配函数 `matches(url: URL)` 必须快速、无副作用（禁止读 DOM / 发网络 / 读写 storage）。
+- `create()` 返回的 adapter 必须是纯对象（不持有跨页面状态）；需要缓存请在调用侧做。
+- 匹配策略：按 `WEB_SITE_ADAPTERS` 的数组顺序查找，第一个 `matches` 命中的 adapter 生效。
+- 新增适配器前先加测试：至少覆盖“匹配成功/不匹配/异常回退”三个场景。
+
+新增一个适配器的最小示例：
+1) 新建一个文件（例如 `apps/extension/src/content/web/site-adapters/example.ts`），导出 factory。
+2) 在 `apps/extension/src/content/web/site-adapters/index.ts` 把它加入 `WEB_SITE_ADAPTERS`。
+
+示例 factory：
+```ts
+import type { WebSiteAdapterFactory } from "../site-adapters";
+
+export const exampleAdapter: WebSiteAdapterFactory = {
+  id: "example",
+  matches: (url) => url.hostname === "example.com",
+  create: () => ({
+    id: "example",
+    textSelector: "article p",
+    shouldQueueElement: () => true,
+    shouldProcessElement: () => true,
+  }),
+};
+```
+
 ---
 
 ## 12. 手工验收清单（TS rewrite 版）

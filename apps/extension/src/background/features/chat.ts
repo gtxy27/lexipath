@@ -13,8 +13,10 @@ import { bumpDailyUsage } from '../usage-summary';
 
 import { MessageError, type createMessageHandlerRegistry } from '../../shared/messages';
 import { parseKeywordSessionId } from '../../shared/chat-session-id';
+import { makeSubtitleAnchorKey, makeWebAnchorKey } from '../../shared/chat-anchor';
 import { getSettings } from '../../shared/storage';
 import { getStorageService } from '../../shared/storage-service';
+
 
 type Registry = ReturnType<typeof createMessageHandlerRegistry>;
 type ConcurrencyManager = ReturnType<typeof createConcurrencyManager>;
@@ -79,7 +81,11 @@ async function ensureChatMigrated(log: { warn: (...args: unknown[]) => void }): 
             conversationIndex: 0,
             createdAt: session.createdAt,
             lastAccessedAt: session.lastAccessedAt,
+            kind: 'general',
+            label: 'General',
+            anchorKey: '',
           });
+
 
           const baseTimestamp = session.createdAt || Date.now();
           for (const [idx, msg] of session.messages.entries()) {
@@ -134,7 +140,19 @@ async function runChatStream(
   t: Translator,
   log: { warn: (...args: unknown[]) => void; debug: (...args: unknown[]) => void },
   concurrency: Pick<ConcurrencyManager, 'getChannelConcurrencyLimit' | 'runWithChannelConcurrency'>,
-  payload: { message: string; conversationId?: string; backgroundInfo?: string },
+  payload: {
+    message: string;
+    conversationId?: string;
+    backgroundInfo?: string;
+    sessionMeta?: {
+      kind?: string | undefined;
+      label?: string | undefined;
+      anchorKey?: string | undefined;
+      forceNewSession?: boolean | undefined;
+      url?: string | undefined;
+      anchorId?: string | undefined;
+    };
+  },
   options: { onDelta: (delta: string) => void; onThinkingDelta?: (delta: string) => void; signal?: AbortSignal }
 ): Promise<{ reply: string; conversationId: string; thinking?: string }> {
   await ensureChatMigrated(log);
@@ -157,15 +175,70 @@ async function runChatStream(
   const storageService = getStorageService();
   const now = Date.now();
 
+  const requestedMeta = payload.sessionMeta;
+  const requestedAnchorKey = await (async () => {
+    if (!requestedMeta) return '';
+
+    const explicit = typeof requestedMeta.anchorKey === 'string' ? requestedMeta.anchorKey.trim() : '';
+    if (explicit) return explicit;
+
+    const kind = typeof requestedMeta.kind === 'string' ? requestedMeta.kind.trim() : '';
+
+    if (kind === 'web') {
+      // For web sessions, callers may include a URL only to compute a hashed anchorKey.
+      const url = typeof requestedMeta.url === 'string' ? requestedMeta.url.trim() : '';
+      return url ? await makeWebAnchorKey(url) : '';
+    }
+
+    if (kind === 'subtitle') {
+
+      const anchorId = typeof requestedMeta.anchorId === 'string' ? requestedMeta.anchorId.trim() : '';
+      return anchorId ? await makeSubtitleAnchorKey(anchorId) : '';
+    }
+
+    return '';
+  })();
+
   const existing = await storageService.getSession(sessionId);
   if (!existing) {
+    const keyword = parsedSessionId?.keyword ?? '';
+    const kind = keyword.trim() ? 'keyword' : 'general';
+
+    // If we have an anchor key and this isn't a forced-new session,
+    // reuse the most recent session for that anchor.
+    const wantsReuse = Boolean(requestedAnchorKey) && requestedMeta?.forceNewSession !== true;
+    if (wantsReuse) {
+      const allSessions = await storageService.listAllSessions();
+      const reuse = allSessions
+        .filter((s) => s.anchorKey === requestedAnchorKey)
+        .sort((a, b) => b.lastAccessedAt - a.lastAccessedAt)[0];
+
+      if (reuse) {
+        // Continue the existing session instead of creating a new one.
+        return runChatStream(
+          t,
+          log,
+          concurrency,
+          {
+            ...payload,
+            conversationId: reuse.sessionId,
+          },
+          options
+        );
+      }
+    }
+
     await storageService.upsertSession({
       sessionId,
-      keyword: parsedSessionId?.keyword ?? '',
+      keyword,
       conversationIndex: parsedSessionId?.conversationIndex ?? 0,
       createdAt: now,
       lastAccessedAt: now,
+      kind,
+      label: kind === 'keyword' ? keyword : 'General',
+      anchorKey: '',
     });
+
   }
 
   const userMessageId = await storageService.addMessage({
@@ -174,6 +247,30 @@ async function runChatStream(
     content: payload.message,
     timestamp: now,
   });
+
+  // If the caller has better metadata for this session, persist it.
+  // This keeps history labels/kinds consistent with the UI entry points.
+  const meta = payload.sessionMeta;
+  if (meta && (meta.kind || meta.label || meta.anchorKey || requestedAnchorKey)) {
+    try {
+      const existingSession = await storageService.getSession(sessionId);
+      const nextKind = typeof meta.kind === 'string' && meta.kind.trim() ? meta.kind.trim() : undefined;
+      const nextLabel = typeof meta.label === 'string' && meta.label.trim() ? meta.label.trim() : undefined;
+      const explicitAnchorKey = typeof meta.anchorKey === 'string' && meta.anchorKey.trim() ? meta.anchorKey.trim() : undefined;
+      const nextAnchorKey = explicitAnchorKey ?? (requestedAnchorKey ? requestedAnchorKey : undefined);
+
+      if (existingSession && (nextKind || nextLabel || nextAnchorKey)) {
+        await storageService.upsertSession({
+          ...existingSession,
+          ...(nextKind ? { kind: nextKind as any } : {}),
+          ...(nextLabel ? { label: nextLabel } : {}),
+          ...(nextAnchorKey ? { anchorKey: nextAnchorKey } : {}),
+        });
+      }
+    } catch (error: unknown) {
+      log.warn('Failed to persist chat session metadata; continuing without metadata update', error);
+    }
+  }
 
   const history = await storageService.getMessages(sessionId, { limit: CHAT_MAX_HISTORY_MESSAGES });
   let accumulatedThinking = '';
@@ -289,11 +386,22 @@ export function registerChatFeature(options: {
       t,
       log,
       concurrency,
-      {
-        message: payload.message,
-        ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
-        ...(payload.backgroundInfo ? { backgroundInfo: payload.backgroundInfo } : {}),
-      },
+        {
+          message: payload.message,
+          ...(payload.conversationId ? { conversationId: payload.conversationId } : {}),
+          ...(payload.backgroundInfo ? { backgroundInfo: payload.backgroundInfo } : {}),
+          ...(payload.sessionMeta
+            ? {
+                sessionMeta: {
+                  ...(payload.sessionMeta.kind ? { kind: payload.sessionMeta.kind } : {}),
+                  ...(payload.sessionMeta.label ? { label: payload.sessionMeta.label } : {}),
+                  ...(payload.sessionMeta.anchorKey ? { anchorKey: payload.sessionMeta.anchorKey } : {}),
+                  ...(payload.sessionMeta.url ? { url: payload.sessionMeta.url } : {}),
+                  ...(payload.sessionMeta.anchorId ? { anchorId: payload.sessionMeta.anchorId } : {}),
+                },
+              }
+            : {}),
+        },
       {
         onDelta: (delta) => {
           reply += delta;
@@ -327,15 +435,26 @@ export function registerChatFeature(options: {
         try {
           let reply = '';
           let thinking = '';
-          const result = await runChatStream(
-            t,
-            log,
-            concurrency,
-            {
-              message: startMessage,
-              ...(startConversationId ? { conversationId: startConversationId } : {}),
-              ...(startBackgroundInfo ? { backgroundInfo: startBackgroundInfo } : {}),
-            },
+           const result = await runChatStream(
+             t,
+             log,
+             concurrency,
+              {
+                message: startMessage,
+                ...(startConversationId ? { conversationId: startConversationId } : {}),
+                ...(startBackgroundInfo ? { backgroundInfo: startBackgroundInfo } : {}),
+                ...(payload.sessionMeta
+                  ? {
+                      sessionMeta: {
+                        ...(payload.sessionMeta.kind ? { kind: payload.sessionMeta.kind } : {}),
+                        ...(payload.sessionMeta.label ? { label: payload.sessionMeta.label } : {}),
+                        ...(payload.sessionMeta.anchorKey ? { anchorKey: payload.sessionMeta.anchorKey } : {}),
+                        ...(payload.sessionMeta.url ? { url: payload.sessionMeta.url } : {}),
+                        ...(payload.sessionMeta.anchorId ? { anchorId: payload.sessionMeta.anchorId } : {}),
+                      },
+                    }
+                  : {}),
+              },
             {
               onDelta: (delta) => {
                 reply += delta;

@@ -1,6 +1,7 @@
-import type { Settings } from '@lexipath/core';
+import type { Cue, Settings } from '@lexipath/core';
 import { createLogger } from '@lexipath/core/log';
-import { fetchBilibiliSubtitles, getBilibiliAvailableTracks, getCid, parseVideoInfo, SubtitleHttpError } from '@lexipath/subtitles';
+import { parseVideoInfo, SubtitleHttpError } from '@lexipath/subtitles';
+import { sendMessage } from '../../../shared/messages';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
 import { getI18nMessage } from '../../i18n';
 
@@ -29,7 +30,8 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
 
     this.settings = settings;
     this.bvid = info.bvid;
-    this.cid = info.cid ?? (await getCid(info.bvid, info.pageNumber));
+    // cid can be fetched in background when needed.
+    this.cid = info.cid ?? null;
   }
 
   destroy(): void {
@@ -71,26 +73,30 @@ export class BilibiliSubtitleProvider implements SubtitleProvider {
   }
 
   async fetchSubtitles(): Promise<SubtitleFetchResult> {
-    if (!this.settings || !this.bvid || !this.cid) return { cues: [] };
+    if (!this.settings || !this.bvid) return { cues: [] };
 
     try {
-      const tracks = await getBilibiliAvailableTracks(this.bvid, this.cid);
-      if (tracks.length === 0) {
-        log.info('No subtitle tracks found');
-        return { cues: [] };
+      const response = await sendMessage('FETCH_SUBTITLES', {
+        platform: 'bilibili',
+        url: `https://www.bilibili.com/video/${encodeURIComponent(this.bvid)}`,
+        targetLanguage: this.settings.targetLanguage,
+      });
+
+      if (!response.ok) {
+        throw new Error(response.error.message);
       }
 
-      const desired = this.settings.targetLanguage.toLowerCase();
-      const preferred =
-        tracks.find((track) => track.languageCode.toLowerCase() === desired) ??
-        tracks.find((track) => track.languageCode.toLowerCase().startsWith(`${desired}-`)) ??
-        tracks.find((track) => track.languageCode.toLowerCase().includes(desired));
-      const track = preferred || tracks[0];
+      const cues = response.value.cues as Cue[];
+      const lang = typeof response.value.lang === 'string' ? response.value.lang : undefined;
+      const statusMessage =
+        typeof response.value.statusMessage === 'string' && response.value.statusMessage.trim()
+          ? response.value.statusMessage
+          : undefined;
 
-      if (!track) return { cues: [] };
-
-      const cues = await fetchBilibiliSubtitles(track.url);
-      return { cues, lang: track.languageCode };
+      if (lang && statusMessage) return { cues, lang, statusMessage };
+      if (lang) return { cues, lang };
+      if (statusMessage) return { cues, statusMessage };
+      return { cues };
     } catch (error) {
       if (error instanceof SubtitleHttpError && (error.status === 401 || error.status === 403)) {
         return { cues: [], statusMessage: getI18nMessage('subtitle_requiresVip') };

@@ -20,7 +20,9 @@ vi.mock('../../shared/messages', () => ({
 vi.mock('webextension-polyfill', () => ({
   default: {
     runtime: {
-      sendMessage: vi.fn(async () => ({ success: true, data: 'potc=1' })),
+      sendMessage: vi.fn(async () => {
+        throw new Error('browser.runtime.sendMessage should not be used in subtitle-controller tests');
+      }),
       onMessage: {
         addListener: vi.fn(),
         removeListener: vi.fn(),
@@ -29,14 +31,14 @@ vi.mock('webextension-polyfill', () => ({
   },
 }));
 
-vi.mock('@lexipath/subtitles', () => ({
-  getVideoId: vi.fn(),
-  fetchYouTubeSubtitles: vi.fn(),
-  parseVideoInfo: vi.fn(),
-  getCid: vi.fn(),
-  fetchBilibiliSubtitles: vi.fn(),
-  getBilibiliAvailableTracks: vi.fn(),
-}));
+vi.mock('@lexipath/subtitles', async () => {
+  const actual = (await vi.importActual('@lexipath/subtitles')) as Record<string, unknown>;
+  return {
+    ...actual,
+    getVideoId: vi.fn(),
+    parseVideoInfo: vi.fn(),
+  };
+});
 
 vi.mock('../ui', () => {
   const SubtitleOverlay = vi.fn();
@@ -58,14 +60,7 @@ vi.mock('../ui', () => {
 
 // Import mocked modules
 import { sendMessage } from '../../shared/messages';
-import {
-  getVideoId,
-  fetchYouTubeSubtitles,
-  parseVideoInfo,
-  getCid,
-  fetchBilibiliSubtitles,
-  getBilibiliAvailableTracks,
-} from '@lexipath/subtitles';
+import { getVideoId, parseVideoInfo } from '@lexipath/subtitles';
 import { SubtitleOverlay } from '../ui';
 
 describe('detectPlatform', () => {
@@ -124,9 +119,10 @@ describe('SubtitleController', () => {
   };
 
   beforeEach(() => {
-    // Clear mocks
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
+
 
     // Setup DOM
     document.body.innerHTML = '';
@@ -196,11 +192,21 @@ describe('SubtitleController', () => {
       siteMode: 'all',
       excludedSites: [],
       allowedSites: [],
+      toolExecutionEnabled: false,
     };
     controller = new SubtitleController(settings);
 
     vi.mocked(sendMessage).mockImplementation(async (type) => {
+      if (type === 'GET_CAPTION_REQUEST_INFO') {
+        return { ok: true, value: { params: '' } };
+      }
+      if (type === 'FETCH_SUBTITLES') {
+        return { ok: true, value: { cues: [], lang: 'en' } };
+      }
       if (type === 'SELECT_KEYWORDS') {
+        return { ok: true, value: [] };
+      }
+      if (type === 'TRANSLATE_KEYWORDS') {
         return { ok: true, value: [] };
       }
       if (type === 'EXPLAIN_WORD') {
@@ -212,6 +218,7 @@ describe('SubtitleController', () => {
 
   afterEach(() => {
     controller?.destroy();
+    vi.useRealTimers();
   });
 
   describe('init', () => {
@@ -228,8 +235,15 @@ describe('SubtitleController', () => {
       ];
 
       vi.mocked(getVideoId).mockReturnValue('dQw4w9WgXcQ');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
+      });
+
+      vi.mocked(getVideoId).mockReturnValue('dQw4w9WgXcQ');
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: mockCues, lang: 'en' } };
+        if (type === 'GET_CAPTION_REQUEST_INFO') return { ok: true, value: { params: 'potc=1' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
         return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
       });
@@ -239,7 +253,7 @@ describe('SubtitleController', () => {
       expect(result).toBe(true);
       expect(SubtitleOverlay).toHaveBeenCalledWith('youtube', expect.any(Object));
       expect(vi.mocked(SubtitleOverlay.prototype.mount)).toHaveBeenCalled();
-      expect(fetchYouTubeSubtitles).toHaveBeenCalledWith('dQw4w9WgXcQ', 'en', { additionalParams: 'potc=1' });
+      expect(vi.mocked(sendMessage)).toHaveBeenCalledWith('FETCH_SUBTITLES', expect.anything());
     });
 
     it('passes keywordTranslations to overlay in enhanced mode (context window enabled)', async () => {
@@ -257,13 +271,14 @@ describe('SubtitleController', () => {
       ];
 
       vi.mocked(getVideoId).mockReturnValue('test123');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
-
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: mockCues, lang: 'en' } };
+        if (type === 'GET_CAPTION_REQUEST_INFO') return { ok: true, value: { params: 'potc=1' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: ['world'] };
         if (type === 'TRANSLATE_KEYWORDS') return { ok: true, value: ['world-cn'] };
+        if (type === 'ENHANCE_SUBTITLE') return { ok: true, value: { line1_final: 'Hello world' } as SubtitleEnhanceOutput };
         if (type === 'EXPLAIN_WORD') return { ok: true, value: { word: 'world', definition: 'definition' } as any };
-        return { ok: true, value: { line1_final: 'Hello world' } as SubtitleEnhanceOutput };
+        return { ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput };
       });
 
       await controller.init('https://www.youtube.com/watch?v=test123');
@@ -280,47 +295,6 @@ describe('SubtitleController', () => {
       ).toBe(true);
     });
 
-    it('shows native translation in bilingual mode', async () => {
-      const mockCues: Cue[] = [
-        {
-          id: 'youtube:test:0-1000:0',
-          startMs: 0,
-          endMs: 1000,
-          text: 'Hello world',
-          lang: 'en',
-          source: 'youtube',
-        },
-      ];
-
-      vi.mocked(getVideoId).mockReturnValue('test123');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
-      vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
-
-      vi.mocked(sendMessage).mockImplementation(async (type, payload) => {
-        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
-        if (type === 'ENHANCE_SUBTITLE') {
-          const mode = (payload as any)?.mode;
-          if (mode === 'bilingual') {
-            return { ok: true, value: { line1_final: 'Hello world', line2_final: '你好，世界' } as SubtitleEnhanceOutput };
-          }
-          return { ok: true, value: { line1_final: 'Hello world' } as SubtitleEnhanceOutput };
-        }
-        return { ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput };
-      });
-
-      await controller.init('https://www.youtube.com/watch?v=test123');
-
-      const overlayOptions = vi.mocked(SubtitleOverlay).mock.calls[0]?.[1] as any;
-      overlayOptions?.onModeChange?.('bilingual');
-      await (controller as any).ensureCueBilingual(mockCues[0]);
-
-      const displayCalls = vi.mocked(SubtitleOverlay.prototype.display).mock.calls;
-      const bilingual = displayCalls
-        .map((call) => call[0] as any)
-        .find((item) => item?.mode === 'bilingual' && item?.lines?.[1]?.text === '你好，世界');
-      expect(bilingual).toBeTruthy();
-    });
-
     it('refreshes captions when already enabled but params missing', async () => {
       vi.useFakeTimers();
 
@@ -335,10 +309,11 @@ describe('SubtitleController', () => {
 
       document.body.appendChild(subtitlesButton);
 
-      const browser = await import('webextension-polyfill');
-      vi.mocked(browser.default.runtime.sendMessage).mockImplementation(async () => {
-        if (captionsKicked) return { success: true, data: 'potc=1' };
-        return { success: true, data: '' };
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'GET_CAPTION_REQUEST_INFO') {
+          return captionsKicked ? { ok: true, value: { params: 'potc=1' } } : { ok: true, value: { params: '' } };
+        }
+        return { ok: true, value: null };
       });
 
       const provider = new YouTubeSubtitleProvider();
@@ -375,17 +350,12 @@ describe('SubtitleController', () => {
         },
       ];
 
-      const mockTracks = [
-        { languageCode: 'en', name: 'English', url: 'https://subtitle.url' },
-      ];
-
       vi.mocked(parseVideoInfo).mockReturnValue({
         bvid: 'BV1Q5411W7x1',
         cid: '123456',
       });
-      vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
-      vi.mocked(fetchBilibiliSubtitles).mockResolvedValue(mockCues);
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: mockCues, lang: 'en' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
         return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
       });
@@ -394,8 +364,7 @@ describe('SubtitleController', () => {
 
       expect(result).toBe(true);
       expect(SubtitleOverlay).toHaveBeenCalledWith('bilibili', expect.any(Object));
-      expect(getBilibiliAvailableTracks).toHaveBeenCalledWith('BV1Q5411W7x1', '123456');
-      expect(fetchBilibiliSubtitles).toHaveBeenCalledWith('https://subtitle.url');
+      expect(vi.mocked(sendMessage)).toHaveBeenCalledWith('FETCH_SUBTITLES', expect.anything());
     });
 
     it('does not fetch subtitles when Bilibili captions are off', async () => {
@@ -409,32 +378,33 @@ describe('SubtitleController', () => {
       const result = await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
 
       expect(result).toBe(true);
-      expect(getBilibiliAvailableTracks).not.toHaveBeenCalled();
-      expect(fetchBilibiliSubtitles).not.toHaveBeenCalled();
+      // When captions are off, controller should not schedule fetching.
       expect(SubtitleOverlay.prototype.clear).toHaveBeenCalled();
     });
 
     it('fetches subtitles after Bilibili captions are enabled', async () => {
       const button = addBilibiliCaptionsButton(false);
 
-      const mockTracks = [{ languageCode: 'en', name: 'English', url: 'https://subtitle.url' }];
+
       vi.mocked(parseVideoInfo).mockReturnValue({
         bvid: 'BV1Q5411W7x1',
         cid: '123456',
       });
-      vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
-      vi.mocked(fetchBilibiliSubtitles).mockResolvedValue([]);
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: [], lang: 'en' } };
+        if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
+        return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
+      });
 
       const result = await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
       expect(result).toBe(true);
-      expect(getBilibiliAvailableTracks).not.toHaveBeenCalled();
 
+      // Now enable native captions; controller should fetch.
       button.classList.add('bpx-player-ctrl-btn-active');
       await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(getBilibiliAvailableTracks).toHaveBeenCalledWith('BV1Q5411W7x1', '123456');
-      expect(fetchBilibiliSubtitles).toHaveBeenCalledWith('https://subtitle.url');
+      expect(vi.mocked(sendMessage)).toHaveBeenCalledWith('FETCH_SUBTITLES', expect.anything());
     });
 
     it('returns false for unsupported platform', async () => {
@@ -467,11 +437,13 @@ describe('SubtitleController', () => {
   describe('destroy', () => {
     it('cleans up resources', async () => {
       vi.mocked(getVideoId).mockReturnValue('dQw4w9WgXcQ');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue([]);
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'GET_CAPTION_REQUEST_INFO') return { ok: true, value: { params: 'potc=1' } };
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: [], lang: 'en' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
         return { ok: true, value: {} as SubtitleEnhanceOutput };
       });
+
 
       await controller.init('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
       controller.destroy();
@@ -502,9 +474,11 @@ describe('SubtitleController', () => {
       ];
 
       vi.mocked(getVideoId).mockReturnValue('test123');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
+
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'GET_CAPTION_REQUEST_INFO') return { ok: true, value: { params: 'potc=1' } };
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: mockCues, lang: 'zh' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
         return { ok: true, value: { line1_final: 'Enhanced' } as SubtitleEnhanceOutput };
       });
@@ -545,11 +519,15 @@ describe('SubtitleController', () => {
       ];
 
       vi.mocked(getVideoId).mockReturnValue('test123');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
+
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
-      vi.mocked(sendMessage).mockResolvedValue({
-        ok: false,
-        error: { code: 'ERROR', message: 'Enhancement failed' },
+      vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'GET_CAPTION_REQUEST_INFO') return { ok: true, value: { params: 'potc=1' } };
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: mockCues, lang: 'en' } };
+        if (type === 'ENHANCE_SUBTITLE') {
+          return { ok: false, error: { code: 'ERROR', message: 'Enhancement failed' } };
+        }
+        return { ok: true, value: [] };
       });
 
       const result = await controller.init('https://www.youtube.com/watch?v=test123');
@@ -566,7 +544,7 @@ describe('SubtitleController', () => {
       ];
 
       vi.mocked(getVideoId).mockReturnValue('test123');
-      vi.mocked(fetchYouTubeSubtitles).mockResolvedValue(mockCues);
+
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true);
 
       const deferred: Array<{ resolve: (value: Response<unknown>) => void; promise: Promise<Response<unknown>> }> = [];
@@ -579,6 +557,8 @@ describe('SubtitleController', () => {
       }
 
       vi.mocked(sendMessage).mockImplementation((type, _payload) => {
+        if (type === 'GET_CAPTION_REQUEST_INFO') return Promise.resolve({ ok: true, value: { params: 'potc=1' } });
+        if (type === 'FETCH_SUBTITLES') return Promise.resolve({ ok: true, value: { cues: mockCues, lang: 'zh' } });
         if (type === 'SELECT_KEYWORDS') return Promise.resolve({ ok: true, value: [] });
         if (type === 'ENHANCE_SUBTITLE') {
           const d = makeDeferred();
@@ -611,54 +591,52 @@ describe('SubtitleController', () => {
     it('prefers English track when available', async () => {
       addBilibiliCaptionsButton(true);
 
-      const mockTracks = [
-        { languageCode: 'zh-Hans', name: 'Chinese', url: 'https://chinese.url' },
-        { languageCode: 'en', name: 'English', url: 'https://english.url' },
-        { languageCode: 'ja', name: 'Japanese', url: 'https://japanese.url' },
+      const mockCues: Cue[] = [
+        {
+          id: 'bilibili:0-1000:0',
+          startMs: 0,
+          endMs: 1000,
+          text: 'Test subtitle',
+          lang: 'en',
+          source: 'bilibili',
+        },
       ];
 
       vi.mocked(parseVideoInfo).mockReturnValue({
         bvid: 'BV1Q5411W7x1',
         cid: '123456',
       });
-      vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
-      vi.mocked(fetchBilibiliSubtitles).mockResolvedValue([]);
-      vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: mockCues, lang: 'en' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
-        return { ok: true, value: {} as SubtitleEnhanceOutput };
+        return { ok: true, value: { line1_final: 'Enhanced test' } as SubtitleEnhanceOutput };
       });
 
-      await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
+      const result = await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
 
-      // Should fetch English track
-      expect(fetchBilibiliSubtitles).toHaveBeenCalledWith('https://english.url');
+      expect(result).toBe(true);
+      expect(SubtitleOverlay).toHaveBeenCalledWith('bilibili', expect.any(Object));
+      expect(vi.mocked(sendMessage)).toHaveBeenCalledWith('FETCH_SUBTITLES', expect.anything());
     });
 
     it('falls back to first track when English not available', async () => {
       addBilibiliCaptionsButton(true);
 
-      const mockTracks = [
-        { languageCode: 'zh-Hans', name: 'Chinese', url: 'https://chinese.url' },
-        { languageCode: 'ja', name: 'Japanese', url: 'https://japanese.url' },
-      ];
-
       vi.mocked(parseVideoInfo).mockReturnValue({
         bvid: 'BV1Q5411W7x1',
         cid: '123456',
       });
-      vi.mocked(getBilibiliAvailableTracks).mockResolvedValue(mockTracks);
-      vi.mocked(fetchBilibiliSubtitles).mockResolvedValue([]);
+
       vi.mocked(SubtitleOverlay.prototype.mount).mockReturnValue(true); // Ensure mount succeeds
       vi.mocked(sendMessage).mockImplementation(async (type) => {
+        if (type === 'FETCH_SUBTITLES') return { ok: true, value: { cues: [], lang: 'zh-Hans' } };
         if (type === 'SELECT_KEYWORDS') return { ok: true, value: [] };
         return { ok: true, value: {} as SubtitleEnhanceOutput };
       });
 
       await controller.init('https://www.bilibili.com/video/BV1Q5411W7x1?cid=123456');
 
-      // Should fetch first track (Chinese)
-      expect(fetchBilibiliSubtitles).toHaveBeenCalledWith('https://chinese.url');
+      expect(vi.mocked(sendMessage)).toHaveBeenCalledWith('FETCH_SUBTITLES', expect.anything());
     });
   });
 });

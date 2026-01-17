@@ -2,6 +2,11 @@ import browser from 'webextension-polyfill';
 
 import { getErrorMessage } from '@lexipath/core/log';
 
+import type { createMessageHandlerRegistry } from '../../shared/messages';
+
+type Registry = ReturnType<typeof createMessageHandlerRegistry>;
+
+
 type LoggerLike = {
   info: (message: string, meta?: Record<string, unknown>) => void;
   warn: (message: string, meta?: Record<string, unknown>) => void;
@@ -33,21 +38,27 @@ function getCachedYouTubeCaptionParams(videoId: string): string {
   return entry.params;
 }
 
-export function maybeHandleCaptionRequestInfoMessage(message: unknown): Promise<{ success: true; data: string }> | null {
-  if (message && typeof message === 'object') {
-    const record = message as Record<string, unknown>;
-    if (record.type === 'GET_CAPTION_REQUEST_INFO') {
-      const videoId = typeof record.videoId === 'string' ? record.videoId : '';
-      const params = videoId ? getCachedYouTubeCaptionParams(videoId) : '';
-      return Promise.resolve({ success: true, data: params });
-    }
-  }
-  return null;
+export function registerYouTubeCaptionsFeature(options: { registry: Registry }) {
+  const { registry } = options;
+
+  registry.register('GET_CAPTION_REQUEST_INFO', async (payload) => {
+    const params = payload.videoId ? getCachedYouTubeCaptionParams(payload.videoId) : '';
+    return { params };
+  });
 }
 
+
 export function setupYouTubeTimedtextInterception(log: LoggerLike) {
-  if (browser.webRequest?.onBeforeRequest?.addListener) {
+  if (!browser.webRequest?.onBeforeRequest?.addListener) {
+    log.warn('webRequest.onBeforeRequest is unavailable; YouTube subtitle interception disabled');
+    return;
+  }
+
+  // Keep background startup resilient: a failing webRequest registration can break
+  // runtime messaging, which would make Options/Sidebar hang on load.
+  try {
     log.info('webRequest available; enabling YouTube timedtext interception');
+
     browser.webRequest.onBeforeRequest.addListener(
       (details) => {
         try {
@@ -96,11 +107,12 @@ export function setupYouTubeTimedtextInterception(log: LoggerLike) {
       },
       {
         urls: ['*://www.youtube.com/api/timedtext*', '*://youtube.com/api/timedtext*', '*://*.youtube.com/api/timedtext*'],
-      },
-      ['requestBody']
+      }
     );
-  } else {
-    log.warn('webRequest.onBeforeRequest is unavailable; YouTube subtitle interception disabled');
+  } catch (error: unknown) {
+    log.warn('Failed to register YouTube timedtext interception; disabling feature', {
+      message: getErrorMessage(error),
+    });
   }
 }
 

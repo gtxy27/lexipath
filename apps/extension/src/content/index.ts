@@ -293,12 +293,121 @@ async function init(): Promise<void> {
     }
   });
 
+  const MAX_SURROUNDING_CHARS = 400;
+
+  function normalizeSelectionText(text: string): string {
+    return String(text ?? "").replace(/\s+/g, " ").trim();
+  }
+
+  function takeLastBounded(text: string, maxChars: number): string {
+    const normalized = normalizeSelectionText(text);
+    if (normalized.length <= maxChars) return normalized;
+
+    const sliced = normalized.slice(normalized.length - maxChars);
+    const firstSpace = sliced.indexOf(" ");
+    if (firstSpace > 0 && firstSpace < 40) {
+      return sliced.slice(firstSpace + 1).trim();
+    }
+    return sliced.trim();
+  }
+
+  function takeFirstBounded(text: string, maxChars: number): string {
+    const normalized = normalizeSelectionText(text);
+    if (normalized.length <= maxChars) return normalized;
+
+    const sliced = normalized.slice(0, maxChars);
+    const lastSpace = sliced.lastIndexOf(" ");
+    if (lastSpace > maxChars - 40) {
+      return sliced.slice(0, lastSpace).trim();
+    }
+    return sliced.trim();
+  }
+
+  function getWebSelectionContext():
+    | {
+        kind: "web";
+        source: "selection";
+        title?: string;
+        domain?: string;
+        url?: string;
+        selectedText?: string;
+        beforeText?: string;
+        afterText?: string;
+      }
+    | null {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+
+    const selectedText = normalizeSelectionText(selection.toString());
+    if (!selectedText) return null;
+
+    const title = normalizeSelectionText(document.title);
+    const domain = normalizeSelectionText(window.location.hostname);
+
+    try {
+      const range = selection.getRangeAt(0);
+      const node = range.commonAncestorContainer;
+      const el =
+        node instanceof Element
+          ? node
+          : node && (node as any).parentElement instanceof Element
+            ? (node as any).parentElement
+            : null;
+
+      const container =
+        (el?.closest?.("p, li, blockquote, dd, dt, article, section, main, div") as HTMLElement | null) ??
+        (el as HTMLElement | null) ??
+        document.body;
+
+      const beforeRange = document.createRange();
+      beforeRange.selectNodeContents(container);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+
+      const afterRange = document.createRange();
+      afterRange.selectNodeContents(container);
+      afterRange.setStart(range.endContainer, range.endOffset);
+
+      const beforeText = takeLastBounded(beforeRange.toString(), MAX_SURROUNDING_CHARS);
+      const afterText = takeFirstBounded(afterRange.toString(), MAX_SURROUNDING_CHARS);
+
+      return {
+        kind: "web",
+        source: "selection",
+        ...(title ? { title } : {}),
+        ...(domain ? { domain } : {}),
+        url: window.location.href,
+        selectedText,
+        ...(beforeText ? { beforeText } : {}),
+        ...(afterText ? { afterText } : {}),
+      };
+    } catch {
+      return {
+        kind: "web",
+        source: "selection",
+        ...(title ? { title } : {}),
+        ...(domain ? { domain } : {}),
+        url: window.location.href,
+        selectedText,
+      };
+    }
+  }
+
   browser.runtime?.onMessage?.addListener?.((message: unknown) => {
-    if (message && typeof message === "object" && (message as Record<string, unknown>).type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
+    if (!message || typeof message !== "object") return;
+    const type = (message as Record<string, unknown>).type;
+
+    if (type === "LEXIPATH_TOGGLE_ORIGINAL_TAB") {
       if (!currentSettings) return;
       toggleTabShowOriginal(Boolean(currentSettings.webShowOriginal));
       return;
     }
+
+    if (type === "LEXIPATH_GET_WEB_SELECTION_CONTEXT") {
+      const context = getWebSelectionContext();
+      return Promise.resolve(context ?? undefined);
+    }
+
+    return;
   });
 }
 

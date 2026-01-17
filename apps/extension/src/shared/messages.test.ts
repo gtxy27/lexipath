@@ -24,6 +24,22 @@ describe('sendMessage payload validation', () => {
     }
   });
 
+  it('validates tool execution payloads locally (default-off scaffolding)', async () => {
+    runtimeSendMessage.mockReset();
+
+    const { sendMessage } = await import('./messages');
+    const response = await sendMessage('REQUEST_TOOL_EXECUTION', {
+      requestId: '',
+      toolId: 'http_fetch',
+    } as any);
+
+    expect(runtimeSendMessage).not.toHaveBeenCalled();
+    expect(response.ok).toBe(false);
+    if (!response.ok) {
+      expect(response.error.code).toBe('INVALID_PAYLOAD');
+    }
+  });
+
   it('accepts valid payload and parses response', async () => {
     runtimeSendMessage.mockReset();
     runtimeSendMessage.mockResolvedValue({ ok: true, value: { word: 'test', definition: 'ok' } });

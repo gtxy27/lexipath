@@ -575,14 +575,100 @@
     "message": "暂无历史",
     "description": "侧边栏暂无历史"
   },
+  "chatSearch": {
+    "message": "搜索",
+    "description": "侧边栏对话历史 Tab：搜索"
+  },
   "chatSearchPlaceholder": {
     "message": "搜索消息...",
     "description": "侧边栏搜索占位符"
   },
+
   "chatNoSearchResults": {
     "message": "未找到结果",
     "description": "侧边栏搜索无结果"
   },
+  "chatStudyPage": {
+    "message": "学习本页",
+    "description": "悬浮菜单：开始网页学习对话"
+  },
+  "chatStudyPageDesc": {
+    "message": "用一段有界摘录开始网页学习会话。",
+    "description": "悬浮菜单：网页学习提示"
+  },
+  "chatStudyPagePrompt": {
+    "message": "学习本页",
+    "description": "侧边栏：网页学习默认提示"
+  },
+  "chatRemoveSavedTerm": {
+    "message": "移除已保存的词",
+    "description": "侧边栏：移除已保存词 aria-label"
+  },
+  "chatRemove": {
+    "message": "移除",
+    "description": "侧边栏：通用移除文案"
+  },
+  "chatSaveTerm": {
+    "message": "保存词条",
+    "description": "侧边栏：保存词条按钮 title"
+  },
+  "chatHistoryAllTypes": {
+    "message": "全部类型",
+    "description": "侧边栏：历史类型筛选"
+  },
+  "chatHistoryAllKeywords": {
+    "message": "全部单词",
+    "description": "侧边栏：历史关键词筛选"
+  },
+  "chatHistoryKeywordSearchPlaceholder": {
+    "message": "输入以筛选单词...",
+    "description": "侧边栏：单词下拉搜索占位符"
+  },
+  "chatHistoryKindWords": {
+    "message": "单词",
+    "description": "侧边栏：会话类型（keyword）"
+  },
+  "chatHistoryKindWeb": {
+    "message": "网页",
+    "description": "侧边栏：会话类型（web）"
+  },
+  "chatHistoryKindVideo": {
+    "message": "视频",
+    "description": "侧边栏：会话类型（subtitle）"
+  },
+  "chatHistoryKindGeneral": {
+    "message": "通用",
+    "description": "侧边栏：会话类型（general）"
+  },
+  "chatClearKeywordFilter": {
+    "message": "清除单词筛选",
+    "description": "侧边栏：清除单词筛选按钮 title"
+  },
+  "chatGeneralConversation": {
+    "message": "通用对话",
+    "description": "侧边栏：通用会话的兜底名称"
+  },
+  "chatToggleContextTitle": {
+    "message": "切换是否发送标题",
+    "description": "侧边栏：上下文 chip 标题开关"
+  },
+  "chatToggleContextTime": {
+    "message": "切换是否发送时间",
+    "description": "侧边栏：上下文 chip 时间开关"
+  },
+  "chatToggleContextSnippet": {
+    "message": "切换是否发送片段",
+    "description": "侧边栏：上下文 chip 片段开关"
+  },
+  "chatToggleContextPage": {
+    "message": "切换是否发送页面信息",
+    "description": "侧边栏：上下文 chip 页面信息开关"
+  },
+  "chatToggleContextText": {
+    "message": "切换是否发送选中文本",
+    "description": "侧边栏：上下文 chip 选中文本开关"
+  },
+
   "user": {
     "message": "用户",
     "description": "用户角色标签"
@@ -906,6 +992,14 @@
   "optionsEnabledHint": {
     "message": "扩展状态",
     "description": "底部状态提示"
+  },
+  "optionsToolExecutionTitle": {
+    "message": "工具执行（实验性）",
+    "description": "设置：工具执行开关标题"
+  },
+  "optionsToolExecutionDesc": {
+    "message": "为未来的网络工具预留；当前仍不会执行真实网络请求。",
+    "description": "设置：工具执行开关描述"
   },
   "optionsProviderApiKeyOptional": {
     "message": "可选",

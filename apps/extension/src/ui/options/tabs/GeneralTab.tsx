@@ -33,20 +33,33 @@ export function GeneralTab(props: {
 
       <AiGate enabled={aiEnabled} onOpenChannels={onOpenChannels}>
         <div className="space-y-10 mt-4">
-          <OptionsSection title={t("optionsGeneralStatusTitle")}>
-            <OptionsRow
-              title={t("optionsEnabledTitle")}
-              description={t("optionsEnabledHint")}
-            >
-              <Switch
-                checked={form.enabled}
-                onCheckedChange={(checked) =>
-                  setForm({ ...form, enabled: checked })
-                }
-                className="data-[state=checked]:bg-primary"
-              />
-            </OptionsRow>
-          </OptionsSection>
+           <OptionsSection title={t("optionsGeneralStatusTitle")}>
+             <OptionsRow
+               title={t("optionsEnabledTitle")}
+               description={t("optionsEnabledHint")}
+             >
+               <Switch
+                 checked={form.enabled}
+                 onCheckedChange={(checked) =>
+                   setForm({ ...form, enabled: checked })
+                 }
+                 className="data-[state=checked]:bg-primary"
+               />
+             </OptionsRow>
+
+             <OptionsRow
+               title={t("optionsToolExecutionTitle")}
+               description={t("optionsToolExecutionDesc")}
+             >
+               <Switch
+                 checked={form.toolExecutionEnabled}
+                 onCheckedChange={(checked) =>
+                   setForm({ ...form, toolExecutionEnabled: checked })
+                 }
+                 className="data-[state=checked]:bg-primary"
+               />
+             </OptionsRow>
+           </OptionsSection>
 
           <DisplayTab
             embedded

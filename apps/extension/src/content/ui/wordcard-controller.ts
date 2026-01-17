@@ -13,6 +13,9 @@ type ContextInfo = {
   title?: string;
   timestampSec?: number;
   lines?: string[];
+  // Used for stable session grouping without storing raw IDs.
+  anchorId?: string;
+  url?: string;
 };
 
 const log = createLogger('wordcard-controller');
@@ -44,6 +47,8 @@ export class WordCardController {
   private getVideoTitle: () => string;
   private getVideoTimestampSec: () => number | null;
   private getSubtitleContextLines: () => string[];
+  private getSubtitleAnchorId: () => string = () => '';
+
 
   constructor(options: {
     container: HTMLDivElement;
@@ -55,6 +60,7 @@ export class WordCardController {
     getVideoTitle: () => string;
     getVideoTimestampSec: () => number | null;
     getSubtitleContextLines: () => string[];
+    getSubtitleAnchorId: () => string;
   }) {
     this.container = options.container;
     this.wordCardElement = options.wordCardElement;
@@ -65,6 +71,7 @@ export class WordCardController {
     this.getVideoTitle = options.getVideoTitle;
     this.getVideoTimestampSec = options.getVideoTimestampSec;
     this.getSubtitleContextLines = options.getSubtitleContextLines;
+    this.getSubtitleAnchorId = options.getSubtitleAnchorId;
   }
 
   destroy(): void {
@@ -277,6 +284,7 @@ export class WordCardController {
       const title = this.getVideoTitle();
       const timestampSec = this.getVideoTimestampSec();
       const lines = this.getSubtitleContextLines();
+      const anchorId = this.getSubtitleAnchorId();
 
       const contextInfo: ContextInfo = {
         kind: 'subtitle',
@@ -284,6 +292,8 @@ export class WordCardController {
         ...(title ? { title } : {}),
         ...(typeof timestampSec === 'number' ? { timestampSec } : {}),
         ...(lines.length ? { lines } : {}),
+        ...(anchorId ? { anchorId } : {}),
+        url: window.location.href,
       };
 
       sendMessage('OPEN_SIDEBAR', {

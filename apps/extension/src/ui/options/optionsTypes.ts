@@ -74,6 +74,7 @@ export type FormState = {
     password: string;
     path: string;
   };
+  toolExecutionEnabled: boolean;
 };
 
 export type FieldErrorKey =

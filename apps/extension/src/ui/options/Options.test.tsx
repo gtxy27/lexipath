@@ -46,6 +46,7 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
     },
     enabled: true,
     autoEnhance: true,
+    toolExecutionEnabled: false,
     englishCorrection: {
       enabled: false,
       triggerKey: "space",

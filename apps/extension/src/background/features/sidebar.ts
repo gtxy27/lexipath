@@ -68,6 +68,20 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
 
       const tabId = tab?.id;
 
+      const contextInfo = await (async () => {
+        if (typeof tabId !== 'number') return undefined;
+        try {
+          const response = await browser.tabs.sendMessage(tabId, { type: 'LEXIPATH_GET_WEB_SELECTION_CONTEXT' });
+          if (!response || typeof response !== 'object') return undefined;
+          const kind = (response as Record<string, unknown>).kind;
+          if (kind !== 'web') return undefined;
+          return response;
+        } catch (error: unknown) {
+          log.warn('Failed to read web selection context from tab; continuing without context', { tabId, error });
+          return undefined;
+        }
+      })();
+
       const pendingWritePromise = browser.storage.local
         .set({
           lexipath_sidebar_pending_message: {
@@ -75,6 +89,7 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
             text: prompt,
             timestamp: Date.now(),
             isAutoSend: true,
+            ...(contextInfo ? { contextInfo } : {}),
           },
         })
         .catch((error: unknown) => {

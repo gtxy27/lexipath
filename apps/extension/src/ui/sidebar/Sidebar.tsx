@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
-import type { ChatResponse, Theme } from "@lexipath/core";
+import type { ChatResponse, ChatSessionKind, Theme } from "@lexipath/core";
+
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
 import { chatStream } from "../../shared/chat-stream";
@@ -9,14 +10,39 @@ import { MessageContent } from "./MessageContent";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Popover, PopoverAnchor, PopoverContent } from "../components/ui/popover";
+
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
-import { ArrowDown, Send, SquareStop, Trash2, Bot, User, Loader2, AlertCircle, Sparkles, PlusCircle, MessageSquare, History, ChevronLeft, ChevronDown, Search } from "lucide-react";
+import {
+  ArrowDown,
+  BookOpen,
+  ChevronDown,
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  History,
+  Loader2,
+  MessageSquare,
+  Search,
+  Send,
+  Sparkles,
+  SquareStop,
+  Trash2,
+  User,
+  Bot,
+  AlertCircle,
+  BookmarkPlus,
+  PlusCircle,
+  X,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApplyTheme } from "../lib/theme";
 import { t } from "../../shared/i18n";
+
 
 import type {
   ChatMessage,
@@ -24,9 +50,10 @@ import type {
   ChatSessionMessagesSearchResult,
   SidebarContextInfo,
   SidebarContextSelection,
+  WebContextInfo,
 } from "./types";
 import { DEFAULT_CONTEXT_SELECTION } from "./types";
-import { buildChatBackgroundInfo, formatTimestampLabel } from "./context";
+import { buildChatBackgroundInfo, computeContextAnchorKey, formatTimestampLabel } from "./context";
 import { parsePendingSidebarMessage } from "./pending";
 
 import { useAutoResizeTextarea } from "./hooks/useAutoResizeTextarea";
@@ -34,6 +61,12 @@ import { useScrollAtBottom } from "./hooks/useScrollAtBottom";
 import { useDebouncedSearch } from "./hooks/useDebouncedSearch";
 
 const log = createLogger("ui:sidebar");
+
+const SAVED_TERMS_STORAGE_KEY = "lexipath_saved_terms";
+
+function normalizeSavedTerm(term: string): string {
+  return term.trim().toLowerCase();
+}
 
 function makeRandomChatSessionId(): string {
   return `chat-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
@@ -49,9 +82,21 @@ export function Sidebar(): React.ReactElement {
   const [theme, setTheme] = useState<Theme | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [showSessions, setShowSessions] = useState(false);
+  const [historyTab, setHistoryTab] = useState<"sessions" | "terms">("sessions");
+  const [sessionKindFilter, setSessionKindFilter] = useState<"all" | ChatSession["kind"]>("all");
+  // Selected keyword filter (normalized). Keeps matching stable across casing/whitespace.
+  const [keywordFilterKey, setKeywordFilterKey] = useState<string | null>(null);
+  const [keywordFilterQuery, setKeywordFilterQuery] = useState("");
+  const [isKeywordPickerOpen, setIsKeywordPickerOpen] = useState(false);
+  const keywordPickerAnchorRef = useRef<HTMLDivElement | null>(null);
+
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ChatSessionMessagesSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  const [savedTerms, setSavedTerms] = useState<string[]>([]);
+
 
   const [expandedThinkingById, setExpandedThinkingById] = useState<Record<string, boolean>>({});
 
@@ -63,15 +108,70 @@ export function Sidebar(): React.ReactElement {
   // While switching sessions (or before contextBySessionId is populated), fall back to the draft
   // context so the chips don't flicker/disappear.
   const activeContextInfo = conversationId ? (contextBySessionId[conversationId] ?? draftContextInfo) : draftContextInfo;
+  const getDefaultSelectionForContext = useCallback(
+    (context: SidebarContextInfo | null): SidebarContextSelection => {
+      if (context?.kind === "web") {
+        return { title: true, timestamp: false, snippet: true };
+      }
+      return DEFAULT_CONTEXT_SELECTION;
+    },
+    [],
+  );
+
+  const hydrateContextFromSession = useCallback(
+    (session: ChatSession) => {
+      const sessionId = session.sessionId;
+      if (!sessionId) return;
+
+      const label = typeof session.label === "string" ? session.label.trim() : "";
+      if (!label) return;
+
+      if (session.kind === "web") {
+        const parts = label.split(" · ").map((p) => p.trim()).filter(Boolean);
+        const domain = parts.length >= 2 ? parts[parts.length - 1] : "";
+        const title = parts.length >= 2 ? parts.slice(0, -1).join(" · ") : label;
+        const context: SidebarContextInfo = {
+          kind: "web",
+          source: "study",
+          ...(title ? { title } : {}),
+          ...(domain ? { domain } : {}),
+        };
+
+        setContextBySessionId((prev) => (prev[sessionId] ? prev : { ...prev, [sessionId]: context }));
+        setContextSelectionBySessionId((prev) =>
+          prev[sessionId] ? prev : { ...prev, [sessionId]: getDefaultSelectionForContext(context) },
+        );
+        return;
+      }
+
+      if (session.kind === "subtitle") {
+        const parts = label.split(" · ").map((p) => p.trim()).filter(Boolean);
+        const platform = parts.length >= 2 ? parts[parts.length - 1] : "";
+        const title = parts.length >= 2 ? parts.slice(0, -1).join(" · ") : label;
+        const context: SidebarContextInfo = {
+          kind: "subtitle",
+          ...(title ? { title } : {}),
+          ...(platform ? { platform } : {}),
+        };
+
+        setContextBySessionId((prev) => (prev[sessionId] ? prev : { ...prev, [sessionId]: context }));
+        setContextSelectionBySessionId((prev) =>
+          prev[sessionId] ? prev : { ...prev, [sessionId]: getDefaultSelectionForContext(context) },
+        );
+      }
+    },
+    [getDefaultSelectionForContext],
+  );
+
   const activeContextSelection = conversationId
-    ? (contextSelectionBySessionId[conversationId] ?? DEFAULT_CONTEXT_SELECTION)
+    ? (contextSelectionBySessionId[conversationId] ?? getDefaultSelectionForContext(activeContextInfo ?? null))
     : draftContextSelection;
   // Keep UI simple and stable: any active UI stream counts as "loading".
   // Session switching explicitly detaches the stream, so this won't leak across sessions.
   const isLoading = Boolean(loadingSessionId);
   
   useDebouncedSearch({
-    query: searchQuery,
+    query: showSessions && historyTab === "terms" ? searchQuery : "",
     delayMs: 300,
     search: async (query) => {
       const response = await sendMessage("SEARCH_MESSAGES", { query });
@@ -87,6 +187,8 @@ export function Sidebar(): React.ReactElement {
   const isAtBottom = useScrollAtBottom({ viewportRef: scrollViewportRef, disabled: showSessions });
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const streamCancelRef = useRef<null | (() => void)>(null);
+  const forceNewSessionNextSendRef = useRef(false);
+
   // Tracks whether the UI currently has an active stream attached.
   // We use a ref (not state) to avoid async race conditions where history loads
   // can clobber in-flight stream UI before React state updates apply.
@@ -96,6 +198,54 @@ export function Sidebar(): React.ReactElement {
   const pendingHandledKeyRef = useRef("");
 
   useApplyTheme(theme);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await browser.storage.local.get(SAVED_TERMS_STORAGE_KEY);
+        const raw = (data as Record<string, unknown>)[SAVED_TERMS_STORAGE_KEY];
+        const terms = Array.isArray(raw)
+          ? raw
+              .filter((t) => typeof t === "string")
+              .map((t) => normalizeSavedTerm(t))
+              .filter(Boolean)
+          : [];
+        setSavedTerms(Array.from(new Set(terms)));
+      } catch {
+        setSavedTerms([]);
+      }
+    })();
+  }, []);
+
+  const persistSavedTerms = useCallback(async (next: string[]) => {
+    const normalized = next.map((t) => normalizeSavedTerm(t)).filter(Boolean);
+    const unique = Array.from(new Set(normalized));
+    setSavedTerms(unique);
+    try {
+      await browser.storage.local.set({ [SAVED_TERMS_STORAGE_KEY]: unique });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const addSavedTerm = useCallback(
+    async (term: string) => {
+      const normalized = normalizeSavedTerm(term);
+      if (!normalized) return;
+      if (savedTerms.includes(normalized)) return;
+      await persistSavedTerms([normalized, ...savedTerms]);
+    },
+    [persistSavedTerms, savedTerms],
+  );
+
+  const removeSavedTerm = useCallback(
+    async (term: string) => {
+      const normalized = normalizeSavedTerm(term);
+      if (!normalized) return;
+      await persistSavedTerms(savedTerms.filter((t) => t !== normalized));
+    },
+    [persistSavedTerms, savedTerms],
+  );
 
   useEffect(() => {
     return () => {
@@ -158,13 +308,14 @@ export function Sidebar(): React.ReactElement {
           // Sort by lastAccessedAt desc
           const sorted = [...allSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
           const latest = sorted[0];
+          if (latest) hydrateContextFromSession(latest);
           if (latest && !options?.skipMessages && !startedWhileStreaming && !uiStreamActiveRef.current) {
             await loadMessages(latest.sessionId);
           }
         }
       }
     },
-    [loadMessages],
+    [hydrateContextFromSession, loadMessages],
   );
 
   useEffect(() => {
@@ -199,6 +350,7 @@ export function Sidebar(): React.ReactElement {
   }, [loadLatestSession]);
 
   const handleNewChat = useCallback(() => {
+    forceNewSessionNextSendRef.current = false;
     streamCancelRef.current?.();
     uiStreamActiveRef.current = false;
     historyLoadTokenRef.current += 1;
@@ -209,6 +361,7 @@ export function Sidebar(): React.ReactElement {
     setShowSessions(false);
     setExpandedThinkingById({});
     setDraftContextSelection(DEFAULT_CONTEXT_SELECTION);
+    setDraftContextInfo(null);
     inputRef.current?.focus();
   }, []);
 
@@ -248,14 +401,15 @@ export function Sidebar(): React.ReactElement {
         setContextBySessionId((prev) => (prev[sessionId] ? prev : { ...prev, [sessionId]: draftContextInfo }));
       }
 
+      const defaultSelectionForContext = getDefaultSelectionForContext(contextInfoForSession);
       const selectionForSession =
-        contextSelectionBySessionId[sessionId] ?? (isNewSession ? draftContextSelection : DEFAULT_CONTEXT_SELECTION);
+        contextSelectionBySessionId[sessionId] ?? (isNewSession ? draftContextSelection : defaultSelectionForContext);
 
       if (!contextSelectionBySessionId[sessionId]) {
         if (isNewSession) {
           setContextSelectionBySessionId((prev) => ({ ...prev, [sessionId]: draftContextSelection }));
         } else if (contextInfoFromOptions) {
-          setContextSelectionBySessionId((prev) => ({ ...prev, [sessionId]: DEFAULT_CONTEXT_SELECTION }));
+          setContextSelectionBySessionId((prev) => ({ ...prev, [sessionId]: defaultSelectionForContext }));
         }
       }
 
@@ -348,9 +502,87 @@ export function Sidebar(): React.ReactElement {
       };
 
       const backgroundInfo = buildChatBackgroundInfo(contextInfoForSession, selectionForSession);
+
+      const sessionMeta = await (async () => {
+        if (!contextInfoForSession) return undefined;
+
+        const isWebOrSubtitle = contextInfoForSession.kind === "web" || contextInfoForSession.kind === "subtitle";
+        if (!isWebOrSubtitle) return undefined;
+
+        const anchorKey = await computeContextAnchorKey(contextInfoForSession);
+
+        const isWebStudy =
+          contextInfoForSession.kind === "web" && (contextInfoForSession as any).source === "study";
+
+        // Selection-based web assistance stays general (spec); only persist anchorKey for explicit web study sessions.
+        const shouldPersistAnchorKey = isNewSession && (contextInfoForSession.kind === "subtitle" || isWebStudy);
+        void anchorKey;
+
+        const meta: {
+          kind?: ChatSessionKind;
+          label?: string;
+          anchorKey?: string;
+          forceNewSession?: boolean;
+          url?: string;
+          anchorId?: string;
+        } = {};
+
+        if (contextInfoForSession.kind === "web") {
+          // Spec: selection-based web assistance keeps the session `general`.
+          // Only explicit "study" turns create/label a `web` session and anchorKey.
+          const source = (contextInfoForSession as any).source;
+          const isStudy = source === "study";
+
+          if (isStudy) {
+            meta.kind = "web";
+            const label = [contextInfoForSession.title, contextInfoForSession.domain].filter(Boolean).join(" · ");
+            if (label.trim()) meta.label = label;
+
+            const url = typeof contextInfoForSession.url === "string" ? contextInfoForSession.url.trim() : "";
+            if (url) meta.url = url;
+          }
+        }
+
+        if (contextInfoForSession.kind === "subtitle") {
+          meta.kind = "subtitle";
+          const label = [contextInfoForSession.title, contextInfoForSession.platform].filter(Boolean).join(" · ");
+          if (label.trim()) meta.label = label;
+
+          const anchorId = typeof contextInfoForSession.anchorId === "string" ? contextInfoForSession.anchorId.trim() : "";
+          if (anchorId) meta.anchorId = anchorId;
+        }
+
+        // anchorKey is computed in the background from meta.url/meta.anchorId.
+        // We only include these fields for new sessions, to keep requests small.
+        if (shouldPersistAnchorKey) {
+          meta.forceNewSession = false;
+        }
+
+        const hasAny = Boolean(meta.kind || meta.label || meta.url || meta.anchorId || meta.forceNewSession === false);
+        return hasAny ? meta : undefined;
+      })();
+
       uiStreamActiveRef.current = true;
       const { cancel } = chatStream(
-        { message, conversationId: sessionId, ...(backgroundInfo ? { backgroundInfo } : {}) },
+        {
+          message,
+          conversationId: sessionId,
+          ...(backgroundInfo ? { backgroundInfo } : {}),
+          ...(sessionMeta
+            ? {
+                sessionMeta: {
+                  ...(sessionMeta.kind ? { kind: sessionMeta.kind } : {}),
+                  ...(sessionMeta.label ? { label: sessionMeta.label } : {}),
+                  ...(sessionMeta.anchorKey ? { anchorKey: sessionMeta.anchorKey } : {}),
+                  ...(typeof (sessionMeta as any).url === "string" ? { url: String((sessionMeta as any).url) } : {}),
+                  ...(typeof (sessionMeta as any).anchorId === "string" ? { anchorId: String((sessionMeta as any).anchorId) } : {}),
+                  ...(typeof sessionMeta.forceNewSession === "boolean"
+                    ? { forceNewSession: sessionMeta.forceNewSession }
+                    : {}),
+                },
+              }
+            : {}),
+        },
         {
           onChunk: (delta) => {
             if (finished) return;
@@ -464,6 +696,13 @@ export function Sidebar(): React.ReactElement {
 
   const normalizePromptForDedup = useCallback((text: string) => text.trim().replace(/\s+/g, " "), []);
 
+  const normalizeDomain = useCallback((domain: string) => {
+    const trimmed = domain.trim().toLowerCase();
+    if (!trimmed) return "";
+    return trimmed.startsWith("www.") ? trimmed.slice(4) : trimmed;
+  }, []);
+
+
   const hasAnsweredLastPrompt = useCallback((history: ChatMessage[], prompt: string) => {
     const normalizedPrompt = normalizePromptForDedup(prompt);
     if (!normalizedPrompt) return false;
@@ -499,6 +738,8 @@ export function Sidebar(): React.ReactElement {
       if (!parsed) return;
       if (Date.now() - parsed.timestamp >= 10000) return;
 
+
+
       const pendingKeyRaw =
         typeof parsed.nonce === "string" && parsed.nonce.trim()
           ? parsed.nonce.trim()
@@ -517,8 +758,35 @@ export function Sidebar(): React.ReactElement {
       const pendingText = parsed.text;
       const pendingContextInfo = parsed.contextInfo ?? null;
 
+      // Whole-page study opt-in: the content script attaches a bounded excerpt (when available)
+      // via contextInfo.selectedText. The sidebar shows a preview before sending.
+      if (pendingContextInfo?.kind === "web" && (pendingContextInfo as any).source === "study") {
+        // Treat "Study this page" as a fresh entry point.
+        // We intentionally clear the active session so the background can either:
+        // - reuse the most recent session for the same anchorKey, or
+        // - create a new session when the page differs.
+        detachUiStream();
+        historyLoadTokenRef.current += 1;
+        setMessages([]);
+        setConversationId(undefined);
+        setExpandedThinkingById({});
+        setError(null);
+        setLoadingSessionId(null);
+        setShowSessions(false);
+
+        forceNewSessionNextSendRef.current = true;
+
+        setDraftContextInfo(pendingContextInfo);
+        setDraftContextSelection({ title: true, timestamp: false, snippet: true });
+        setInputValue(pendingText);
+        inputRef.current?.focus();
+        return;
+      }
+
+
       if (pendingContextInfo) {
         setDraftContextInfo(pendingContextInfo);
+        setDraftContextSelection(getDefaultSelectionForContext(pendingContextInfo));
       }
 
       if (!parsed.isAutoSend) {
@@ -527,55 +795,57 @@ export function Sidebar(): React.ReactElement {
         return;
       }
 
-      const keyword = (parsed.keyword ?? "").trim();
+       const keyword = (parsed.keyword ?? "").trim();
 
-      // Detach any existing UI stream to avoid leaking "loading" across sessions.
-      detachUiStream();
-      setError(null);
-      setShowSessions(false);
-      setExpandedThinkingById({});
+       // Detach any existing UI stream to avoid leaking "loading" across sessions.
+       detachUiStream();
+       setError(null);
+       setShowSessions(false);
+       setExpandedThinkingById({});
 
-      if (keyword) {
-        // Cancel any in-flight history loads from initial mount so they can't overwrite the chat UI.
-        historyLoadTokenRef.current += 1;
+       if (keyword) {
+         // Cancel any in-flight history loads from initial mount so they can't overwrite the chat UI.
+         historyLoadTokenRef.current += 1;
 
-        const normalizedKeyword = normalizeChatKeyword(keyword);
-        const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
-        if (pendingProcessTokenRef.current !== processToken) return;
-        const keywordSessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
-        const sessionId = keywordSessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
+         const normalizedKeyword = normalizeChatKeyword(keyword);
+         const sessionsResponse = await sendMessage("GET_CHAT_SESSIONS", { keyword: normalizedKeyword });
+         if (pendingProcessTokenRef.current !== processToken) return;
+         const keywordSessions = sessionsResponse.ok ? (sessionsResponse.value as ChatSession[]) : [];
+         const sessionId = keywordSessions[0]?.sessionId ?? makeKeywordSessionId(normalizedKeyword, 1);
 
-        setSessions(keywordSessions);
+         // IMPORTANT: keep `sessions` as the full history list.
+         // Selecting a word should not shrink the "all words" dropdown to a single keyword.
 
-        const history = await fetchChatMessages(sessionId, 80);
-        if (pendingProcessTokenRef.current !== processToken) return;
+         const history = await fetchChatMessages(sessionId, 80);
+         if (pendingProcessTokenRef.current !== processToken) return;
 
-        if (history) {
-          applySessionHistory(sessionId, history);
-          // If the same prompt has already been answered in this session, don't auto-send again.
-          if (pendingText && hasAnsweredLastPrompt(history, pendingText)) {
-            inputRef.current?.focus();
-            return;
-          }
-        } else {
-          // If history can't be loaded, still switch session for consistency.
-          setConversationId(sessionId);
-        }
+         if (history) {
+           applySessionHistory(sessionId, history);
+           // If the same prompt has already been answered in this session, don't auto-send again.
+           if (pendingText && hasAnsweredLastPrompt(history, pendingText)) {
+             void loadSessions();
+             inputRef.current?.focus();
+             return;
+           }
+         } else {
+           // If history can't be loaded, still switch session for consistency.
+           setConversationId(sessionId);
+         }
 
-        await sendChatText(pendingText, {
-          conversationId: sessionId,
-          allowWhileLoading: true,
-          ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
-        });
-        return;
-      }
+         await sendChatText(pendingText, {
+           conversationId: sessionId,
+           allowWhileLoading: true,
+           ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
+         });
+         return;
+       }
 
       await sendChatText(pendingText, {
         allowWhileLoading: true,
         ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
       });
     },
-    [applySessionHistory, detachUiStream, fetchChatMessages, hasAnsweredLastPrompt, sendChatText],
+    [applySessionHistory, detachUiStream, fetchChatMessages, hasAnsweredLastPrompt, loadSessions, sendChatText],
   );
 
   useEffect(() => {
@@ -625,8 +895,20 @@ export function Sidebar(): React.ReactElement {
   }, [isAtBottom, messages, scrollToBottom, showSessions]);
 
   const handleSend = useCallback(() => {
+    const isWebStudy =
+      activeContextInfo?.kind === "web" && (activeContextInfo as any).source === "study";
+
+    // No modal preview: study context is controlled via chips.
+    // For "study" entrypoints, ensure we don't accidentally continue an unrelated session.
+    if (isWebStudy && forceNewSessionNextSendRef.current) {
+      forceNewSessionNextSendRef.current = false;
+      void sendChatText(inputValue, { conversationId: "" });
+      return;
+    }
+
     void sendChatText(inputValue);
-  }, [inputValue, sendChatText]);
+  }, [activeContextInfo, inputValue, sendChatText]);
+
 
   const handleStop = useCallback(() => {
     if (!isLoading) return;
@@ -636,6 +918,13 @@ export function Sidebar(): React.ReactElement {
   const toggleThinking = useCallback((messageId: string) => {
     setExpandedThinkingById((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
   }, []);
+
+  const clearDraftContext = useCallback(() => {
+    setDraftContextInfo(null);
+    setDraftContextSelection(DEFAULT_CONTEXT_SELECTION);
+  }, []);
+
+
 
   const toggleContextPart = useCallback(
     (part: keyof SidebarContextSelection) => {
@@ -671,17 +960,94 @@ export function Sidebar(): React.ReactElement {
 
   const handleClear = useCallback(() => {
     if (messages.length === 0) return;
-    if (confirm(t("chatClearConfirm"))) {
-      streamCancelRef.current?.();
-      uiStreamActiveRef.current = false;
-      historyLoadTokenRef.current += 1;
-      setMessages([]);
-      setConversationId(undefined);
-      setError(null);
-      setLoadingSessionId(null);
-      setExpandedThinkingById({});
-    }
+    if (!confirm(t("chatClearConfirm"))) return;
+
+    streamCancelRef.current?.();
+    uiStreamActiveRef.current = false;
+    historyLoadTokenRef.current += 1;
+    setMessages([]);
+    setConversationId(undefined);
+    setError(null);
+    setLoadingSessionId(null);
+    setExpandedThinkingById({});
+    setDraftContextInfo(null);
   }, [messages.length]);
+
+  const sortedSessions = React.useMemo(() => {
+    return [...sessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
+  }, [sessions]);
+
+  type KeywordOption = { key: string; label: string; lastAccessedAt: number };
+
+  const keywordOptions = React.useMemo((): KeywordOption[] => {
+    const byKey = new Map<string, KeywordOption>();
+
+    for (const session of sortedSessions) {
+      if (session.kind !== "keyword") continue;
+
+      const raw = typeof session.keyword === "string" ? session.keyword.trim() : "";
+      if (!raw) continue;
+
+      const key = normalizeChatKeyword(raw);
+      if (!key) continue;
+
+      const prev = byKey.get(key);
+      const lastAccessedAt = Math.max(prev?.lastAccessedAt ?? 0, session.lastAccessedAt);
+
+      // Keep the first-seen label stable; key is normalized for matching.
+      const label = prev?.label ?? raw;
+
+      byKey.set(key, { key, label, lastAccessedAt });
+    }
+
+    return Array.from(byKey.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [sortedSessions]);
+
+  const recentKeywordOptions = React.useMemo((): KeywordOption[] => {
+    return [...keywordOptions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt).slice(0, 20);
+  }, [keywordOptions]);
+
+
+  const sessionsForCurrentFilter = React.useMemo(() => {
+    let filtered = [...sortedSessions];
+
+    if (sessionKindFilter !== "all") {
+      filtered = filtered.filter((s) => s.kind === sessionKindFilter);
+    }
+
+    // Keyword filtering only applies inside the "Words" view.
+    // IMPORTANT: typing in the keyword box should not filter sessions until a keyword is selected.
+    if (sessionKindFilter === "keyword" && keywordFilterKey) {
+      filtered = filtered.filter((s) => {
+        if (s.kind !== "keyword") return false;
+        const raw = typeof s.keyword === "string" ? s.keyword.trim() : "";
+        return raw ? normalizeChatKeyword(raw) === keywordFilterKey : false;
+      });
+    }
+
+    return filtered;
+  }, [keywordFilterKey, sessionKindFilter, sortedSessions]);
+
+  const filteredKeywordOptions = React.useMemo((): KeywordOption[] => {
+    const query = keywordFilterQuery.trim().toLowerCase();
+    if (!query) return keywordOptions;
+    return keywordOptions.filter((opt) => opt.label.toLowerCase().includes(query));
+  }, [keywordFilterQuery, keywordOptions]);
+
+  const keywordPickerOptions = React.useMemo((): KeywordOption[] => {
+    if (keywordFilterQuery.trim()) return filteredKeywordOptions;
+
+    // Default list: recent keywords, but always include the current selection
+    // so the user can see what is active.
+    if (keywordFilterKey && !recentKeywordOptions.some((opt) => opt.key === keywordFilterKey)) {
+      const selected = keywordOptions.find((opt) => opt.key === keywordFilterKey);
+      return selected ? [selected, ...recentKeywordOptions] : recentKeywordOptions;
+    }
+
+    return recentKeywordOptions;
+  }, [filteredKeywordOptions, keywordFilterKey, keywordFilterQuery, keywordOptions, recentKeywordOptions]);
+
+
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
@@ -723,8 +1089,21 @@ export function Sidebar(): React.ReactElement {
             variant="ghost"
             size="icon"
             onClick={() => {
+              const nextShowSessions = !showSessions;
               void loadSessions();
-              setShowSessions(!showSessions);
+              setShowSessions(nextShowSessions);
+              if (nextShowSessions) {
+                        setHistoryTab("sessions");
+                        setSessionKindFilter("all");
+                        setKeywordFilterKey(null);
+                        setKeywordFilterQuery("");
+                        setIsKeywordPickerOpen(false);
+
+                setSearchQuery("");
+                setIsSearching(false);
+                setSearchResults([]);
+              }
+
             }}
             title={t("chatHistory") || "History"}
             className={cn(
@@ -760,74 +1139,299 @@ export function Sidebar(): React.ReactElement {
               className="flex-1 overflow-hidden flex flex-col"
             >
               <div className="px-4 py-3 border-b border-border bg-muted/15">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setSearchQuery(next);
-                      if (!next.trim()) {
-                        setIsSearching(false);
-                        setSearchResults([]);
-                      }
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={historyTab === "sessions" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => {
+                      setHistoryTab("sessions");
+                      setSearchQuery("");
+                      setIsSearching(false);
+                      setSearchResults([]);
                     }}
-                    placeholder={t("chatSearchPlaceholder") || "Search messages..."}
-                    className="pl-10 h-10 rounded-xl text-sm bg-card shadow-sm"
-                  />
-                  {isSearching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                  )}
+                    className="rounded-xl"
+                  >
+                    {t("chatHistory")}
+
+                  </Button>
+                  <Button
+                      type="button"
+                      variant={historyTab === "terms" ? "secondary" : "ghost"}
+                      size="sm"
+                      onClick={() => {
+                        setHistoryTab("terms");
+                        setKeywordFilterKey(null);
+                      }}
+                    className="rounded-xl"
+                  >
+                    {t("chatSearch")}
+                  </Button>
                 </div>
+
+                {historyTab === "sessions" && (
+                  <div className="mt-3 flex items-center gap-2">
+                      <Select
+                        value={sessionKindFilter}
+                        onValueChange={(value) => {
+                          const next = value as "all" | ChatSession["kind"];
+                          setSessionKindFilter(next);
+
+                          if (next !== "keyword") {
+                            setKeywordFilterKey(null);
+                            setKeywordFilterQuery("");
+                            setIsKeywordPickerOpen(false);
+                          }
+                        }}
+                      >
+                      <SelectTrigger className="h-10 rounded-xl bg-card shadow-sm flex-1">
+                        <SelectValue placeholder={t("chatHistoryAllTypes")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("chatHistoryAllTypes")}</SelectItem>
+                        <SelectItem value="keyword">{t("chatHistoryKindWords")}</SelectItem>
+                        <SelectItem value="web">{t("chatHistoryKindWeb")}</SelectItem>
+                        <SelectItem value="subtitle">{t("chatHistoryKindVideo")}</SelectItem>
+                        <SelectItem value="general">{t("chatHistoryKindGeneral")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {sessionKindFilter === "keyword" && keywordOptions.length > 0 && (
+                      <Popover open={isKeywordPickerOpen} onOpenChange={setIsKeywordPickerOpen}>
+                        <PopoverAnchor asChild>
+                          <div ref={keywordPickerAnchorRef} className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              value={keywordFilterQuery}
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                setKeywordFilterQuery(next);
+
+                                // Live filter: exact match applies immediately. Otherwise, keep showing
+                                // suggestions without switching the active filter until the user selects.
+                                const normalized = normalizeChatKeyword(next);
+                                if (!normalized) {
+                                  setKeywordFilterKey(null);
+                                  return;
+                                }
+
+                                const exact = keywordOptions.find((opt) => opt.key === normalized);
+                                if (exact) {
+                                  setKeywordFilterKey(exact.key);
+                                  return;
+                                }
+
+                                // If the user is typing and previously had a filter selected, clear it so
+                                // the list isn't "stuck" while the user searches.
+                                if (keywordFilterKey) setKeywordFilterKey(null);
+                              }}
+                              onFocus={() => setIsKeywordPickerOpen(true)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") setIsKeywordPickerOpen(false);
+                              }}
+                              placeholder={t("chatHistoryAllKeywords")}
+                              className="pl-10 pr-10 h-10 rounded-xl text-sm bg-card shadow-sm"
+                            />
+                             {(keywordFilterKey || keywordFilterQuery.trim()) && (
+                               <button
+                                 type="button"
+                                 onClick={(e) => {
+                                   e.preventDefault();
+                                   e.stopPropagation();
+                                   setKeywordFilterKey(null);
+                                   setKeywordFilterQuery("");
+                                   setIsKeywordPickerOpen(false);
+                                 }}
+                                title={t("chatClearKeywordFilter")}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center justify-center"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </PopoverAnchor>
+                        <PopoverContent
+                          align="start"
+                          className="p-2 w-[var(--radix-popover-trigger-width)]"
+                          onOpenAutoFocus={(event) => event.preventDefault()}
+                          onInteractOutside={(event) => {
+                            const target = event.target as Node | null;
+                            if (target && keywordPickerAnchorRef.current?.contains(target)) {
+                              // Clicking the input again should not dismiss the picker.
+                              event.preventDefault();
+                            }
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <div className="px-2 py-1 text-xs text-muted-foreground">{t("chatHistoryKeywordSearchPlaceholder")}</div>
+                            <div className="max-h-56 overflow-auto">
+                               {!keywordFilterQuery.trim() && (
+                                 <button
+                                   type="button"
+                                   onClick={() => {
+                                     setKeywordFilterKey(null);
+                                     setKeywordFilterQuery("");
+                                     setIsKeywordPickerOpen(false);
+                                   }}
+                                   className={cn(
+                                     "w-full px-3 py-2 text-left text-sm rounded-lg hover:bg-muted/30",
+                                     !keywordFilterKey && "bg-muted/30"
+                                   )}
+                                 >
+                                   {t("chatHistoryAllKeywords")}
+                                 </button>
+                               )}
+
+                               {keywordPickerOptions.slice(0, 50).map((opt) => (
+                                 <button
+                                   key={opt.key}
+                                   type="button"
+                                   onClick={() => {
+                                     setSessionKindFilter("keyword");
+                                     setKeywordFilterKey(opt.key);
+                                     setKeywordFilterQuery(opt.label);
+                                     setIsKeywordPickerOpen(false);
+                                   }}
+                                   className={cn(
+                                     "w-full px-3 py-2 text-left text-sm rounded-lg hover:bg-muted/30",
+                                     keywordFilterKey === opt.key && "bg-muted/30"
+                                   )}
+                                 >
+                                   {opt.label}
+                                 </button>
+                               ))}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                )}
+
+                {historyTab === "terms" && (
+                  <>
+                    <div className="mt-3 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setSearchQuery(next);
+                          if (!next.trim()) {
+                            setIsSearching(false);
+                            setSearchResults([]);
+                          }
+                        }}
+                        placeholder={t("chatSearchPlaceholder") || "Search terms..."}
+                        className="pl-10 pr-12 h-10 rounded-xl text-sm bg-card shadow-sm"
+                      />
+                      {isSearching ? (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => void addSavedTerm(searchQuery)}
+                          disabled={!searchQuery.trim()}
+                          title={t("chatSaveTerm")}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                        >
+                          <BookmarkPlus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {savedTerms.length > 0 && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {savedTerms.map((term) => (
+                          <div
+                            key={term}
+                            className="flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs shadow-sm"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery(term)}
+                              className="max-w-[180px] truncate font-medium"
+                              title={term}
+                            >
+                              {term}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void removeSavedTerm(term)}
+                              className="text-muted-foreground hover:text-foreground"
+                              aria-label={t("chatRemoveSavedTerm")}
+                              title={t("chatRemove")}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
               <ScrollArea className="flex-1 px-4">
                 <div className="flex flex-col gap-2 py-4">
-                  {searchQuery.trim() ? (
-                    searchResults.length === 0 ? (
+                  {historyTab === "terms" ? (
+                    searchQuery.trim() ? (
+                      searchResults.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                          <Search className="h-12 w-12 opacity-20 mb-4" />
+                          <p className="text-sm font-medium">{t("chatNoSearchResults") || "No results found"}</p>
+                        </div>
+                      ) : (
+                        searchResults.map((result) => (
+                            <button
+                              key={result.id}
+                          onClick={() => {
+                            detachUiStream();
+                            const session = sessions.find((s) => s.sessionId === result.sessionId);
+                            if (session) hydrateContextFromSession(session);
+                            void loadMessages(result.sessionId);
+                            setShowSessions(false);
+                            setHistoryTab("sessions");
+                          }}
+                              className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
+                            >
+                              <div className="flex items-center justify-between w-full mb-1">
+                                <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+                                  {result.role === 'user' ? t('user') || 'User' : t('assistant') || 'AI'}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(result.timestamp).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-sm line-clamp-2 text-muted-foreground">
+                                {result.content}
+                              </p>
+                              <div className="text-xs text-muted-foreground/70">
+                                {result.sessionId.split('-').slice(0, 2).join('-')}
+                              </div>
+                            </button>
+                          ))
+                      )
+                    ) : (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                         <Search className="h-12 w-12 opacity-20 mb-4" />
-                        <p className="text-sm font-medium">{t("chatNoSearchResults") || "No results found"}</p>
+                        <p className="text-sm font-medium">{t("chatSearchPlaceholder") || "Search terms..."}</p>
                       </div>
-                    ) : (
-                      searchResults.map((result) => (
-                          <button
-                            key={result.id}
-                            onClick={() => {
-                              detachUiStream();
-                              void loadMessages(result.sessionId);
-                              setShowSessions(false);
-                              setSearchQuery("");
-                              setIsSearching(false);
-                              setSearchResults([]);
-                          }}
-                          className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
-                        >
-                          <div className="flex items-center justify-between w-full mb-1">
-                            <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
-                              {result.role === 'user' ? t('user') || 'User' : t('assistant') || 'AI'}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(result.timestamp).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <p className="text-sm line-clamp-2 text-muted-foreground">
-                            {result.content}
-                          </p>
-                        </button>
-                      ))
                     )
                   ) : (
-                    sessions.length === 0 ? (
+                    sessionsForCurrentFilter.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                         <MessageSquare className="h-12 w-12 opacity-20 mb-4" />
                         <p className="text-sm font-medium">{t("chatNoHistory") || "No history yet"}</p>
                       </div>
                     ) : (
-                      sessions.map((session) => (
+                      sessionsForCurrentFilter.map((session) => (
                         <button
                           key={session.sessionId}
                           onClick={() => {
                             detachUiStream();
+                            hydrateContextFromSession(session);
                             void loadMessages(session.sessionId);
                             setShowSessions(false);
                           }}
@@ -839,9 +1443,32 @@ export function Sidebar(): React.ReactElement {
                           )}
                         >
                           <div className="flex items-center justify-between w-full">
-                            <span className="font-medium text-sm truncate max-w-[180px]">
-                              {session.keyword || "General Conversation"}
-                            </span>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="font-medium text-sm truncate max-w-[180px]">
+                                {(() => {
+                                  const label = typeof session.label === "string" ? session.label.trim() : "";
+                                  const keyword = typeof session.keyword === "string" ? session.keyword.trim() : "";
+
+                                  if (session.kind === "general") {
+                                    if (!label || label.toLowerCase() === "general") return t("chatGeneralConversation");
+                                    return label;
+                                  }
+
+                                  return label || keyword || t("chatGeneralConversation");
+                                })()}
+                              </span>
+                                  <Badge variant="outline" className="border-border bg-muted text-muted-foreground shrink-0">
+                                    {session.kind === "keyword"
+                                      ? t("chatHistoryKindWords")
+                                      : session.kind === "web"
+                                        ? t("chatHistoryKindWeb")
+                                        : session.kind === "subtitle"
+                                          ? t("chatHistoryKindVideo")
+                                          : session.kind === "general"
+                                            ? t("chatHistoryKindGeneral")
+                                            : session.kind}
+                                  </Badge>
+                            </div>
                             <span className="text-xs text-muted-foreground">
                               {new Date(session.lastAccessedAt).toLocaleDateString()}
                             </span>
@@ -1006,10 +1633,11 @@ export function Sidebar(): React.ReactElement {
                 </motion.div>
               )}
 
-              <div className="p-4 border-t border-border bg-muted/15">
-                {activeContextInfo?.kind === "subtitle" && (
+                <div className="p-4 border-t border-border bg-muted/15">
+
+                {(activeContextInfo?.kind === "subtitle" || activeContextInfo?.kind === "web") && (
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                    {typeof activeContextInfo.title === "string" && activeContextInfo.title.trim() && (
+                    {activeContextInfo.kind === "subtitle" && typeof activeContextInfo.title === "string" && activeContextInfo.title.trim() && (
                       activeContextSelection.title ? (
                         <button
                           type="button"
@@ -1019,7 +1647,7 @@ export function Sidebar(): React.ReactElement {
                             "flex max-w-full items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                             "border-border bg-background/80 text-foreground",
                           )}
-                          title="Toggle sending video title"
+                           title={t("chatToggleContextTitle")}
                         >
                           <span className="shrink-0">Title</span>
                           <span className="max-w-[240px] truncate">{activeContextInfo.title.trim()}</span>
@@ -1033,7 +1661,7 @@ export function Sidebar(): React.ReactElement {
                             "flex max-w-full items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                             "border-border/60 bg-background/40 text-muted-foreground line-through decoration-muted-foreground/60",
                           )}
-                          title="Toggle sending video title"
+                           title={t("chatToggleContextTitle")}
                         >
                           <span className="shrink-0">Title</span>
                           <span className="max-w-[240px] truncate">{activeContextInfo.title.trim()}</span>
@@ -1041,7 +1669,7 @@ export function Sidebar(): React.ReactElement {
                       )
                     )}
 
-                    {typeof activeContextInfo.timestampSec === "number" &&
+                    {activeContextInfo.kind === "subtitle" && typeof activeContextInfo.timestampSec === "number" &&
                       Number.isFinite(activeContextInfo.timestampSec) && (
                         activeContextSelection.timestamp ? (
                           <button
@@ -1052,7 +1680,7 @@ export function Sidebar(): React.ReactElement {
                               "flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                               "border-border bg-background/80 text-foreground",
                             )}
-                            title="Toggle sending timestamp"
+                             title={t("chatToggleContextTime")}
                           >
                             <span className="shrink-0">Time</span>
                             <span className="tabular-nums">
@@ -1068,7 +1696,7 @@ export function Sidebar(): React.ReactElement {
                               "flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                               "border-border/60 bg-background/40 text-muted-foreground line-through decoration-muted-foreground/60",
                             )}
-                            title="Toggle sending timestamp"
+                             title={t("chatToggleContextTime")}
                           >
                             <span className="shrink-0">Time</span>
                             <span className="tabular-nums">
@@ -1078,7 +1706,7 @@ export function Sidebar(): React.ReactElement {
                         )
                       )}
 
-                    {Array.isArray(activeContextInfo.lines) && activeContextInfo.lines.length > 0 && (
+                    {activeContextInfo.kind === "subtitle" && Array.isArray(activeContextInfo.lines) && activeContextInfo.lines.length > 0 && (
                       activeContextSelection.snippet ? (
                         <button
                           type="button"
@@ -1088,7 +1716,7 @@ export function Sidebar(): React.ReactElement {
                             "flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                             "border-border bg-background/80 text-foreground",
                           )}
-                          title="Toggle sending subtitle snippet"
+                           title={t("chatToggleContextSnippet")}
                         >
                           <span className="shrink-0">Snippet</span>
                           <span className="tabular-nums">{activeContextInfo.lines.length} lines</span>
@@ -1102,12 +1730,93 @@ export function Sidebar(): React.ReactElement {
                             "flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
                             "border-border/60 bg-background/40 text-muted-foreground line-through decoration-muted-foreground/60",
                           )}
-                          title="Toggle sending subtitle snippet"
+                           title={t("chatToggleContextSnippet")}
                         >
                           <span className="shrink-0">Snippet</span>
                           <span className="tabular-nums">{activeContextInfo.lines.length} lines</span>
                         </button>
                       )
+                    )}
+
+                    {activeContextInfo.kind === "web" && (
+                      <>
+                        {(typeof activeContextInfo.title === "string" && activeContextInfo.title.trim()) ||
+                        (typeof activeContextInfo.domain === "string" && activeContextInfo.domain.trim()) ? (
+                          activeContextSelection.title ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleContextPart("title")}
+                              aria-pressed="true"
+                              className={cn(
+                                "flex max-w-full items-center gap-2 rounded-full border px-3 py-1 transition-colors",
+                                "border-border bg-background/80 text-foreground",
+                              )}
+                               title={t("chatToggleContextPage")}
+                            >
+                              <span className="shrink-0">Page</span>
+                              <span className="max-w-[240px] truncate">
+                                {(activeContextInfo.title ?? activeContextInfo.domain ?? "").trim()}
+                              </span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleContextPart("title")}
+                              aria-pressed="false"
+                              className={cn(
+                                "flex max-w-full items-center gap-2 rounded-full border px-3 py-1 transition-colors",
+                                "border-border/60 bg-background/40 text-muted-foreground line-through decoration-muted-foreground/60",
+                              )}
+                               title={t("chatToggleContextPage")}
+                            >
+                              <span className="shrink-0">Page</span>
+                              <span className="max-w-[240px] truncate">
+                                {(activeContextInfo.title ?? activeContextInfo.domain ?? "").trim()}
+                              </span>
+                            </button>
+                          )
+                        ) : null}
+
+                        {(() => {
+                          const text =
+                            typeof activeContextInfo.selectedText === "string"
+                              ? activeContextInfo.selectedText.trim()
+                              : "";
+
+                          // Always show the Text chip (even when empty) so the UX stays consistent.
+                          const count = text.length;
+
+                          return activeContextSelection.snippet ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleContextPart("snippet")}
+                              aria-pressed="true"
+                              className={cn(
+                                "flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
+                                "border-border bg-background/80 text-foreground",
+                              )}
+                              title={t("chatToggleContextText")}
+                            >
+                              <span className="shrink-0">Text</span>
+                              <span className="tabular-nums">{count} chars</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleContextPart("snippet")}
+                              aria-pressed="false"
+                              className={cn(
+                                "flex items-center gap-2 rounded-full border px-3 py-1 transition-colors",
+                                "border-border/60 bg-background/40 text-muted-foreground line-through decoration-muted-foreground/60",
+                              )}
+                              title={t("chatToggleContextText")}
+                            >
+                              <span className="shrink-0">Text</span>
+                              <span className="tabular-nums">{count} chars</span>
+                            </button>
+                          );
+                        })()}
+                      </>
                     )}
                   </div>
                 )}

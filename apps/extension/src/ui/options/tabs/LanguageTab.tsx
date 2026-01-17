@@ -736,16 +736,12 @@ export function LanguageTab(props: {
             </div>
           </div>
 
-          {form.hasCompletedOnboarding ? null : (
+          {!form.hasCompletedOnboarding ? (
             <div className="md:col-span-2 md:order-5 bg-card border border-border rounded-xl p-6 space-y-5">
-              <h4 className="text-sm font-medium">
-                {t("openOnboarding")}
-              </h4>
+              <h4 className="text-sm font-medium">{t("openOnboarding")}</h4>
 
               <div className="space-y-5">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {t("optionsOpenOnboardingDesc")}
-                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t("optionsOpenOnboardingDesc")}</p>
                 <Button
                   variant="outline"
                   className="w-full sm:w-auto h-10 rounded-lg border border-border bg-background font-medium text-xs"
@@ -759,7 +755,7 @@ export function LanguageTab(props: {
                 </Button>
               </div>
             </div>
-          )}
+          ) : null}
 
           <div className="md:col-span-2 md:order-6 bg-card border border-border rounded-xl p-6 space-y-5">
             <h4 className="text-sm font-medium">

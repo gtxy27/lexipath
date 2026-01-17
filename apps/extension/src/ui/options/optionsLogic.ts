@@ -366,12 +366,13 @@ export function settingsToFormState(settings: Settings): FormState {
 	    siteMode: settings.siteMode,
 	    excludedSites: settings.excludedSites,
 	    allowedSites: settings.allowedSites,
-	    webdav: {
+    webdav: {
       url: settings.webdav?.url ?? "",
       username: settings.webdav?.username ?? "",
       password: settings.webdav?.password ?? "",
       path: settings.webdav?.path ?? "/LexiPath/backup.json",
     },
+    toolExecutionEnabled: Boolean(settings.toolExecutionEnabled),
   };
 }
 
@@ -731,8 +732,9 @@ export function buildSettingsPatch(
 	    siteMode: form.siteMode,
 	    excludedSites: form.excludedSites,
 	    allowedSites: form.allowedSites,
-	    webdav: webdavHasAnyInput ? builtWebdav : undefined,
-	  };
+    webdav: webdavHasAnyInput ? builtWebdav : undefined,
+    toolExecutionEnabled: Boolean(form.toolExecutionEnabled),
+  };
 
   const parsed = SettingsSchema.partial().strict().safeParse(patch);
   if (!parsed.success) {
