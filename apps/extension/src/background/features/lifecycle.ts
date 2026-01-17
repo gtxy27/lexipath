@@ -57,7 +57,7 @@ export function setupLifecycleListeners(log: LoggerLike) {
     }
   }
 
-  async function openSidePanel(tabId: number | null): Promise<void> {
+  async function openSidePanel(tabId?: number): Promise<void> {
     if (typeof (browser as any).sidePanel?.open !== 'function') return;
     try {
       // Some browsers allow `tabId` to be omitted.
@@ -69,12 +69,22 @@ export function setupLifecycleListeners(log: LoggerLike) {
   }
 
   browser.commands?.onCommand?.addListener?.(async (command: string, tab?: browser.Tabs.Tab) => {
-    const tabId = await resolveTabId(tab);
-
     if (command === 'toggle-sidebar') {
-      await openSidePanel(tabId);
+      // Attempt to preserve user activation by opening immediately, without awaiting extra work.
+      const directTabId = tab?.id;
+      void openSidePanel(typeof directTabId === 'number' ? directTabId : undefined);
+
+      // If no tab id was provided, best-effort retry using a query.
+      if (typeof directTabId !== 'number') {
+        void (async () => {
+          const resolved = await resolveTabId(undefined);
+          if (typeof resolved === 'number') await openSidePanel(resolved);
+        })();
+      }
       return;
     }
+
+    const tabId = await resolveTabId(tab);
 
     if (command === 'toggle-floating-button') {
       try {
