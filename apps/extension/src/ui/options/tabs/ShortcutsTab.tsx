@@ -38,15 +38,21 @@ export function ShortcutsTab(): React.ReactElement {
       try {
         const list = await browser.commands.getAll();
         if (!alive) return;
-        setCommands(
-          list
-            .filter((cmd) => Boolean(cmd?.name))
-            .map((cmd) => ({
-              name: cmd.name,
-              description: cmd.description,
-              shortcut: cmd.shortcut,
-            })),
-        );
+        // Chrome may include built-in commands like `_execute_action` in `commands.getAll()`.
+        // Users can't meaningfully manage these from our extension UI, so hide them.
+        const cleaned: CommandInfo[] = [];
+        for (const cmd of list) {
+          const name = cmd?.name;
+          if (typeof name !== "string" || name.length === 0) continue;
+          if (name.startsWith("_execute_")) continue;
+
+          const next: CommandInfo = { name };
+          if (typeof cmd.description === "string") next.description = cmd.description;
+          if (typeof cmd.shortcut === "string") next.shortcut = cmd.shortcut;
+          cleaned.push(next);
+        }
+
+        setCommands(cleaned);
       } catch {
         if (!alive) return;
         setCommands([]);
