@@ -675,6 +675,10 @@
     "message": "Toggle subtitle bilingual mode",
     "description": "Command: toggle subtitle bilingual"
   },
+  "command_executeAction": {
+    "message": "Open LexiPath",
+    "description": "Command: open extension action (toolbar button)"
+  },
   "optionsTab_language": {
     "message": "Language",
     "description": "Options tab: language"

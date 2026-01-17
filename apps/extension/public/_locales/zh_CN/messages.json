@@ -703,6 +703,10 @@
     "message": "\u5207\u6362\u5b57\u5e55\u53cc\u8bed\u6a21\u5f0f",
     "description": "\u547d\u4ee4\uff1a\u5207\u6362\u53cc\u8bed\u5b57\u5e55"
   },
+  "command_executeAction": {
+    "message": "\u6253\u5f00 LexiPath",
+    "description": "\u547d\u4ee4\uff1a\u6253\u5f00\u6269\u5c55\u6309\u94ae\uff08\u5de5\u5177\u680f\uff09"
+  },
   "optionsDisplayDesc": {
     "message": "自定义外观、叠加层行为和高亮样式。",
     "description": "显示 Tab 描述"
