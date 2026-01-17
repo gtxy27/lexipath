@@ -73,3 +73,9 @@ export function setTabEnhancePaused(next: boolean): void {
   document.documentElement.classList.toggle(ENHANCE_PAUSED_CLASS, next);
 }
 
+export function toggleTabEnhancePaused(): boolean {
+  const next = !isEnhancePausedNow();
+  setTabEnhancePaused(next);
+  return next;
+}
+

@@ -1,5 +1,5 @@
 import React from "react";
-import { Cloud, Globe, Settings2 } from "lucide-react";
+import { Cloud, Globe, Keyboard, Settings2 } from "lucide-react";
 import { Switch } from "../../components/ui/switch";
 import { AiGate } from "../AiGate";
 import { t } from "../optionsI18n";
@@ -11,6 +11,7 @@ import { OptionsDisclosure } from "../components/OptionsDisclosure";
 import { OptionsPageHeader } from "../components/OptionsPageHeader";
 import { OptionsRow } from "../components/OptionsRow";
 import { OptionsSection } from "../components/OptionsSection";
+import { ShortcutsTab } from "./ShortcutsTab";
 
 export function GeneralTab(props: {
   form: FormState;
@@ -61,13 +62,23 @@ export function GeneralTab(props: {
              </OptionsRow>
            </OptionsSection>
 
+          <OptionsDisclosure
+            title={t("optionsShortcutsTitle")}
+            description={t("optionsShortcutsDesc")}
+            summaryRight={t("optionsAdvancedTitle")}
+            icon={Keyboard}
+          >
+            <ShortcutsTab />
+          </OptionsDisclosure>
+
           <DisplayTab
-            embedded
-            form={form}
-            setForm={setForm}
-            aiEnabled={aiEnabled}
-            onOpenChannels={onOpenChannels}
-          />
+             embedded
+             form={form}
+             setForm={setForm}
+             aiEnabled={aiEnabled}
+             onOpenChannels={onOpenChannels}
+           />
+
 
           <OptionsDisclosure
             title={t("optionsGeneralSitesTitle")}

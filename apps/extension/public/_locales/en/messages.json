@@ -689,6 +689,78 @@
     "message": "Summary",
     "description": "Options tab: summary"
   },
+  "optionsTab_shortcuts": {
+    "message": "Shortcuts",
+    "description": "Options tab: shortcuts"
+  },
+  "optionsShortcutsTitle": {
+    "message": "Keyboard shortcuts",
+    "description": "Options shortcuts: page title"
+  },
+  "optionsShortcutsDesc": {
+    "message": "View and configure global keyboard shortcuts.",
+    "description": "Options shortcuts: page description"
+  },
+  "optionsShortcutsManageTitle": {
+    "message": "Manage",
+    "description": "Options shortcuts: manage section title"
+  },
+  "optionsShortcutsManageDesc": {
+    "message": "Shortcut bindings are managed by your browser.",
+    "description": "Options shortcuts: manage section description"
+  },
+  "optionsShortcutsConfigureButton": {
+    "message": "Configure shortcuts",
+    "description": "Options shortcuts: open config UI button"
+  },
+  "optionsShortcutsHintChrome": {
+    "message": "Chrome/Chromium: open $1",
+    "description": "Options shortcuts: Chrome hint ($1=url)"
+  },
+  "optionsShortcutsHintFirefox": {
+    "message": "Firefox: open Add-ons and search for \"Manage Extension Shortcuts\".",
+    "description": "Options shortcuts: Firefox hint"
+  },
+  "optionsShortcutsOpenBlocked": {
+    "message": "Your browser blocked opening this page. Open it manually: $1",
+    "description": "Options shortcuts: blocked open fallback ($1=url)"
+  },
+  "optionsShortcutsListTitle": {
+    "message": "Available commands",
+    "description": "Options shortcuts: list section title"
+  },
+  "optionsShortcutsListDesc": {
+    "message": "Commands without bindings will show as \"Not set\".",
+    "description": "Options shortcuts: list section description"
+  },
+  "optionsShortcutsNotSet": {
+    "message": "Not set",
+    "description": "Options shortcuts: not set label"
+  },
+  "optionsShortcutsEmpty": {
+    "message": "No commands found.",
+    "description": "Options shortcuts: empty list state"
+  },
+  "command_toggleSidebar": {
+    "message": "Activate sidebar",
+    "description": "Command: activate sidebar"
+  },
+  "command_toggleOriginal": {
+    "message": "Toggle original text",
+    "description": "Command: toggle original"
+  },
+  "command_toggleEnhancePaused": {
+    "message": "Pause/resume web enhancement (current tab)",
+    "description": "Command: toggle enhance paused"
+  },
+  "command_toggleFloatingButton": {
+    "message": "Toggle floating button",
+    "description": "Command: toggle floating button"
+  },
+  "command_toggleSubtitleBilingual": {
+    "message": "Toggle subtitle bilingual mode",
+    "description": "Command: toggle subtitle bilingual"
+  },
   "optionsTab_language": {
     "message": "Language",
     "description": "Options tab: language"

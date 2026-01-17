@@ -38,12 +38,24 @@
     "https://www.bilibili.com/*"
   ],
   "commands": {
-    "toggle-original": {
+    "toggle-sidebar": {
       "suggested_key": {
-        "default": "Ctrl+Shift+E",
-        "mac": "Command+Shift+E"
+        "default": "Alt+Shift+L",
+        "mac": "Command+Shift+L"
       },
-      "description": "Toggle original text"
+      "description": "__MSG_command_toggleSidebar__"
+    },
+    "toggle-original": {
+      "description": "__MSG_command_toggleOriginal__"
+    },
+    "toggle-enhance-paused": {
+      "description": "__MSG_command_toggleEnhancePaused__"
+    },
+    "toggle-floating-button": {
+      "description": "__MSG_command_toggleFloatingButton__"
+    },
+    "toggle-subtitle-bilingual": {
+      "description": "__MSG_command_toggleSubtitleBilingual__"
     }
   },
   "web_accessible_resources": [
