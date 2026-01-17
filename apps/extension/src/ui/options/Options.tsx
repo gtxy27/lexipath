@@ -7,14 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import { BarChart3, Keyboard, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
+import { BarChart3, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { ICON_URL } from "../lib/assets";
 import { ChannelsTab } from "./tabs/ChannelsTab";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { LearningTab } from "./tabs/LearningTab";
-import { ShortcutsTab } from "./tabs/ShortcutsTab";
 import { SummaryTab } from "./tabs/SummaryTab";
 import {
   buildSettingsPatch,
@@ -128,7 +127,6 @@ export function Options(): React.ReactElement {
     { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
     { value: "learning", label: t("optionsTab_learning"), icon: Languages },
     { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-    { value: "shortcuts", label: t("optionsTab_shortcuts"), icon: Keyboard },
     { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
   ];
 
@@ -236,13 +234,6 @@ export function Options(): React.ReactElement {
             className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
           >
             <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
-          </TabsContent>
-
-          <TabsContent
-            value="shortcuts"
-            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-          >
-            <ShortcutsTab />
           </TabsContent>
 
           <TabsContent
