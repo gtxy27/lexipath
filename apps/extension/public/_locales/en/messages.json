@@ -559,14 +559,100 @@
     "message": "No history yet",
     "description": "Sidebar no history message"
   },
+  "chatSearch": {
+    "message": "Search",
+    "description": "Sidebar chat history tab: search"
+  },
   "chatSearchPlaceholder": {
     "message": "Search messages...",
     "description": "Sidebar chat search placeholder"
   },
+
   "chatNoSearchResults": {
     "message": "No results found",
     "description": "Sidebar chat search no results"
   },
+  "chatStudyPage": {
+    "message": "Study this page",
+    "description": "Floating menu: start page study chat"
+  },
+  "chatStudyPageDesc": {
+    "message": "Start a web study session with a bounded excerpt.",
+    "description": "Floating menu: page study hint"
+  },
+  "chatStudyPagePrompt": {
+    "message": "Study this page",
+    "description": "Sidebar: default prompt for page study"
+  },
+  "chatRemoveSavedTerm": {
+    "message": "Remove saved term",
+    "description": "Sidebar: aria-label for removing saved term"
+  },
+  "chatRemove": {
+    "message": "Remove",
+    "description": "Sidebar: generic remove label"
+  },
+  "chatSaveTerm": {
+    "message": "Save term",
+    "description": "Sidebar: save term button title"
+  },
+  "chatHistoryAllTypes": {
+    "message": "All types",
+    "description": "Sidebar: history kind filter label"
+  },
+  "chatHistoryAllKeywords": {
+    "message": "All keywords",
+    "description": "Sidebar: history keyword filter label"
+  },
+  "chatHistoryKeywordSearchPlaceholder": {
+    "message": "Type to filter keywords...",
+    "description": "Sidebar: keyword dropdown search placeholder"
+  },
+  "chatHistoryKindWords": {
+    "message": "Words",
+    "description": "Sidebar: session kind label (keyword)"
+  },
+  "chatHistoryKindWeb": {
+    "message": "Web",
+    "description": "Sidebar: session kind label (web)"
+  },
+  "chatHistoryKindVideo": {
+    "message": "Video",
+    "description": "Sidebar: session kind label (subtitle)"
+  },
+  "chatHistoryKindGeneral": {
+    "message": "General",
+    "description": "Sidebar: session kind label (general)"
+  },
+  "chatClearKeywordFilter": {
+    "message": "Clear keyword filter",
+    "description": "Sidebar: keyword filter clear button title"
+  },
+  "chatGeneralConversation": {
+    "message": "General Conversation",
+    "description": "Sidebar: fallback label for general sessions"
+  },
+  "chatToggleContextTitle": {
+    "message": "Toggle sending title",
+    "description": "Sidebar: context chip title toggle"
+  },
+  "chatToggleContextTime": {
+    "message": "Toggle sending time",
+    "description": "Sidebar: context chip time toggle"
+  },
+  "chatToggleContextSnippet": {
+    "message": "Toggle sending snippet",
+    "description": "Sidebar: context chip snippet toggle"
+  },
+  "chatToggleContextPage": {
+    "message": "Toggle sending page info",
+    "description": "Sidebar: context chip page toggle"
+  },
+  "chatToggleContextText": {
+    "message": "Toggle sending selected text",
+    "description": "Sidebar: context chip selected text toggle"
+  },
+
   "user": {
     "message": "User",
     "description": "User role label"
@@ -1146,6 +1232,14 @@
   "optionsEnabledHint": {
     "message": "Extension status",
     "description": "Footer status hint"
+  },
+  "optionsToolExecutionTitle": {
+    "message": "Tool execution (experimental)",
+    "description": "Options: tool execution toggle title"
+  },
+  "optionsToolExecutionDesc": {
+    "message": "Reserved for future network tools; still no real execution yet.",
+    "description": "Options: tool execution toggle description"
   },
   "optionsProviderApiKeyOptional": {
     "message": "Optional",
