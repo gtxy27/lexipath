@@ -211,7 +211,8 @@ export function Popup(): React.ReactElement {
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </Button>
 
-          {!settings?.hasCompletedOnboarding ? (
+          {settings && !settings.hasCompletedOnboarding ? (
+
             <Button
               variant="outline"
               className="h-10 w-full justify-between rounded-xl px-3 bg-background dark:bg-card hover:bg-muted/40 dark:hover:bg-muted/60 shadow-sm"

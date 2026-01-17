@@ -2,9 +2,15 @@ import { createRoot, Root } from "react-dom/client";
 import React from "react";
 import browser from "webextension-polyfill";
 import { FloatingButton } from "./floating-button";
+
+// Ensure the controller stays in sync with the FloatingButton props.
+import type { FloatingButtonProps } from "./floating-button";
 import { Settings } from "@lexipath/core";
 import { isUrlInSiteList } from "@lexipath/core/qualify";
 import { sendMessage } from "../../shared/messages";
+import { buildStudyContext } from "../web/study-context";
+
+
 import {
   applyTabEnhancePausedFromStorage,
   ENHANCE_PAUSED_CLASS,
@@ -308,6 +314,101 @@ export class FloatingButtonController {
       hasEnhancedOnce || document.querySelector(".lexipath-word, .lexipath-paragraph-enhanced"),
     );
 
+    const props: FloatingButtonProps = {
+      enabled: settings?.enabled ?? true,
+      enhanceSiteMode: siteMode,
+      siteRuleStatus: siteRule.status,
+      ...(siteRule.matchedRule ? { siteRuleMatchedRule: siteRule.matchedRule } : {}),
+      currentHost,
+      tabShowOriginal,
+      enhancePaused: tabEnhancePaused,
+      hasEnhancedMarkup,
+      forgottenWords: this.pageContext.forgottenWords,
+      translatedCount: this.pageContext.translatedCount ?? 0,
+      seenCount: this.pageContext.seenCount ?? 0,
+      webEnhanceMode: this.pageContext.webEnhanceMode ?? "i_plus_1",
+      pageEligible: this.pageContext.pageEligible ?? true,
+      ...(this.pageContext.pageLanguage ? { pageLanguage: this.pageContext.pageLanguage } : {}),
+      onToggleCurrentSiteRule: async () => {
+        const hostRule = currentHost;
+        const url = window.location.href;
+        if (!settings) return;
+        const mode = this.getEnhanceSiteMode(settings);
+
+        if (mode === "auto_blacklist") {
+          const matched = isUrlInSiteList({ url, sites: settings.excludedSites ?? [] });
+          const nextExcluded = matched.matched
+            ? (settings.excludedSites ?? []).filter((rule) => rule !== matched.matchedRule)
+            : Array.from(new Set([...(settings.excludedSites ?? []), hostRule]));
+          sendMessage("SET_SETTINGS", { excludedSites: nextExcluded });
+        }
+
+        if (mode === "auto_whitelist") {
+          const matched = isUrlInSiteList({ url, sites: settings.allowedSites ?? [] });
+          const nextAllowed = matched.matched
+            ? (settings.allowedSites ?? []).filter((rule) => rule !== matched.matchedRule)
+            : Array.from(new Set([...(settings.allowedSites ?? []), hostRule]));
+          sendMessage("SET_SETTINGS", { allowedSites: nextAllowed });
+        }
+      },
+      onRunEnhanceOnce: async () => {
+        try {
+          await this.onRunWebEnhanceOnce?.();
+        } finally {
+          this.render();
+        }
+      },
+      onRunRewriteOnce: async () => {
+        try {
+          await this.onRunWebRewriteOnce?.();
+        } finally {
+          this.render();
+        }
+      },
+      onSetTabShowOriginal: (showOriginal) => {
+        setTabShowOriginal(showOriginal, Boolean(this.settings?.webShowOriginal));
+        this.render();
+      },
+      onSetTabEnhancePaused: (paused) => {
+        setTabEnhancePaused(paused);
+        this.render();
+      },
+      onOpenOptions: () => {
+        browser.runtime.openOptionsPage();
+      },
+      onOpenSidebar: () => {
+        sendMessage("OPEN_SIDEBAR", { isAutoSend: false });
+      },
+      onStudyPage: () => {
+        const url = window.location.href;
+        const prompt = browser.i18n.getMessage("chatStudyPagePrompt") || "Study this page";
+
+        const context = buildStudyContext(url, { preloadScreens: 2 });
+
+        sendMessage("OPEN_SIDEBAR", {
+          initialMessage: prompt,
+          isAutoSend: false,
+          contextInfo: {
+            kind: "web",
+            source: "study",
+            title: document.title,
+            domain: window.location.hostname,
+            url,
+            ...(context.beforeText ? { beforeText: context.beforeText } : {}),
+            ...(context.selectedText ? { selectedText: context.selectedText } : {}),
+          },
+        });
+      },
+      onHideOnce: () => {
+        try {
+          sessionStorage.setItem(FLOATING_HIDE_ONCE_KEY, "1");
+        } catch (error: unknown) {
+          void error;
+        }
+        this.unmount();
+      },
+    };
+
     this.root.render(
       <FloatingButton
         enabled={settings?.enabled ?? true}
@@ -373,6 +474,25 @@ export class FloatingButtonController {
         }}
         onOpenSidebar={() => {
           sendMessage("OPEN_SIDEBAR", { isAutoSend: false });
+        }}
+        onStudyPage={() => {
+          const url = window.location.href;
+          const prompt = browser.i18n.getMessage("chatStudyPagePrompt") || "Study this page";
+          const context = buildStudyContext(url, { preloadScreens: 2 });
+
+          sendMessage("OPEN_SIDEBAR", {
+            initialMessage: prompt,
+            isAutoSend: false,
+            contextInfo: {
+              kind: "web",
+              source: "study",
+              title: document.title,
+              domain: window.location.hostname,
+              url,
+              ...(context.beforeText ? { beforeText: context.beforeText } : {}),
+              ...(context.selectedText ? { selectedText: context.selectedText } : {}),
+            },
+          });
         }}
         onHideOnce={() => {
           try {

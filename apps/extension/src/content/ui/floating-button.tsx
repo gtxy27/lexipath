@@ -18,8 +18,9 @@ import { t as i18nT } from "../../shared/i18n";
 type EnhanceSiteMode = "manual" | "auto_blacklist" | "auto_whitelist";
 type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
 
-interface FloatingButtonProps {
+export interface FloatingButtonProps {
   onOpenSidebar?: () => void;
+  onStudyPage?: () => void | Promise<void>;
   onRunEnhanceOnce?: () => void | Promise<void>;
   onRunRewriteOnce?: () => void | Promise<void>;
   onToggleCurrentSiteRule?: () => void | Promise<void>;
@@ -46,6 +47,7 @@ interface FloatingButtonProps {
 
 export const FloatingButton: React.FC<FloatingButtonProps> = ({
   onOpenSidebar,
+  onStudyPage,
   onRunEnhanceOnce,
   onRunRewriteOnce,
   onToggleCurrentSiteRule,
@@ -195,6 +197,21 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
   const isEnhanceActive = enabled && pageEligible && !enhancePaused;
 
   const menuItems = [
+    ...(onStudyPage
+      ? [
+          {
+            key: "study",
+            icon: BookOpen,
+            label: t("chatStudyPage"),
+            hint: t("chatStudyPageDesc"),
+            color: "text-primary",
+            onClick: () => {
+              runAction(onStudyPage);
+              setIsOpen(false);
+            },
+          },
+        ]
+      : []),
     ...(pageEligible || !onRunRewriteOnce
       ? []
       : [
@@ -313,8 +330,13 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
     itemByKey.get("enhance"),
     itemByKey.get("siteRule"),
   ].filter(Boolean) as typeof menuItems;
-  const focusItems = [itemByKey.get("forgotten"), itemByKey.get("chat")].filter(Boolean) as typeof menuItems;
+  const focusItems = [
+    itemByKey.get("forgotten"),
+    itemByKey.get("study"),
+    itemByKey.get("chat"),
+  ].filter(Boolean) as typeof menuItems;
   const settingsItems = [itemByKey.get("settings"), itemByKey.get("hide")].filter(Boolean) as typeof menuItems;
+
 
   return (
     <motion.div

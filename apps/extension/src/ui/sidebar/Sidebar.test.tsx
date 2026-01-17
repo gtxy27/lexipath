@@ -46,6 +46,43 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
       if (type === "GET_CHAT_SESSIONS") {
         return {
           ok: true,
+          value: [
+            {
+              sessionId: "kw:hello:1",
+              keyword: "Hello",
+              conversationIndex: 1,
+              createdAt: 1,
+              lastAccessedAt: 10,
+              kind: "keyword",
+              label: "Hello",
+              anchorKey: "",
+            },
+            {
+              sessionId: "kw:world:1",
+              keyword: "WORLD",
+              conversationIndex: 1,
+              createdAt: 2,
+              lastAccessedAt: 9,
+              kind: "keyword",
+              label: "WORLD",
+              anchorKey: "",
+            },
+            {
+              sessionId: "chat-3",
+              keyword: "",
+              conversationIndex: 0,
+              createdAt: 3,
+              lastAccessedAt: 8,
+              kind: "general",
+              label: "General",
+              anchorKey: "",
+            },
+          ],
+        };
+      }
+      if (type === "GET_CHAT_MESSAGES") {
+        return {
+          ok: true,
           value: [],
         };
       }
@@ -89,7 +126,13 @@ describe("Sidebar", () => {
     const user = userEvent.setup();
     render(<Sidebar />);
 
-    await user.type(screen.getByPlaceholderText("chatPlaceholder"), "hi{enter}");
+    // Let init finish its initial session/history load so it can't overwrite the just-sent UI.
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith("GET_CHAT_SESSIONS", {});
+    });
+
+    await user.type(screen.getByPlaceholderText("chatPlaceholder"), "hi");
+    await user.click(screen.getByLabelText("chatSend"));
 
     await waitFor(() => {
       expect(sendMessageMock).toHaveBeenCalledWith(
@@ -99,5 +142,154 @@ describe("Sidebar", () => {
     });
 
     expect(await screen.findByText("assistantReply")).toBeInTheDocument();
+  });
+
+  it("sends a study-page prompt with backgroundInfo", async () => {
+    const user = userEvent.setup();
+
+    // Mock storage so init path sees a recent pending study-page message.
+    (browserMock.storage.local.get as any).mockImplementation(async (key: string) => {
+      if (key === "lexipath_sidebar_pending_message") {
+        return {
+          lexipath_sidebar_pending_message: {
+            nonce: "n-study",
+            text: "Study this page",
+            timestamp: Date.now(),
+            isAutoSend: false,
+            contextInfo: {
+              kind: "web",
+              source: "study",
+              title: "Example",
+              domain: "example.com",
+              url: "https://example.com/a",
+              selectedText: "1. Headline one\n2. Headline two",
+              beforeText: "Page description",
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    render(<Sidebar />);
+
+    // Wait for the draft prompt to appear.
+    const box = await screen.findByPlaceholderText("chatPlaceholder");
+    await waitFor(() => {
+      expect((box as HTMLTextAreaElement).value).toBe("Study this page");
+    });
+
+    await user.click(screen.getByLabelText("chatSend"));
+
+    await waitFor(() => {
+      const chatCall = sendMessageMock.mock.calls.find((call) => call[0] === "CHAT");
+      expect(chatCall).toBeTruthy();
+      const payload = chatCall?.[1] as any;
+      expect(payload?.message).toBe("Study this page");
+      expect(String(payload?.backgroundInfo ?? "")).toContain("Scene: Web page");
+      expect(String(payload?.backgroundInfo ?? "")).toContain("Page title:");
+    });
+  });
+
+  it("does not overwrite sessions list when selecting a word via pending keyword", async () => {
+    // Simulate a pending message that targets a keyword session.
+    // The sidebar should keep the full session list in state (so "All keywords" stays complete).
+    // Keep return types loose; Sidebar only checks `.ok` and reads `.value`.
+    sendMessageMock.mockImplementation(async (type: string, payload: unknown): Promise<any> => {
+      if (type === "GET_SETTINGS") {
+        return { ok: true, value: { theme: "system" } };
+      }
+      if (type === "GET_CHAT_SESSIONS") {
+        // Return a full list for both all-sessions and keyword lookup.
+        return {
+          ok: true,
+          value: [
+            {
+              sessionId: "kw:hello:1",
+              keyword: "Hello",
+              conversationIndex: 1,
+              createdAt: 1,
+              lastAccessedAt: 10,
+              kind: "keyword",
+              label: "Hello",
+              anchorKey: "",
+            },
+            {
+              sessionId: "kw:world:1",
+              keyword: "WORLD",
+              conversationIndex: 1,
+              createdAt: 2,
+              lastAccessedAt: 9,
+              kind: "keyword",
+              label: "WORLD",
+              anchorKey: "",
+            },
+          ],
+        };
+      }
+      if (type === "GET_CHAT_MESSAGES") {
+        // Pretend keyword history exists.
+        return {
+          ok: true,
+          value: [
+            { id: 1, sessionId: "kw:hello:1", role: "user", content: "q", timestamp: 1 },
+            { id: 2, sessionId: "kw:hello:1", role: "assistant", content: "a", timestamp: 2 },
+          ],
+        };
+      }
+      if (type === "CHAT") {
+        return {
+          ok: true,
+          value: { reply: "assistantReply", conversationId: "kw:hello:1" },
+        };
+      }
+      return { ok: true, value: null };
+    });
+
+    // Mock storage so init path sees a recent pending message.
+    (browserMock.storage.local.get as any).mockImplementation(async (key: string) => {
+      if (key === "lexipath_sidebar_pending_message") {
+        return {
+          lexipath_sidebar_pending_message: {
+            nonce: "n1",
+            text: "hi",
+            keyword: "Hello",
+            timestamp: Date.now(),
+            isAutoSend: true,
+          },
+        };
+      }
+      return {};
+    });
+
+    render(<Sidebar />);
+
+    // Open history panel.
+    const user = userEvent.setup();
+    const historyButtons = screen.getAllByTitle("chatHistory");
+    await user.click(historyButtons[0]!);
+
+    // Wait for the sessions panel to finish animating in.
+    // Wait for the sessions panel to mount.
+    await screen.findByText("chatHistory");
+
+    // Switch to "Words" type.
+    const kindTriggerText = await screen.findByText("chatHistoryAllTypes");
+    const kindTrigger = kindTriggerText.closest("button");
+    expect(kindTrigger).not.toBeNull();
+
+    // Click can fail when children have pointer-events; dispatch via DOM click.
+    kindTrigger!.click();
+
+    const wordsOption = await screen.findByRole("option", { name: "chatHistoryKindWords" });
+    (wordsOption as HTMLElement).click();
+
+    // Open the keyword popover suggestions.
+    const keywordInput = await screen.findByPlaceholderText("chatHistoryAllKeywords");
+    keywordInput.click();
+
+    // Both keywords should exist in the keyword picker.
+    expect((await screen.findAllByText("Hello")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("WORLD")).length).toBeGreaterThan(0);
   });
 });
