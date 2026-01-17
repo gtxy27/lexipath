@@ -1,7 +1,13 @@
 import React from "react";
 import { t } from "../optionsI18n";
 import type { FieldErrors, FormState } from "../optionsTypes";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
 import { LanguageTab } from "./LanguageTab";
 import { RoutingTab } from "./RoutingTab";
@@ -29,10 +35,7 @@ export function LearningTab(props: {
         onOpenChannels={onOpenChannels}
       />
 
-      <OptionsSection
-        title={t("optionsLlmContextTitle")}
-        description={t("optionsLlmContextDesc")}
-      >
+      <OptionsSection title={t("optionsLlmContextTitle")} description={t("optionsLlmContextDesc")}>
         <div className="space-y-5">
           <OptionsRow
             title={t("optionsLlmContextEnableTitle")}

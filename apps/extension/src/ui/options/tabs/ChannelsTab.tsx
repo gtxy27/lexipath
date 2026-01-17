@@ -396,6 +396,7 @@ export function ChannelsTab(props: {
                               type="password"
                               value={channel.apiKey}
                               onChange={(e) =>
+
                                 setForm({
                                   ...form,
                                   channels: form.channels.map((ch) =>

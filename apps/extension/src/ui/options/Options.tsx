@@ -7,12 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import {
-  BarChart3,
-  Languages,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
+import { BarChart3, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { ICON_URL } from "../lib/assets";
@@ -29,6 +24,7 @@ import {
 } from "./optionsLogic";
 import { t } from "./optionsI18n";
 import type { FieldErrors, FormState } from "./optionsTypes";
+import { OptionsTour } from "./OptionsTour";
 
 const log = createLogger("ui:Options");
 
@@ -43,6 +39,8 @@ export function Options(): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
 
+  const [tourOpen, setTourOpen] = useState(false);
+
   useApplyTheme(form?.theme ?? settings?.theme);
 
   async function reloadSettings() {
@@ -54,7 +52,6 @@ export function Options(): React.ReactElement {
     setSettings(response.value);
     setForm(settingsToFormState(response.value));
   }
-
 
   useEffect(() => {
     async function load() {
@@ -73,6 +70,48 @@ export function Options(): React.ReactElement {
     }
     load();
   }, []);
+
+  function clearTourQueryParam() {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("tour")) return;
+      url.searchParams.delete("tour");
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    if (!settings) return;
+
+    const hasCompleted = Boolean((settings as any).hasCompletedOnboarding);
+    const hasSeen = Boolean((settings as any).hasSeenOptionsTour);
+
+    let tourParam = false;
+    try {
+      const url = new URL(window.location.href);
+      tourParam = url.searchParams.get("tour") === "1";
+    } catch {
+      // ignore
+    }
+
+    if (tourParam && hasCompleted && !hasSeen) {
+      setTourOpen(true);
+      clearTourQueryParam();
+      return;
+    }
+
+    if (!tourParam && hasCompleted && !hasSeen) {
+      setTourOpen(true);
+      return;
+    }
+
+    if (tourParam) {
+      // Ensure we don't loop on refresh even if we won't show.
+      clearTourQueryParam();
+    }
+  }, [settings]);
 
   async function handleSave() {
     if (!form || saving) return;
@@ -151,10 +190,11 @@ export function Options(): React.ReactElement {
     );
   }
 
-
   const currentForm = form;
-  const setFormState: React.Dispatch<React.SetStateAction<FormState>> = (value) =>
-    setForm((prev) => {
+  const setFormState: React.Dispatch<React.SetStateAction<FormState>> = (
+    value: React.SetStateAction<FormState>,
+  ) =>
+    setForm((prev: FormState | null) => {
       const base = prev ?? currentForm;
       return typeof value === "function"
         ? (value as (prevState: FormState) => FormState)(base)
@@ -164,9 +204,35 @@ export function Options(): React.ReactElement {
   const hasAiConfigured = currentForm.channels.some(channelIsConfigured);
   const openChannelsTab = () => setActiveTab("channels");
 
+  async function markOptionsTourSeen() {
+    try {
+      await sendMessage("SET_SETTINGS", { hasSeenOptionsTour: true });
+    } catch {
+      // ignore
+    }
+    setSettings((prev: Settings | null) =>
+      prev ? ({ ...prev, hasSeenOptionsTour: true } as any) : prev,
+    );
+  }
+
+  const tourNavigateTab = (tab: "summary" | "learning" | "channels" | "general") => {
+    setActiveTab(tab);
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground relative font-sans">
       <Toaster />
+      <OptionsTour
+        open={tourOpen}
+        onOpenChange={(next) => {
+          setTourOpen(next);
+          if (!next) {
+            clearTourQueryParam();
+          }
+        }}
+        onMarkSeen={markOptionsTourSeen}
+        onNavigateTab={tourNavigateTab}
+      />
 
       <Tabs
         value={activeTab}
@@ -183,16 +249,37 @@ export function Options(): React.ReactElement {
             </h1>
           </div>
 
-	          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
-	            {[
-	              { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
-	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-	            ].map((tab) => (
+          <TabsList className="hidden lg:flex flex-col h-auto bg-transparent border-0 space-y-1.5 p-0">
+            {[
+              {
+                value: "summary",
+                label: t("optionsTab_summary"),
+                icon: BarChart3,
+                tourId: "options-tab-summary",
+              },
+              {
+                value: "learning",
+                label: t("optionsTab_learning"),
+                icon: Languages,
+                tourId: "options-tab-learning",
+              },
+              {
+                value: "channels",
+                label: t("optionsTab_channels"),
+                icon: Sparkles,
+                tourId: "options-tab-channels",
+              },
+              {
+                value: "general",
+                label: t("optionsTab_general"),
+                icon: SlidersHorizontal,
+                tourId: "options-tab-general",
+              },
+            ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
+                data-tour-id={tab.tourId}
                 className="w-full justify-start gap-2.5 px-3 py-2.5 rounded-lg border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
@@ -207,9 +294,7 @@ export function Options(): React.ReactElement {
                 <div
                   className={cn(
                     "h-2 w-2 rounded-full",
-                    form.enabled
-                      ? "bg-emerald-500"
-                      : "bg-muted-foreground/40",
+                    form.enabled ? "bg-emerald-500" : "bg-muted-foreground/40",
                   )}
                 />
                 <span className="text-xs text-muted-foreground">
@@ -246,59 +331,80 @@ export function Options(): React.ReactElement {
             </Button>
           </div>
 
-	          <TabsContent
-	            value="summary"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <SummaryTab />
-	          </TabsContent>
+          <TabsContent
+            value="summary"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <SummaryTab />
+          </TabsContent>
 
-	          <TabsContent
-	            value="learning"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <LearningTab
-	              form={currentForm}
-	              setForm={setFormState}
-	              errors={errors}
-	              aiEnabled={hasAiConfigured}
-	              onOpenChannels={openChannelsTab}
-	            />
-	          </TabsContent>
+          <TabsContent
+            value="learning"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <LearningTab
+              form={currentForm}
+              setForm={setFormState}
+              errors={errors}
+              aiEnabled={hasAiConfigured}
+              onOpenChannels={openChannelsTab}
+            />
+          </TabsContent>
 
-	          <TabsContent
-	            value="channels"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
-	          </TabsContent>
+          <TabsContent
+            value="channels"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <ChannelsTab form={currentForm} setForm={setFormState} errors={errors} />
+          </TabsContent>
 
-	          <TabsContent
-	            value="general"
-	            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
-	          >
-	            <GeneralTab
-	              form={currentForm}
-	              setForm={setFormState}
-	              errors={errors}
-	              aiEnabled={hasAiConfigured}
-	              onOpenChannels={openChannelsTab}
-	              onReloadSettings={reloadSettings}
-	            />
-	          </TabsContent>
-	        </div>
+          <TabsContent
+            value="general"
+            className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-400 outline-none"
+          >
+            <GeneralTab
+              form={currentForm}
+              setForm={setFormState}
+              errors={errors}
+              aiEnabled={hasAiConfigured}
+              onOpenChannels={openChannelsTab}
+              onReloadSettings={reloadSettings}
+            />
+          </TabsContent>
+        </div>
 
-	        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border px-2 pb-safe pt-2 z-50">
-	          <TabsList className="flex h-auto bg-transparent border-0 p-0">
-	            {[
-	              { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
-	              { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-	              { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-	              { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-	            ].map((tab) => (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border px-2 pb-safe pt-2 z-50">
+          <TabsList className="flex h-auto bg-transparent border-0 p-0">
+            {[
+              {
+                value: "summary",
+                label: t("optionsTab_summary"),
+                icon: BarChart3,
+                tourId: "options-tab-summary",
+              },
+              {
+                value: "learning",
+                label: t("optionsTab_learning"),
+                icon: Languages,
+                tourId: "options-tab-learning",
+              },
+              {
+                value: "channels",
+                label: t("optionsTab_channels"),
+                icon: Sparkles,
+                tourId: "options-tab-channels",
+              },
+              {
+                value: "general",
+                label: t("optionsTab_general"),
+                icon: SlidersHorizontal,
+                tourId: "options-tab-general",
+              },
+            ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
+                data-tour-id={tab.tourId}
                 className="flex-1 flex-col gap-1 py-3 rounded-lg data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground border-0 shadow-none"
               >
                 <tab.icon className="h-5 w-5" />
@@ -308,52 +414,6 @@ export function Options(): React.ReactElement {
           </TabsList>
         </div>
       </Tabs>
-
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-          .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.05); border-radius: 10px; }
-          .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.1); }
-          .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.1); }
-          .no-scrollbar::-webkit-scrollbar { display: none; }
-          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-          details > summary [data-disclosure-chevron] { transition: transform 150ms ease-out; }
-          details[open] > summary [data-disclosure-chevron] { transform: rotate(90deg); }
-
-          .lx-style-preview .lx-preview-word {
-            cursor: default;
-            display: inline-flex;
-            align-items: center;
-            border-radius: 4px;
-            padding: 0 6px;
-            border-bottom: 2px dotted var(--lx-word-color, #6366f1);
-            background: rgba(99, 102, 241, 0.12);
-            color: inherit;
-          }
-          .lx-style-preview [data-lx-style="border"] {
-            border-bottom-style: dotted;
-          }
-          .lx-style-preview [data-lx-style="dashedLine"] {
-            border-bottom-style: dashed;
-            background: rgba(99, 102, 241, 0.10);
-          }
-          .lx-style-preview [data-lx-style="weakened"] {
-            opacity: 0.85;
-            background: rgba(244, 63, 94, 0.10);
-          }
-          .lx-style-preview [data-lx-style="background"] {
-            background: rgba(34, 197, 94, 0.10);
-          }
-          .lx-style-preview [data-lx-style="textColor"] {
-            background: rgba(148, 163, 184, 0.12);
-          }
-        `,
-        }}
-      />
     </div>
   );
 }
