@@ -1,7 +1,8 @@
 import type { Cue, Settings } from '@lexipath/core';
 import browser from 'webextension-polyfill';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
-import { fetchYouTubeSubtitles, getVideoId as getYouTubeVideoId, SubtitleHttpError } from '@lexipath/subtitles';
+import { getVideoId as getYouTubeVideoId, SubtitleHttpError } from '@lexipath/subtitles';
+import { sendMessage } from '../../../shared/messages';
 import type { SubtitleFetchResult, SubtitleProvider } from './subtitle-provider';
 import { getI18nMessage } from '../../i18n';
 
@@ -151,10 +152,31 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
     }
 
     try {
-      const cues = await fetchYouTubeSubtitles(videoId, this.settings.targetLanguage, {
-        additionalParams,
+      const response = await sendMessage('FETCH_SUBTITLES', {
+        platform: 'youtube',
+        url: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+        targetLanguage: this.settings.targetLanguage,
+        ...(additionalParams ? { additionalParams } : {}),
         ...(this.isLive ? { live: true } : {}),
       });
+
+      if (!response.ok) {
+        // The background already used structured errors; keep provider behavior compatible.
+        throw new Error(response.error.message);
+      }
+
+      const cues = response.value.cues;
+      const responseLang = typeof response.value.lang === 'string' ? response.value.lang : undefined;
+      const responseStatusMessage =
+        typeof response.value.statusMessage === 'string' && response.value.statusMessage.trim()
+          ? response.value.statusMessage
+          : undefined;
+
+      const resolvedLang = responseLang ?? cues[0]?.lang ?? this.settings.targetLanguage;
+
+      if (responseStatusMessage) {
+        return { cues, lang: resolvedLang, statusMessage: responseStatusMessage };
+      }
 
       if (this.isLive) {
         const merged = this.mergeLiveCues(cues, { videoId });
@@ -247,12 +269,12 @@ export class YouTubeSubtitleProvider implements SubtitleProvider {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (this.destroyed) return '';
       try {
-        const response = await browser.runtime.sendMessage({ type: 'GET_CAPTION_REQUEST_INFO', videoId });
-        if (response && typeof response === 'object') {
-          const record = response as Record<string, unknown>;
-          if (record.success === true && typeof record.data === 'string' && record.data.trim()) {
-            this.youtubeAdditionalParams = record.data;
-            return record.data;
+        const response = await sendMessage('GET_CAPTION_REQUEST_INFO', { videoId });
+        if (response.ok) {
+          const params = response.value.params;
+          if (params.trim()) {
+            this.youtubeAdditionalParams = params;
+            return params;
           }
         }
       } catch (error: unknown) {

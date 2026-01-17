@@ -4,13 +4,21 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { Settings } from '@lexipath/core';
-import { SubtitleHttpError } from '@lexipath/subtitles';
+
 import { YouTubeSubtitleProvider } from './youtube-subtitle-provider';
 
 vi.mock('webextension-polyfill', () => ({
   default: {
     runtime: {
-      sendMessage: vi.fn(async () => ({ success: false, data: '' })),
+      sendMessage: vi.fn(async (msg: any) => {
+        if (msg?.type === 'GET_CAPTION_REQUEST_INFO') {
+          return { ok: true, value: { params: '' } };
+        }
+        if (msg?.type === 'FETCH_SUBTITLES') {
+          return { ok: true, value: { cues: [], lang: 'en' } };
+        }
+        return { ok: true, value: null };
+      }),
       onMessage: {
         addListener: vi.fn(),
         removeListener: vi.fn(),
@@ -27,11 +35,9 @@ vi.mock('@lexipath/subtitles', async () => {
   return {
     ...actual,
     getVideoId: vi.fn(() => 'dQw4w9WgXcQ'),
-    fetchYouTubeSubtitles: vi.fn(async () => []),
   };
 });
 
-import { fetchYouTubeSubtitles } from '@lexipath/subtitles';
 
 describe('YouTubeSubtitleProvider', () => {
   it('finds captions button on Shorts surfaces', async () => {
@@ -64,9 +70,20 @@ describe('YouTubeSubtitleProvider', () => {
   });
 
   it('returns a premium hint when YouTube fetch is forbidden', async () => {
-    vi.mocked(fetchYouTubeSubtitles).mockRejectedValueOnce(
-      new SubtitleHttpError('forbidden', { status: 403, statusText: 'Forbidden', url: 'https://www.youtube.com/api/timedtext' })
-    );
+    // Provider should map 403 timedtext errors to a user-friendly hint.
+    const runtime = await import('webextension-polyfill');
+    const sendMessageMock = vi.mocked(runtime.default.runtime.sendMessage);
+
+    sendMessageMock.mockImplementation(async (msg: any) => {
+      if (msg?.type === 'GET_CAPTION_REQUEST_INFO') {
+        return { ok: true, value: { params: '' } };
+      }
+      if (msg?.type === 'FETCH_SUBTITLES') {
+        // Background converts 401/403 into a user hint via statusMessage.
+        return { ok: true, value: { cues: [], lang: 'en', statusMessage: 'subtitle_requiresPremium' } };
+      }
+      return { ok: true, value: null };
+    });
 
     const provider = new YouTubeSubtitleProvider();
     await provider.init('https://www.youtube.com/watch?v=dQw4w9WgXcQ', { targetLanguage: 'en' } as Settings);
