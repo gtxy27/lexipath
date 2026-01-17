@@ -11,9 +11,28 @@ export type SubtitleContextInfo = {
   title?: string;
   timestampSec?: number;
   lines?: string[];
+  anchorId?: string;
+  url?: string;
 };
 
-export type SidebarContextInfo = SubtitleContextInfo;
+export type WebContextInfo = {
+  kind: 'web';
+  /**
+   * How this context was created.
+   * - selection: user selected text and asked for help (session stays `general`)
+   * - study: user explicitly started a page study (session becomes `web`)
+   */
+  source?: 'selection' | 'study';
+  title?: string;
+  domain?: string;
+  url?: string;
+  selectedText?: string;
+  beforeText?: string;
+  afterText?: string;
+};
+
+export type SidebarContextInfo = SubtitleContextInfo | WebContextInfo;
+
 
 export type SidebarContextSelection = {
   title: boolean;
