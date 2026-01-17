@@ -38,6 +38,8 @@ export function Options(): React.ReactElement {
   const [form, setForm] = useState<FormState | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
 
@@ -45,16 +47,22 @@ export function Options(): React.ReactElement {
 
   async function reloadSettings() {
     const response = await sendMessage("GET_SETTINGS", undefined);
-    if (!response.ok) return;
+    if (!response.ok) {
+      setLoadError(response.error.message);
+      return;
+    }
     setSettings(response.value);
     setForm(settingsToFormState(response.value));
   }
 
+
   useEffect(() => {
     async function load() {
+      setLoadError(null);
       const response = await sendMessage("GET_SETTINGS", undefined);
       if (!response.ok) {
         log.error("Failed to load settings", response.error);
+        setLoadError(response.error.message);
         setLoading(false);
         return;
       }
@@ -109,13 +117,40 @@ export function Options(): React.ReactElement {
     }
   }
 
-  if (loading || !form) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-8">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+
+  if (!form) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-8">
+        <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 text-foreground shadow-sm">
+          <div className="text-sm font-semibold">{t("optionsLoadError")}</div>
+          <div className="mt-2 text-sm text-muted-foreground break-words">
+            {loadError ?? "Unknown error"}
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => {
+                setLoading(true);
+                void reloadSettings().finally(() => setLoading(false));
+              }}
+            >
+              {t("retry")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 
   const currentForm = form;
   const setFormState: React.Dispatch<React.SetStateAction<FormState>> = (value) =>
