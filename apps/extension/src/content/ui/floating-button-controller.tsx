@@ -5,10 +5,13 @@ import { FloatingButton } from "./floating-button";
 
 // Ensure the controller stays in sync with the FloatingButton props.
 import type { FloatingButtonProps } from "./floating-button";
-import { Settings } from "@lexipath/core";
+import type { Settings } from "@lexipath/core";
+import { makeWordbookEntryId, normalizeWordbookLanguage, normalizeWordbookTerm } from "@lexipath/core";
 import { isUrlInSiteList } from "@lexipath/core/qualify";
 import { sendMessage } from "../../shared/messages";
 import { buildStudyContext } from "../web/study-context";
+import { makeWebAnchorKey } from "../../shared/chat-anchor";
+
 
 
 import {
@@ -100,6 +103,9 @@ export class FloatingButtonController {
   private onRunWebEnhanceOnce: (() => void | Promise<void>) | null = null;
   private onRunWebRewriteOnce: (() => void | Promise<void>) | null = null;
   private pageContext: PageContext = { forgottenWords: [] };
+  private rawForgottenWords: PageContext["forgottenWords"] = [];
+  private forgottenFilterToken = 0;
+  private forgottenWordbookStateCache = new Map<string, "active" | "archived" | "ignored" | null>();
   private prefersDarkMql: MediaQueryList | null = null;
   private prefersDarkHandler: (() => void) | null = null;
 
@@ -173,7 +179,22 @@ export class FloatingButtonController {
   }
 
   updatePageContext(next: Partial<PageContext>) {
-    this.pageContext = { ...this.pageContext, ...next };
+    const hasForgotten = Array.isArray(next.forgottenWords);
+    if (hasForgotten) {
+      this.rawForgottenWords = next.forgottenWords ?? [];
+    }
+
+    const displayForgotten = this.computeDisplayForgottenWords();
+    this.pageContext = {
+      ...this.pageContext,
+      ...next,
+      ...(hasForgotten ? { forgottenWords: displayForgotten } : {}),
+    };
+
+    if (hasForgotten) {
+      void this.refreshForgottenWordbookStates();
+    }
+
     this.render();
   }
 
@@ -189,6 +210,97 @@ export class FloatingButtonController {
       return;
     }
     this.applyThemeToRoot();
+    void this.refreshForgottenWordbookStates();
+    this.render();
+  }
+
+  private shouldHideArchivedIgnoredInForgotten(): boolean {
+    return this.settings?.wordbookHideArchivedIgnoredInForgotten ?? true;
+  }
+
+  private resolveWordbookLanguage(): string {
+    return normalizeWordbookLanguage(
+      this.settings?.targetLanguage ?? this.pageContext.pageLanguage ?? "en",
+    );
+  }
+
+  private computeDisplayForgottenWords(): PageContext["forgottenWords"] {
+    const raw = this.rawForgottenWords ?? [];
+    if (!this.shouldHideArchivedIgnoredInForgotten()) return raw;
+
+    const language = this.resolveWordbookLanguage();
+    return raw.filter(({ word }) => {
+      const id = makeWordbookEntryId(language as any, word);
+      const state = this.forgottenWordbookStateCache.get(id);
+      return state !== "archived" && state !== "ignored";
+    });
+  }
+
+  private mergeWordbookSources(existing: any[], incoming: any): any[] {
+    const out: any[] = [];
+    const seen = new Set<string>();
+
+    const add = (src: any) => {
+      if (!src) return;
+      const kind = String(src.kind ?? "");
+      const anchorKey = String(src.anchorKey ?? "");
+      if (!kind || !anchorKey) return;
+      const key = `${kind}\u0000${anchorKey}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(src);
+    };
+
+    add(incoming);
+    for (const src of Array.isArray(existing) ? existing : []) add(src);
+
+    out.sort((a, b) => (Number(b.capturedAt ?? 0) || 0) - (Number(a.capturedAt ?? 0) || 0));
+    return out;
+  }
+
+  private async refreshForgottenWordbookStates(): Promise<void> {
+    if (!this.shouldHideArchivedIgnoredInForgotten()) {
+      this.pageContext = {
+        ...this.pageContext,
+        forgottenWords: this.rawForgottenWords ?? [],
+      };
+      this.render();
+      return;
+    }
+
+    const language = this.resolveWordbookLanguage();
+    const ids = (this.rawForgottenWords ?? [])
+      .map(({ word }) => makeWordbookEntryId(language as any, word))
+      .filter(Boolean);
+
+    const uniqueIds = Array.from(new Set(ids));
+    const toFetch = uniqueIds.filter((id) => !this.forgottenWordbookStateCache.has(id));
+
+    const token = ++this.forgottenFilterToken;
+
+    await Promise.all(
+      toFetch.map(async (id) => {
+        try {
+          const resp = await sendMessage("WORDBOOK_GET", { id } as any);
+          if (!resp.ok) {
+            this.forgottenWordbookStateCache.set(id, null);
+            return;
+          }
+          const entry = resp.value as any;
+          const state = entry?.state ?? null;
+          this.forgottenWordbookStateCache.set(id, state);
+        } catch {
+          this.forgottenWordbookStateCache.set(id, null);
+        }
+      }),
+    );
+
+    if (token !== this.forgottenFilterToken) return;
+
+    this.pageContext = {
+      ...this.pageContext,
+      forgottenWords: this.computeDisplayForgottenWords(),
+    };
     this.render();
   }
 
@@ -376,9 +488,130 @@ export class FloatingButtonController {
       onOpenOptions: () => {
         browser.runtime.openOptionsPage();
       },
-      onOpenSidebar: () => {
-        sendMessage("OPEN_SIDEBAR", { isAutoSend: false });
-      },
+       onOpenSidebar: () => {
+         sendMessage("OPEN_SIDEBAR", { isAutoSend: false });
+       },
+        onOpenWordbook: () => {
+          sendMessage("OPEN_SIDEBAR", {
+            isAutoSend: false,
+            ui: { panel: "wordbook" },
+          } as any);
+        },
+
+       onForgottenSave: async (word) => {
+         const language = this.resolveWordbookLanguage();
+         const url = window.location.href;
+         const anchorKey = await makeWebAnchorKey(url);
+
+         const snippet = (() => {
+           const s = String(word ?? "").trim();
+           return s.length > 120 ? s.slice(0, 120) : s;
+         })();
+
+         const normalizedTerm = normalizeWordbookTerm(word);
+         const id = makeWordbookEntryId(language as any, normalizedTerm);
+         if (!normalizedTerm) return;
+
+         const now = Date.now();
+
+         const existing = await (async () => {
+           try {
+             const resp = await sendMessage("WORDBOOK_GET", { id } as any);
+             return resp.ok ? (resp.value as any) : null;
+           } catch {
+             return null;
+           }
+         })();
+
+         const nextSources = anchorKey
+           ? this.mergeWordbookSources(existing?.sources, {
+               kind: "web",
+               anchorKey,
+               capturedAt: now,
+               ...(snippet ? { snippet } : {}),
+               domain: window.location.hostname,
+               title: document.title,
+             })
+           : Array.isArray(existing?.sources)
+             ? existing.sources
+             : [];
+
+         const entry = {
+           id,
+           language,
+           term: (existing?.term ?? String(word ?? "").trim()) as string,
+           normalizedTerm,
+           state: "active",
+           tags: Array.isArray(existing?.tags) ? existing.tags : [],
+           note: typeof existing?.note === "string" ? existing.note : "",
+           sources: nextSources,
+           createdAt: typeof existing?.createdAt === "number" ? existing.createdAt : now,
+           updatedAt: now,
+         };
+
+         await sendMessage("WORDBOOK_UPSERT", { entry } as any);
+         this.forgottenWordbookStateCache.set(id, "active");
+         void this.refreshForgottenWordbookStates();
+       },
+       onForgottenIgnore: async (word) => {
+         const language = this.resolveWordbookLanguage();
+         const normalizedTerm = normalizeWordbookTerm(word);
+         const id = makeWordbookEntryId(language as any, normalizedTerm);
+         if (!normalizedTerm) return;
+
+         const existing = await sendMessage("WORDBOOK_GET", { id } as any);
+         if (!existing.ok || !existing.value) {
+           const now = Date.now();
+           await sendMessage("WORDBOOK_UPSERT", {
+             entry: {
+               id,
+               language,
+               term: String(word ?? "").trim(),
+               normalizedTerm,
+               state: "ignored",
+               tags: [],
+               note: "",
+               sources: [],
+               createdAt: now,
+               updatedAt: now,
+             },
+           } as any);
+         } else {
+           await sendMessage("WORDBOOK_SET_STATE", { id, state: "ignored" } as any);
+         }
+         this.forgottenWordbookStateCache.set(id, "ignored");
+         void this.refreshForgottenWordbookStates();
+       },
+       onForgottenArchive: async (word) => {
+         const language = this.resolveWordbookLanguage();
+         const normalizedTerm = normalizeWordbookTerm(word);
+         const id = makeWordbookEntryId(language as any, normalizedTerm);
+         if (!normalizedTerm) return;
+
+         const existing = await sendMessage("WORDBOOK_GET", { id } as any);
+         if (!existing.ok || !existing.value) {
+           const now = Date.now();
+           await sendMessage("WORDBOOK_UPSERT", {
+             entry: {
+               id,
+               language,
+               term: String(word ?? "").trim(),
+               normalizedTerm,
+               state: "archived",
+               tags: [],
+               note: "",
+               sources: [],
+               createdAt: now,
+               updatedAt: now,
+             },
+           } as any);
+         } else {
+           await sendMessage("WORDBOOK_SET_STATE", { id, state: "archived" } as any);
+         }
+         this.forgottenWordbookStateCache.set(id, "archived");
+         void this.refreshForgottenWordbookStates();
+       },
+
       onStudyPage: () => {
         const url = window.location.href;
         const prompt = browser.i18n.getMessage("chatStudyPagePrompt") || "Study this page";
@@ -475,6 +708,10 @@ export class FloatingButtonController {
         onOpenSidebar={() => {
           sendMessage("OPEN_SIDEBAR", { isAutoSend: false });
         }}
+        {...(props.onOpenWordbook ? { onOpenWordbook: props.onOpenWordbook } : {})}
+        {...(props.onForgottenSave ? { onForgottenSave: props.onForgottenSave } : {})}
+        {...(props.onForgottenIgnore ? { onForgottenIgnore: props.onForgottenIgnore } : {})}
+        {...(props.onForgottenArchive ? { onForgottenArchive: props.onForgottenArchive } : {})}
         onStudyPage={() => {
           const url = window.location.href;
           const prompt = browser.i18n.getMessage("chatStudyPagePrompt") || "Study this page";

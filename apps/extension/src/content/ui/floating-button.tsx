@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Archive,
   BookOpen,
+  BookmarkPlus,
   Eye,
   EyeOff,
   Languages,
@@ -20,6 +22,8 @@ type SiteRuleStatus = "enabled" | "disabled" | "not_in_whitelist";
 
 export interface FloatingButtonProps {
   onOpenSidebar?: () => void;
+  onOpenWordbook?: () => void | Promise<void>;
+
   onStudyPage?: () => void | Promise<void>;
   onRunEnhanceOnce?: () => void | Promise<void>;
   onRunRewriteOnce?: () => void | Promise<void>;
@@ -28,6 +32,12 @@ export interface FloatingButtonProps {
   onSetTabEnhancePaused?: (paused: boolean) => void | Promise<void>;
   onOpenOptions?: () => void | Promise<void>;
   onHideOnce?: () => void | Promise<void>;
+
+  // Forgotten list quick actions.
+  onForgottenSave?: (word: string) => void | Promise<void>;
+  onForgottenIgnore?: (word: string) => void | Promise<void>;
+  onForgottenArchive?: (word: string) => void | Promise<void>;
+
   enabled?: boolean;
   initialEnabled?: boolean;
   enhanceSiteMode?: EnhanceSiteMode;
@@ -45,8 +55,10 @@ export interface FloatingButtonProps {
   pageLanguage?: string;
 }
 
+
 export const FloatingButton: React.FC<FloatingButtonProps> = ({
   onOpenSidebar,
+  onOpenWordbook,
   onStudyPage,
   onRunEnhanceOnce,
   onRunRewriteOnce,
@@ -55,6 +67,9 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
   onSetTabEnhancePaused,
   onOpenOptions,
   onHideOnce,
+  onForgottenSave,
+  onForgottenIgnore,
+  onForgottenArchive,
   enabled: enabledProp,
   initialEnabled = true,
   enhanceSiteMode = "manual",
@@ -290,6 +305,17 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       },
     },
     {
+      key: "wordbook",
+      icon: BookmarkPlus,
+      label: t("wordbookTitle"),
+      hint: t("wordbookTitleDesc"),
+      color: "text-primary",
+      onClick: () => {
+        runAction(onOpenWordbook);
+        setIsOpen(false);
+      },
+    },
+    {
       key: "chat",
       icon: PanelRightClose,
       label: t("chatTitle"),
@@ -300,6 +326,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
         setIsOpen(false);
       },
     },
+
     {
       key: "settings",
       icon: Settings2,
@@ -332,9 +359,11 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
   ].filter(Boolean) as typeof menuItems;
   const focusItems = [
     itemByKey.get("forgotten"),
+    itemByKey.get("wordbook"),
     itemByKey.get("study"),
     itemByKey.get("chat"),
   ].filter(Boolean) as typeof menuItems;
+
   const settingsItems = [itemByKey.get("settings"), itemByKey.get("hide")].filter(Boolean) as typeof menuItems;
 
 
@@ -527,19 +556,40 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             >
               <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
               <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-3">
                 <div className="text-[13px] font-semibold tracking-tight">
                   {t("floatingCommandCenterForgotten")}
                 </div>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 rounded-xl hover:bg-muted/40"
-                  onClick={() => setForgottenOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {onOpenWordbook ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 whitespace-nowrap"
+                      title={t("wordbookTitle")}
+                      aria-label={t("wordbookTitle")}
+                      onClick={() => {
+                        runAction(onOpenWordbook);
+                        setForgottenOpen(false);
+                      }}
+                    >
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      {t("wordbookTitle")}
+                    </Button>
+                  ) : null}
+
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 rounded-xl hover:bg-muted/40"
+                    onClick={() => setForgottenOpen(false)}
+                    title={t("floatingCommandCenterClose")}
+                    aria-label={t("floatingCommandCenterClose")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {forgottenWords.length === 0 ? (
@@ -550,23 +600,60 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 <div className="max-h-[260px] overflow-auto pr-1">
                   <div className="flex flex-col gap-2">
                     {forgottenWords.map((item) => (
-                      <div
-                        key={item.word}
-                        className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-medium truncate">
-                            {item.word}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {t("floatingCommandCenterForgottenMeta", [
-                              String(item.familiarity),
-                              String(item.encounters),
-                            ])}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                       <div
+                         key={item.word}
+                         className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                       >
+                         <div className="min-w-0 flex-1">
+                           <div className="text-[13px] font-medium truncate">{item.word}</div>
+                           <div className="text-[11px] text-muted-foreground">
+                             {t("floatingCommandCenterForgottenMeta", [
+                               String(item.familiarity),
+                               String(item.encounters),
+                             ])}
+                           </div>
+                         </div>
+
+                         <div className="flex items-center gap-1 shrink-0">
+                           <Button
+                             type="button"
+                             size="icon"
+                             variant="ghost"
+                             className="h-8 w-8 rounded-xl hover:bg-muted/40"
+                             title={t("wordbookActionSave")}
+                             aria-label={t("wordbookActionSave")}
+                             onClick={() => runAction(() => onForgottenSave?.(item.word))}
+                           >
+                             <BookmarkPlus className="h-4 w-4" />
+                           </Button>
+
+                           <Button
+                             type="button"
+                             size="icon"
+                             variant="ghost"
+                             className="h-8 w-8 rounded-xl hover:bg-muted/40"
+                             title={t("wordbookActionIgnore")}
+                             aria-label={t("wordbookActionIgnore")}
+                             onClick={() => runAction(() => onForgottenIgnore?.(item.word))}
+                           >
+                             <EyeOff className="h-4 w-4" />
+                           </Button>
+
+                           <Button
+                             type="button"
+                             size="icon"
+                             variant="ghost"
+                             className="h-8 w-8 rounded-xl hover:bg-muted/40"
+                             title={t("wordbookActionArchive")}
+                             aria-label={t("wordbookActionArchive")}
+                             onClick={() => runAction(() => onForgottenArchive?.(item.word))}
+                           >
+                             <Archive className="h-4 w-4" />
+                           </Button>
+                         </div>
+                       </div>
+                     ))}
+
                   </div>
                 </div>
               )}

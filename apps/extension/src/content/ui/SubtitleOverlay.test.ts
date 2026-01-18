@@ -4,6 +4,10 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { sendMessageMock } = vi.hoisted(() => ({
+  sendMessageMock: vi.fn(),
+}));
+
 vi.mock('webextension-polyfill', () => ({
   default: {
     i18n: {
@@ -19,6 +23,15 @@ vi.mock('webextension-polyfill', () => ({
       },
     },
   },
+}));
+
+vi.mock('../../shared/messages', () => ({
+  sendMessage: sendMessageMock,
+}));
+
+vi.mock('../../shared/chat-anchor', () => ({
+  makeSubtitleAnchorKey: vi.fn(async () => 'ak_subtitle'),
+  makeWebAnchorKey: vi.fn(async () => 'ak_web'),
 }));
 
 import { SubtitleOverlay, getVideoContainerSelector, type SubtitleLine } from './SubtitleOverlay';
@@ -39,6 +52,29 @@ describe('SubtitleOverlay', () => {
   let videoContainer: HTMLDivElement;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+
+    const wordbookEntries = new Map<string, any>();
+
+    sendMessageMock.mockImplementation(async (type: string, payload: any) => {
+      if (type === 'GET_SETTINGS') {
+        return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+      }
+      if (type === 'WORDBOOK_GET') {
+        return { ok: true, value: wordbookEntries.get(payload?.id) ?? null };
+      }
+      if (type === 'WORDBOOK_UPSERT') {
+        const entry = payload?.entry ?? null;
+        if (entry?.id) wordbookEntries.set(entry.id, entry);
+        return { ok: true, value: entry };
+      }
+      if (type === 'WORDBOOK_DELETE') {
+        if (payload?.id) wordbookEntries.delete(payload.id);
+        return { ok: true, value: { ok: true } };
+      }
+      return { ok: true, value: null };
+    });
+
     // Setup DOM
     document.body.innerHTML = '';
 
@@ -336,4 +372,61 @@ describe('SubtitleOverlay', () => {
       expect(bilibiliContainer.querySelector('#lexipath-subtitle-overlay')).toBeTruthy();
     });
   });
-});
+
+  describe('word card: wordbook integration', () => {
+    it('renders save/unsave button and does not touch familiarity messages', async () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      overlay.showWordCard(
+        {
+          word: 'test',
+          definition: 'def',
+          example: 'example sentence',
+        },
+        new DOMRect(10, 10, 10, 10),
+        { pinned: true },
+      );
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const wordbookButton = shadow?.querySelector(
+        '.lexipath-wordcard__wordbook-button',
+      ) as HTMLButtonElement | null;
+
+      expect(wordbookButton).toBeTruthy();
+
+      // Wait for initial WORDBOOK_GET to resolve and enable the button.
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(wordbookButton?.disabled).toBe(false); 
+      expect(wordbookButton?.getAttribute('aria-label')).toBe('Save'); 
+ 
+      wordbookButton?.click(); 
+ 
+      // Allow async click handler to complete. 
+      await new Promise((r) => setTimeout(r, 0)); 
+      await new Promise((r) => setTimeout(r, 0)); 
+
+      const typesAfterSave = sendMessageMock.mock.calls.map((call) => call[0]); 
+      expect(typesAfterSave).toContain('WORDBOOK_UPSERT'); 
+      expect(typesAfterSave).not.toContain('BATCH_GET_WORD_FAMILIARITY'); 
+ 
+      expect(wordbookButton?.getAttribute('aria-label')).toBe('Unsave'); 
+      expect(wordbookButton?.classList.contains('is-saved')).toBe(true); 
+ 
+      const stateBadge = shadow?.querySelector('.lexipath-wordcard__wordbook-state') as HTMLElement | null; 
+      expect(stateBadge?.textContent).toBe('active'); 
+ 
+      wordbookButton?.click(); 
+      await new Promise((r) => setTimeout(r, 0)); 
+      await new Promise((r) => setTimeout(r, 0)); 
+ 
+      const typesAfterUnsave = sendMessageMock.mock.calls.map((call) => call[0]); 
+      expect(typesAfterUnsave).toContain('WORDBOOK_DELETE'); 
+      expect(wordbookButton?.getAttribute('aria-label')).toBe('Save'); 
+      expect(wordbookButton?.classList.contains('is-saved')).toBe(false); 
+    }); 
+  }); 
+}); 

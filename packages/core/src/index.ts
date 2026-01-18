@@ -17,3 +17,4 @@ export * from './prompting';
 export * from './cache-key';
 export * from './routing';
 export * from './text';
+export * from './wordbook';

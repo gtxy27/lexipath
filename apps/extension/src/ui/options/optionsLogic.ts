@@ -348,6 +348,19 @@ export function settingsToFormState(settings: Settings): FormState {
       Number.isFinite(settings.llmContextSentences)
         ? Math.max(0, Math.min(6, Math.trunc(settings.llmContextSentences)))
         : 1,
+    wordbookSaveSnippetOnCapture:
+      typeof settings.wordbook?.saveSnippetOnCapture === "boolean"
+        ? settings.wordbook.saveSnippetOnCapture
+        : true,
+    wordbookMaxSourcesPerEntry:
+      typeof settings.wordbook?.maxSourcesPerEntry === "number" &&
+      Number.isFinite(settings.wordbook.maxSourcesPerEntry)
+        ? Math.max(1, Math.min(3, Math.trunc(settings.wordbook.maxSourcesPerEntry)))
+        : 2,
+    wordbookHideArchivedIgnoredInForgotten:
+      typeof settings.wordbookHideArchivedIgnoredInForgotten === "boolean"
+        ? settings.wordbookHideArchivedIgnoredInForgotten
+        : true,
 	    enabled: settings.enabled,
 	    autoEnhance: settings.autoEnhance,
 	    webEnhanceMode: settings.webEnhanceMode,
@@ -716,6 +729,11 @@ export function buildSettingsPatch(
     theme: form.theme,
     promptStyle: form.promptStyle,
     llmContextSentences: form.llmContextSentences,
+    wordbook: {
+      saveSnippetOnCapture: Boolean(form.wordbookSaveSnippetOnCapture),
+      maxSourcesPerEntry: Math.max(1, Math.min(3, Math.trunc(form.wordbookMaxSourcesPerEntry))),
+    },
+    wordbookHideArchivedIgnoredInForgotten: Boolean(form.wordbookHideArchivedIgnoredInForgotten),
 	    enabled: form.enabled,
 	    autoEnhance: form.autoEnhance,
 	    webEnhanceMode: form.webEnhanceMode,
