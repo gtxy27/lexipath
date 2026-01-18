@@ -19,7 +19,7 @@ if (elementProto && typeof elementProto.releasePointerCapture !== "function") {
   elementProto.releasePointerCapture = () => {};
 }
 
-const { browserMock, sendMessageMock } = vi.hoisted(() => {
+const { browserMock, sendMessageMock, chatStreamMock } = vi.hoisted(() => {
   return {
     browserMock: {
       i18n: {
@@ -86,13 +86,25 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
           value: [],
         };
       }
-      if (type === "CHAT") {
-        return {
-          ok: true,
-          value: { reply: "assistantReply", conversationId: "c1" },
-        };
-      }
       return { ok: true, value: null };
+    }),
+    chatStreamMock: vi.fn((
+      request: any,
+      handlers: {
+        onChunk?: (delta: string) => void;
+        onThinking?: (delta: string) => void;
+        onDone?: (result: { reply?: string; conversationId?: string; thinking?: string }) => void;
+        onError?: (err: Error) => void;
+      },
+    ) => {
+      // Simulate a complete stream finishing quickly.
+      Promise.resolve().then(() => {
+        handlers.onDone?.({
+          reply: "assistantReply",
+          conversationId: request?.conversationId,
+        });
+      });
+      return { cancel: vi.fn() };
     }),
   };
 });
@@ -103,6 +115,10 @@ vi.mock("webextension-polyfill", () => ({
 
 vi.mock("../../shared/messages", () => ({
   sendMessage: sendMessageMock,
+}));
+
+vi.mock("../../shared/chat-stream", () => ({
+  chatStream: chatStreamMock,
 }));
 
 import { Sidebar } from "./Sidebar";
@@ -135,10 +151,8 @@ describe("Sidebar", () => {
     await user.click(screen.getByLabelText("chatSend"));
 
     await waitFor(() => {
-      expect(sendMessageMock).toHaveBeenCalledWith(
-        "CHAT",
-        expect.objectContaining({ message: "hi", conversationId: expect.any(String) }),
-      );
+      const chatCall = chatStreamMock.mock.calls.find((call) => call?.[0]?.message === "hi");
+      expect(chatCall?.[0]).toEqual(expect.objectContaining({ message: "hi", conversationId: expect.any(String) }));
     });
 
     expect(await screen.findByText("assistantReply")).toBeInTheDocument();
@@ -182,12 +196,12 @@ describe("Sidebar", () => {
     await user.click(screen.getByLabelText("chatSend"));
 
     await waitFor(() => {
-      const chatCall = sendMessageMock.mock.calls.find((call) => call[0] === "CHAT");
+      const chatCall = chatStreamMock.mock.calls.find((call) => call?.[0]?.message === "Study this page");
       expect(chatCall).toBeTruthy();
-      const payload = chatCall?.[1] as any;
-      expect(payload?.message).toBe("Study this page");
-      expect(String(payload?.backgroundInfo ?? "")).toContain("Scene: Web page");
-      expect(String(payload?.backgroundInfo ?? "")).toContain("Page title:");
+      const request = chatCall?.[0] as any;
+      expect(request?.message).toBe("Study this page");
+      expect(String(request?.backgroundInfo ?? "")).toContain("Scene: Web page");
+      expect(String(request?.backgroundInfo ?? "")).toContain("Page title:");
     });
   });
 

@@ -2,12 +2,19 @@ import type { SidebarContextInfo } from './types';
 
 type PendingSidebarMessage = {
   nonce?: string;
-  text: string;
+  // Optional: allows UI-only opens (e.g., open Wordbook tab) without pre-filling the chat input.
+  text?: string;
   keyword?: string;
   contextInfo?: SidebarContextInfo;
+  ui?: {
+    panel?: 'chat' | 'history' | 'wordbook';
+    historyTab?: 'sessions' | 'terms';
+  };
+
   timestamp: number;
   isAutoSend?: boolean;
 };
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
@@ -19,12 +26,29 @@ export function parsePendingSidebarMessage(raw: unknown): PendingSidebarMessage 
   const text = typeof raw.text === 'string' ? raw.text : '';
   const timestamp = typeof raw.timestamp === 'number' && Number.isFinite(raw.timestamp) ? raw.timestamp : 0;
 
-  if (!text.trim()) return null;
   if (!timestamp) return null;
+
 
   const nonce = typeof raw.nonce === 'string' && raw.nonce.trim() ? raw.nonce.trim() : undefined;
   const keyword = typeof raw.keyword === 'string' && raw.keyword.trim() ? raw.keyword.trim() : undefined;
   const isAutoSend = typeof raw.isAutoSend === 'boolean' ? raw.isAutoSend : undefined;
+
+  const uiRaw = raw.ui;
+  const ui = (() => {
+    if (!isRecord(uiRaw)) return undefined;
+    const panel =
+      uiRaw.panel === 'chat' || uiRaw.panel === 'history' || uiRaw.panel === 'wordbook'
+        ? (uiRaw.panel as 'chat' | 'history' | 'wordbook')
+        : undefined;
+    const historyTab =
+      uiRaw.historyTab === 'sessions' || uiRaw.historyTab === 'terms'
+        ? (uiRaw.historyTab as 'sessions' | 'terms')
+        : undefined;
+
+    if (!panel && !historyTab) return undefined;
+    return { ...(panel ? { panel } : {}), ...(historyTab ? { historyTab } : {}) };
+  })();
+
 
   const contextInfoRaw = raw.contextInfo;
   const contextInfo = (() => {
@@ -81,12 +105,16 @@ export function parsePendingSidebarMessage(raw: unknown): PendingSidebarMessage 
 
   })();
 
+  if (!text.trim() && !ui && !keyword && !contextInfo) return null;
+
   return {
     ...(nonce ? { nonce } : {}),
-    text,
+    ...(text ? { text } : {}),
     ...(keyword ? { keyword } : {}),
     ...(contextInfo ? { contextInfo } : {}),
+    ...(ui ? { ui } : {}),
     timestamp,
     ...(isAutoSend !== undefined ? { isAutoSend } : {}),
   };
+
 }

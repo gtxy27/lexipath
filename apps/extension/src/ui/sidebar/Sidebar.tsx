@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import browser from "webextension-polyfill";
-import type { ChatResponse, ChatSessionKind, Theme } from "@lexipath/core";
+import type { ChatResponse, ChatSessionKind, Theme, WordbookEntry } from "@lexipath/core";
+import {
+  makeWordbookEntryId,
+  normalizeWordbookLanguage,
+  normalizeWordbookTerm,
+} from "@lexipath/core";
 
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
@@ -8,15 +13,17 @@ import { chatStream } from "../../shared/chat-stream";
 import { makeKeywordSessionId, normalizeChatKeyword } from "../../shared/chat-session-id";
 import { MessageContent } from "./MessageContent";
 import { Button } from "../components/ui/button";
+import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Popover, PopoverAnchor, PopoverContent } from "../components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Textarea } from "../components/ui/textarea";
 import {
+  Archive,
   ArrowDown,
   BookOpen,
   ChevronDown,
@@ -41,7 +48,9 @@ import {
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApplyTheme } from "../lib/theme";
+import { useToast } from "../components/ui/use-toast";
 import { t } from "../../shared/i18n";
+
 
 
 import type {
@@ -74,15 +83,148 @@ function makeRandomChatSessionId(): string {
 
 
 export function Sidebar(): React.ReactElement {
+  const { toast } = useToast();
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+
   const [inputValue, setInputValue] = useState("");
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [showSessions, setShowSessions] = useState(false);
+  const [activePanel, setActivePanel] = useState<"chat" | "history" | "wordbook">("chat");
   const [historyTab, setHistoryTab] = useState<"sessions" | "terms">("sessions");
+  const [wordbookQuery, setWordbookQuery] = useState("");
+  const [wordbookStateFilter, setWordbookStateFilter] = useState<"all" | "active" | "archived" | "ignored">("all");
+  const [wordbookSort, setWordbookSort] = useState<"updated_desc" | "term_asc">("updated_desc");
+  const [wordbookEntries, setWordbookEntries] = useState<WordbookEntry[]>([]);
+  const [wordbookSelectedId, setWordbookSelectedId] = useState<string | null>(null);
+  const [wordbookSelectedIds, setWordbookSelectedIds] = useState<Set<string>>(() => new Set());
+
+  type WordbookExplainState = {
+    status: "idle" | "loading" | "loaded" | "error";
+    data?: {
+      word: string;
+      phonetic?: string;
+      definition: string;
+      translation?: string;
+      difficulty?: string;
+    };
+  };
+  const [wordbookExplainById, setWordbookExplainById] = useState<Record<string, WordbookExplainState>>(
+    {},
+  );
+  const wordbookExplainByIdRef = useRef<Record<string, WordbookExplainState>>({});
+  useEffect(() => {
+    wordbookExplainByIdRef.current = wordbookExplainById;
+  }, [wordbookExplainById]);
+
+  const [wordbookDraftNote, setWordbookDraftNote] = useState("");
+  const [wordbookBulkMode, setWordbookBulkMode] = useState(false);
+  const [wordbookDraftTags, setWordbookDraftTags] = useState<string[]>([]);
+  const [wordbookDraftTagInput, setWordbookDraftTagInput] = useState("");
+  const [wordbookDraftState, setWordbookDraftState] = useState<WordbookEntry["state"]>("active");
+
+  const [wordbookAddOpen, setWordbookAddOpen] = useState(false);
+  const [wordbookAddTerm, setWordbookAddTerm] = useState("");
+  const [wordbookAddLanguage, setWordbookAddLanguage] = useState("en");
+  const [wordbookAddStatus, setWordbookAddStatus] = useState<"idle" | "saving">(
+    "idle",
+  );
+
+  const [wordbookLastSavedAt, setWordbookLastSavedAt] = useState<number | null>(null);
+  const [wordbookSaveStatus, setWordbookSaveStatus] = useState<"idle" | "dirty" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const wordbookSaveErrorRef = useRef<string>("");
+
+  const [isWordbookLoading, setIsWordbookLoading] = useState(false);
+
+  const fetchWordbookDefinition = useCallback(
+    async (entry: Pick<WordbookEntry, "id" | "term" | "language">, options?: { force?: boolean }) => {
+      const term = String(entry.term ?? "").trim();
+      if (!term) return;
+
+      const cached = wordbookExplainByIdRef.current[entry.id];
+      if (!options?.force && (cached?.status === "loading" || cached?.status === "loaded")) return;
+
+      setWordbookExplainById((prev) => ({
+        ...prev,
+        [entry.id]: { status: "loading", ...(prev[entry.id]?.data ? { data: prev[entry.id]!.data } : {}) },
+      }));
+
+      try {
+        const response = await sendMessage("EXPLAIN_WORD", { word: term, sourceLang: entry.language });
+        if (!response.ok) {
+          setWordbookExplainById((prev) => ({
+            ...prev,
+            [entry.id]: { status: "error", data: { word: term, definition: t("wordCard_definitionFailed") } },
+          }));
+          return;
+        }
+
+        const value = response.value as any;
+        const rawDefinition = typeof value?.definition === "string" ? value.definition : "";
+        const rawTranslation = typeof value?.translation === "string" ? value.translation : "";
+        const definition =
+          rawDefinition.trim()
+            ? rawDefinition
+            : rawTranslation.trim()
+              ? rawTranslation
+              : t("wordCard_definitionUnavailable");
+        const word = typeof value?.word === "string" && value.word.trim() ? value.word : term;
+
+        setWordbookExplainById((prev) => ({
+          ...prev,
+          [entry.id]: {
+            status: "loaded",
+            data: {
+              word,
+              ...(typeof value?.phonetic === "string" && value.phonetic.trim()
+                ? { phonetic: value.phonetic }
+                : {}),
+              definition,
+              ...(rawTranslation.trim() ? { translation: rawTranslation } : {}),
+              ...(typeof value?.difficulty === "string" && value.difficulty.trim()
+                ? { difficulty: value.difficulty }
+                : {}),
+            },
+          },
+        }));
+      } catch {
+        setWordbookExplainById((prev) => ({
+          ...prev,
+          [entry.id]: { status: "error", data: { word: term, definition: t("wordCard_definitionError") } },
+        }));
+      }
+    },
+    [],
+  );
+
+
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    const checkNarrow = () => {
+      try {
+        setIsNarrow(window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768);
+      } catch {
+        setIsNarrow(false);
+      }
+    };
+    checkNarrow();
+    window.addEventListener("resize", checkNarrow);
+    return () => window.removeEventListener("resize", checkNarrow);
+  }, []);
+
+  useEffect(() => {
+    if (activePanel !== "wordbook") return;
+    if (!wordbookSelectedId) return;
+    const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+    if (!entry) return;
+    void fetchWordbookDefinition(entry);
+  }, [activePanel, fetchWordbookDefinition, wordbookEntries, wordbookSelectedId]);
+
   const [sessionKindFilter, setSessionKindFilter] = useState<"all" | ChatSession["kind"]>("all");
   // Selected keyword filter (normalized). Keeps matching stable across casing/whitespace.
   const [keywordFilterKey, setKeywordFilterKey] = useState<string | null>(null);
@@ -171,7 +313,7 @@ export function Sidebar(): React.ReactElement {
   const isLoading = Boolean(loadingSessionId);
   
   useDebouncedSearch({
-    query: showSessions && historyTab === "terms" ? searchQuery : "",
+    query: activePanel === "history" && historyTab === "terms" ? searchQuery : "",
     delayMs: 300,
     search: async (query) => {
       const response = await sendMessage("SEARCH_MESSAGES", { query });
@@ -182,10 +324,32 @@ export function Sidebar(): React.ReactElement {
     onDone: () => setIsSearching(false),
   });
 
+  useDebouncedSearch({
+    query: activePanel === "wordbook" ? wordbookQuery : "",
+    delayMs: 250,
+    search: async (query) => {
+      const response = await sendMessage("WORDBOOK_LIST", {
+        query,
+        state: wordbookStateFilter,
+        sort: wordbookSort,
+        limit: 500,
+      });
+      return response.ok ? (response.value as WordbookEntry[]) : [];
+    },
+    onStart: () => setIsWordbookLoading(true),
+    onResult: (result) => setWordbookEntries(result),
+    onDone: () => setIsWordbookLoading(false),
+  });
+
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
-  const isAtBottom = useScrollAtBottom({ viewportRef: scrollViewportRef, disabled: showSessions });
+  const isAtBottom = useScrollAtBottom({ viewportRef: scrollViewportRef, disabled: activePanel !== "chat" });
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+
+
   const streamCancelRef = useRef<null | (() => void)>(null);
   const forceNewSessionNextSendRef = useRef(false);
 
@@ -238,6 +402,24 @@ export function Sidebar(): React.ReactElement {
     [persistSavedTerms, savedTerms],
   );
 
+  const normalizeWordbookTag = (tag: string) => tag.trim().toLowerCase();
+
+  const applyWordbookTag = useCallback(() => {
+    const raw = wordbookDraftTagInput.trim();
+    if (!raw) return;
+    const clipped = raw.length > 30 ? raw.slice(0, 30) : raw;
+    const normalized = normalizeWordbookTag(clipped);
+    const existing = new Set(wordbookDraftTags.map((t) => normalizeWordbookTag(t)));
+    if (existing.has(normalized)) {
+      setWordbookDraftTagInput("");
+      return;
+    }
+    setWordbookDraftTags((prev) => [...prev, clipped]);
+    setWordbookDraftTagInput("");
+    setWordbookSaveStatus("dirty");
+  }, [wordbookDraftTagInput, wordbookDraftTags]);
+
+
   const removeSavedTerm = useCallback(
     async (term: string) => {
       const normalized = normalizeSavedTerm(term);
@@ -259,6 +441,312 @@ export function Sidebar(): React.ReactElement {
       setSessions(response.value);
     }
   }, []);
+
+  const loadWordbook = useCallback(
+    async (options?: { allowWhileLoading?: boolean }) => {
+      const allowWhileLoading = options?.allowWhileLoading ?? false;
+      if (isWordbookLoading && !allowWhileLoading) return;
+
+      setIsWordbookLoading(true);
+      try {
+        const response = await sendMessage("WORDBOOK_LIST", {
+          query: wordbookQuery,
+          state: wordbookStateFilter,
+          sort: wordbookSort,
+          limit: 500,
+        });
+        if (response.ok) {
+          const next = response.value as WordbookEntry[];
+          setWordbookEntries(next);
+          // Drop any selected ids that no longer exist after reload/filter.
+          setWordbookSelectedIds((prev) => {
+            if (prev.size === 0) return prev;
+            const allowed = new Set(next.map((e) => e.id));
+            const filtered = new Set<string>();
+            prev.forEach((id) => {
+              if (allowed.has(id)) filtered.add(id);
+            });
+            return filtered;
+          });
+        } else {
+          setWordbookEntries([]);
+          setWordbookSelectedIds(new Set());
+        }
+      } finally {
+        setIsWordbookLoading(false);
+      }
+    },
+    [isWordbookLoading, wordbookQuery, wordbookSort, wordbookStateFilter],
+  );
+
+  const selectWordbookEntry = useCallback((entry: WordbookEntry) => {
+    setWordbookSelectedId(entry.id);
+    setWordbookDraftNote(entry.note ?? "");
+    setWordbookDraftTags(Array.isArray(entry.tags) ? entry.tags : []);
+    setWordbookDraftTagInput("");
+    setWordbookDraftState(entry.state);
+    setWordbookSaveStatus("idle");
+    setWordbookLastSavedAt(entry.updatedAt ?? null);
+  }, []);
+
+  const wordbookStateLabel = useCallback((state: WordbookEntry["state"]) => {
+    switch (state) {
+      case "active":
+        return t("wordbookStateActive");
+      case "archived":
+        return t("wordbookStateArchived");
+      case "ignored":
+        return t("wordbookStateIgnored");
+      default:
+        return String(state);
+    }
+  }, []);
+
+  const wordbookStateBadgeClassName = useCallback(
+    (state: WordbookEntry["state"]) => {
+      switch (state) {
+        case "active":
+          return "border-emerald-200/60 bg-emerald-50/60 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300";
+        case "archived":
+          return "border-slate-200/60 bg-slate-50/60 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/20 dark:text-slate-300";
+        case "ignored":
+          return "border-amber-200/60 bg-amber-50/60 text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300";
+        default:
+          return "border-border bg-muted text-muted-foreground";
+      }
+    },
+    [],
+  );
+
+  const handleWordbookAdd = useCallback(async () => {
+    if (wordbookAddStatus !== "idle") return;
+
+    const normalizedTerm = normalizeWordbookTerm(wordbookAddTerm);
+    if (!normalizedTerm) {
+      toast({ title: t("wordbookAddMissing"), variant: "destructive" });
+      return;
+    }
+
+    const language = normalizeWordbookLanguage(wordbookAddLanguage);
+    const id = makeWordbookEntryId(language as any, normalizedTerm);
+
+    setWordbookAddStatus("saving");
+    try {
+      const existing = await sendMessage("WORDBOOK_GET", { id } as any);
+      if (existing.ok && existing.value) {
+        const entry = existing.value as unknown as WordbookEntry;
+        selectWordbookEntry(entry);
+        toast({ title: t("wordbookAddExists") });
+        setWordbookAddOpen(false);
+        setWordbookAddTerm("");
+        return;
+      }
+
+      const now = Date.now();
+      const entry = {
+        id,
+        language,
+        term: wordbookAddTerm.trim(),
+        normalizedTerm,
+        state: "active",
+        tags: [],
+        note: "",
+        sources: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const upserted = await sendMessage("WORDBOOK_UPSERT", { entry } as any);
+      if (!upserted.ok) {
+        toast({
+          title: t("wordbookAddError", upserted.error.message),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const saved = upserted.value as unknown as WordbookEntry;
+      selectWordbookEntry(saved);
+      toast({ title: t("wordbookAddSuccess") });
+      setWordbookAddOpen(false);
+      setWordbookAddTerm("");
+
+      void loadWordbook({ allowWhileLoading: true });
+    } finally {
+      setWordbookAddStatus("idle");
+    }
+  }, [
+    loadWordbook,
+    selectWordbookEntry,
+    toast,
+    wordbookAddLanguage,
+    wordbookAddStatus,
+    wordbookAddTerm,
+  ]);
+
+  const handleWordbookBulkState = useCallback(
+    async (state: "archived" | "ignored") => {
+      if (wordbookSelectedIds.size === 0) return;
+
+      const ids = Array.from(wordbookSelectedIds);
+      const response = await sendMessage("WORDBOOK_BULK_SET_STATE", { ids, state } as any);
+      if (!response.ok) {
+        toast({ title: response.error.message, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: t("wordbookBulkDone") });
+      setWordbookSelectedIds(new Set());
+      void loadWordbook({ allowWhileLoading: true });
+    },
+    [loadWordbook, toast, wordbookSelectedIds],
+  );
+
+  const handleWordbookBulkRemove = useCallback(
+    async () => {
+      if (wordbookSelectedIds.size === 0) return;
+
+      const ids = Array.from(wordbookSelectedIds);
+      const ok = window.confirm(t("wordbookConfirmRemove", [String(ids.length)]));
+      if (!ok) return;
+
+      // No dedicated bulk-delete message; do a conservative sequential delete.
+      for (const id of ids) {
+        const resp = await sendMessage("WORDBOOK_DELETE", { id } as any);
+        if (!resp.ok) {
+          toast({ title: resp.error.message, variant: "destructive" });
+          return;
+        }
+      }
+
+      toast({ title: t("wordbookBulkDone") });
+      setWordbookSelectedIds(new Set());
+      void loadWordbook({ allowWhileLoading: true });
+    },
+    [loadWordbook, toast, wordbookSelectedIds],
+  );
+
+  const saveWordbookEdits = useCallback(
+    async (options?: { source?: "manual" | "autosave" }) => {
+      const source = options?.source ?? "manual";
+
+      if (wordbookDraftTagInput.trim()) {
+        applyWordbookTag();
+        return;
+      }
+
+      const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+      if (!entry) return;
+
+      const nextTags = Array.from(
+        new Map(
+          wordbookDraftTags
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .map((t) => [normalizeWordbookTag(t), t.length > 30 ? t.slice(0, 30) : t] as const),
+        ).values(),
+      );
+
+      const nextNote = (wordbookDraftNote ?? "").slice(0, 2000);
+      const nextState = wordbookDraftState;
+
+      const isDirty =
+        nextNote !== (entry.note ?? "") ||
+        nextState !== entry.state ||
+        JSON.stringify(nextTags) !== JSON.stringify(entry.tags ?? []);
+
+      if (!isDirty && source !== "manual") return;
+
+      setWordbookSaveStatus("saving");
+      wordbookSaveErrorRef.current = "";
+
+      const updated: WordbookEntry = {
+        ...entry,
+        note: nextNote,
+        tags: nextTags,
+        state: nextState,
+        updatedAt: Date.now(),
+      };
+
+      const resp = await sendMessage("WORDBOOK_UPSERT", { entry: updated });
+      if (!resp.ok) {
+        wordbookSaveErrorRef.current = resp.error.message;
+        setWordbookSaveStatus("error");
+        return;
+      }
+
+      setWordbookEntries((prev) => prev.map((e) => (e.id === resp.value.id ? resp.value : e)));
+      setWordbookLastSavedAt(resp.value.updatedAt);
+      setWordbookSaveStatus("saved");
+
+      // Refresh ordering (e.g., updated_desc) while keeping the UI responsive.
+      void loadWordbook({ allowWhileLoading: true });
+
+      window.setTimeout(() => {
+        setWordbookSaveStatus((current) => (current === "saved" ? "idle" : current));
+      }, 1500);
+    },
+    [
+      applyWordbookTag,
+      loadWordbook,
+      wordbookDraftNote,
+      wordbookDraftState,
+      wordbookDraftTagInput,
+      wordbookDraftTags,
+      wordbookEntries,
+      wordbookSelectedId,
+    ],
+  );
+
+  useEffect(() => {
+    if (activePanel !== "wordbook") return;
+
+    // Ensure we have something to show when query is empty (debounced search no-ops).
+    if (!wordbookQuery.trim()) {
+      void loadWordbook({ allowWhileLoading: true });
+    }
+  }, [activePanel, loadWordbook, wordbookQuery, wordbookSort, wordbookStateFilter]);
+
+
+  useEffect(() => {
+    const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+    if (!entry) return;
+
+    // Only initialize drafts when selection changes.
+    setWordbookDraftNote(entry.note ?? "");
+    setWordbookDraftTags(Array.isArray(entry.tags) ? entry.tags : []);
+    setWordbookDraftTagInput("");
+    setWordbookDraftState(entry.state);
+    setWordbookSaveStatus("idle");
+    setWordbookLastSavedAt(entry.updatedAt ?? null);
+  }, [wordbookEntries, wordbookSelectedId]);
+
+  useEffect(() => {
+    const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+    if (!entry) return;
+
+    const nextNote = (wordbookDraftNote ?? "").slice(0, 2000);
+    const nextTags = wordbookDraftTags.map((t) => t.trim()).filter(Boolean);
+    const isDirty =
+      nextNote !== (entry.note ?? "") ||
+      wordbookDraftState !== entry.state ||
+      JSON.stringify(nextTags) !== JSON.stringify(entry.tags ?? []);
+
+    setWordbookSaveStatus((prev) => (prev === "saving" ? prev : isDirty ? "dirty" : "idle"));
+  }, [wordbookDraftNote, wordbookDraftState, wordbookDraftTags, wordbookEntries, wordbookSelectedId]);
+
+  useEffect(() => {
+    const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+    if (!entry) return;
+    if (wordbookSaveStatus !== "dirty") return;
+
+    const timer = window.setTimeout(() => {
+      void saveWordbookEdits({ source: "autosave" });
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [saveWordbookEdits, wordbookDraftNote, wordbookDraftState, wordbookDraftTags, wordbookEntries, wordbookSaveStatus, wordbookSelectedId]);
+
 
   const fetchChatMessages = useCallback(async (sessionId: string, limit = 80): Promise<ChatMessage[] | null> => {
     // Loading an unbounded history can be slow with large sessions; keep UI responsive.
@@ -324,6 +812,9 @@ export function Sidebar(): React.ReactElement {
         const response = await sendMessage("GET_SETTINGS", undefined);
         if (response.ok) {
           setTheme(response.value.theme);
+          setWordbookAddLanguage(
+            normalizeWordbookLanguage((response.value as any)?.targetLanguage),
+          );
         }
       } catch (error: unknown) {
         log.warn("Failed to load sidebar theme from settings; using default theme", { message: getErrorMessage(error) });
@@ -358,7 +849,7 @@ export function Sidebar(): React.ReactElement {
     setConversationId(undefined);
     setError(null);
     setLoadingSessionId(null);
-    setShowSessions(false);
+    setActivePanel("chat");
     setExpandedThinkingById({});
     setDraftContextSelection(DEFAULT_CONTEXT_SELECTION);
     setDraftContextInfo(null);
@@ -755,7 +1246,7 @@ export function Sidebar(): React.ReactElement {
       await browser.storage.local.remove("lexipath_sidebar_pending_message").catch(() => {});
       if (pendingProcessTokenRef.current !== processToken) return;
 
-      const pendingText = parsed.text;
+      const pendingText = typeof parsed.text === "string" ? parsed.text : "";
       const pendingContextInfo = parsed.contextInfo ?? null;
 
       // Whole-page study opt-in: the content script attaches a bounded excerpt (when available)
@@ -772,7 +1263,7 @@ export function Sidebar(): React.ReactElement {
         setExpandedThinkingById({});
         setError(null);
         setLoadingSessionId(null);
-        setShowSessions(false);
+        setActivePanel("chat");
 
         forceNewSessionNextSendRef.current = true;
 
@@ -789,18 +1280,43 @@ export function Sidebar(): React.ReactElement {
         setDraftContextSelection(getDefaultSelectionForContext(pendingContextInfo));
       }
 
-      if (!parsed.isAutoSend) {
-        setInputValue(pendingText);
-        inputRef.current?.focus();
-        return;
-      }
+       if (!parsed.isAutoSend) {
+         // UI-only open (e.g. open wordbook/history) should not clobber the chat input.
+         if (pendingText.trim()) {
+           setInputValue(pendingText);
+           inputRef.current?.focus();
+         }
+
+          const ui = parsed.ui;
+          if (ui?.panel === "history") {
+            void loadSessions();
+            setActivePanel("history");
+            setHistoryTab(ui.historyTab === "terms" ? "terms" : "sessions");
+            setSessionKindFilter("all");
+            setKeywordFilterKey(null);
+            setKeywordFilterQuery("");
+            setIsKeywordPickerOpen(false);
+            setSearchQuery("");
+            setIsSearching(false);
+            setSearchResults([]);
+          } else if (ui?.panel === "wordbook") {
+            setActivePanel("wordbook");
+            void loadWordbook({ allowWhileLoading: true });
+          } else if (ui?.panel === "chat") {
+            setActivePanel("chat");
+          }
+
+
+
+         return;
+       }
 
        const keyword = (parsed.keyword ?? "").trim();
 
        // Detach any existing UI stream to avoid leaking "loading" across sessions.
        detachUiStream();
        setError(null);
-       setShowSessions(false);
+       setActivePanel("chat");
        setExpandedThinkingById({});
 
        if (keyword) {
@@ -845,7 +1361,7 @@ export function Sidebar(): React.ReactElement {
         ...(pendingContextInfo ? { contextInfo: pendingContextInfo } : {}),
       });
     },
-    [applySessionHistory, detachUiStream, fetchChatMessages, hasAnsweredLastPrompt, loadSessions, sendChatText],
+     [applySessionHistory, detachUiStream, fetchChatMessages, hasAnsweredLastPrompt, loadSessions, loadWordbook, sendChatText],
   );
 
   useEffect(() => {
@@ -887,12 +1403,12 @@ export function Sidebar(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    if (showSessions) return;
+    if (activePanel !== "chat") return;
     if (!isAtBottom) return;
 
     const isStreaming = messages.some((msg) => Boolean(msg.isStreaming));
     scrollToBottom(isStreaming ? "auto" : "smooth");
-  }, [isAtBottom, messages, scrollToBottom, showSessions]);
+  }, [activePanel, isAtBottom, messages, scrollToBottom]);
 
   const handleSend = useCallback(() => {
     const isWebStudy =
@@ -953,7 +1469,7 @@ export function Sidebar(): React.ReactElement {
   useAutoResizeTextarea({
     textareaRef: inputRef,
     value: inputValue,
-    dependencies: [showSessions],
+    dependencies: [activePanel],
     minHeightPx: 44,
     maxHeightPx: 176,
   });
@@ -1054,11 +1570,11 @@ export function Sidebar(): React.ReactElement {
       <header className="relative flex items-center justify-between px-5 py-4 bg-background border-b border-border overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 dark:from-primary/5 via-transparent to-transparent opacity-70 dark:opacity-50" />
         <div className="flex items-center gap-3">
-          {showSessions ? (
+          {activePanel !== "chat" ? (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setShowSessions(false)}
+              onClick={() => setActivePanel("chat")}
               className="h-9 w-9 rounded-xl hover:bg-muted/30"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -1071,7 +1587,11 @@ export function Sidebar(): React.ReactElement {
           )}
           <div className="relative">
             <h1 className="text-base font-semibold tracking-tight">
-              {showSessions ? t("chatHistory") || "History" : t("chatTitle")}
+              {activePanel === "history"
+                ? t("chatHistory") || "History"
+                : activePanel === "wordbook"
+                  ? t("wordbookTitle")
+                  : t("chatTitle")}
             </h1>
           </div>
         </div>
@@ -1089,31 +1609,49 @@ export function Sidebar(): React.ReactElement {
             variant="ghost"
             size="icon"
             onClick={() => {
-              const nextShowSessions = !showSessions;
-              void loadSessions();
-              setShowSessions(nextShowSessions);
-              if (nextShowSessions) {
-                        setHistoryTab("sessions");
-                        setSessionKindFilter("all");
-                        setKeywordFilterKey(null);
-                        setKeywordFilterQuery("");
-                        setIsKeywordPickerOpen(false);
-
-                setSearchQuery("");
-                setIsSearching(false);
-                setSearchResults([]);
+              const opening = activePanel !== "wordbook";
+              setActivePanel(opening ? "wordbook" : "chat");
+              if (opening) {
+                void loadWordbook({ allowWhileLoading: true });
               }
-
             }}
-            title={t("chatHistory") || "History"}
+            title={t("wordbookTitle")}
             className={cn(
               "h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30",
-              showSessions && "bg-muted/30 text-foreground"
+              activePanel === "wordbook" && "bg-muted/30 text-foreground",
             )}
           >
-            <History className="h-4 w-4" />
+            <BookOpen className="h-4 w-4" />
           </Button>
-          {messages.length > 0 && !showSessions && (
+           <Button
+             variant="ghost"
+             size="icon"
+             onClick={() => {
+               const opening = activePanel !== "history";
+               void loadSessions();
+               setActivePanel(opening ? "history" : "chat");
+               if (opening) {
+                 setHistoryTab("sessions");
+                 setSessionKindFilter("all");
+                 setKeywordFilterKey(null);
+                 setKeywordFilterQuery("");
+                 setIsKeywordPickerOpen(false);
+ 
+                 setSearchQuery("");
+                 setIsSearching(false);
+                 setSearchResults([]);
+               }
+             }}
+             title={t("chatHistory") || "History"}
+             className={cn(
+               "h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/30",
+               activePanel === "history" && "bg-muted/30 text-foreground"
+             )}
+           >
+             <History className="h-4 w-4" />
+           </Button>
+
+          {messages.length > 0 && activePanel === "chat" && (
             <Button
               variant="ghost"
               size="icon"
@@ -1129,8 +1667,9 @@ export function Sidebar(): React.ReactElement {
       </header>
 
       <div className="flex-1 relative z-10 overflow-hidden flex flex-col">
+
         <AnimatePresence mode="wait">
-          {showSessions ? (
+          {activePanel !== "chat" ? (
             <motion.div
               key="sessions"
               initial={{ opacity: 0, x: -20 }}
@@ -1138,244 +1677,416 @@ export function Sidebar(): React.ReactElement {
               exit={{ opacity: 0, x: -20 }}
               className="flex-1 overflow-hidden flex flex-col"
             >
-              <div className="px-4 py-3 border-b border-border bg-muted/15">
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant={historyTab === "sessions" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => {
-                      setHistoryTab("sessions");
-                      setSearchQuery("");
-                      setIsSearching(false);
-                      setSearchResults([]);
-                    }}
-                    className="rounded-xl"
-                  >
-                    {t("chatHistory")}
+               <div className="px-4 py-3 border-b border-border bg-muted/15">
+                 {activePanel === "history" ? (
+                   <>
+                     <div className="flex items-center gap-2">
+                       <Button
+                         type="button"
+                         variant={historyTab === "sessions" ? "secondary" : "ghost"}
+                         size="sm"
+                         onClick={() => {
+                           setHistoryTab("sessions");
+                           setSearchQuery("");
+                           setIsSearching(false);
+                           setSearchResults([]);
+                         }}
+                         className="rounded-xl"
+                       >
+                         {t("chatHistory")}
+                       </Button>
+                       <Button
+                         type="button"
+                         variant={historyTab === "terms" ? "secondary" : "ghost"}
+                         size="sm"
+                         onClick={() => {
+                           setHistoryTab("terms");
+                           setKeywordFilterKey(null);
+                         }}
+                         className="rounded-xl"
+                       >
+                         {t("chatSearch")}
+                       </Button>
+                     </div>
+ 
+                     {historyTab === "sessions" && (
+                       <div className="mt-3 flex items-center gap-2">
+                         <Select
+                           value={sessionKindFilter}
+                           onValueChange={(value) => {
+                             const next = value as "all" | ChatSession["kind"];
+                             setSessionKindFilter(next);
+ 
+                             if (next !== "keyword") {
+                               setKeywordFilterKey(null);
+                               setKeywordFilterQuery("");
+                               setIsKeywordPickerOpen(false);
+                             }
+                           }}
+                         >
+                           <SelectTrigger className="h-10 rounded-xl bg-card shadow-sm flex-1">
+                             <SelectValue placeholder={t("chatHistoryAllTypes")} />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="all">{t("chatHistoryAllTypes")}</SelectItem>
+                             <SelectItem value="keyword">{t("chatHistoryKindWords")}</SelectItem>
+                             <SelectItem value="web">{t("chatHistoryKindWeb")}</SelectItem>
+                             <SelectItem value="subtitle">{t("chatHistoryKindVideo")}</SelectItem>
+                             <SelectItem value="general">{t("chatHistoryKindGeneral")}</SelectItem>
+                           </SelectContent>
+                         </Select>
+ 
+                         {sessionKindFilter === "keyword" && keywordOptions.length > 0 && (
+                           <Popover open={isKeywordPickerOpen} onOpenChange={setIsKeywordPickerOpen}>
+                             <PopoverAnchor asChild>
+                               <div ref={keywordPickerAnchorRef} className="relative flex-1">
+                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                 <Input
+                                   value={keywordFilterQuery}
+                                   onChange={(e) => {
+                                     const next = e.target.value;
+                                     setKeywordFilterQuery(next);
+ 
+                                     const normalized = normalizeChatKeyword(next);
+                                     if (!normalized) {
+                                       setKeywordFilterKey(null);
+                                       return;
+                                     }
+ 
+                                     const exact = keywordOptions.find((opt) => opt.key === normalized);
+                                     if (exact) {
+                                       setKeywordFilterKey(exact.key);
+                                       return;
+                                     }
+ 
+                                     if (keywordFilterKey) setKeywordFilterKey(null);
+                                   }}
+                                   onFocus={() => setIsKeywordPickerOpen(true)}
+                                   onKeyDown={(e) => {
+                                     if (e.key === "Escape") setIsKeywordPickerOpen(false);
+                                   }}
+                                   placeholder={t("chatHistoryAllKeywords")}
+                                   className="pl-10 pr-10 h-10 rounded-xl text-sm bg-card shadow-sm"
+                                 />
+                                 {(keywordFilterKey || keywordFilterQuery.trim()) && (
+                                   <button
+                                     type="button"
+                                     onClick={(e) => {
+                                       e.preventDefault();
+                                       e.stopPropagation();
+                                       setKeywordFilterKey(null);
+                                       setKeywordFilterQuery("");
+                                       setIsKeywordPickerOpen(false);
+                                     }}
+                                     title={t("chatClearKeywordFilter")}
+                                     className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center justify-center"
+                                   >
+                                     <X className="h-4 w-4" />
+                                   </button>
+                                 )}
+                               </div>
+                             </PopoverAnchor>
+                             <PopoverContent
+                               align="start"
+                               className="p-2 w-[var(--radix-popover-trigger-width)]"
+                               onOpenAutoFocus={(event) => event.preventDefault()}
+                               onInteractOutside={(event) => {
+                                 const target = event.target as Node | null;
+                                 if (target && keywordPickerAnchorRef.current?.contains(target)) {
+                                   event.preventDefault();
+                                 }
+                               }}
+                             >
+                               <div className="flex flex-col">
+                                 <div className="px-2 py-1 text-xs text-muted-foreground">
+                                   {t("chatHistoryKeywordSearchPlaceholder")}
+                                 </div>
+                                 <div className="max-h-56 overflow-auto">
+                                   {!keywordFilterQuery.trim() && (
+                                     <button
+                                       type="button"
+                                       onClick={() => {
+                                         setKeywordFilterKey(null);
+                                         setKeywordFilterQuery("");
+                                         setIsKeywordPickerOpen(false);
+                                       }}
+                                       className={cn(
+                                         "w-full px-3 py-2 text-left text-sm rounded-lg hover:bg-muted/30",
+                                         !keywordFilterKey && "bg-muted/30",
+                                       )}
+                                     >
+                                       {t("chatHistoryAllKeywords")}
+                                     </button>
+                                   )}
+ 
+                                   {keywordPickerOptions.slice(0, 50).map((opt) => (
+                                     <button
+                                       key={opt.key}
+                                       type="button"
+                                       onClick={() => {
+                                         setSessionKindFilter("keyword");
+                                         setKeywordFilterKey(opt.key);
+                                         setKeywordFilterQuery(opt.label);
+                                         setIsKeywordPickerOpen(false);
+                                       }}
+                                       className={cn(
+                                         "w-full px-3 py-2 text-left text-sm rounded-lg hover:bg-muted/30",
+                                         keywordFilterKey === opt.key && "bg-muted/30",
+                                       )}
+                                     >
+                                       {opt.label}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                         )}
+                       </div>
+                     )}
+ 
+                     {historyTab === "terms" && (
+                       <>
+                         <div className="mt-3 relative">
+                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                           <Input
+                             value={searchQuery}
+                             onChange={(e) => {
+                               const next = e.target.value;
+                               setSearchQuery(next);
+                               if (!next.trim()) {
+                                 setIsSearching(false);
+                                 setSearchResults([]);
+                               }
+                             }}
+                             placeholder={t("chatSearchPlaceholder") || "Search terms..."}
+                             className="pl-10 pr-12 h-10 rounded-xl text-sm bg-card shadow-sm"
+                           />
+                           {isSearching ? (
+                             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                           ) : (
+                             <Button
+                               type="button"
+                               variant="ghost"
+                               size="icon"
+                               onClick={() => void addSavedTerm(searchQuery)}
+                               disabled={!searchQuery.trim()}
+                               title={t("chatSaveTerm")}
+                               className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                             >
+                               <BookmarkPlus className="h-4 w-4" />
+                             </Button>
+                           )}
+                         </div>
+ 
+                         {savedTerms.length > 0 && (
+                           <div className="mt-3 flex flex-wrap items-center gap-2">
+                             {savedTerms.map((term) => (
+                               <div
+                                 key={term}
+                                 className="flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs shadow-sm"
+                               >
+                                 <button
+                                   type="button"
+                                   onClick={() => setSearchQuery(term)}
+                                   className="max-w-[180px] truncate font-medium"
+                                   title={term}
+                                 >
+                                   {term}
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => void removeSavedTerm(term)}
+                                   className="text-muted-foreground hover:text-foreground"
+                                   aria-label={t("chatRemoveSavedTerm")}
+                                   title={t("chatRemove")}
+                                 >
+                                   <X className="h-3 w-3" />
+                                 </button>
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                       </>
+                     )}
+                  </>
+                 ) : (
+                    <>
+                      <div className="mt-3 flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant={wordbookBulkMode ? "secondary" : "ghost"}
+                            className="h-10 rounded-xl px-3"
+                            onClick={() => {
+                              setWordbookBulkMode((v) => {
+                                const next = !v;
+                                if (!next) setWordbookSelectedIds(new Set());
+                                return next;
+                              });
+                            }}
+                          >
+                            {t("wordbookBulk")}
+                          </Button>
 
-                  </Button>
-                  <Button
-                      type="button"
-                      variant={historyTab === "terms" ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => {
-                        setHistoryTab("terms");
-                        setKeywordFilterKey(null);
-                      }}
-                    className="rounded-xl"
-                  >
-                    {t("chatSearch")}
-                  </Button>
-                </div>
+                          {wordbookBulkMode && (
+                            <>
+                              <Badge
+                                variant="outline"
+                                className="h-10 px-3 border-border bg-muted text-muted-foreground rounded-xl"
+                              >
+                                {t("wordbookSelectedCount", [String(wordbookSelectedIds.size)])}
+                              </Badge>
 
-                {historyTab === "sessions" && (
-                  <div className="mt-3 flex items-center gap-2">
-                      <Select
-                        value={sessionKindFilter}
-                        onValueChange={(value) => {
-                          const next = value as "all" | ChatSession["kind"];
-                          setSessionKindFilter(next);
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-xl"
+                                disabled={wordbookSelectedIds.size === 0}
+                                title={t("wordbookBulkArchive")}
+                                onClick={() => void handleWordbookBulkState("archived")}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
 
-                          if (next !== "keyword") {
-                            setKeywordFilterKey(null);
-                            setKeywordFilterQuery("");
-                            setIsKeywordPickerOpen(false);
-                          }
-                        }}
-                      >
-                      <SelectTrigger className="h-10 rounded-xl bg-card shadow-sm flex-1">
-                        <SelectValue placeholder={t("chatHistoryAllTypes")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("chatHistoryAllTypes")}</SelectItem>
-                        <SelectItem value="keyword">{t("chatHistoryKindWords")}</SelectItem>
-                        <SelectItem value="web">{t("chatHistoryKindWeb")}</SelectItem>
-                        <SelectItem value="subtitle">{t("chatHistoryKindVideo")}</SelectItem>
-                        <SelectItem value="general">{t("chatHistoryKindGeneral")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-xl"
+                                disabled={wordbookSelectedIds.size === 0}
+                                title={t("wordbookBulkIgnore")}
+                                onClick={() => void handleWordbookBulkState("ignored")}
+                              >
+                                <EyeOff className="h-4 w-4" />
+                              </Button>
 
-                    {sessionKindFilter === "keyword" && keywordOptions.length > 0 && (
-                      <Popover open={isKeywordPickerOpen} onOpenChange={setIsKeywordPickerOpen}>
-                        <PopoverAnchor asChild>
-                          <div ref={keywordPickerAnchorRef} className="relative flex-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive"
+                                disabled={wordbookSelectedIds.size === 0}
+                                title={t("wordbookBulkRemove")}
+                                onClick={() => void handleWordbookBulkRemove()}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+
+                          <div className="flex-1" />
+
+                          <Popover open={wordbookAddOpen} onOpenChange={setWordbookAddOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="h-10 rounded-xl px-3 gap-2 whitespace-nowrap"
+                                title={t("wordbookAddButton")}
+                              >
+                                <PlusCircle className="h-4 w-4" />
+                                <span>{t("wordbookAddButton")}</span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-[320px] rounded-xl p-4">
+                              <div className="text-sm font-semibold">{t("wordbookAddTitle")}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {t("wordbookAddHint")}
+                              </div>
+                              <div className="mt-3 flex items-center gap-2">
+                                <Input
+                                  value={wordbookAddTerm}
+                                  onChange={(e) => setWordbookAddTerm(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void handleWordbookAdd();
+                                    }
+                                  }}
+                                  placeholder={t("wordbookAddPlaceholder")}
+                                  className="h-10 rounded-xl bg-background shadow-sm"
+                                />
+                                <Button
+                                  type="button"
+                                  className="h-10 rounded-xl"
+                                  disabled={wordbookAddStatus !== "idle"}
+                                  onClick={() => void handleWordbookAdd()}
+                                >
+                                  {wordbookAddStatus === "saving" ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <PlusCircle className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                              value={keywordFilterQuery}
+                              value={wordbookQuery}
                               onChange={(e) => {
                                 const next = e.target.value;
-                                setKeywordFilterQuery(next);
-
-                                // Live filter: exact match applies immediately. Otherwise, keep showing
-                                // suggestions without switching the active filter until the user selects.
-                                const normalized = normalizeChatKeyword(next);
-                                if (!normalized) {
-                                  setKeywordFilterKey(null);
-                                  return;
+                                setWordbookQuery(next);
+                                if (!next.trim()) {
+                                  void loadWordbook({ allowWhileLoading: true });
                                 }
-
-                                const exact = keywordOptions.find((opt) => opt.key === normalized);
-                                if (exact) {
-                                  setKeywordFilterKey(exact.key);
-                                  return;
-                                }
-
-                                // If the user is typing and previously had a filter selected, clear it so
-                                // the list isn't "stuck" while the user searches.
-                                if (keywordFilterKey) setKeywordFilterKey(null);
                               }}
-                              onFocus={() => setIsKeywordPickerOpen(true)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Escape") setIsKeywordPickerOpen(false);
-                              }}
-                              placeholder={t("chatHistoryAllKeywords")}
-                              className="pl-10 pr-10 h-10 rounded-xl text-sm bg-card shadow-sm"
+                              placeholder={t("wordbookTitleDesc")}
+                              className="pl-10 h-10 rounded-xl text-sm bg-card shadow-sm"
                             />
-                             {(keywordFilterKey || keywordFilterQuery.trim()) && (
-                               <button
-                                 type="button"
-                                 onClick={(e) => {
-                                   e.preventDefault();
-                                   e.stopPropagation();
-                                   setKeywordFilterKey(null);
-                                   setKeywordFilterQuery("");
-                                   setIsKeywordPickerOpen(false);
-                                 }}
-                                title={t("chatClearKeywordFilter")}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 flex items-center justify-center"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
+                            {isWordbookLoading && (
+                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                             )}
                           </div>
-                        </PopoverAnchor>
-                        <PopoverContent
-                          align="start"
-                          className="p-2 w-[var(--radix-popover-trigger-width)]"
-                          onOpenAutoFocus={(event) => event.preventDefault()}
-                          onInteractOutside={(event) => {
-                            const target = event.target as Node | null;
-                            if (target && keywordPickerAnchorRef.current?.contains(target)) {
-                              // Clicking the input again should not dismiss the picker.
-                              event.preventDefault();
-                            }
-                          }}
-                        >
-                          <div className="flex flex-col">
-                            <div className="px-2 py-1 text-xs text-muted-foreground">{t("chatHistoryKeywordSearchPlaceholder")}</div>
-                            <div className="max-h-56 overflow-auto">
-                               {!keywordFilterQuery.trim() && (
-                                 <button
-                                   type="button"
-                                   onClick={() => {
-                                     setKeywordFilterKey(null);
-                                     setKeywordFilterQuery("");
-                                     setIsKeywordPickerOpen(false);
-                                   }}
-                                   className={cn(
-                                     "w-full px-3 py-2 text-left text-sm rounded-lg hover:bg-muted/30",
-                                     !keywordFilterKey && "bg-muted/30"
-                                   )}
-                                 >
-                                   {t("chatHistoryAllKeywords")}
-                                 </button>
-                               )}
 
-                               {keywordPickerOptions.slice(0, 50).map((opt) => (
-                                 <button
-                                   key={opt.key}
-                                   type="button"
-                                   onClick={() => {
-                                     setSessionKindFilter("keyword");
-                                     setKeywordFilterKey(opt.key);
-                                     setKeywordFilterQuery(opt.label);
-                                     setIsKeywordPickerOpen(false);
-                                   }}
-                                   className={cn(
-                                     "w-full px-3 py-2 text-left text-sm rounded-lg hover:bg-muted/30",
-                                     keywordFilterKey === opt.key && "bg-muted/30"
-                                   )}
-                                 >
-                                   {opt.label}
-                                 </button>
-                               ))}
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  </div>
-                )}
-
-                {historyTab === "terms" && (
-                  <>
-                    <div className="mt-3 relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={searchQuery}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setSearchQuery(next);
-                          if (!next.trim()) {
-                            setIsSearching(false);
-                            setSearchResults([]);
-                          }
-                        }}
-                        placeholder={t("chatSearchPlaceholder") || "Search terms..."}
-                        className="pl-10 pr-12 h-10 rounded-xl text-sm bg-card shadow-sm"
-                      />
-                      {isSearching ? (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => void addSavedTerm(searchQuery)}
-                          disabled={!searchQuery.trim()}
-                          title={t("chatSaveTerm")}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30"
-                        >
-                          <BookmarkPlus className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {savedTerms.length > 0 && (
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {savedTerms.map((term) => (
-                          <div
-                            key={term}
-                            className="flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs shadow-sm"
+                          <Select
+                            value={wordbookStateFilter}
+                            onValueChange={(v) => {
+                              setWordbookStateFilter(v as any);
+                              void loadWordbook({ allowWhileLoading: true });
+                            }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => setSearchQuery(term)}
-                              className="max-w-[180px] truncate font-medium"
-                              title={term}
-                            >
-                              {term}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void removeSavedTerm(term)}
-                              className="text-muted-foreground hover:text-foreground"
-                              aria-label={t("chatRemoveSavedTerm")}
-                              title={t("chatRemove")}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
+                            <SelectTrigger className="h-10 rounded-xl bg-card shadow-sm w-full sm:w-[140px]">
+                              <SelectValue placeholder={t("wordbookStateAll")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">{t("wordbookStateAll")}</SelectItem>
+                              <SelectItem value="active">{t("wordbookStateActive")}</SelectItem>
+                              <SelectItem value="archived">{t("wordbookStateArchived")}</SelectItem>
+                              <SelectItem value="ignored">{t("wordbookStateIgnored")}</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <Select
+                            value={wordbookSort}
+                            onValueChange={(v) => {
+                              setWordbookSort(v as any);
+                              void loadWordbook({ allowWhileLoading: true });
+                            }}
+                          >
+                            <SelectTrigger className="h-10 rounded-xl bg-card shadow-sm w-full sm:w-[140px]">
+                              <SelectValue placeholder={t("wordbookSortUpdated")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="updated_desc">{t("wordbookSortUpdated")}</SelectItem>
+                              <SelectItem value="term_asc">{t("wordbookSortAZ")}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    )}
-                  </>
+                    </>
                 )}
               </div>
               <ScrollArea className="flex-1 px-4">
                 <div className="flex flex-col gap-2 py-4">
-                  {historyTab === "terms" ? (
+                  {activePanel === "history" && historyTab === "terms" ? (
+
                     searchQuery.trim() ? (
                       searchResults.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -1384,34 +2095,29 @@ export function Sidebar(): React.ReactElement {
                         </div>
                       ) : (
                         searchResults.map((result) => (
-                            <button
-                              key={result.id}
-                          onClick={() => {
-                            detachUiStream();
-                            const session = sessions.find((s) => s.sessionId === result.sessionId);
-                            if (session) hydrateContextFromSession(session);
-                            void loadMessages(result.sessionId);
-                            setShowSessions(false);
-                            setHistoryTab("sessions");
-                          }}
-                              className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
-                            >
-                              <div className="flex items-center justify-between w-full mb-1">
-                                <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
-                                  {result.role === 'user' ? t('user') || 'User' : t('assistant') || 'AI'}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(result.timestamp).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <p className="text-sm line-clamp-2 text-muted-foreground">
-                                {result.content}
-                              </p>
-                              <div className="text-xs text-muted-foreground/70">
-                                {result.sessionId.split('-').slice(0, 2).join('-')}
-                              </div>
-                            </button>
-                          ))
+                          <button
+                            key={result.id}
+                            onClick={() => {
+                              detachUiStream();
+                              const session = sessions.find((s) => s.sessionId === result.sessionId);
+                              if (session) hydrateContextFromSession(session);
+                              void loadMessages(result.sessionId);
+                              setActivePanel("chat");
+                              setHistoryTab("sessions");
+
+                            }}
+                            className="flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border bg-card hover:bg-muted/30 shadow-sm"
+                          >
+                            <div className="flex items-center justify-between w-full mb-1">
+                              <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+                                {result.role === 'user' ? t('user') || 'User' : t('assistant') || 'AI'}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">{new Date(result.timestamp).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-sm line-clamp-2 text-muted-foreground">{result.content}</p>
+                            <div className="text-xs text-muted-foreground/70">{result.sessionId.split('-').slice(0, 2).join('-')}</div>
+                          </button>
+                        ))
                       )
                     ) : (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -1419,7 +2125,627 @@ export function Sidebar(): React.ReactElement {
                         <p className="text-sm font-medium">{t("chatSearchPlaceholder") || "Search terms..."}</p>
                       </div>
                     )
+                  ) : activePanel === "wordbook" ? (
+
+                    isNarrow ? (
+                      // Mobile: list OR detail.
+                      wordbookSelectedId ? (
+                        (() => {
+                          const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+                          if (!entry) {
+                            return (
+                              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                                <BookOpen className="h-12 w-12 opacity-20 mb-4" />
+                                <p className="text-sm font-medium">{t("wordbookTitle")}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{t("wordbookNoEntrySelected")}</p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="flex flex-col gap-3">
+                              <div className="flex items-center justify-between">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setWordbookSelectedId(null)}
+                                  className="h-9 w-9 rounded-xl hover:bg-muted/30"
+                                  title={t("wordbookBack")}
+                                >
+                                  <ChevronLeft className="h-5 w-5" />
+                                </Button>
+
+                                <div className="flex items-center gap-2">
+                                  {(() => {
+                                    const label =
+                                      wordbookSaveStatus === "saving"
+                                        ? t("optionsSaving")
+                                        : wordbookSaveStatus === "saved"
+                                          ? t("optionsSaveSuccess")
+                                          : wordbookSaveStatus === "error"
+                                            ? t("optionsSaveError", wordbookSaveErrorRef.current || "Error")
+                                            : wordbookSaveStatus === "dirty"
+                                              ? t("wordbookUnsaved")
+                                              : "";
+
+                                    return label ? (
+                                      <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+                                        {label}
+                                      </Badge>
+                                    ) : null;
+                                  })()}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border border-border bg-card shadow-sm p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-base font-semibold truncate">{entry.term}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{entry.language}</div>
+                                  </div>
+                                  <Select
+                                    value={wordbookDraftState}
+                                    onValueChange={(v) => {
+                                      setWordbookDraftState(v as any);
+                                      setWordbookSaveStatus("dirty");
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9 rounded-xl bg-background shadow-sm w-[120px]">
+                                      <SelectValue placeholder={t("wordbookStateLabel")} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="active">{t("wordbookStateActive")}</SelectItem>
+                                      <SelectItem value="archived">{t("wordbookStateArchived")}</SelectItem>
+                                      <SelectItem value="ignored">{t("wordbookStateIgnored")}</SelectItem>
+                                  </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="mt-4">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-xs font-medium text-muted-foreground">
+                                      {t("wordCard_sectionDefinition")}
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground"
+                                      disabled={wordbookExplainById[entry.id]?.status === "loading"}
+                                      onClick={() => void fetchWordbookDefinition(entry, { force: true })}
+                                    >
+                                      {t("summaryRefresh")}
+                                    </Button>
+                                  </div>
+
+                                  <div className="mt-2 rounded-xl border border-border bg-background/60 px-3 py-2">
+                                    {wordbookExplainById[entry.id]?.status === "loading" ? (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>{t("wordCard_loading")}</span>
+                                      </div>
+                                    ) : wordbookExplainById[entry.id]?.data ? (
+                                      <div>
+                                        {wordbookExplainById[entry.id]?.data?.phonetic ||
+                                        wordbookExplainById[entry.id]?.data?.difficulty ? (
+                                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                                            {wordbookExplainById[entry.id]?.data?.phonetic ? (
+                                              <span className="text-xs text-muted-foreground">
+                                                {wordbookExplainById[entry.id]?.data?.phonetic}
+                                              </span>
+                                            ) : null}
+                                            {wordbookExplainById[entry.id]?.data?.difficulty ? (
+                                              <Badge
+                                                variant="outline"
+                                                className="border-border bg-background text-muted-foreground text-[11px] px-2 py-0.5 rounded-full"
+                                              >
+                                                {wordbookExplainById[entry.id]?.data?.difficulty}
+                                              </Badge>
+                                            ) : null}
+                                          </div>
+                                        ) : null}
+                                        {wordbookExplainById[entry.id]?.data?.translation &&
+                                        wordbookExplainById[entry.id]?.data?.translation?.trim() &&
+                                        wordbookExplainById[entry.id]?.data?.translation?.trim() !==
+                                          wordbookExplainById[entry.id]?.data?.definition?.trim() ? (
+                                          <div className="mb-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                                            {wordbookExplainById[entry.id]?.data?.translation}
+                                          </div>
+                                        ) : null}
+                                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                                          {wordbookExplainById[entry.id]?.data?.definition}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-muted-foreground">
+                                        {t("wordCard_definitionUnavailable")}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="mt-4">
+                                  <div className="text-xs font-medium text-muted-foreground">{t("wordbookTagsLabel")}</div>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {wordbookDraftTags.map((tag) => (
+                                      <span key={tag} className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs">
+                                        <span className="max-w-[220px] truncate">{tag}</span>
+                                        <button
+                                          type="button"
+                                          className="text-muted-foreground hover:text-foreground"
+                                          onClick={() => {
+                                            setWordbookDraftTags((prev) => prev.filter((t) => t !== tag));
+                                            setWordbookSaveStatus("dirty");
+                                          }}
+                                          title={t("chatRemove")}
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <Input
+                                    value={wordbookDraftTagInput}
+                                    onChange={(e) => setWordbookDraftTagInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        applyWordbookTag();
+                                      }
+                                    }}
+                                    placeholder={t("wordbookTagPlaceholder")}
+                                    className="mt-2 h-10 rounded-xl bg-background shadow-sm"
+                                  />
+                                </div>
+
+                                <div className="mt-4">
+                                  <div className="text-xs font-medium text-muted-foreground">{t("wordbookNoteLabel")}</div>
+                                  <Textarea
+                                    value={wordbookDraftNote}
+                                    onChange={(e) => {
+                                      setWordbookDraftNote(e.target.value);
+                                      setWordbookSaveStatus("dirty");
+                                    }}
+                                    placeholder={t("wordbookNotePlaceholder")}
+                                    className="mt-2 min-h-[120px] rounded-xl bg-background shadow-sm"
+                                  />
+                                </div>
+
+                                {Array.isArray(entry.sources) && entry.sources.length > 0 && (
+                                  <div className="mt-4">
+                                    <div className="text-xs font-medium text-muted-foreground">{t("wordbookSourcesLabel")}</div>
+                                    <div className="mt-2 flex flex-col gap-2">
+                                      {entry.sources.slice(0, 3).map((s, idx) => (
+                                        <div key={`${s.anchorKey}:${idx}`} className="rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                                          <div>{s.kind} · {new Date(s.capturedAt).toLocaleDateString()}</div>
+                                          {s.domain ? <div className="truncate">{s.domain}</div> : null}
+                                          {s.title ? <div className="truncate">{s.title}</div> : null}
+                                          {s.platform ? <div className="truncate">{s.platform}</div> : null}
+                                          {typeof s.timestampSec === "number" ? <div>t={s.timestampSec}s</div> : null}
+                                          {s.snippet ? <div className="mt-1 text-foreground/70 line-clamp-2">{s.snippet}</div> : null}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        wordbookEntries.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                            <BookOpen className="h-12 w-12 opacity-20 mb-4" />
+                            <p className="text-sm font-medium">{t("wordbookTitle")}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{isWordbookLoading ? t("wordbookLoading") : t("wordbookEmpty")}</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="mt-4 rounded-xl"
+                              onClick={() => setWordbookAddOpen(true)}
+                            >
+                              <PlusCircle className="h-4 w-4 mr-2" />
+                              {t("wordbookAddButton")}
+                            </Button>
+                          </div>
+                        ) : (
+                          wordbookEntries.map((entry) => (
+                            <div
+                              key={entry.id}
+                              className={cn(
+                                "flex items-start gap-3 p-4 rounded-xl border border-border bg-card shadow-sm transition-colors hover:bg-muted/30",
+                                wordbookSelectedId === entry.id ? "ring-2 ring-primary/30" : "",
+                              )}
+                            >
+                              {wordbookBulkMode && (
+                                <div className="pt-1">
+                                  <Checkbox
+                                    checked={wordbookSelectedIds.has(entry.id)}
+                                    onCheckedChange={(checked) => {
+                                      setWordbookSelectedIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (checked) next.add(entry.id);
+                                        else next.delete(entry.id);
+                                        return next;
+                                      });
+                                    }}
+                                    aria-label={t("wordbookSelectedCount", [String(wordbookSelectedIds.size)])}
+                                  />
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (wordbookBulkMode) {
+                                    setWordbookSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(entry.id)) next.delete(entry.id);
+                                      else next.add(entry.id);
+                                      return next;
+                                    });
+                                    return;
+                                  }
+
+                                  selectWordbookEntry(entry);
+                                }}
+                                className={cn(
+                                  "flex-1 min-w-0 flex items-start justify-between gap-3 text-left",
+                                  wordbookBulkMode && "cursor-pointer",
+                                )}
+                                >
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm truncate">{entry.term}</span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn("shrink-0", wordbookStateBadgeClassName(entry.state))}
+                                    >
+                                      {wordbookStateLabel(entry.state)}
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{entry.language}</span>
+                                    {typeof entry.updatedAt === "number" ? (
+                                      <>
+                                        <span className="opacity-40">•</span>
+                                        <span>{formatTimestampLabel(entry.updatedAt)}</span>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                  {Array.isArray(entry.tags) && entry.tags.length > 0 ? (
+                                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                      {entry.tags.slice(0, 2).map((tag) => (
+                                        <Badge
+                                          key={tag}
+                                          variant="outline"
+                                          className="border-border bg-background/70 text-muted-foreground text-[11px] px-2 py-0.5 rounded-full"
+                                        >
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                      {entry.tags.length > 2 ? (
+                                        <span className="text-xs text-muted-foreground">
+                                          +{entry.tags.length - 2}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                  {entry.note ? <div className="text-xs text-muted-foreground mt-2 line-clamp-2">{entry.note}</div> : null}
+                                </div>
+                              </button>
+                            </div>
+                          ))
+                        )
+                      )
+                    ) : (
+                      // Desktop: split view (list + detail)
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-2">
+                          {wordbookEntries.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                              <BookOpen className="h-12 w-12 opacity-20 mb-4" />
+                              <p className="text-sm font-medium">{t("wordbookTitle")}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{isWordbookLoading ? t("wordbookLoading") : t("wordbookEmpty")}</p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="mt-4 rounded-xl"
+                                onClick={() => setWordbookAddOpen(true)}
+                              >
+                                <PlusCircle className="h-4 w-4 mr-2" />
+                                {t("wordbookAddButton")}
+                              </Button>
+                            </div>
+                          ) : (
+                            wordbookEntries.map((entry) => (
+                              <div
+                                key={entry.id}
+                                className={cn(
+                                  "flex items-start gap-3 p-4 rounded-xl border border-border bg-card shadow-sm transition-colors hover:bg-muted/30",
+                                  wordbookSelectedId === entry.id ? "ring-2 ring-primary/30" : "",
+                                )}
+                              >
+                                {wordbookBulkMode && (
+                                  <div className="pt-1">
+                                    <Checkbox
+                                      checked={wordbookSelectedIds.has(entry.id)}
+                                      onCheckedChange={(checked) => {
+                                        setWordbookSelectedIds((prev) => {
+                                          const next = new Set(prev);
+                                          if (checked) next.add(entry.id);
+                                          else next.delete(entry.id);
+                                          return next;
+                                        });
+                                      }}
+                                      aria-label={t("wordbookSelectedCount", [String(wordbookSelectedIds.size)])}
+                                    />
+                                  </div>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (wordbookBulkMode) {
+                                      setWordbookSelectedIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(entry.id)) next.delete(entry.id);
+                                        else next.add(entry.id);
+                                        return next;
+                                      });
+                                      return;
+                                    }
+
+                                    selectWordbookEntry(entry);
+                                  }}
+                                  className={cn(
+                                    "flex-1 min-w-0 flex items-start justify-between gap-3 text-left",
+                                    wordbookBulkMode && "cursor-pointer",
+                                  )}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm truncate">{entry.term}</span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn("shrink-0", wordbookStateBadgeClassName(entry.state))}
+                                      >
+                                        {wordbookStateLabel(entry.state)}
+                                      </Badge>
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span>{entry.language}</span>
+                                      {typeof entry.updatedAt === "number" ? (
+                                        <>
+                                          <span className="opacity-40">•</span>
+                                          <span>{formatTimestampLabel(entry.updatedAt)}</span>
+                                        </>
+                                      ) : null}
+                                    </div>
+                                    {Array.isArray(entry.tags) && entry.tags.length > 0 ? (
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        {entry.tags.slice(0, 2).map((tag) => (
+                                          <Badge
+                                            key={tag}
+                                            variant="outline"
+                                            className="border-border bg-background/70 text-muted-foreground text-[11px] px-2 py-0.5 rounded-full"
+                                          >
+                                            {tag}
+                                          </Badge>
+                                        ))}
+                                        {entry.tags.length > 2 ? (
+                                          <span className="text-xs text-muted-foreground">
+                                            +{entry.tags.length - 2}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                    {entry.note ? <div className="text-xs text-muted-foreground mt-2 line-clamp-2">{entry.note}</div> : null}
+                                  </div>
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-border bg-card shadow-sm p-4">
+                          {(() => {
+                            const entry = wordbookEntries.find((e) => e.id === wordbookSelectedId) ?? null;
+                            if (!entry) {
+                              return (
+                                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                                  <BookOpen className="h-10 w-10 opacity-20 mb-3" />
+                                  <div className="text-sm font-medium">{t("wordbookSelectEntry")}</div>
+                                  <div className="text-xs mt-1">{t("wordbookDetailHint")}</div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="flex flex-col gap-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-lg font-semibold truncate">{entry.term}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{entry.language}</div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {(() => {
+                                      const label =
+                                        wordbookSaveStatus === "saving"
+                                          ? t("optionsSaving")
+                                          : wordbookSaveStatus === "saved"
+                                            ? t("optionsSaveSuccess")
+                                            : wordbookSaveStatus === "error"
+                                              ? t("optionsSaveError", wordbookSaveErrorRef.current || "Error")
+                                              : wordbookSaveStatus === "dirty"
+                                                ? t("wordbookUnsaved")
+                                                : "";
+
+                                      return label ? (
+                                        <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+                                          {label}
+                                        </Badge>
+                                      ) : null;
+                                    })()}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="text-xs font-medium text-muted-foreground">{t("wordbookStateLabel")}</div>
+                                  <Select
+                                    value={wordbookDraftState}
+                                    onValueChange={(v) => {
+                                      setWordbookDraftState(v as any);
+                                      setWordbookSaveStatus("dirty");
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9 rounded-xl bg-background shadow-sm w-[140px]">
+                                      <SelectValue placeholder={t("wordbookStateLabel")} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="active">{t("wordbookStateActive")}</SelectItem>
+                                      <SelectItem value="archived">{t("wordbookStateArchived")}</SelectItem>
+                                      <SelectItem value="ignored">{t("wordbookStateIgnored")}</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="text-xs font-medium text-muted-foreground">
+                                      {t("wordCard_sectionDefinition")}
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 rounded-xl px-2 text-xs text-muted-foreground hover:text-foreground"
+                                      disabled={wordbookExplainById[entry.id]?.status === "loading"}
+                                      onClick={() => void fetchWordbookDefinition(entry, { force: true })}
+                                    >
+                                      {t("summaryRefresh")}
+                                    </Button>
+                                  </div>
+
+                                  <div className="mt-2 rounded-xl border border-border bg-background/60 px-3 py-2">
+                                    {wordbookExplainById[entry.id]?.status === "loading" ? (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>{t("wordCard_loading")}</span>
+                                      </div>
+                                    ) : wordbookExplainById[entry.id]?.data ? (
+                                      <div>
+                                        {wordbookExplainById[entry.id]?.data?.phonetic ||
+                                        wordbookExplainById[entry.id]?.data?.difficulty ? (
+                                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                                            {wordbookExplainById[entry.id]?.data?.phonetic ? (
+                                              <span className="text-xs text-muted-foreground">
+                                                {wordbookExplainById[entry.id]?.data?.phonetic}
+                                              </span>
+                                            ) : null}
+                                            {wordbookExplainById[entry.id]?.data?.difficulty ? (
+                                              <Badge
+                                                variant="outline"
+                                                className="border-border bg-background text-muted-foreground text-[11px] px-2 py-0.5 rounded-full"
+                                              >
+                                                {wordbookExplainById[entry.id]?.data?.difficulty}
+                                              </Badge>
+                                            ) : null}
+                                          </div>
+                                        ) : null}
+                                        {wordbookExplainById[entry.id]?.data?.translation &&
+                                        wordbookExplainById[entry.id]?.data?.translation?.trim() &&
+                                        wordbookExplainById[entry.id]?.data?.translation?.trim() !==
+                                          wordbookExplainById[entry.id]?.data?.definition?.trim() ? (
+                                          <div className="mb-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                                            {wordbookExplainById[entry.id]?.data?.translation}
+                                          </div>
+                                        ) : null}
+                                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                                          {wordbookExplainById[entry.id]?.data?.definition}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-muted-foreground">
+                                        {t("wordCard_definitionUnavailable")}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="text-xs font-medium text-muted-foreground">{t("wordbookTagsLabel")}</div>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {wordbookDraftTags.map((tag) => (
+                                      <span key={tag} className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs">
+                                        <span className="max-w-[220px] truncate">{tag}</span>
+                                        <button
+                                          type="button"
+                                          className="text-muted-foreground hover:text-foreground"
+                                          onClick={() => {
+                                            setWordbookDraftTags((prev) => prev.filter((t) => t !== tag));
+                                            setWordbookSaveStatus("dirty");
+                                          }}
+                                          title={t("chatRemove")}
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <Input
+                                    value={wordbookDraftTagInput}
+                                    onChange={(e) => setWordbookDraftTagInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        applyWordbookTag();
+                                      }
+                                    }}
+                                    placeholder={t("wordbookTagPlaceholder")}
+                                    className="mt-2 h-10 rounded-xl bg-background shadow-sm"
+                                  />
+                                </div>
+
+                                <div>
+                                  <div className="text-xs font-medium text-muted-foreground">{t("wordbookNoteLabel")}</div>
+                                  <Textarea
+                                    value={wordbookDraftNote}
+                                    onChange={(e) => {
+                                      setWordbookDraftNote(e.target.value);
+                                      setWordbookSaveStatus("dirty");
+                                    }}
+                                    placeholder={t("wordbookNotePlaceholder")}
+                                    className="mt-2 min-h-[140px] rounded-xl bg-background shadow-sm"
+                                  />
+                                </div>
+
+                                {Array.isArray(entry.sources) && entry.sources.length > 0 && (
+                                  <div>
+                                    <div className="text-xs font-medium text-muted-foreground">{t("wordbookSourcesLabel")}</div>
+                                    <div className="mt-2 flex flex-col gap-2">
+                                      {entry.sources.slice(0, 3).map((s, idx) => (
+                                        <div key={`${s.anchorKey}:${idx}`} className="rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                                          <div>{s.kind} · {new Date(s.capturedAt).toLocaleDateString()}</div>
+                                          {s.domain ? <div className="truncate">{s.domain}</div> : null}
+                                          {s.title ? <div className="truncate">{s.title}</div> : null}
+                                          {s.platform ? <div className="truncate">{s.platform}</div> : null}
+                                          {typeof s.timestampSec === "number" ? <div>t={s.timestampSec}s</div> : null}
+                                          {s.snippet ? <div className="mt-1 text-foreground/70 line-clamp-2">{s.snippet}</div> : null}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )
                   ) : (
+
                     sessionsForCurrentFilter.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                         <MessageSquare className="h-12 w-12 opacity-20 mb-4" />
@@ -1433,7 +2759,7 @@ export function Sidebar(): React.ReactElement {
                             detachUiStream();
                             hydrateContextFromSession(session);
                             void loadMessages(session.sessionId);
-                            setShowSessions(false);
+                            setActivePanel("chat");
                           }}
                           className={cn(
                             "flex flex-col gap-1 p-4 rounded-xl text-left transition-colors border border-border shadow-sm",
@@ -1608,7 +2934,7 @@ export function Sidebar(): React.ReactElement {
                   </div>
                 </ScrollArea>
 
-                {!showSessions && messages.length > 0 && !isAtBottom && (
+                {activePanel === "chat" && messages.length > 0 && !isAtBottom && (
                   <Button
                     variant="secondary"
                     size="icon"
