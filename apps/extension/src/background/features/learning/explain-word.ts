@@ -9,14 +9,36 @@ import { recordLookupManual } from '../../../shared/familiarity';
 import { getSettings } from '../../../shared/storage';
 
 import { bingTranslateProvider, getChatProvider, googleTranslateProvider } from '../../lib/providers';
-import { getChatProviderByChannel, resolveChannel, resolveRoute, routeIdentity, routeKey } from '../../lib/routing';
-import { makeContextInfoFromText, makePromptUserInfo } from '../../lib/prompt';
-import { dedupeInFlight, makeCacheKey } from '../../pipeline';
-import { dictionaryService } from '../../services/dictionary';
-import { bumpDailyUsage } from '../../usage-summary';
+import { getChatProviderByChannel, resolveChannel, resolveRoute, routeIdentity, routeKey } from '../../lib/routing'; 
+import { makeContextInfoFromText, makePromptUserInfo } from '../../lib/prompt'; 
+import { dedupeInFlight, makeCacheKey } from '../../pipeline'; 
+import { dictionaryService } from '../../services/dictionary'; 
+import { bumpDailyUsage } from '../../usage-summary'; 
+ 
+import type { LearningConcurrency, Logger, TranslatorLike } from './types'; 
+import { CACHE_FALLBACK_TTL_MS, CACHE_SUCCESS_TTL_MS, explainWordCache, explainWordInFlight } from './cache'; 
 
-import type { LearningConcurrency, Logger, TranslatorLike } from './types';
-import { CACHE_FALLBACK_TTL_MS, CACHE_SUCCESS_TTL_MS, explainWordCache, explainWordInFlight } from './cache';
+function normalizeExplainTextForDisplay(value: string): string {
+  // Some providers return strings that contain literal "\n" sequences rather than actual newlines.
+  // Convert those into real newlines so UIs with `white-space: pre-*` render them as line breaks.
+  return String(value ?? '')
+    .replaceAll('\\r\\n', '\n')
+    .replaceAll('\\n', '\n')
+    .replaceAll('\\r', '\n');
+}
+
+function normalizeExplainOutput(out: ExplainWordOutput): ExplainWordOutput {
+  return {
+    ...out,
+    word: normalizeExplainTextForDisplay(out.word),
+    definition: normalizeExplainTextForDisplay(out.definition),
+    ...(out.translation ? { translation: normalizeExplainTextForDisplay(out.translation) } : {}),
+    ...(out.example ? { example: normalizeExplainTextForDisplay(out.example) } : {}),
+    ...(out.example_translation
+      ? { example_translation: normalizeExplainTextForDisplay(out.example_translation) }
+      : {}),
+  };
+}
 
 export async function handleExplainWord(options: {
   payload: ExplainWordPayload;
@@ -32,16 +54,16 @@ export async function handleExplainWord(options: {
     throw new MessageError({ code: 'INVALID_PAYLOAD', message: 'Expected payload { word: string }' });
   }
 
-  await recordLookupManual(word);
+  await recordLookupManual(word); 
+ 
+  const settings = await getSettings(); 
+  const sourceLang = payload.sourceLang ?? settings.targetLanguage; 
+  const targetLang = payload.targetLang ?? settings.nativeLanguage; 
+  const userLevel = settings.proficiencyLevel; 
 
-  const settings = await getSettings();
-  const sourceLang = settings.targetLanguage;
-  const targetLang = settings.nativeLanguage;
-  const userLevel = settings.proficiencyLevel;
-
-  const dictionaryRoute = resolveRoute('dictionary', settings);
-  const dictionaryChannel = dictionaryRoute.kind === 1 ? resolveChannel(dictionaryRoute.channelId, settings) : null;
-  const dictionaryProviderInfo = dictionaryChannel ? getChatProviderByChannel(dictionaryChannel) : null;
+  const dictionaryRoute = resolveRoute('dictionary', settings); 
+  const dictionaryChannel = dictionaryRoute.kind === 1 ? resolveChannel(dictionaryRoute.channelId, settings) : null; 
+  const dictionaryProviderInfo = dictionaryChannel ? getChatProviderByChannel(dictionaryChannel) : null; 
 
   const cacheKey = makeCacheKey('EXPLAIN_WORD', {
     v: 5,
@@ -63,33 +85,34 @@ export async function handleExplainWord(options: {
   }
 
   let providerKey: string | undefined;
-  let apiEvent = !explainWordInFlight.has(cacheKey);
+  let apiEvent = !explainWordInFlight.has(cacheKey); 
+ 
+  const value = await dedupeInFlight(explainWordInFlight, cacheKey, async () => { 
+    const entry = await dictionaryService.lookup(word); 
+    if (entry) { 
+      providerKey = 'offline'; 
+      apiEvent = false; 
+      const definition = 
+        entry.definitions?.[0]?.definition ?? 
+        entry.definitions?.map((item) => item.definition).filter(Boolean).join('\n') ?? 
+        t('wordCard_definitionUnavailable'); 
 
-  const value = await dedupeInFlight(explainWordInFlight, cacheKey, async () => {
-    const entry = await dictionaryService.lookup(word);
-    if (entry) {
-      providerKey = 'offline';
-      apiEvent = false;
-      const definition =
-        entry.definitions?.[0]?.definition ??
-        entry.definitions?.map((item) => item.definition).filter(Boolean).join('\n') ??
-        t('wordCard_definitionUnavailable');
+      const normalizedWord = typeof entry.word === 'string' && entry.word.trim() ? entry.word.trim() : word; 
+      const out: ExplainWordOutput = { 
+        word: normalizedWord, 
+        definition: definition.trim() ? definition : t('wordCard_definitionUnavailable'), 
+        ...(entry.phonetic && entry.phonetic.trim() ? { phonetic: entry.phonetic.trim() } : {}), 
+        ...(entry.difficulty && entry.difficulty.trim() ? { difficulty: entry.difficulty.trim() } : {}), 
+      }; 
 
-      const normalizedWord = typeof entry.word === 'string' && entry.word.trim() ? entry.word.trim() : word;
-      const out: ExplainWordOutput = {
-        word: normalizedWord,
-        definition: definition.trim() ? definition : t('wordCard_definitionUnavailable'),
-        ...(entry.phonetic && entry.phonetic.trim() ? { phonetic: entry.phonetic.trim() } : {}),
-        ...(entry.difficulty && entry.difficulty.trim() ? { difficulty: entry.difficulty.trim() } : {}),
-      };
-
-      explainWordCache.set(cacheKey, out, CACHE_SUCCESS_TTL_MS);
-      return out;
-    }
-
-    if (dictionaryRoute.kind === 2 || dictionaryRoute.kind === 3) {
-      try {
-        providerKey = dictionaryRoute.kind === 2 ? 'google' : 'bing';
+      const normalizedOut = normalizeExplainOutput(out); 
+      explainWordCache.set(cacheKey, normalizedOut, CACHE_SUCCESS_TTL_MS); 
+      return normalizedOut; 
+    } 
+ 
+    if (dictionaryRoute.kind === 2 || dictionaryRoute.kind === 3) { 
+      try { 
+        providerKey = dictionaryRoute.kind === 2 ? 'google' : 'bing'; 
         apiEvent = true;
         const limit = concurrency.getChannelConcurrencyLimit(null, dictionaryRoute.kind);
         const translated = await concurrency.runWithChannelConcurrency(routeKey(dictionaryRoute), limit, () =>
@@ -104,8 +127,13 @@ export async function handleExplainWord(options: {
           definition,
           ...(translated?.trim() ? { translation: translated.trim() } : {}),
         };
-        explainWordCache.set(cacheKey, out, translated?.trim() ? CACHE_SUCCESS_TTL_MS : CACHE_FALLBACK_TTL_MS);
-        return out;
+        const normalizedOut = normalizeExplainOutput(out);
+        explainWordCache.set(
+          cacheKey,
+          normalizedOut,
+          translated?.trim() ? CACHE_SUCCESS_TTL_MS : CACHE_FALLBACK_TTL_MS,
+        );
+        return normalizedOut;
       } catch (error: unknown) {
         log.warn('EXPLAIN_WORD translation fallback failed; returning unavailable definition', { message: getErrorMessage(error) });
         const out: ExplainWordOutput = { word, definition: t('wordCard_definitionUnavailable') };
@@ -199,8 +227,9 @@ export async function handleExplainWord(options: {
         });
       }
 
-      explainWordCache.set(cacheKey, out, CACHE_SUCCESS_TTL_MS);
-      return out;
+      const normalizedOut = normalizeExplainOutput(out);
+      explainWordCache.set(cacheKey, normalizedOut, CACHE_SUCCESS_TTL_MS);
+      return normalizedOut;
     } catch (error: unknown) {
       log.warn('EXPLAIN_WORD failed; returning fallback definition', { word, message: getErrorMessage(error) });
       const out: ExplainWordOutput = { word, definition: t('wordCard_definitionFailed') };

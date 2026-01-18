@@ -44,22 +44,34 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
     // Start persisting the pending message as early as possible, but do not await it before attempting
     // to open the side panel. Chrome requires `sidePanel.open()` to be called in response to a user gesture,
     // and awaiting storage can break the user activation chain.
-    const pendingWritePromise = payload?.initialMessage
+    const shouldPersist = Boolean(
+      payload &&
+        (
+          (typeof payload.initialMessage === 'string' && payload.initialMessage.trim()) ||
+          (typeof payload.keyword === 'string' && payload.keyword.trim()) ||
+          payload.contextInfo ||
+          (payload as any).ui
+        )
+    );
+
+    const pendingWritePromise = shouldPersist
       ? browser.storage.local
           .set({
             lexipath_sidebar_pending_message: {
               nonce: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-              text: payload.initialMessage,
-              keyword: typeof payload.keyword === 'string' ? payload.keyword : undefined,
-              contextInfo: payload.contextInfo,
+              text: typeof payload?.initialMessage === 'string' ? payload.initialMessage : '',
+              keyword: typeof payload?.keyword === 'string' ? payload.keyword : undefined,
+              contextInfo: payload?.contextInfo,
+              ui: (payload as any)?.ui,
               timestamp: Date.now(),
-              isAutoSend: payload.isAutoSend ?? false,
+              isAutoSend: payload?.isAutoSend ?? false,
             },
           })
           .catch((error: unknown) => {
             log.warn('Failed to persist pending sidebar message; opening sidebar anyway', { tabId, error });
           })
       : Promise.resolve();
+
 
     // IMPORTANT: `sidePanel.open()` must be called in response to a user gesture.
     // Keep it as early as possible to avoid losing user activation.

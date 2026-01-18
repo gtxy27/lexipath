@@ -67,6 +67,11 @@
     "message": "例句翻译",
     "description": "单词卡：板块标题（例句翻译）"
   },
+  "wordCard_askAI": {
+    "message": "问 AI",
+    "description": "单词卡：问 AI 按钮"
+  },
+
   "englishCorrection_tagEncouragement": {
     "message": "鼓励",
     "description": "英文纠错：卡片标签（鼓励）"
@@ -440,6 +445,164 @@
     "message": "熟悉度 $1 · 暴露 $2",
     "description": "悬浮按钮：遗忘词条目元信息"
   },
+
+  "wordbookTitle": {
+    "message": "单词本",
+    "description": "单词本：标题"
+  },
+  "wordbookTitleDesc": {
+    "message": "保存并管理词/短语。",
+    "description": "单词本：入口提示"
+  },
+  "wordbookActionSave": {
+    "message": "保存",
+    "description": "单词本：保存"
+  },
+  "wordbookActionIgnore": {
+    "message": "不想学",
+    "description": "单词本：不想学"
+  },
+  "wordbookActionArchive": {
+    "message": "已掌握",
+    "description": "单词本：已掌握"
+  },
+  "wordbookUnsaved": {
+    "message": "未保存",
+    "description": "单词本：未保存变更提示"
+  },
+  "wordbookEmpty": {
+    "message": "暂无条目",
+    "description": "单词本：列表为空"
+  },
+  "wordbookLoading": {
+    "message": "加载中...",
+    "description": "单词本：加载列表"
+  },
+  "wordbookSelectEntry": {
+    "message": "请选择一个条目",
+    "description": "单词本：提示选择条目"
+  },
+  "wordbookNoEntrySelected": {
+    "message": "未选择条目",
+    "description": "单词本：未选择条目"
+  },
+  "wordbookBack": {
+    "message": "返回",
+    "description": "单词本：返回按钮"
+  },
+  "wordbookTagsLabel": {
+    "message": "标签",
+    "description": "单词本：标签标题"
+  },
+  "wordbookTagPlaceholder": {
+    "message": "输入标签并回车",
+    "description": "单词本：标签输入占位符"
+  },
+  "wordbookNoteLabel": {
+    "message": "笔记",
+    "description": "单词本：笔记标题"
+  },
+  "wordbookNotePlaceholder": {
+    "message": "添加笔记...",
+    "description": "单词本：笔记占位符"
+  },
+  "wordbookSourcesLabel": {
+    "message": "来源",
+    "description": "单词本：来源标题"
+  },
+  "wordbookStateLabel": {
+    "message": "状态",
+    "description": "单词本：状态标题"
+  },
+  "wordbookDetailHint": {
+    "message": "编辑标签与笔记；1 秒后自动保存。",
+    "description": "单词本：详情面板提示"
+  },
+  "wordbookStateAll": {
+    "message": "全部",
+    "description": "单词本：状态筛选 全部"
+  },
+  "wordbookStateActive": {
+    "message": "学习中",
+    "description": "单词本：状态 学习中"
+  },
+  "wordbookStateArchived": {
+    "message": "已掌握",
+    "description": "单词本：状态 已掌握"
+  },
+  "wordbookStateIgnored": {
+    "message": "不想学",
+    "description": "单词本：状态 不想学"
+  },
+  "wordbookSortUpdated": {
+    "message": "按更新时间",
+    "description": "单词本：排序 更新时间"
+  },
+  "wordbookSortAZ": {
+    "message": "按字母",
+    "description": "单词本：排序 字母"
+  },
+  "wordbookBulk": {
+    "message": "批量",
+    "description": "单词本：批量模式"
+  },
+  "wordbookSelectedCount": {
+    "message": "已选 $1 项",
+    "description": "单词本：已选择数量"
+  },
+  "wordbookBulkArchive": {
+    "message": "标记为已掌握",
+    "description": "单词本：批量标记为已掌握"
+  },
+  "wordbookBulkIgnore": {
+    "message": "标记为不想学",
+    "description": "单词本：批量标记为不想学"
+  },
+  "wordbookBulkRemove": {
+    "message": "删除所选",
+    "description": "单词本：批量删除"
+  },
+  "wordbookBulkDone": {
+    "message": "已完成。",
+    "description": "单词本：批量操作完成"
+  },
+  "wordbookConfirmRemove": {
+    "message": "确认删除 $1 个条目？",
+    "description": "单词本：确认删除"
+  },
+  "wordbookAddTitle": {
+    "message": "添加到单词本",
+    "description": "单词本：添加条目标题"
+  },
+  "wordbookAddHint": {
+    "message": "会创建为“学习中”状态（使用你的目标语言）。",
+    "description": "单词本：添加条目提示"
+  },
+  "wordbookAddPlaceholder": {
+    "message": "输入单词或短语…",
+    "description": "单词本：添加条目输入框占位符"
+  },
+  "wordbookAddButton": {
+    "message": "添加",
+    "description": "单词本：添加条目按钮"
+  },
+  "wordbookAddMissing": {
+    "message": "请先输入单词或短语。",
+    "description": "单词本：添加条目缺少内容提示"
+  },
+  "wordbookAddExists": {
+    "message": "已在你的单词本中。",
+    "description": "单词本：添加条目已存在提示"
+  },
+  "wordbookAddSuccess": {
+    "message": "已添加到单词本。",
+    "description": "单词本：添加条目成功提示"
+  },
+  "wordbookAddError": {
+    "message": "添加失败：$1",
+    "description": "单词本：添加条目失败提示"
+  },
+
   "themeSystem": {
     "message": "跟随系统",
     "description": "主题：系统"
@@ -969,6 +1132,74 @@
   "optionsImportDesc": {
     "message": "从之前导出的 JSON 文件恢复数据。这将覆盖当前设置。",
     "description": "导入描述"
+  },
+  "optionsWordbookTransferTitle": {
+    "message": "单词本导入/导出",
+    "description": "选项：单词本导入/导出区块标题"
+  },
+  "optionsWordbookTransferDesc": {
+    "message": "仅导入/导出单词本。完整备份也会包含单词本。",
+    "description": "选项：单词本导入/导出区块描述"
+  },
+  "optionsWordbookExportTitle": {
+    "message": "导出单词本",
+    "description": "选项：单词本导出标题"
+  },
+  "optionsWordbookExportButton": {
+    "message": "导出单词本",
+    "description": "选项：单词本导出按钮"
+  },
+  "optionsWordbookExportSuccess": {
+    "message": "单词本已导出。",
+    "description": "选项：单词本导出成功提示"
+  },
+  "optionsWordbookExportError": {
+    "message": "导出失败：$1",
+    "description": "选项：单词本导出失败提示"
+  },
+  "optionsWordbookImportTitle": {
+    "message": "导入单词本",
+    "description": "选项：单词本导入标题"
+  },
+  "optionsWordbookImportButton": {
+    "message": "导入单词本",
+    "description": "选项：单词本导入按钮"
+  },
+  "optionsWordbookImportStrategyLabel": {
+    "message": "导入策略",
+    "description": "选项：单词本导入策略标签"
+  },
+  "optionsWordbookImportStrategyMerge": {
+    "message": "合并（推荐）",
+    "description": "选项：单词本导入策略（合并）"
+  },
+  "optionsWordbookImportStrategyOverwrite": {
+    "message": "覆盖",
+    "description": "选项：单词本导入策略（覆盖）"
+  },
+  "optionsWordbookImportStrategySkip": {
+    "message": "跳过重复项",
+    "description": "选项：单词本导入策略（跳过重复）"
+  },
+  "optionsWordbookImportSuccess": {
+    "message": "导入完成：新增 $1，更新 $2，跳过 $3。",
+    "description": "选项：单词本导入成功提示，$1=新增，$2=更新，$3=跳过"
+  },
+  "optionsWordbookImportError": {
+    "message": "导入失败：$1",
+    "description": "选项：单词本导入失败提示"
+  },
+  "optionsWordbookFormatJson": {
+    "message": "JSON",
+    "description": "选项：单词本格式（json）"
+  },
+  "optionsWordbookFormatAnkiCsv": {
+    "message": "Anki CSV",
+    "description": "选项：单词本格式（anki csv）"
+  },
+  "optionsWordbookFormatMarkdown": {
+    "message": "Markdown",
+    "description": "选项：单词本格式（markdown）"
   },
   "optionsImportInvalidJson": {
     "message": "JSON 格式无效。",
@@ -1786,6 +2017,27 @@
     "message": "已掌握",
     "description": "标记为已掌握按钮"
   },
+  "wordCard_save": {
+    "message": "保存",
+    "description": "保存到单词本"
+  },
+  "wordCard_unsave": {
+    "message": "已保存",
+    "description": "从单词本移除"
+  },
+  "wordCard_stateActive": {
+    "message": "学习中",
+    "description": "单词本状态 学习中"
+  },
+  "wordCard_stateArchived": {
+    "message": "已掌握",
+    "description": "单词本状态 已掌握"
+  },
+  "wordCard_stateIgnored": {
+    "message": "不想学",
+    "description": "单词本状态 不想学"
+  },
+
   "onboardingStepProgress": {
     "message": "步骤 $1 / 3",
     "description": "步骤进度指示器"
@@ -2542,5 +2794,42 @@
   "summaryDetailsMetric_failure": {
     "message": "\u5931\u8d25",
     "description": "Options summary: details metric label"
+  },
+  "optionsWordbookTitle": {
+    "message": "\u5355\u8bcd\u672c",
+    "description": "Options: wordbook section title"
+  },
+  "optionsWordbookDesc": {
+    "message": "控制捕获行为和遗忘列表过滤。导入/导出在【设置 \u2192 备份】中。",
+    "description": "Options: wordbook section description"
+  },
+
+  "optionsWordbookSaveSnippetTitle": {
+    "message": "\u6355\u83b7\u65f6\u4fdd\u5b58\u6765\u6e90\u7247\u6bb5",
+    "description": "Options: wordbook save snippet title"
+  },
+  "optionsWordbookSaveSnippetDesc": {
+    "message": "\u4fdd\u5b58\u8bcd\u6761\u65f6\uff0c\u540c\u65f6\u4fdd\u5b58\u4e00\u6bb5\u7b80\u77ed\u7684\u4e0a\u4e0b\u6587\u6458\u5f55\u3002",
+    "description": "Options: wordbook save snippet description"
+  },
+  "optionsWordbookMaxSourcesTitle": {
+    "message": "\u6bcf\u6761\u8bcd\u6761\u6700\u591a\u6765\u6e90\u6570",
+    "description": "Options: wordbook max sources title"
+  },
+  "optionsWordbookMaxSourcesDesc": {
+    "message": "\u9650\u5236\u6bcf\u4e2a\u8bcd\u6761\u4fdd\u7559\u7684\u6765\u6e90/\u7247\u6bb5\u6570\u91cf\u3002",
+    "description": "Options: wordbook max sources description"
+  },
+  "optionsWordbookMaxSourcesLabel": {
+    "message": "$1 \u4e2a\u6765\u6e90",
+    "description": "Options: wordbook max sources option label, $1=count"
+  },
+  "optionsWordbookHideArchivedIgnoredTitle": {
+    "message": "\u5728\u9057\u5fd8\u5217\u8868\u4e2d\u9690\u85cf\u5df2\u638c\u63e1/\u4e0d\u60f3\u5b66",
+    "description": "Options: hide archived/ignored forgotten list title"
+  },
+  "optionsWordbookHideArchivedIgnoredDesc": {
+    "message": "\u5f00\u542f\u540e\uff0c\u5df2\u638c\u63e1\u548c\u201c\u4e0d\u60f3\u5b66\u201d\u7684\u8bcd\u6761\u4e0d\u4f1a\u51fa\u73b0\u5728\u9057\u5fd8\u5355\u8bcd\u5217\u8868\u4e2d\u3002",
+    "description": "Options: hide archived/ignored forgotten list description"
   }
 }

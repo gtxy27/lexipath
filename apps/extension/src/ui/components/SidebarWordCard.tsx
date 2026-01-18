@@ -1,13 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
 import { speak, stop } from "@lexipath/dictionary";
-import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
-import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { Volume2, Star, Check, X, Sparkles } from "lucide-react";
-import { cn } from "../lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { t } from "../../shared/i18n";
+import { Card, CardContent, CardFooter, CardHeader } from "./ui/card"; 
+import { Button } from "./ui/button"; 
+import { Badge } from "./ui/badge"; 
+import { Volume2, Star, Check, X, Sparkles } from "lucide-react"; 
+import { cn } from "../lib/utils"; 
+import { motion, AnimatePresence } from "framer-motion"; 
+import { t } from "../../shared/i18n"; 
 
 const log = createLogger("ui:WordCard");
 
@@ -24,6 +24,11 @@ export interface WordCardProps {
   data: WordCardData;
   mode?: "hover" | "click";
   ttsLang?: string;
+  wordbookState?: "active" | "archived" | "ignored" | null;
+  onWordbookToggle?: (
+    word: string,
+    currentState: "active" | "archived" | "ignored" | null,
+  ) => void;
   onFavoriteToggle?: (word: string, isFavorited: boolean) => void;
   onLearnedToggle?: (word: string, isLearned: boolean) => void;
   onClose?: () => void;
@@ -33,6 +38,8 @@ export function WordCard({
   data,
   mode = "click",
   ttsLang,
+  wordbookState = null,
+  onWordbookToggle,
   onFavoriteToggle,
   onLearnedToggle,
   onClose,
@@ -70,9 +77,13 @@ export function WordCard({
     onLearnedToggle?.(data.word, nextValue);
   }, [data.word, isLearned, onLearnedToggle]);
 
-  const getDifficultyStyles = (difficulty?: string) => {
-    if (!difficulty) return "text-muted-foreground border-border bg-muted/20";
-    const lower = difficulty.toLowerCase();
+  const handleWordbookToggle = useCallback(() => { 
+    onWordbookToggle?.(data.word, wordbookState); 
+  }, [data.word, onWordbookToggle, wordbookState]); 
+ 
+  const getDifficultyStyles = (difficulty?: string) => { 
+    if (!difficulty) return "text-muted-foreground border-border bg-muted/20"; 
+    const lower = difficulty.toLowerCase(); 
     if (lower.includes("easy") || lower === "a1" || lower === "a2") {
       return "text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10";
     }
@@ -83,6 +94,32 @@ export function WordCard({
       return "text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10";
     }
     return "text-primary border-primary/25 bg-primary/10";
+  };
+
+  const getWordbookStateLabel = (
+    state: "active" | "archived" | "ignored",
+  ): string => {
+    switch (state) {
+      case "active":
+        return t("wordCard_stateActive");
+      case "archived":
+        return t("wordCard_stateArchived");
+      case "ignored":
+        return t("wordCard_stateIgnored");
+    }
+  };
+
+  const getWordbookStateStyles = (
+    state: "active" | "archived" | "ignored",
+  ): string => {
+    switch (state) {
+      case "active":
+        return "text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-500/10";
+      case "archived":
+        return "text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/20 bg-amber-50 dark:bg-amber-500/10";
+      case "ignored":
+        return "text-muted-foreground border-border bg-muted/20";
+    }
   };
 
   return (
@@ -99,6 +136,17 @@ export function WordCard({
               <h3 className="text-2xl font-black tracking-tight text-foreground">
                 {data.word}
               </h3>
+              {wordbookState && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[9px] px-1.5 py-0 h-4.5 font-bold uppercase tracking-wider border shadow-none",
+                    getWordbookStateStyles(wordbookState),
+                  )}
+                >
+                  {getWordbookStateLabel(wordbookState)}
+                </Badge>
+              )}
               {data.difficulty && (
                 <Badge
                   variant="outline"
@@ -106,14 +154,14 @@ export function WordCard({
                     "text-[9px] px-1.5 py-0 h-4.5 font-bold uppercase tracking-wider border shadow-none",
                     getDifficultyStyles(data.difficulty),
                   )}
-                >
-                  {data.difficulty}
-                </Badge>
-              )}
-            </div>
-            {data.phonetic && (
-              <div className="flex items-center gap-1.5">
-                 <Sparkles className="h-3 w-3 text-primary/70" />
+                > 
+                  {data.difficulty} 
+                </Badge> 
+              )} 
+            </div> 
+            {data.phonetic && ( 
+              <div className="flex items-center gap-1.5"> 
+                 <Sparkles className="h-3 w-3 text-primary/70" /> 
                  <p className="text-xs text-muted-foreground font-medium tracking-wide">
                   {data.phonetic}
                  </p>
@@ -162,25 +210,44 @@ export function WordCard({
             </span>
           </Button>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleFavoriteToggle}
-              className={cn(
-                "h-9 w-9 p-0 rounded-xl transition-all",
-                isFavorited
-                  ? "text-amber-500 bg-amber-500/10 border border-amber-500/20"
-                  : "text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 border border-transparent",
-              )}
-              aria-label={t("wordCard_favorite")}
-            >
-              <Star className={cn("h-4 w-4", isFavorited && "fill-current")} />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
+          <div className="flex items-center gap-2"> 
+            {onWordbookToggle && ( 
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleWordbookToggle} 
+                className={cn( 
+                  "h-9 w-9 p-0 rounded-xl transition-all", 
+                  wordbookState 
+                    ? "text-amber-500 bg-amber-500/10 border border-amber-500/20" 
+                    : "text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 border border-transparent", 
+                )} 
+                aria-label={wordbookState ? t("wordCard_unsave") : t("wordCard_save")} 
+              > 
+                <Star className={cn("h-4 w-4", wordbookState && "fill-current")} /> 
+              </Button> 
+            )} 
+ 
+            {!onWordbookToggle && ( 
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleFavoriteToggle} 
+                className={cn( 
+                  "h-9 w-9 p-0 rounded-xl transition-all", 
+                  isFavorited 
+                    ? "text-amber-500 bg-amber-500/10 border border-amber-500/20" 
+                    : "text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 border border-transparent", 
+                )} 
+                aria-label={t("wordCard_favorite")} 
+              > 
+                <Star className={cn("h-4 w-4", isFavorited && "fill-current")} /> 
+              </Button> 
+            )} 
+ 
+            <Button 
+              variant="ghost" 
+              size="sm" 
               onClick={handleLearnedToggle}
               className={cn(
                 "h-9 gap-2 px-3 rounded-xl transition-all border font-bold",

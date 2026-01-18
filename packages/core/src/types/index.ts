@@ -81,6 +81,16 @@ export const MessageTypeSchema = z.enum([
   'WEBDAV_UPLOAD',
   'WEBDAV_DOWNLOAD',
 
+  // Wordbook
+  'WORDBOOK_UPSERT',
+  'WORDBOOK_GET',
+  'WORDBOOK_LIST',
+  'WORDBOOK_DELETE',
+  'WORDBOOK_SET_STATE',
+  'WORDBOOK_BULK_SET_STATE',
+  'WORDBOOK_EXPORT',
+  'WORDBOOK_IMPORT',
+
   // Reserved scaffolding for future tool execution + HTTP stream.
   'REQUEST_TOOL_EXECUTION',
   'RESPOND_TOOL_APPROVAL',
@@ -363,6 +373,18 @@ export type WordCardSectionKey = z.infer<typeof WordCardSectionKeySchema>;
 export const EnglishAccentSchema = z.enum(['us', 'uk']);
 export type EnglishAccent = z.infer<typeof EnglishAccentSchema>;
 
+// =============================================================================
+// Wordbook (settings-only subset)
+// =============================================================================
+
+export const WordbookCaptureSettingsSchema = z
+  .object({
+    saveSnippetOnCapture: z.boolean().default(true),
+    maxSourcesPerEntry: z.number().int().min(1).max(3).default(2),
+  })
+  .strict();
+export type WordbookCaptureSettings = z.infer<typeof WordbookCaptureSettingsSchema>;
+
 export const SettingsSchema = z.object({
   // Language
   nativeLanguage: NativeLanguageSchema.default('zh-CN'),
@@ -422,6 +444,10 @@ export const SettingsSchema = z.object({
 
   // Backup (Cloud)
   webdav: WebDAVConfigSchema.optional(),
+
+  // Wordbook
+  wordbook: WordbookCaptureSettingsSchema.default({ saveSnippetOnCapture: true, maxSourcesPerEntry: 2 }),
+  wordbookHideArchivedIgnoredInForgotten: z.boolean().default(true),
 
   // Reserved scaffolding for future tool execution.
   toolExecutionEnabled: z.boolean().default(false),
@@ -605,6 +631,53 @@ export const LearnedWordSchema = z.object({
 export type LearnedWord = z.infer<typeof LearnedWordSchema>;
 
 // =============================================================================
+// Wordbook
+// =============================================================================
+
+export const WordbookEntryStateSchema = z.enum(['active', 'archived', 'ignored']);
+export type WordbookEntryState = z.infer<typeof WordbookEntryStateSchema>;
+
+export const WordbookEntrySourceSchema = z
+  .object({
+    kind: z.enum(['web', 'subtitle']),
+    // Privacy-preserving stable identifier (e.g., hashed anchor key); MUST NOT be a raw URL.
+    anchorKey: z.string().min(1),
+    capturedAt: z.number().int().min(0),
+
+    // Lightweight context only.
+    snippet: z.string().min(1).max(500).optional(),
+
+    // Web-only hints.
+    domain: z.string().max(200).optional(),
+    title: z.string().max(200).optional(),
+
+    // Subtitle-only hints.
+    platform: z.string().max(50).optional(),
+    timestampSec: z.number().int().min(0).optional(),
+  })
+  .strict();
+export type WordbookEntrySource = z.infer<typeof WordbookEntrySourceSchema>;
+
+export const WordbookEntrySchema = z
+  .object({
+    // Stable key: language + normalizedTerm (exact format is an implementation detail).
+    id: z.string().min(1),
+    language: SupportedLanguageSchema,
+    term: z.string().min(1),
+    normalizedTerm: z.string().min(1),
+    state: WordbookEntryStateSchema.default('active'),
+    tags: z.array(z.string().min(1).max(30)).default([]),
+    note: z.string().max(2000).default(''),
+    sources: z.array(WordbookEntrySourceSchema).default([]),
+    createdAt: z.number().int().min(0),
+    updatedAt: z.number().int().min(0),
+  })
+  .strict();
+export type WordbookEntry = z.infer<typeof WordbookEntrySchema>;
+
+
+
+// =============================================================================
 // Tier & Strategy
 // =============================================================================
 
@@ -674,6 +747,10 @@ export type ChatResponse = z.infer<typeof ChatResponseSchema>;
 export const ExplainWordPayloadSchema = z
   .object({
     word: z.string().min(1),
+    // Optional overrides (defaults to Settings targetLanguage/nativeLanguage).
+    // Useful for wordbook entries after the user switches learning language.
+    sourceLang: SupportedLanguageSchema.optional(),
+    targetLang: NativeLanguageSchema.optional(),
     context: z.string().min(1).optional(),
     contextBefore: z.array(z.string().min(1)).optional(),
     contextAfter: z.array(z.string().min(1)).optional(),

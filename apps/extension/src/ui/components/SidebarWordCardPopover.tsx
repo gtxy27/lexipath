@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createLogger, getErrorMessage } from "@lexipath/core/log";
-import { WordCard, type WordCardData } from "./WordCard";
+import { makeWordbookEntryId, normalizeWordbookLanguage, normalizeWordbookTerm } from "@lexipath/core";
+import { WordCard, type WordCardData } from "./SidebarWordCard";
 import { sendMessage } from "../../shared/messages";
+import { makeWebAnchorKey } from "../../shared/chat-anchor";
 import { cn } from "../lib/utils";
 import { t } from "../../shared/i18n";
 import { computeAnchoredOverlayPosition, isCoarsePointer } from "../../shared/ui/overlay-adaptation";
@@ -70,6 +72,8 @@ export function WordCardPopover({
   const [cardData, setCardData] = useState<WordCardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [ttsLang, setTtsLang] = useState<string>("en-US");
+  const [wordbookLanguage, setWordbookLanguage] = useState<string>("en");
+  const [wordbookState, setWordbookState] = useState<"active" | "archived" | "ignored" | null>(null);
   const [position, setPosition] = useState<Position>({ top: 0, left: 0 });
   const [isVisible, setIsVisible] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -83,6 +87,7 @@ export function WordCardPopover({
         const response = await sendMessage("GET_SETTINGS", undefined);
         if (!response.ok || cancelled) return;
         setTtsLang(resolveTtsLang(response.value));
+        setWordbookLanguage(normalizeWordbookLanguage((response.value as any)?.targetLanguage));
       } catch (error: unknown) {
         log.warn("Failed to load settings for TTS language; using default", { message: getErrorMessage(error) });
       }
@@ -93,6 +98,38 @@ export function WordCardPopover({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchWordbookState() {
+      const normalizedTerm = normalizeWordbookTerm(word);
+      if (!normalizedTerm) {
+        setWordbookState(null);
+        return;
+      }
+      const id = makeWordbookEntryId(wordbookLanguage as any, normalizedTerm);
+
+      try {
+        const resp = await sendMessage("WORDBOOK_GET", { id } as any);
+        if (cancelled) return;
+        if (!resp.ok) {
+          setWordbookState(null);
+          return;
+        }
+        const entry = resp.value as any;
+        setWordbookState(entry?.state ?? null);
+      } catch (error: unknown) {
+        if (cancelled) return;
+        setWordbookState(null);
+      }
+    }
+
+    void fetchWordbookState();
+    return () => {
+      cancelled = true;
+    };
+  }, [word, wordbookLanguage]);
 
   // Fetch word explanation
   useEffect(() => {
@@ -211,6 +248,66 @@ export function WordCardPopover({
     }
   }, [mode, onClose]);
 
+  const handleWordbookToggle = useCallback(
+    async (_word: string, currentState: "active" | "archived" | "ignored" | null) => {
+      const normalizedTerm = normalizeWordbookTerm(word);
+      if (!normalizedTerm) return;
+      const id = makeWordbookEntryId(wordbookLanguage as any, normalizedTerm);
+
+      try {
+        if (currentState) {
+          await sendMessage("WORDBOOK_DELETE", { id } as any);
+          setWordbookState(null);
+          return;
+        }
+
+        const now = Date.now();
+        const anchorKey = await makeWebAnchorKey(window.location.href);
+
+        const snippet = (() => {
+          const candidate = (cardData as any)?.example ?? "";
+          const trimmed = String(candidate ?? "").trim();
+          if (!trimmed) return undefined;
+          return trimmed.length > 240 ? `${trimmed.slice(0, 240)}…` : trimmed;
+        })();
+
+        const source = anchorKey
+          ? {
+              kind: "web",
+              anchorKey,
+              capturedAt: now,
+              ...(snippet ? { snippet } : {}),
+              domain: window.location.hostname,
+              title: document.title,
+            }
+          : null;
+
+        const entry = {
+          id,
+          language: wordbookLanguage,
+          term: word.trim(),
+          normalizedTerm,
+          state: "active",
+          tags: [],
+          note: "",
+          sources: source ? [source] : [],
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const upserted = await sendMessage("WORDBOOK_UPSERT", { entry } as any);
+        if (upserted.ok) {
+          setWordbookState((upserted.value as any)?.state ?? "active");
+        } else {
+          setWordbookState(null);
+        }
+      } catch (error: unknown) {
+        void error;
+      }
+    },
+    [cardData, word, wordbookLanguage],
+  );
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -222,15 +319,16 @@ export function WordCardPopover({
 
   const isMobile = useIsCoarsePointer();
 
-  return (
-    <AnimatePresence>
-      <motion.div
-        ref={popoverRef}
-        initial={isMobile ? { y: "100%", opacity: 0 } : { opacity: 0 }}
-        animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1 }}
-        exit={isMobile ? { y: "100%", opacity: 0 } : { opacity: 0 }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className={cn(
+  return ( 
+    <AnimatePresence> 
+      <motion.div 
+        ref={popoverRef} 
+        data-lx-wordcard="sidebar" 
+        initial={isMobile ? { y: "100%", opacity: 0 } : { opacity: 0 }} 
+        animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1 }} 
+        exit={isMobile ? { y: "100%", opacity: 0 } : { opacity: 0 }} 
+        transition={{ type: "spring", damping: 25, stiffness: 200 }} 
+        className={cn( 
           "fixed z-[10000]",
           isMobile 
             ? "bottom-0 left-0 right-0 w-full" 
@@ -268,6 +366,8 @@ export function WordCardPopover({
               data={cardData}
               mode={isMobile ? "click" : mode}
               ttsLang={ttsLang}
+              wordbookState={wordbookState}
+              onWordbookToggle={handleWordbookToggle}
               {...(onFavoriteToggle ? { onFavoriteToggle } : {})}
               {...(onLearnedToggle ? { onLearnedToggle } : {})}
               onClose={onClose}

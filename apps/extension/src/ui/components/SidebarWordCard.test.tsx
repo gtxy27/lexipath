@@ -19,7 +19,7 @@ vi.mock("webextension-polyfill", () => ({
   default: browserMock,
 }));
 
-import { WordCard } from "./WordCard";
+import { WordCard } from "./SidebarWordCard"; 
 
 describe("WordCard", () => {
   beforeEach(() => {

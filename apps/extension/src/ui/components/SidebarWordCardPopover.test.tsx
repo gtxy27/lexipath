@@ -28,13 +28,17 @@ vi.mock('../../shared/messages', () => ({
   sendMessage: sendMessageMock,
 }));
 
+vi.mock('../../shared/chat-anchor', () => ({
+  makeWebAnchorKey: vi.fn(async () => 'ak_web'),
+}));
+
 vi.mock('@lexipath/dictionary', () => ({
   speak: speakMock,
   stop: stopMock,
   getVoices: vi.fn(() => []),
 }));
 
-import { WordCardPopover } from './WordCardPopover';
+import { WordCardPopover } from './SidebarWordCardPopover';
 
 describe('WordCardPopover', () => {
   const mockAnchorRect: DOMRect = {
@@ -59,10 +63,23 @@ describe('WordCardPopover', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default: successful response
-    sendMessageMock.mockResolvedValue({
-      ok: true,
-      value: mockWordData,
+    sendMessageMock.mockImplementation(async (type: string, payload: any) => {
+      if (type === 'GET_SETTINGS') {
+        return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+      }
+      if (type === 'WORDBOOK_GET') {
+        return { ok: true, value: null };
+      }
+      if (type === 'WORDBOOK_UPSERT') {
+        return { ok: true, value: payload?.entry ?? null };
+      }
+      if (type === 'WORDBOOK_DELETE') {
+        return { ok: true, value: { ok: true } };
+      }
+      if (type === 'EXPLAIN_WORD') {
+        return { ok: true, value: mockWordData };
+      }
+      return { ok: true, value: null };
     });
 
     // Mock getBoundingClientRect for popover positioning
@@ -112,12 +129,23 @@ describe('WordCardPopover', () => {
     });
 
     it('handles missing optional fields', async () => {
-      sendMessageMock.mockResolvedValue({
-        ok: true,
-        value: {
-          word: 'test',
-          definition: 'A test',
-        },
+      sendMessageMock.mockImplementation(async (type: string, payload: any) => {
+        if (type === 'GET_SETTINGS') {
+          return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+        }
+        if (type === 'WORDBOOK_GET') {
+          return { ok: true, value: null };
+        }
+        if (type === 'EXPLAIN_WORD') {
+          return {
+            ok: true,
+            value: {
+              word: 'test',
+              definition: 'A test',
+            },
+          };
+        }
+        return { ok: true, value: null };
       });
 
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
@@ -133,9 +161,17 @@ describe('WordCardPopover', () => {
 
     it('shows error message when fetch fails', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      sendMessageMock.mockResolvedValue({
-        ok: false,
-        error: { code: 'NETWORK_ERROR', message: 'Network error' },
+      sendMessageMock.mockImplementation(async (type: string, payload: any) => {
+        if (type === 'GET_SETTINGS') {
+          return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+        }
+        if (type === 'WORDBOOK_GET') {
+          return { ok: true, value: null };
+        }
+        if (type === 'EXPLAIN_WORD') {
+          return { ok: false, error: { code: 'NETWORK_ERROR', message: 'Network error' } };
+        }
+        return { ok: true, value: null };
       });
 
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
@@ -153,11 +189,17 @@ describe('WordCardPopover', () => {
     });
 
     it('shows fallback when definition is missing', async () => {
-      sendMessageMock.mockResolvedValue({
-        ok: true,
-        value: {
-          word: 'test',
-        },
+      sendMessageMock.mockImplementation(async (type: string, payload: any) => {
+        if (type === 'GET_SETTINGS') {
+          return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+        }
+        if (type === 'WORDBOOK_GET') {
+          return { ok: true, value: null };
+        }
+        if (type === 'EXPLAIN_WORD') {
+          return { ok: true, value: { word: 'test' } };
+        }
+        return { ok: true, value: null };
       });
 
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
@@ -169,7 +211,18 @@ describe('WordCardPopover', () => {
 
     it('handles exception during fetch', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      sendMessageMock.mockRejectedValue(new Error('Network failure'));
+      sendMessageMock.mockImplementation(async (type: string) => {
+        if (type === 'GET_SETTINGS') {
+          return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+        }
+        if (type === 'WORDBOOK_GET') {
+          return { ok: true, value: null };
+        }
+        if (type === 'EXPLAIN_WORD') {
+          throw new Error('Network failure');
+        }
+        return { ok: true, value: null };
+      });
 
       render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
 
@@ -249,29 +302,6 @@ describe('WordCardPopover', () => {
       expect(onClose).toHaveBeenCalled();
     });
 
-    it('forwards onFavoriteToggle callback', async () => {
-      const user = userEvent.setup();
-      const onFavoriteToggle = vi.fn();
-
-      render(
-        <WordCardPopover
-          word="test"
-          anchorRect={mockAnchorRect}
-          onClose={vi.fn()}
-          onFavoriteToggle={onFavoriteToggle}
-        />
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('test')).toBeInTheDocument();
-      });
-
-      const favoriteButton = screen.getByLabelText('wordCard_favorite');
-      await user.click(favoriteButton);
-
-      expect(onFavoriteToggle).toHaveBeenCalledWith('test', true);
-    });
-
     it('forwards onLearnedToggle callback', async () => {
       const user = userEvent.setup();
       const onLearnedToggle = vi.fn();
@@ -305,13 +335,77 @@ describe('WordCardPopover', () => {
       });
 
       // Should not throw when clicking without callbacks
-      const favoriteButton = screen.getByLabelText('wordCard_favorite');
-      await user.click(favoriteButton);
+      const saveButton = screen.getByLabelText('wordCard_save');
+      await user.click(saveButton);
 
       const learnedButton = screen.getByLabelText('wordCard_markLearned');
       await user.click(learnedButton);
 
       // No assertion needed - just checking it doesn't throw
+    });
+
+    it('shows wordbook state indicator when saved', async () => {
+      sendMessageMock.mockImplementation(async (type: string, payload: any) => {
+        if (type === 'GET_SETTINGS') {
+          return { ok: true, value: { targetLanguage: 'en', nativeLanguage: 'en' } };
+        }
+        if (type === 'WORDBOOK_GET') {
+          return {
+            ok: true,
+            value: {
+              id: 'en:test',
+              language: 'en',
+              term: 'test',
+              normalizedTerm: 'test',
+              state: 'archived',
+              tags: [],
+              note: '',
+              sources: [],
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          };
+        }
+        if (type === 'EXPLAIN_WORD') {
+          return { ok: true, value: mockWordData };
+        }
+        return { ok: true, value: null };
+      });
+
+      render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('test')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('wordCard_stateArchived')).toBeInTheDocument();
+      expect(screen.getByLabelText('wordCard_unsave')).toBeInTheDocument();
+    });
+
+    it('toggles wordbook save/unsave without touching familiarity paths', async () => {
+      const user = userEvent.setup();
+
+      render(<WordCardPopover word="test" anchorRect={mockAnchorRect} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('test')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByLabelText('wordCard_save'));
+
+      const typesAfterSave = sendMessageMock.mock.calls.map((call) => call[0]);
+      expect(typesAfterSave).toContain('WORDBOOK_UPSERT');
+      expect(typesAfterSave).not.toContain('BATCH_GET_WORD_FAMILIARITY');
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('wordCard_unsave')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByLabelText('wordCard_unsave'));
+
+      const typesAfterUnsave = sendMessageMock.mock.calls.map((call) => call[0]);
+      expect(typesAfterUnsave).toContain('WORDBOOK_DELETE');
+      expect(typesAfterUnsave).not.toContain('BATCH_GET_WORD_FAMILIARITY');
     });
   });
 

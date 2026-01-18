@@ -5,6 +5,13 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 import { useToast } from "../../components/ui/use-toast";
 import { Download, Loader2, Upload } from "lucide-react";
 import { AiGate } from "../AiGate";
@@ -32,6 +39,12 @@ export function BackupTab(props: {
   const [webdavAction, setWebdavAction] = useState<"upload" | "download" | null>(
     null,
   );
+  const [wordbookExportFormat, setWordbookExportFormat] = useState<
+    "json" | "anki_csv" | "markdown"
+  >("json");
+  const [wordbookImportStrategy, setWordbookImportStrategy] = useState<
+    "merge" | "overwrite" | "skip-duplicates"
+  >("merge");
 
   async function ensureWebDAVPermission(url: string): Promise<boolean> {
     try {
@@ -187,6 +200,82 @@ export function BackupTab(props: {
     event.target.value = "";
   }
 
+  async function handleWordbookExport() {
+    const response = await sendMessage("WORDBOOK_EXPORT", {
+      format: wordbookExportFormat,
+    });
+
+    if (!response.ok) {
+      toast({
+        title: t("optionsWordbookExportError", response.error.message),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const blob = new Blob([response.value.content], { type: response.value.mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = response.value.filename;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast({ title: t("optionsWordbookExportSuccess") });
+  }
+
+  async function handleWordbookImport(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const format = file.name.toLowerCase().endsWith(".csv") ? "anki_csv" : "json";
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const raw = e.target?.result;
+        if (typeof raw !== "string") return;
+
+        const response = await sendMessage("WORDBOOK_IMPORT", {
+          format,
+          data: raw,
+          strategy: wordbookImportStrategy,
+        });
+
+        if (!response.ok) {
+          toast({
+            title: t("optionsWordbookImportError", response.error.message),
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: t("optionsWordbookImportSuccess", [
+            String(response.value.added),
+            String(response.value.updated),
+            String(response.value.skipped),
+          ]),
+        });
+      } catch (err: unknown) {
+        log.error("Wordbook import failed", { message: getErrorMessage(err) });
+        toast({
+          title: t(
+            "optionsWordbookImportError",
+            err instanceof Error ? err.message : t("error_unknown"),
+          ),
+          variant: "destructive",
+        });
+      }
+    };
+
+    reader.readAsText(file);
+    input.value = "";
+  }
+
   const content = (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
@@ -224,6 +313,86 @@ export function BackupTab(props: {
           </div>
         </OptionsSection>
       </div>
+
+      <OptionsSection
+        title={t("optionsWordbookTransferTitle")}
+        description={t("optionsWordbookTransferDesc")}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="text-sm font-medium">{t("optionsWordbookExportTitle")}</div>
+            <Select
+              value={wordbookExportFormat}
+              onValueChange={(v) =>
+                setWordbookExportFormat(v as "json" | "anki_csv" | "markdown")
+              }
+            >
+              <SelectTrigger className="h-11 rounded-lg bg-background/70 dark:bg-card/60 shadow-sm">
+                <SelectValue placeholder={t("optionsWordbookFormatJson")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="json">{t("optionsWordbookFormatJson")}</SelectItem>
+                <SelectItem value="anki_csv">{t("optionsWordbookFormatAnkiCsv")}</SelectItem>
+                <SelectItem value="markdown">{t("optionsWordbookFormatMarkdown")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              onClick={handleWordbookExport}
+              className="w-full h-11 rounded-lg flex items-center justify-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {t("optionsWordbookExportButton")}
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="text-sm font-medium">{t("optionsWordbookImportTitle")}</div>
+            <div className="space-y-2.5">
+              <Label className="text-xs text-muted-foreground">
+                {t("optionsWordbookImportStrategyLabel")}
+              </Label>
+              <Select
+                value={wordbookImportStrategy}
+                onValueChange={(v) =>
+                  setWordbookImportStrategy(
+                    v as "merge" | "overwrite" | "skip-duplicates",
+                  )
+                }
+              >
+                <SelectTrigger className="h-11 rounded-lg bg-background/70 dark:bg-card/60 shadow-sm">
+                  <SelectValue placeholder={t("optionsWordbookImportStrategyMerge")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="merge">{t("optionsWordbookImportStrategyMerge")}</SelectItem>
+                  <SelectItem value="overwrite">
+                    {t("optionsWordbookImportStrategyOverwrite")}
+                  </SelectItem>
+                  <SelectItem value="skip-duplicates">
+                    {t("optionsWordbookImportStrategySkip")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="relative">
+              <Input
+                type="file"
+                accept=".json,.csv"
+                onChange={handleWordbookImport}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+              />
+              <Button
+                variant="outline"
+                className="w-full h-11 rounded-lg flex items-center justify-center gap-2 bg-background/70 dark:bg-card/60 hover:bg-background dark:hover:bg-card/80"
+              >
+                <Upload className="h-4 w-4" />
+                {t("optionsWordbookImportButton")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </OptionsSection>
 
       <OptionsSection className="shadow-none">
         <header className="flex items-center justify-between gap-4">

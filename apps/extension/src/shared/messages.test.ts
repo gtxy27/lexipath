@@ -40,6 +40,19 @@ describe('sendMessage payload validation', () => {
     }
   });
 
+  it('validates wordbook payloads locally', async () => {
+    runtimeSendMessage.mockReset();
+
+    const { sendMessage } = await import('./messages');
+    const response = await sendMessage('WORDBOOK_GET', { id: '' } as any);
+
+    expect(runtimeSendMessage).not.toHaveBeenCalled();
+    expect(response.ok).toBe(false);
+    if (!response.ok) {
+      expect(response.error.code).toBe('INVALID_PAYLOAD');
+    }
+  });
+
   it('accepts valid payload and parses response', async () => {
     runtimeSendMessage.mockReset();
     runtimeSendMessage.mockResolvedValue({ ok: true, value: { word: 'test', definition: 'ok' } });
