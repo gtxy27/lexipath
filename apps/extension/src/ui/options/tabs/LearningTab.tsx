@@ -19,6 +19,7 @@ export function LearningTab(props: {
   const { form, setForm, errors, aiEnabled, onOpenChannels } = props;
   const contextEnabled = form.llmContextSentences > 0;
   const contextOptions = [1, 2, 3, 4, 5, 6];
+  const maxSourcesOptions = [1, 2, 3];
 
   return (
     <div className="space-y-10">
@@ -83,6 +84,73 @@ export function LearningTab(props: {
               </Select>
             </OptionsRow>
           ) : null}
+        </div>
+      </OptionsSection>
+
+      <OptionsSection
+        title={t("optionsWordbookTitle")}
+        description={t("optionsWordbookDesc")}
+      >
+        <div className="space-y-5">
+          <OptionsRow
+            title={t("optionsWordbookSaveSnippetTitle")}
+            description={t("optionsWordbookSaveSnippetDesc")}
+          >
+            <Switch
+              data-testid="wordbook-save-snippet"
+              checked={Boolean(form.wordbookSaveSnippetOnCapture)}
+              onCheckedChange={(checked) =>
+                setForm({ ...form, wordbookSaveSnippetOnCapture: Boolean(checked) })
+              }
+              className="data-[state=checked]:bg-primary"
+            />
+          </OptionsRow>
+
+          <OptionsRow
+            title={t("optionsWordbookMaxSourcesTitle")}
+            description={t("optionsWordbookMaxSourcesDesc")}
+          >
+            <Select
+              value={String(form.wordbookMaxSourcesPerEntry)}
+              onValueChange={(v) =>
+                setForm({
+                  ...form,
+                  wordbookMaxSourcesPerEntry: Number(v),
+                })
+              }
+            >
+              <SelectTrigger
+                data-testid="wordbook-max-sources"
+                className="w-full sm:w-56 h-11 rounded-lg text-xs"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {maxSourcesOptions.map((n) => (
+                  <SelectItem key={String(n)} value={String(n)}>
+                    {t("optionsWordbookMaxSourcesLabel", String(n))}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </OptionsRow>
+
+          <OptionsRow
+            title={t("optionsWordbookHideArchivedIgnoredTitle")}
+            description={t("optionsWordbookHideArchivedIgnoredDesc")}
+          >
+            <Switch
+              data-testid="wordbook-hide-archived-ignored"
+              checked={Boolean(form.wordbookHideArchivedIgnoredInForgotten)}
+              onCheckedChange={(checked) =>
+                setForm({
+                  ...form,
+                  wordbookHideArchivedIgnoredInForgotten: Boolean(checked),
+                })
+              }
+              className="data-[state=checked]:bg-primary"
+            />
+          </OptionsRow>
         </div>
       </OptionsSection>
 

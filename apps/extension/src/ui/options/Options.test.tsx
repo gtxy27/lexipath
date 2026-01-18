@@ -80,6 +80,26 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
       if (type === "SET_SETTINGS") return { ok: true, value: null };
       if (type === "TEST_PROVIDER_CONNECTION") return { ok: true, value: true };
       if (type === "REQUEST_HOST_PERMISSION") return { ok: true, value: true };
+      if (type === "WORDBOOK_EXPORT") {
+        const format = (payload as any)?.format ?? "json";
+        return {
+          ok: true,
+          value: {
+            format,
+            filename: `lexipath-wordbook.${format === "anki_csv" ? "csv" : format === "markdown" ? "md" : "json"}`,
+            mime:
+              format === "anki_csv"
+                ? "text/csv"
+                : format === "markdown"
+                  ? "text/markdown"
+                  : "application/json",
+            content: "front,back",
+          },
+        };
+      }
+      if (type === "WORDBOOK_IMPORT") {
+        return { ok: true, value: { added: 1, updated: 2, skipped: 3 } };
+      }
       return { ok: true, value: null };
     }),
   };
@@ -229,5 +249,140 @@ describe("Options", () => {
 
     const payload = setCalls[0]?.[1] as any;
     expect(payload.llmContextSentences).toBe(3);
+  });
+
+  it("saves wordbook settings from the learning tab", async () => {
+    render(<Options />);
+    const user = userEvent.setup();
+
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
+    });
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!);
+
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {
+        selector: "#channel-1-base-url",
+      })[0]!,
+      "https://api.openai.com/v1",
+    );
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderModelLabel/, {
+        selector: "#channel-1-model",
+      })[0]!,
+      "gpt-4o-mini",
+    );
+
+    await user.click(screen.getAllByRole("tab", { name: "optionsTab_learning" })[0]!);
+
+    const saveSnippetToggle = await screen.findByTestId("wordbook-save-snippet");
+    const hideToggle = await screen.findByTestId("wordbook-hide-archived-ignored");
+
+    await user.click(saveSnippetToggle);
+    await user.click(hideToggle);
+
+    await user.click(screen.getByTestId("wordbook-max-sources"));
+    await user.click(await screen.findByText("optionsWordbookMaxSourcesLabel:3"));
+
+    await user.click(screen.getAllByRole("button", { name: "optionsSaveButton" })[0]!);
+
+    const setCalls = sendMessageMock.mock.calls.filter((call) => call[0] === "SET_SETTINGS");
+    expect(setCalls).toHaveLength(1);
+
+    const payload = setCalls[0]?.[1] as any;
+    expect(payload.wordbook).toMatchObject({
+      saveSnippetOnCapture: false,
+      maxSourcesPerEntry: 3,
+    });
+    expect(payload.wordbookHideArchivedIgnoredInForgotten).toBe(false);
+  });
+
+  it("exports and imports wordbook from the backup section", async () => {
+    render(<Options />);
+    const user = userEvent.setup();
+
+    (globalThis.URL as any).createObjectURL ??= vi.fn(() => "blob:mock");
+    (globalThis.URL as any).revokeObjectURL ??= vi.fn();
+
+    class MockFileReader {
+      public onload: ((e: any) => void) | null = null;
+      public result: string | null = null;
+      public readAsText(file: any) {
+        const promise =
+          file && typeof file.text === "function" ? file.text() : Promise.resolve("");
+        void promise.then((text: string) => {
+          this.result = text;
+          this.onload?.({ target: { result: text } });
+        });
+      }
+    }
+
+    (globalThis as any).FileReader = MockFileReader;
+
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith("GET_SETTINGS", undefined);
+    });
+
+    await user.click(
+      screen.getAllByRole("tab", { name: "optionsTab_channels" })[0]!,
+    );
+
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderBaseUrlLabel/, {
+        selector: "#channel-1-base-url",
+      })[0]!,
+      "https://api.openai.com/v1",
+    );
+    await user.type(
+      screen.getAllByLabelText(/optionsProviderModelLabel/, {
+        selector: "#channel-1-model",
+      })[0]!,
+      "gpt-4o-mini",
+    );
+
+    await user.click(
+      screen.getAllByRole("tab", { name: "optionsTab_general" })[0]!,
+    );
+
+    await screen.findByText("optionsGeneralBackupTitle");
+
+    await user.click(
+      screen.getByText("optionsGeneralBackupTitle").closest("summary")!,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "optionsWordbookExportButton" }),
+    );
+
+    const exportCalls = sendMessageMock.mock.calls.filter(
+      (call) => call[0] === "WORDBOOK_EXPORT",
+    );
+    expect(exportCalls).toHaveLength(1);
+    expect(exportCalls[0]?.[1]).toEqual({ format: "json" });
+
+    const input = document.querySelector(
+      'input[type="file"][accept=".json,.csv"]',
+    ) as HTMLInputElement | null;
+    expect(input).toBeTruthy();
+
+    const csv = new File(["front,back"], "wordbook.csv", { type: "text/csv" });
+    await user.upload(input!, csv);
+
+    await waitFor(() => {
+      const importCalls = sendMessageMock.mock.calls.filter(
+        (call) => call[0] === "WORDBOOK_IMPORT",
+      );
+      expect(importCalls).toHaveLength(1);
+    });
+
+    const importCalls = sendMessageMock.mock.calls.filter(
+      (call) => call[0] === "WORDBOOK_IMPORT",
+    );
+    expect(importCalls[0]?.[1]).toEqual({
+      format: "anki_csv",
+      data: "front,back",
+      strategy: "merge",
+    });
   });
 });

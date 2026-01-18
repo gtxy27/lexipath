@@ -63,6 +63,11 @@
     "message": "Example translation",
     "description": "Word card: section label (example translation)"
   },
+  "wordCard_askAI": {
+    "message": "Ask AI",
+    "description": "Word card: ask AI button"
+  },
+
   "englishCorrection_tagEncouragement": {
     "message": "Encouragement",
     "description": "English correction: card tag (encouragement)"
@@ -415,6 +420,164 @@
     "message": "Familiarity $1 · Seen $2",
     "description": "Floating button: forgotten item meta"
   },
+
+  "wordbookTitle": {
+    "message": "Wordbook",
+    "description": "Wordbook: title"
+  },
+  "wordbookTitleDesc": {
+    "message": "Save and manage words/phrases.",
+    "description": "Wordbook: entry point hint"
+  },
+  "wordbookActionSave": {
+    "message": "Save",
+    "description": "Wordbook: save action"
+  },
+  "wordbookActionIgnore": {
+    "message": "Don't learn",
+    "description": "Wordbook: ignore action"
+  },
+  "wordbookActionArchive": {
+    "message": "Mastered",
+    "description": "Wordbook: archive action"
+  },
+  "wordbookUnsaved": {
+    "message": "Unsaved",
+    "description": "Wordbook: unsaved changes badge"
+  },
+  "wordbookEmpty": {
+    "message": "No entries",
+    "description": "Wordbook: empty list"
+  },
+  "wordbookLoading": {
+    "message": "Loading...",
+    "description": "Wordbook: loading list"
+  },
+  "wordbookSelectEntry": {
+    "message": "Select an entry",
+    "description": "Wordbook: prompt to select an entry"
+  },
+  "wordbookNoEntrySelected": {
+    "message": "No entry selected",
+    "description": "Wordbook: no entry selected"
+  },
+  "wordbookBack": {
+    "message": "Back",
+    "description": "Wordbook: back button"
+  },
+  "wordbookTagsLabel": {
+    "message": "Tags",
+    "description": "Wordbook: tags label"
+  },
+  "wordbookTagPlaceholder": {
+    "message": "Type a tag and press Enter",
+    "description": "Wordbook: tag input placeholder"
+  },
+  "wordbookNoteLabel": {
+    "message": "Note",
+    "description": "Wordbook: note label"
+  },
+  "wordbookNotePlaceholder": {
+    "message": "Add a note...",
+    "description": "Wordbook: note placeholder"
+  },
+  "wordbookSourcesLabel": {
+    "message": "Sources",
+    "description": "Wordbook: sources label"
+  },
+  "wordbookStateLabel": {
+    "message": "State",
+    "description": "Wordbook: state label"
+  },
+  "wordbookDetailHint": {
+    "message": "Edit tags and notes; autosaves in 1s.",
+    "description": "Wordbook: detail panel hint"
+  },
+  "wordbookStateAll": {
+    "message": "All",
+    "description": "Wordbook: state filter all"
+  },
+  "wordbookStateActive": {
+    "message": "Learning",
+    "description": "Wordbook: state active"
+  },
+  "wordbookStateArchived": {
+    "message": "Mastered",
+    "description": "Wordbook: state archived"
+  },
+  "wordbookStateIgnored": {
+    "message": "Don't learn",
+    "description": "Wordbook: state ignored"
+  },
+  "wordbookSortUpdated": {
+    "message": "Updated",
+    "description": "Wordbook: sort updated"
+  },
+  "wordbookSortAZ": {
+    "message": "A-Z",
+    "description": "Wordbook: sort term asc"
+  },
+  "wordbookBulk": {
+    "message": "Bulk",
+    "description": "Wordbook: bulk mode toggle"
+  },
+  "wordbookSelectedCount": {
+    "message": "$1 selected",
+    "description": "Wordbook: selected count"
+  },
+  "wordbookBulkArchive": {
+    "message": "Mark as mastered",
+    "description": "Wordbook: bulk archive action"
+  },
+  "wordbookBulkIgnore": {
+    "message": "Mark as don't learn",
+    "description": "Wordbook: bulk ignore action"
+  },
+  "wordbookBulkRemove": {
+    "message": "Remove selected",
+    "description": "Wordbook: bulk remove action"
+  },
+  "wordbookBulkDone": {
+    "message": "Done.",
+    "description": "Wordbook: bulk action complete toast"
+  },
+  "wordbookConfirmRemove": {
+    "message": "Remove $1 entries?",
+    "description": "Wordbook: confirm remove"
+  },
+  "wordbookAddTitle": {
+    "message": "Add to wordbook",
+    "description": "Wordbook: add entry title"
+  },
+  "wordbookAddHint": {
+    "message": "Creates a learning entry (uses your target language).",
+    "description": "Wordbook: add entry hint"
+  },
+  "wordbookAddPlaceholder": {
+    "message": "Type a word or phrase...",
+    "description": "Wordbook: add entry input placeholder"
+  },
+  "wordbookAddButton": {
+    "message": "Add",
+    "description": "Wordbook: add entry button"
+  },
+  "wordbookAddMissing": {
+    "message": "Please enter a word or phrase.",
+    "description": "Wordbook: add entry missing term error"
+  },
+  "wordbookAddExists": {
+    "message": "Already in your wordbook.",
+    "description": "Wordbook: add entry already exists toast"
+  },
+  "wordbookAddSuccess": {
+    "message": "Added to wordbook.",
+    "description": "Wordbook: add entry success toast"
+  },
+  "wordbookAddError": {
+    "message": "Failed to add: $1",
+    "description": "Wordbook: add entry error toast"
+  },
+
   "themeSystem": {
     "message": "System",
     "description": "Theme: system"
@@ -1128,6 +1291,74 @@
   "optionsImportDesc": {
     "message": "Restore data from a previously exported JSON file. This will overwrite current settings.",
     "description": "Import data description"
+  },
+  "optionsWordbookTransferTitle": {
+    "message": "Wordbook Import & Export",
+    "description": "Options: wordbook transfer section title"
+  },
+  "optionsWordbookTransferDesc": {
+    "message": "Export or import just your wordbook. Full backup export also includes it.",
+    "description": "Options: wordbook transfer section description"
+  },
+  "optionsWordbookExportTitle": {
+    "message": "Export wordbook",
+    "description": "Options: wordbook export title"
+  },
+  "optionsWordbookExportButton": {
+    "message": "Export Wordbook",
+    "description": "Options: wordbook export button"
+  },
+  "optionsWordbookExportSuccess": {
+    "message": "Wordbook exported successfully.",
+    "description": "Options: wordbook export success message"
+  },
+  "optionsWordbookExportError": {
+    "message": "Wordbook export failed: $1",
+    "description": "Options: wordbook export error message"
+  },
+  "optionsWordbookImportTitle": {
+    "message": "Import wordbook",
+    "description": "Options: wordbook import title"
+  },
+  "optionsWordbookImportButton": {
+    "message": "Import Wordbook",
+    "description": "Options: wordbook import button"
+  },
+  "optionsWordbookImportStrategyLabel": {
+    "message": "Import strategy",
+    "description": "Options: wordbook import strategy label"
+  },
+  "optionsWordbookImportStrategyMerge": {
+    "message": "Merge (recommended)",
+    "description": "Options: wordbook import strategy label (merge)"
+  },
+  "optionsWordbookImportStrategyOverwrite": {
+    "message": "Overwrite",
+    "description": "Options: wordbook import strategy label (overwrite)"
+  },
+  "optionsWordbookImportStrategySkip": {
+    "message": "Skip duplicates",
+    "description": "Options: wordbook import strategy label (skip duplicates)"
+  },
+  "optionsWordbookImportSuccess": {
+    "message": "Imported. Added: $1, updated: $2, skipped: $3.",
+    "description": "Options: wordbook import success message, $1=added, $2=updated, $3=skipped"
+  },
+  "optionsWordbookImportError": {
+    "message": "Wordbook import failed: $1",
+    "description": "Options: wordbook import error message"
+  },
+  "optionsWordbookFormatJson": {
+    "message": "JSON",
+    "description": "Options: wordbook format label (json)"
+  },
+  "optionsWordbookFormatAnkiCsv": {
+    "message": "Anki CSV",
+    "description": "Options: wordbook format label (anki csv)"
+  },
+  "optionsWordbookFormatMarkdown": {
+    "message": "Markdown",
+    "description": "Options: wordbook format label (markdown)"
   },
   "optionsImportInvalidJson": {
     "message": "Invalid JSON.",
@@ -1945,6 +2176,27 @@
     "message": "Learned",
     "description": "Mark as learned button"
   },
+  "wordCard_save": {
+    "message": "Save",
+    "description": "Save to wordbook"
+  },
+  "wordCard_unsave": {
+    "message": "Saved",
+    "description": "Unsave from wordbook"
+  },
+  "wordCard_stateActive": {
+    "message": "Learning",
+    "description": "Wordbook state: learning"
+  },
+  "wordCard_stateArchived": {
+    "message": "Mastered",
+    "description": "Wordbook state: mastered"
+  },
+  "wordCard_stateIgnored": {
+    "message": "Skip",
+    "description": "Wordbook state: skip"
+  },
+
   "onboardingStepProgress": {
     "message": "Step $1 of 3",
     "description": "Step progress indicator"
@@ -2380,5 +2632,41 @@
   "optionsTestBingTranslate": {
     "message": "Test Bing Translate",
     "description": "Test Bing Translate button"
+  },
+  "optionsWordbookTitle": {
+    "message": "Wordbook",
+    "description": "Options: wordbook section title"
+  },
+  "optionsWordbookDesc": {
+    "message": "Control capture behavior and forgotten list filtering. Import/export is available in Settings \u2192 Backup.",
+    "description": "Options: wordbook section description"
+  },
+  "optionsWordbookSaveSnippetTitle": {
+    "message": "Save source snippets on capture",
+    "description": "Options: wordbook save snippet title"
+  },
+  "optionsWordbookSaveSnippetDesc": {
+    "message": "When saving a term, also store a short excerpt from where it was captured.",
+    "description": "Options: wordbook save snippet description"
+  },
+  "optionsWordbookMaxSourcesTitle": {
+    "message": "Max sources per entry",
+    "description": "Options: wordbook max sources title"
+  },
+  "optionsWordbookMaxSourcesDesc": {
+    "message": "Limits how many sources/snippets are kept per wordbook entry.",
+    "description": "Options: wordbook max sources description"
+  },
+  "optionsWordbookMaxSourcesLabel": {
+    "message": "$1 sources",
+    "description": "Options: wordbook max sources option label, $1=count"
+  },
+  "optionsWordbookHideArchivedIgnoredTitle": {
+    "message": "Hide mastered/don't-learn in forgotten list",
+    "description": "Options: hide archived/ignored forgotten list title"
+  },
+  "optionsWordbookHideArchivedIgnoredDesc": {
+    "message": "When enabled, mastered and \"don't learn\" entries won't appear in the forgotten words list.",
+    "description": "Options: hide archived/ignored forgotten list description"
   }
 }

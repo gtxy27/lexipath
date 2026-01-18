@@ -50,6 +50,9 @@ export type FormState = {
   theme: Settings["theme"];
   promptStyle: Settings["promptStyle"];
   llmContextSentences: Settings["llmContextSentences"];
+  wordbookSaveSnippetOnCapture: boolean;
+  wordbookMaxSourcesPerEntry: number;
+  wordbookHideArchivedIgnoredInForgotten: boolean;
   enabled: boolean;
   autoEnhance: boolean;
   webEnhanceMode: Settings["webEnhanceMode"];
