@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { SettingsSchema, WordFamiliaritySchema } from '@lexipath/core';
+import { SettingsSchema, WordFamiliaritySchema, WordbookEntrySchema } from '@lexipath/core';
+
 
 export const ChatSessionKindSchema = z.enum(['general', 'keyword', 'web', 'subtitle']);
 export type ChatSessionKind = z.infer<typeof ChatSessionKindSchema>;
@@ -57,11 +58,15 @@ export const StorageExportSchema = z
         .strict()
     ),
     familiarity: z.array(WordFamiliaritySchema),
+    // Optional for backward compatibility with pre-wordbook exports.
+    wordbook: z.array(WordbookEntrySchema).optional(),
   })
   .strict();
 
 export type StorageExportData = z.infer<typeof StorageExportSchema>;
 
-export type ChatSessionRecord = StorageExportData['sessions'][number];
-export type ChatMessageRecord = Omit<StorageExportData['messages'][number], 'id'>;
-export type ChatMessageRecordWithId = StorageExportData['messages'][number];
+export type ChatSessionRecord = z.infer<typeof StorageExportSchema>['sessions'][number];
+export type ChatMessageRecord = Omit<z.infer<typeof StorageExportSchema>['messages'][number], 'id'>;
+export type ChatMessageRecordWithId = z.infer<typeof StorageExportSchema>['messages'][number];
+export type WordbookEntryRecord = z.infer<typeof StorageExportSchema>['wordbook'] extends Array<infer T> ? T : never;
+

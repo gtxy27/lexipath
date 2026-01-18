@@ -12,7 +12,7 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
-function openDb(name: string, version = 2): Promise<IDBDatabase> {
+function openDb(name: string, version = 3): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(name, version);
     request.onerror = () => reject(request.error);

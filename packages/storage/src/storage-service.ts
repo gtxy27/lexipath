@@ -1,4 +1,15 @@
-import { SettingsSchema, WordFamiliaritySchema, type Settings, type WordFamiliarity } from '@lexipath/core';
+import {
+  SettingsSchema,
+  WordFamiliaritySchema,
+  WordbookEntrySchema,
+  WordbookEntrySourceSchema,
+  WordbookEntryStateSchema,
+  type Settings,
+  type WordFamiliarity,
+  type WordbookEntry,
+  type WordbookEntrySource,
+  type WordbookEntryState,
+} from '@lexipath/core';
 import { z } from 'zod';
 import {
   StorageExportSchema,
@@ -26,6 +37,9 @@ type TermMessageRecord = {
   sessionId: string;
 };
 
+type WordbookStoreRecord = WordbookEntry;
+
+
 type DbConfig = {
   dbName: string;
   version: number;
@@ -33,8 +47,9 @@ type DbConfig = {
 
 const DEFAULT_CONFIG: DbConfig = {
   dbName: 'lexipath-storage',
-  version: 2,
+  version: 3,
 };
+
 
 function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -54,6 +69,45 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
 function normalizeTerm(input: string): string {
   return input.trim().toLowerCase();
 }
+
+function wordbookEntryId(language: string, normalizedTerm: string): string {
+  return `${language}:${normalizedTerm}`;
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  const n = Math.floor(value);
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
+function normalizeWordbookTerm(term: string): string {
+  return normalizeTerm(term);
+}
+
+function normalizeWordbookSources(sources: WordbookEntrySource[]): WordbookEntrySource[] {
+  const seen = new Set<string>();
+  const out: WordbookEntrySource[] = [];
+  for (const s of sources) {
+    const key = `${s.kind}\u0000${s.anchorKey}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+function applyWordbookSourceLimits(
+  sources: WordbookEntrySource[],
+  options: { maxSources: number }
+): WordbookEntrySource[] {
+  const maxSources = clampInt(options.maxSources, 1, 3);
+  const unique = normalizeWordbookSources(sources);
+  unique.sort((a, b) => (b.capturedAt ?? 0) - (a.capturedAt ?? 0));
+  return unique.slice(0, maxSources);
+}
+
 
 function tokenizeForIndex(text: string): string[] {
   const normalized = text.toLowerCase();
@@ -205,6 +259,15 @@ export class StorageService {
         if (!db.objectStoreNames.contains('familiarity')) {
           db.createObjectStore('familiarity', { keyPath: 'word' });
         }
+
+        if (!db.objectStoreNames.contains('wordbook')) {
+          const store = db.createObjectStore('wordbook', { keyPath: 'id' });
+          store.createIndex('language', 'language', { unique: false });
+          store.createIndex('normalizedTerm', 'normalizedTerm', { unique: false });
+          store.createIndex('state', 'state', { unique: false });
+          store.createIndex('updatedAt', 'updatedAt', { unique: false });
+        }
+
       };
     });
 
@@ -563,8 +626,194 @@ export class StorageService {
   }
 
   // =============================================================================
+  // Wordbook
+  // =============================================================================
+
+  async getWordbookEntry(id: string): Promise<WordbookEntry | null> {
+    const db = await this.getDb();
+    const tx = db.transaction('wordbook', 'readonly');
+    const store = tx.objectStore('wordbook');
+    const raw = await requestToPromise(store.get(id));
+    await transactionDone(tx);
+    const parsed = WordbookEntrySchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+  }
+
+  async upsertWordbookEntry(entry: WordbookEntry): Promise<void> {
+    const parsed = WordbookEntrySchema.parse(entry);
+    const db = await this.getDb();
+    const tx = db.transaction('wordbook', 'readwrite');
+    const store = tx.objectStore('wordbook');
+    await requestToPromise(store.put(parsed satisfies WordbookStoreRecord));
+    await transactionDone(tx);
+  }
+
+  async deleteWordbookEntry(id: string): Promise<void> {
+    const db = await this.getDb();
+    const tx = db.transaction('wordbook', 'readwrite');
+    const store = tx.objectStore('wordbook');
+    await requestToPromise(store.delete(id));
+    await transactionDone(tx);
+  }
+
+  async listWordbookEntries(options: {
+    query?: string;
+    state?: WordbookEntryState | 'all';
+    limit?: number;
+    sort?: 'updated_desc' | 'term_asc';
+  } = {}): Promise<WordbookEntry[]> {
+    const query = typeof options.query === 'string' ? options.query.trim() : '';
+    const state = options.state ?? 'all';
+    const limit = typeof options.limit === 'number' && Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 500;
+    const sort = options.sort ?? 'updated_desc';
+
+    const db = await this.getDb();
+    const tx = db.transaction('wordbook', 'readonly');
+    const store = tx.objectStore('wordbook');
+
+    const results: WordbookEntry[] = [];
+
+    const shouldInclude = (entry: WordbookEntry): boolean => {
+      if (state !== 'all' && entry.state !== state) return false;
+      if (!query) return true;
+      const needle = normalizeTerm(query);
+      if (!needle) return true;
+      const hay = `${entry.normalizedTerm}\n${(entry.note ?? '').toLowerCase()}\n${(entry.tags ?? []).join(' ').toLowerCase()}`;
+      return hay.includes(needle);
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const direction = sort === 'updated_desc' ? 'prev' : 'next';
+      const index = sort === 'updated_desc' ? store.index('updatedAt') : store.index('normalizedTerm');
+      const request = index.openCursor(null, direction);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+        const parsed = WordbookEntrySchema.safeParse(cursor.value);
+        if (parsed.success && shouldInclude(parsed.data)) {
+          results.push(parsed.data);
+          if (results.length >= limit) {
+            resolve();
+            return;
+          }
+        }
+        cursor.continue();
+      };
+    });
+
+    await transactionDone(tx);
+
+    if (sort === 'term_asc') {
+      return results.sort((a, b) => a.normalizedTerm.localeCompare(b.normalizedTerm));
+    }
+    return results;
+  }
+
+  async captureWordbookTerm(options: {
+    term: string;
+    language: string;
+    state?: WordbookEntryState;
+    tags?: string[];
+    note?: string;
+    source?: WordbookEntrySource;
+    maxSources?: number;
+    saveSnippet?: boolean;
+  }): Promise<WordbookEntry> {
+    const term = options.term.trim();
+    const normalizedTerm = normalizeWordbookTerm(term);
+    if (!normalizedTerm) throw new Error('Invalid term');
+
+    const language = String(options.language ?? '').trim() || 'en';
+    const id = wordbookEntryId(language, normalizedTerm);
+
+    const now = Date.now();
+
+    const existing = await this.getWordbookEntry(id);
+
+    const state: WordbookEntryState = options.state ?? existing?.state ?? 'active';
+    const tags = Array.from(
+      new Set(
+        (options.tags ?? existing?.tags ?? [])
+          .map((t) => String(t ?? '').trim())
+          .filter(Boolean)
+          .slice(0, 50)
+      )
+    );
+    const note = typeof options.note === 'string' ? options.note : existing?.note ?? '';
+
+    const nextSources = (() => {
+      const base = existing?.sources ?? [];
+      const incoming = options.source;
+      if (!incoming) return base;
+
+      const saveSnippet = options.saveSnippet ?? true;
+      const parsedIncoming = WordbookEntrySourceSchema.parse({
+        ...incoming,
+        ...(saveSnippet ? {} : { snippet: undefined }),
+      });
+      const merged = [parsedIncoming, ...base];
+      return applyWordbookSourceLimits(merged, { maxSources: options.maxSources ?? 2 });
+    })();
+
+    const entry: WordbookEntry = {
+      id,
+      language: language as any,
+      term: existing?.term ?? term,
+      normalizedTerm,
+      state,
+      tags,
+      note,
+      sources: nextSources,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+
+    await this.upsertWordbookEntry(entry);
+    return entry;
+  }
+
+  async setWordbookEntryState(id: string, state: WordbookEntryState): Promise<WordbookEntry> {
+    const existing = await this.getWordbookEntry(id);
+    if (!existing) throw new Error('Wordbook entry not found');
+    const next: WordbookEntry = {
+      ...existing,
+      state: WordbookEntryStateSchema.parse(state),
+      updatedAt: Date.now(),
+    };
+    await this.upsertWordbookEntry(next);
+    return next;
+  }
+
+  async bulkSetWordbookEntryState(ids: string[], state: WordbookEntryState): Promise<number> {
+    const parsedState = WordbookEntryStateSchema.parse(state);
+    const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+    if (uniqueIds.length === 0) return 0;
+
+    const db = await this.getDb();
+    const tx = db.transaction('wordbook', 'readwrite');
+    const store = tx.objectStore('wordbook');
+
+    let updated = 0;
+    for (const id of uniqueIds) {
+      const raw = await requestToPromise(store.get(id));
+      const parsed = WordbookEntrySchema.safeParse(raw);
+      if (!parsed.success) continue;
+      await requestToPromise(store.put({ ...parsed.data, state: parsedState, updatedAt: Date.now() } satisfies WordbookStoreRecord));
+      updated += 1;
+    }
+
+    await transactionDone(tx);
+    return updated;
+  }
+
+  // =============================================================================
   // Search (inverted index via chat_term_messages)
   // =============================================================================
+
 
   async searchMessages(query: string, options: { limit?: number } = {}): Promise<ChatMessageRecordWithId[]> {
     const limit = typeof options.limit === 'number' && options.limit > 0 ? Math.floor(options.limit) : 50;
@@ -662,6 +911,8 @@ export class StorageService {
     const messages = await this.listAllMessages();
     const familiarity = await this.listWordFamiliarity();
 
+    const wordbook = await this.listWordbookEntries();
+
     const payload: StorageExportData = {
       version: '1.0',
       exportedAt: Date.now(),
@@ -669,21 +920,26 @@ export class StorageService {
       sessions,
       messages,
       familiarity,
+      wordbook,
     };
 
     return StorageExportSchema.parse(payload);
   }
+
 
   async importAll(raw: unknown, options: { strategy?: 'overwrite' | 'merge' } = {}): Promise<void> {
     const data = StorageExportSchema.parse(raw);
     const strategy = options.strategy ?? 'overwrite';
 
     const db = await this.getDb();
-    const tx = db.transaction(['settings', 'chat_sessions', 'chat_messages', 'familiarity'], 'readwrite');
+    const tx = db.transaction(['settings', 'chat_sessions', 'chat_messages', 'familiarity', 'wordbook'], 'readwrite');
     const settingsStore = tx.objectStore('settings');
     const sessionStore = tx.objectStore('chat_sessions');
     const messageStore = tx.objectStore('chat_messages');
     const familiarityStore = tx.objectStore('familiarity');
+    const wordbookStore = tx.objectStore('wordbook');
+
+    const incomingWordbook = Array.isArray(data.wordbook) ? data.wordbook : [];
 
     if (strategy === 'overwrite') {
       await requestToPromise(settingsStore.put({ key: 'settings', value: data.settings } satisfies SettingsRecord));
@@ -703,18 +959,34 @@ export class StorageService {
         await requestToPromise(familiarityStore.put(parsed));
       }
 
+      for (const entry of incomingWordbook) {
+        const parsed = WordbookEntrySchema.parse(entry);
+        await requestToPromise(wordbookStore.put(parsed satisfies WordbookStoreRecord));
+      }
+
       await transactionDone(tx);
       this.settingsCache = data.settings;
       await this.rebuildSearchIndex();
       return;
     }
 
-    // Merge strategy: keep local settings; merge sessions/messages/familiarity.
+
+    // Merge strategy: keep local settings; merge sessions/messages/familiarity/wordbook.
     const existingSettings = await requestToPromise(settingsStore.get('settings'));
     if (!existingSettings) {
       await requestToPromise(settingsStore.put({ key: 'settings', value: data.settings } satisfies SettingsRecord));
       this.settingsCache = data.settings;
     }
+
+    const captureSettings = (() => {
+      const local = (this.settingsCache ?? null) as Settings | null;
+      const defaults = { saveSnippetOnCapture: true, maxSourcesPerEntry: 2 };
+      const wordbook = (local as any)?.wordbook;
+      const maxSources = typeof wordbook?.maxSourcesPerEntry === 'number' ? wordbook.maxSourcesPerEntry : defaults.maxSourcesPerEntry;
+      const saveSnippet = typeof wordbook?.saveSnippetOnCapture === 'boolean' ? wordbook.saveSnippetOnCapture : defaults.saveSnippetOnCapture;
+      return { maxSources: clampInt(maxSources, 1, 3), saveSnippet };
+    })();
+
 
     for (const session of data.sessions) {
       const existing = await requestToPromise(sessionStore.get(session.sessionId));
@@ -825,7 +1097,74 @@ export class StorageService {
       );
     }
 
+    // Wordbook merge: merge by id (language:normalizedTerm)
+    for (const entry of incomingWordbook) {
+      const parsedIncoming = WordbookEntrySchema.parse(entry);
+      const existing = await requestToPromise(wordbookStore.get(parsedIncoming.id));
+      const existingParsed = WordbookEntrySchema.safeParse(existing);
+
+      if (!existingParsed.success) {
+        const baseSources = applyWordbookSourceLimits(
+          captureSettings.saveSnippet
+            ? parsedIncoming.sources
+            : parsedIncoming.sources.map((s) => ({ ...s, snippet: undefined })),
+          { maxSources: captureSettings.maxSources },
+        );
+
+        await requestToPromise(
+          wordbookStore.put(
+            {
+              ...parsedIncoming,
+              sources: baseSources,
+            } satisfies WordbookStoreRecord,
+          ),
+        );
+        continue;
+      }
+
+      const existingEntry = existingParsed.data;
+
+      // Prefer explicit state: keep the more restrictive state if either is ignored/archived.
+      const mergedState: WordbookEntryState = (() => {
+        const order: Record<WordbookEntryState, number> = { active: 0, archived: 1, ignored: 2 };
+        return order[existingEntry.state] >= order[parsedIncoming.state] ? existingEntry.state : parsedIncoming.state;
+      })();
+
+      const mergedTags = Array.from(new Set([...(existingEntry.tags ?? []), ...(parsedIncoming.tags ?? [])]))
+        .map((t) => String(t ?? '').trim())
+        .filter(Boolean)
+        .slice(0, 50);
+
+      const mergedNote = existingEntry.note?.trim()
+        ? existingEntry.note
+        : parsedIncoming.note ?? '';
+
+      const mergedSources = applyWordbookSourceLimits(
+        [
+          ...existingEntry.sources,
+          ...(captureSettings.saveSnippet
+            ? parsedIncoming.sources
+            : parsedIncoming.sources.map((s) => ({ ...s, snippet: undefined }))),
+        ],
+        { maxSources: captureSettings.maxSources },
+      );
+
+      const merged: WordbookEntry = {
+        ...existingEntry,
+        term: existingEntry.term?.trim() ? existingEntry.term : parsedIncoming.term,
+        state: mergedState,
+        tags: mergedTags,
+        note: mergedNote,
+        sources: mergedSources,
+        createdAt: Math.min(existingEntry.createdAt, parsedIncoming.createdAt),
+        updatedAt: Math.max(existingEntry.updatedAt, parsedIncoming.updatedAt),
+      };
+
+      await requestToPromise(wordbookStore.put(merged satisfies WordbookStoreRecord));
+    }
+
     await transactionDone(tx);
     await this.rebuildSearchIndex();
   }
+
 }
