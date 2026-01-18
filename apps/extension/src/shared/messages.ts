@@ -24,6 +24,9 @@ import {
   TestProviderConnectionPayloadSchema,
   TranslateKeywordsPayloadSchema,
   WordFamiliaritySchema,
+  WordbookEntrySchema,
+  WordbookEntrySourceSchema,
+  WordbookEntryStateSchema,
   WebDAVConfigSchema,
   WebEnhanceOutputSchema,
   type ErrorResponse,
@@ -31,6 +34,7 @@ import {
   type Response,
   type Settings,
 } from '@lexipath/core';
+
 
 const log = createLogger('shared:messages');
 
@@ -280,6 +284,15 @@ const messageDefinitions = {
         initialMessage: z.string().optional(),
         keyword: z.string().optional(),
         isAutoSend: z.boolean().optional(),
+        // Optional UI hint for the sidebar on open.
+        ui: z
+          .object({
+            panel: z.enum(['chat', 'history', 'wordbook']).optional(),
+            historyTab: z.enum(['sessions', 'terms']).optional(),
+
+          })
+          .strict()
+          .optional(),
         contextInfo: z
           .discriminatedUnion('kind', [
             z
@@ -294,24 +307,24 @@ const messageDefinitions = {
               })
               .strict(),
             z
-               .object({
-                 kind: z.literal('web'),
-                 source: z.enum(['selection', 'study']).optional(),
-                 title: z.string().optional(),
-                 domain: z.string().optional(),
-                 url: z.string().optional(),
-                 selectedText: z.string().optional(),
-                 beforeText: z.string().optional(),
-                 afterText: z.string().optional(),
-               })
+              .object({
+                kind: z.literal('web'),
+                source: z.enum(['selection', 'study']).optional(),
+                title: z.string().optional(),
+                domain: z.string().optional(),
+                url: z.string().optional(),
+                selectedText: z.string().optional(),
+                beforeText: z.string().optional(),
+                afterText: z.string().optional(),
+              })
               .strict(),
           ])
           .optional(),
-
       })
       .optional(),
     valueSchema: z.object({ ok: z.literal(true) }),
   },
+
   EXPORT_DATA: {
     payloadSchema: z.undefined(),
     valueSchema: StorageExportSchema,
@@ -336,6 +349,97 @@ const messageDefinitions = {
     payloadSchema: WebDAVConfigSchema,
     valueSchema: z.object({ ok: z.literal(true) }),
   },
+
+  // ---------------------------------------------------------------------------
+  // Wordbook
+  // ---------------------------------------------------------------------------
+  WORDBOOK_UPSERT: {
+    payloadSchema: z
+      .object({
+        entry: WordbookEntrySchema,
+      })
+      .strict(),
+    valueSchema: WordbookEntrySchema,
+  },
+  WORDBOOK_GET: {
+    payloadSchema: z
+      .object({
+        id: z.string().min(1),
+      })
+      .strict(),
+    valueSchema: WordbookEntrySchema.nullable(),
+  },
+  WORDBOOK_LIST: {
+    payloadSchema: z
+      .object({
+        query: z.string().optional(),
+        state: WordbookEntryStateSchema.or(z.literal('all')).optional(),
+        limit: z.number().int().min(1).max(2000).optional(),
+        sort: z.enum(['updated_desc', 'term_asc']).optional(),
+      })
+      .strict()
+      .optional(),
+    valueSchema: z.array(WordbookEntrySchema),
+  },
+  WORDBOOK_DELETE: {
+    payloadSchema: z
+      .object({
+        id: z.string().min(1),
+      })
+      .strict(),
+    valueSchema: z.object({ ok: z.literal(true) }),
+  },
+  WORDBOOK_SET_STATE: {
+    payloadSchema: z
+      .object({
+        id: z.string().min(1),
+        state: WordbookEntryStateSchema,
+      })
+      .strict(),
+    valueSchema: WordbookEntrySchema,
+  },
+  WORDBOOK_BULK_SET_STATE: {
+    payloadSchema: z
+      .object({
+        ids: z.array(z.string().min(1)).min(1),
+        state: WordbookEntryStateSchema,
+      })
+      .strict(),
+    valueSchema: z.object({ updated: z.number().int().min(0) }).strict(),
+  },
+  WORDBOOK_EXPORT: {
+    payloadSchema: z
+      .object({
+        format: z.enum(['json', 'anki_csv', 'markdown']),
+        ids: z.array(z.string().min(1)).optional(),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        format: z.enum(['json', 'anki_csv', 'markdown']),
+        filename: z.string().min(1),
+        mime: z.string().min(1),
+        content: z.string(),
+      })
+      .strict(),
+  },
+  WORDBOOK_IMPORT: {
+    payloadSchema: z
+      .object({
+        format: z.enum(['json', 'anki_csv']),
+        data: z.string().min(1),
+        strategy: z.enum(['merge', 'overwrite', 'skip-duplicates']).optional(),
+      })
+      .strict(),
+    valueSchema: z
+      .object({
+        added: z.number().int().min(0),
+        updated: z.number().int().min(0),
+        skipped: z.number().int().min(0),
+      })
+      .strict(),
+  },
+
 
   // ---------------------------------------------------------------------------
   // Tool execution scaffolding (disabled-by-default)
