@@ -19,7 +19,7 @@ if (elementProto && typeof elementProto.releasePointerCapture !== "function") {
   elementProto.releasePointerCapture = () => {};
 }
 
-const { browserMock, sendMessageMock } = vi.hoisted(() => {
+const { browserMock, sendMessageMock, defaultSettings } = vi.hoisted(() => {
   const settings = {
     nativeLanguage: "zh-CN",
     targetLanguage: "en",
@@ -47,6 +47,8 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
     enabled: true,
     autoEnhance: true,
     toolExecutionEnabled: false,
+    hasCompletedOnboarding: false,
+    hasSeenOptionsTour: false,
     englishCorrection: {
       enabled: false,
       triggerKey: "space",
@@ -63,6 +65,7 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
   return {
     defaultSettings: settings,
     browserMock: {
+      defaultSettings: settings,
       i18n: {
         getMessage: vi.fn((key: string, substitutions?: any) => {
           if (Array.isArray(substitutions) && substitutions.length > 0) {
@@ -75,7 +78,7 @@ const { browserMock, sendMessageMock } = vi.hoisted(() => {
         }),
       },
     },
-    sendMessageMock: vi.fn(async (type: string, payload: unknown) => {
+    sendMessageMock: vi.fn(async (type: string, _payload: unknown) => {
       if (type === "GET_SETTINGS") return { ok: true, value: settings };
       if (type === "SET_SETTINGS") return { ok: true, value: null };
       if (type === "TEST_PROVIDER_CONNECTION") return { ok: true, value: true };
@@ -116,6 +119,36 @@ describe("Options", () => {
     expect(screen.getAllByText("optionsChannelsTitle")[0]).toBeTruthy();
   });
 
+  it("auto-shows options tour once after onboarding completion", async () => {
+    sendMessageMock.mockImplementationOnce(async (type: string) => {
+      if (type === "GET_SETTINGS") {
+        return {
+          ok: true,
+          value: {
+            ...(browserMock as any).defaultSettings,
+            hasCompletedOnboarding: true,
+            hasSeenOptionsTour: false,
+          },
+        } as any;
+      }
+      return { ok: true, value: null };
+    });
+
+    render(<Options />);
+
+    expect(await screen.findByText((_, el) => el?.textContent === "1/9")).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "optionsTourSkip" }));
+
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        "SET_SETTINGS",
+        expect.objectContaining({ hasSeenOptionsTour: true }),
+      );
+    });
+  });
+
   it("saves channel config and switches translate route to google", async () => {
     render(<Options />);
     const user = userEvent.setup();
@@ -146,7 +179,7 @@ describe("Options", () => {
 
     await user.click(screen.getAllByRole("button", { name: "optionsSaveButton" })[0]!);
 
-    const setCalls = sendMessageMock.mock.calls.filter((call) => call[0] === "SET_SETTINGS");
+    const setCalls = sendMessageMock.mock.calls.filter((call: any[]) => call[0] === "SET_SETTINGS");
     expect(setCalls).toHaveLength(1);
 
     const payload = setCalls[0]?.[1] as any;
@@ -185,7 +218,7 @@ describe("Options", () => {
     await user.click(screen.getByText("optionsLearningRoutingTitle").closest("summary")!);
     await user.click(screen.getByRole("button", { name: "optionsTestGoogleTranslate" }));
 
-    const calls = sendMessageMock.mock.calls.filter((call) => call[0] === "TEST_PROVIDER_CONNECTION");
+    const calls = sendMessageMock.mock.calls.filter((call: any[]) => call[0] === "TEST_PROVIDER_CONNECTION");
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[1]).toEqual({ type: "google" });
   });
@@ -224,7 +257,7 @@ describe("Options", () => {
 
     await user.click(screen.getAllByRole("button", { name: "optionsSaveButton" })[0]!);
 
-    const setCalls = sendMessageMock.mock.calls.filter((call) => call[0] === "SET_SETTINGS");
+    const setCalls = sendMessageMock.mock.calls.filter((call: any[]) => call[0] === "SET_SETTINGS");
     expect(setCalls).toHaveLength(1);
 
     const payload = setCalls[0]?.[1] as any;

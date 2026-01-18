@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, {  useEffect, useState } from "react";
 import { SettingsSchema, type Settings } from "@lexipath/core";
 import { createLogger } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
@@ -7,7 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Toaster } from "../components/ui/toaster";
 import { useToast } from "../components/ui/use-toast";
 import { Loader2 } from "lucide-react";
-import { BarChart3, Languages, SlidersHorizontal, Sparkles } from "lucide-react";
+import {
+  BarChart3,
+  Languages,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 import { useApplyTheme } from "../lib/theme";
 import { ICON_URL } from "../lib/assets";
@@ -23,6 +28,7 @@ import {
 } from "./optionsLogic";
 import { t } from "./optionsI18n";
 import type { FieldErrors, FormState } from "./optionsTypes";
+import { OptionsTour, type TourStepId } from "./OptionsTour";
 
 const log = createLogger("ui:Options");
 
@@ -36,6 +42,10 @@ export function Options(): React.ReactElement {
 
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
+
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourHasTriggered, setTourHasTriggered] = useState(false);
+  const [tourStepId, setTourStepId] = useState<TourStepId | undefined>(undefined);
 
   useApplyTheme(form?.theme ?? settings?.theme);
 
@@ -67,6 +77,54 @@ export function Options(): React.ReactElement {
     }
     load();
   }, []);
+
+  function clearTourQueryParam() {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("tour")) return;
+      url.searchParams.delete("tour");
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    if (!settings) return;
+
+    const hasCompleted = Boolean((settings as any).hasCompletedOnboarding);
+    const hasSeen = Boolean((settings as any).hasSeenOptionsTour);
+
+    let tourParam = false;
+    try {
+      const url = new URL(window.location.href);
+      tourParam = url.searchParams.get("tour") === "1";
+    } catch {
+      // ignore
+    }
+
+    if (tourHasTriggered) return;
+
+    if (tourParam && hasCompleted && !hasSeen) {
+      setTourHasTriggered(true);
+      setTourOpen(true);
+      setTourStepId("summary");
+      clearTourQueryParam();
+      return;
+    }
+
+    if (!tourParam && hasCompleted && !hasSeen) {
+      setTourHasTriggered(true);
+      setTourOpen(true);
+      setTourStepId("summary");
+      return;
+    }
+
+    if (tourParam) {
+      // Ensure we don't loop on refresh even if we won't show.
+      clearTourQueryParam();
+    }
+  }, [settings, tourHasTriggered]);
 
   async function handleSave() {
     if (!form || saving) return;
@@ -106,6 +164,12 @@ export function Options(): React.ReactElement {
       toast({
         title: t("optionsSaveSuccess"),
       });
+      if (tourOpen && tourStepId === "channels_api_key") {
+          setActiveTab("learning");
+          setTourStepId("learning_language");
+      }
+
+
     } finally {
       setSaving(false);
     }
@@ -145,29 +209,72 @@ export function Options(): React.ReactElement {
     );
   }
 
-
   const currentForm = form;
-  const setFormState: React.Dispatch<React.SetStateAction<FormState>> = (value) =>
-    setForm((prev) => {
+  const setFormState: React.Dispatch<React.SetStateAction<FormState>> = (
+    value: React.SetStateAction<FormState>,
+  ) =>
+    setForm((prev: FormState | null) => {
       const base = prev ?? currentForm;
-      return typeof value === "function"
-        ? (value as (prevState: FormState) => FormState)(base)
-        : value;
+      const next =
+        typeof value === "function"
+          ? (value as (prevState: FormState) => FormState)(base)
+          : value;
+
+
+
+      return next;
     });
 
   const hasAiConfigured = currentForm.channels.some(channelIsConfigured);
-  const openChannelsTab = () => setActiveTab("channels");
+  const openChannelsTab = () => {
+    setActiveTab("channels");
+    // If the user is in the tutorial flow, clicking the "configure" CTA should advance to API key.
+    if (tourOpen && tourStepId === "general_ai_required") {
+      setTourStepId("channels_api_key");
+    }
+  };
 
-  const navItems = [
-    { value: "summary", label: t("optionsTab_summary"), icon: BarChart3 },
-    { value: "learning", label: t("optionsTab_learning"), icon: Languages },
-    { value: "channels", label: t("optionsTab_channels"), icon: Sparkles },
-    { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal },
-  ];
+  async function markOptionsTourSeen() {
+    try {
+      await sendMessage("SET_SETTINGS", { hasSeenOptionsTour: true });
+    } catch {
+      // ignore
+    }
+    setSettings((prev: Settings | null) =>
+      prev ? ({ ...prev, hasSeenOptionsTour: true } as any) : prev,
+    );
+  }
+
+  const tourNavigateTab = (tab: "summary" | "learning" | "channels" | "general") => {
+    setActiveTab(tab);
+  };
+
+    const navItems = [
+        { value: "summary", label: t("optionsTab_summary"), icon: BarChart3,tourId: "options-tab-summary" },
+        { value: "learning", label: t("optionsTab_learning"), icon: Languages, tourId: "options-tab-learning" },
+        { value: "channels", label: t("optionsTab_channels"), icon: Sparkles,  tourId: "options-tab-channels" },
+        { value: "general", label: t("optionsTab_general"), icon: SlidersHorizontal, tourId: "options-tab-general" },
+    ];
 
   return (
     <div className="min-h-screen bg-background text-foreground relative font-sans">
       <Toaster />
+      <OptionsTour
+        open={tourOpen}
+        {...(tourStepId ? { stepId: tourStepId } : {})}
+        onStepIdChange={(id) => {
+          setTourStepId(id);
+          setTourHasTriggered(true);
+        }}
+        onOpenChange={(next) => {
+          setTourOpen(next);
+          if (!next) {
+            clearTourQueryParam();
+          }
+        }}
+        onMarkSeen={markOptionsTourSeen}
+        onNavigateTab={tourNavigateTab}
+      />
 
       <Tabs
         value={activeTab}
@@ -189,6 +296,7 @@ export function Options(): React.ReactElement {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
+                data-tour-id={tab.tourId}
                 className="w-full justify-start gap-2.5 px-3 py-2.5 rounded-lg border border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
@@ -203,24 +311,32 @@ export function Options(): React.ReactElement {
                 <div
                   className={cn(
                     "h-2 w-2 rounded-full",
-                    form.enabled ? "bg-emerald-500" : "bg-muted-foreground/40",
+                    form.enabled
+                      ? "bg-emerald-500"
+                      : "bg-muted-foreground/40",
                   )}
                 />
                 <span className="text-xs text-muted-foreground">
                   {form.enabled ? t("on") : t("off")}
                 </span>
               </div>
-              <Button
-                size="sm"
-                className="h-9 px-4 text-xs font-medium rounded-lg"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+              <div className="relative">
+                 {tourOpen && tourStepId === "channels_api_key" ? (
+
+                  <div className="pointer-events-none absolute -top-1 left-0 -translate-y-full whitespace-nowrap text-[11px] rounded-full bg-amber-500/15 text-amber-600 px-2.5 py-1 border border-amber-500/25 animate-in fade-in duration-200">
+                    {t("optionsTourSaveInlineHint")}
+                  </div>
                 ) : null}
-                {t("optionsSaveButton")}
-              </Button>
+                <Button
+                  size="sm"
+                  className="h-9 px-4 text-xs font-medium rounded-lg"
+                  onClick={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
+                  {t("optionsSaveButton")}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -292,6 +408,7 @@ export function Options(): React.ReactElement {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
+                data-tour-id={tab.tourId}
                 className="flex-1 flex-col gap-1 py-3 rounded-lg data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground border-0 shadow-none"
               >
                 <tab.icon className="h-5 w-5" />

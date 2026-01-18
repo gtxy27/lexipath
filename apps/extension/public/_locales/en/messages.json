@@ -191,7 +191,12 @@
     "message": "Open Settings",
     "description": "Open settings link"
   },
+  "onboardingGoToSettings": {
+    "message": "Go to settings",
+    "description": "Onboarding: go to settings and start tour"
+  },
   "openOnboarding": {
+
     "message": "Restart onboarding",
     "description": "Open onboarding page"
   },
@@ -761,6 +766,71 @@
     "message": "Toggle subtitle bilingual mode",
     "description": "Command: toggle subtitle bilingual"
   },
+  "optionsTourSkip": {
+    "message": "Skip",
+    "description": "Options tour: skip button"
+  },
+  "optionsTourBack": {
+    "message": "Back",
+    "description": "Options tour: back button"
+  },
+  "optionsTourNext": {
+    "message": "Next",
+    "description": "Options tour: next button"
+  },
+  "optionsTourDone": {
+    "message": "Done",
+    "description": "Options tour: done button"
+  },
+  "optionsTourStep_summary_desc": {
+    "message": "Quick status and an overview of your progress.",
+    "description": "Options tour: summary step description"
+  },
+  "optionsTourStep_learning_desc": {
+    "message": "Let’s quickly walk the key learning options.",
+    "description": "Options tour: learning step description"
+  },
+  "optionsTourStep_channels_desc": {
+    "message": "Configure your AI model and provider channel.",
+    "description": "Options tour: channels step description"
+  },
+  "optionsTourStep_general_desc": {
+    "message": "Global toggles, advanced settings, and maintenance tools.",
+    "description": "Options tour: general step description"
+  },
+  "optionsTourStep_general_ai_required_desc": {
+    "message": "Click to configure your API key and enable AI features.",
+    "description": "Options tour: general ai required step"
+  },
+  "optionsTourStep_channels_api_key_desc": {
+    "message": "Fill in your API key here.",
+    "description": "Options tour: channels api key step"
+  },
+  "optionsTourStep_channels_save_desc": {
+    "message": "Click Save to apply your changes.",
+    "description": "Options tour: channels save reminder step"
+  },
+  "optionsTourStep_learning_language_desc": {
+    "message": "Set your target language and levels.",
+    "description": "Options tour: learning language step"
+  },
+  "optionsTourStep_learning_context_desc": {
+    "message": "Adjust the context window size.",
+    "description": "Options tour: learning context step"
+  },
+  "optionsTourStep_learning_routing_desc": {
+    "message": "Choose which features use AI and which providers to route to.",
+    "description": "Options tour: learning routing step"
+  },
+  "optionsTourSaveInlineHint": {
+    "message": "Remember to save",
+    "description": "Options tour: inline save hint"
+  },
+  "optionsTourClickToConfigure": {
+    "message": "Click the button",
+    "description": "Options tour: hint to click CTA"
+  },
+
   "optionsTab_language": {
     "message": "Language",
     "description": "Options tab: language"

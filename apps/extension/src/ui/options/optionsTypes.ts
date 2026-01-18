@@ -59,7 +59,9 @@ export type FormState = {
   webCustomCss: Settings["webCustomCss"];
   scenesEnabled: Settings["scenesEnabled"];
   hasCompletedOnboarding: Settings["hasCompletedOnboarding"];
+  hasSeenOptionsTour: Settings["hasSeenOptionsTour"];
   floatingButtonEnabled: Settings["floatingButtonEnabled"];
+
   webSelectionExplainEnabled: Settings["webSelectionExplainEnabled"];
   wordCardSectionsOrder: Settings["wordCardSectionsOrder"];
   wordCardAutoPronounce: Settings["wordCardAutoPronounce"];

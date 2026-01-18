@@ -356,8 +356,10 @@ export function settingsToFormState(settings: Settings): FormState {
 	    webStyleMapping: settings.webStyleMapping,
 	    webCustomCss: settings.webCustomCss,
 	    scenesEnabled: settings.scenesEnabled,
-	    hasCompletedOnboarding: settings.hasCompletedOnboarding,
+	    hasCompletedOnboarding: Boolean(settings.hasCompletedOnboarding),
+	    hasSeenOptionsTour: Boolean(settings.hasSeenOptionsTour),
 	    floatingButtonEnabled: settings.floatingButtonEnabled,
+
 	    webSelectionExplainEnabled: settings.webSelectionExplainEnabled,
 	    wordCardSectionsOrder: settings.wordCardSectionsOrder,
 	    wordCardAutoPronounce: settings.wordCardAutoPronounce,
@@ -722,8 +724,10 @@ export function buildSettingsPatch(
 	    webStyleMapping: form.webStyleMapping,
 	    webCustomCss: form.webCustomCss,
 	    scenesEnabled: form.scenesEnabled,
-	    hasCompletedOnboarding: form.hasCompletedOnboarding,
+	    hasCompletedOnboarding: Boolean(form.hasCompletedOnboarding),
+	    hasSeenOptionsTour: Boolean(form.hasSeenOptionsTour),
 	    floatingButtonEnabled: form.floatingButtonEnabled,
+
 	    webSelectionExplainEnabled: form.webSelectionExplainEnabled,
 	    wordCardSectionsOrder: form.wordCardSectionsOrder,
 	    wordCardAutoPronounce: form.wordCardAutoPronounce,

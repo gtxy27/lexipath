@@ -524,25 +524,19 @@ describe('Onboarding', () => {
       });
     });
 
-    it('closes window after successful save', async () => {
+    it('shows go-to-settings CTA after successful save', async () => {
       const user = userEvent.setup();
-      const closeMock = vi.fn();
-      vi.stubGlobal('close', closeMock);
-
       render(<Onboarding />);
 
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingNext'));
       await user.click(screen.getByText('onboardingFinish'));
 
-      // Wait for async operation to complete
-      await waitFor(
-        () => {
-          expect(closeMock).toHaveBeenCalled();
-        },
-        { timeout: 3000 }
-      );
+      await waitFor(() => {
+        expect(screen.getByText('onboardingGoToSettings')).toBeInTheDocument();
+      });
     });
+
 
     it('handles save errors gracefully', async () => {
       const user = userEvent.setup();

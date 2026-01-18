@@ -164,6 +164,8 @@ export function Onboarding(): React.ReactElement {
     webEnhanceMode: "i_plus_1",
   });
   const [saving, setSaving] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
+
 
   useApplyTheme(theme);
 
@@ -281,7 +283,7 @@ export function Onboarding(): React.ReactElement {
   async function handleFinish() {
     setSaving(true);
     try {
-      await sendMessage("SET_SETTINGS", {
+      const response = await sendMessage("SET_SETTINGS", {
         targetLanguage: formData.targetLanguage,
         proficiencyLevel: formData.proficiencyLevel,
         proficiencyPreference: formData.proficiencyPreference,
@@ -291,13 +293,16 @@ export function Onboarding(): React.ReactElement {
         hasCompletedOnboarding: true,
       });
 
-      globalThis.close?.();
+      if ((response as any)?.ok) {
+        setHasSaved(true);
+      }
     } catch (error) {
       log.error("Failed to save onboarding settings", { message: getErrorMessage(error) });
     } finally {
       setSaving(false);
     }
   }
+
 
   const progress = (currentStep / 3) * 100;
   const step1Valid =
@@ -936,7 +941,7 @@ export function Onboarding(): React.ReactElement {
             <Button
               variant="ghost"
               onClick={handlePrevious}
-              disabled={currentStep === 1}
+              disabled={currentStep === 1 || hasSaved}
               className="gap-2 h-10 px-4 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-medium"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -946,11 +951,27 @@ export function Onboarding(): React.ReactElement {
             {currentStep < 3 ? (
               <Button
                 onClick={handleNext}
-                disabled={currentStep === 1 && !step1Valid}
+                disabled={(currentStep === 1 && !step1Valid) || hasSaved}
                 className="gap-2 h-11 px-6 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
               >
                 {t("onboardingNext")}
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : hasSaved ? (
+              <Button
+                onClick={async () => {
+                  const url = browser.runtime.getURL("src/ui/options/index.html?tour=1");
+                  globalThis.open?.(url, "_blank");
+                  try {
+                    globalThis.close?.();
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className="gap-2 h-11 px-6 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t("onboardingGoToSettings")}
               </Button>
             ) : (
               <Button
@@ -963,6 +984,7 @@ export function Onboarding(): React.ReactElement {
               </Button>
             )}
           </CardFooter>
+
         </Card>
       </motion.div>
     </div>

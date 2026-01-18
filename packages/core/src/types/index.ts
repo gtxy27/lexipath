@@ -399,6 +399,9 @@ export const SettingsSchema = z.object({
   webCustomCss: z.string().max(2000).default(''),
   scenesEnabled: SceneFlagsSchema,
   hasCompletedOnboarding: z.boolean().default(false),
+  // One-time, post-onboarding Options tour.
+  hasSeenOptionsTour: z.boolean().default(false),
+
 
   // Word card
   webSelectionExplainEnabled: z.boolean().default(true),

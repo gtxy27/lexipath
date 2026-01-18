@@ -193,6 +193,8 @@ describe('SubtitleController', () => {
       excludedSites: [],
       allowedSites: [],
       toolExecutionEnabled: false,
+      hasSeenOptionsTour: false,
+
     };
     controller = new SubtitleController(settings);
 
