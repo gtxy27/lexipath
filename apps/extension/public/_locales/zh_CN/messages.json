@@ -7,6 +7,10 @@
     "message": "沉浸式语言学习 - 用智能 i+1 增强改造网页和视频",
     "description": "扩展描述"
   },
+  "contextMenu_explainSelection": {
+    "message": "解释选中内容",
+    "description": "右键菜单：解释选中文本"
+  },
   "loading": {
     "message": "加载中...",
     "description": "加载状态"

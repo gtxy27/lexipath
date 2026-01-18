@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "bun scripts/dev.mjs",
-    "build": "bun run build:chrome && bun run build:firefox",
-    "build:chrome": "VITE_BROWSER=chrome vite build --mode chrome && VITE_BROWSER=chrome vite build -c vite.config.content.ts --mode chrome",
-    "build:firefox": "VITE_BROWSER=firefox vite build --mode firefox && VITE_BROWSER=firefox vite build -c vite.config.content.ts --mode firefox",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "build": "bun run icons:generate && bun run build:chrome && bun run build:firefox",
+    "build:chrome": "bun run icons:generate && VITE_BROWSER=chrome vite build --mode chrome && VITE_BROWSER=chrome vite build -c vite.config.content.ts --mode chrome",
+    "build:firefox": "bun run icons:generate && VITE_BROWSER=firefox vite build --mode firefox && VITE_BROWSER=firefox vite build -c vite.config.content.ts --mode firefox",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

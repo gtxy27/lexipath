@@ -7,6 +7,10 @@
     "message": "Immersive language learning - transform web pages and videos with intelligent i+1 enhancement",
     "description": "Extension description"
   },
+  "contextMenu_explainSelection": {
+    "message": "Explain selection",
+    "description": "Context menu: explain selected text"
+  },
   "loading": {
     "message": "Loading...",
     "description": "Loading state"
