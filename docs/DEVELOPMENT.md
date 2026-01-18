@@ -278,38 +278,35 @@ UI 行为（对齐 `../docs/OPEN_SOURCE_PRODUCT_PLAN.md`）：
 - content script 注入 UI 必须隔离样式（推荐 Shadow DOM），避免污染网页或被网页污染。
 - 仅 UI 文本走 i18n key（不要硬编码字符串），保证可本地化。
 
-### 11.1 Web 站点适配器（site adapters）
+### 11.1 Web 站点 Profile（site profiles）
 
-目的：对不同网站的 DOM 结构做小幅、可控的差异适配（例如正文选择器、过滤规则）。
+目的：对不同网站的 DOM 结构做小幅、可控的差异适配（例如正文 root、排除区域、正文选择器），并让上层统一通过 content scope 模块消费。
 
 约定：
-- 入口：`apps/extension/src/content/web/site-adapters.ts`
-- 内置适配器列表：`apps/extension/src/content/web/site-adapters/index.ts`
-- 默认行为必须稳定：即使没有任何适配器，或适配器抛错，也必须回退到默认 adapter（不得导致网页增强崩溃）。
-- `id` 必须全局唯一（便于日志/排查）；不要复用。
-- 匹配函数 `matches(url: URL)` 必须快速、无副作用（禁止读 DOM / 发网络 / 读写 storage）。
-- `create()` 返回的 adapter 必须是纯对象（不持有跨页面状态）；需要缓存请在调用侧做。
-- 匹配策略：按 `WEB_SITE_ADAPTERS` 的数组顺序查找，第一个 `matches` 命中的 adapter 生效。
-- 新增适配器前先加测试：至少覆盖“匹配成功/不匹配/异常回退”三个场景。
+- Profile 类型/入口：`apps/extension/src/content/web/site-profiles.ts`
+- 内置 profile 列表：`apps/extension/src/content/web/site-profiles/index.ts`（`WEB_SITE_PROFILES`）
+- 统一内容作用域：`apps/extension/src/content/web/web-content-scope.ts`（`resolveWebContentScope(url)`）
+- Profile 必须只有 5 个字段：`id`、`matches(url)`、`rootSelector`、`excludeSelector?`、`textSelector?`
+- 默认行为必须稳定：URL 非法/无匹配/抛错都回退到 default profile；扫描必须在 resolved root 内有界进行
+- 匹配函数 `matches(url: URL)` 必须快速、无副作用（禁止读 DOM / 发网络 / 读写 storage）
+- 匹配策略：按 `WEB_SITE_PROFILES` 的数组顺序查找，第一个 `matches` 命中的 profile 生效
+- 新增 profile 前先加测试：至少覆盖“匹配成功/不匹配/异常回退”三个场景
 
-新增一个适配器的最小示例：
-1) 新建一个文件（例如 `apps/extension/src/content/web/site-adapters/example.ts`），导出 factory。
-2) 在 `apps/extension/src/content/web/site-adapters/index.ts` 把它加入 `WEB_SITE_ADAPTERS`。
+新增一个 profile 的最小示例：
+1) 新建一个文件（例如 `apps/extension/src/content/web/site-profiles/example.ts`），导出 `WebSiteProfile` 对象。
+2) 在 `apps/extension/src/content/web/site-profiles/index.ts` 把它加入 `WEB_SITE_PROFILES`。
 
-示例 factory：
+示例 profile：
 ```ts
-import type { WebSiteAdapterFactory } from "../site-adapters";
+import type { WebSiteProfile } from "../site-profiles";
 
-export const exampleAdapter: WebSiteAdapterFactory = {
+export const exampleProfile: WebSiteProfile = Object.freeze({
   id: "example",
   matches: (url) => url.hostname === "example.com",
-  create: () => ({
-    id: "example",
-    textSelector: "article p",
-    shouldQueueElement: () => true,
-    shouldProcessElement: () => true,
-  }),
-};
+  rootSelector: "article, main, body",
+  excludeSelector: "nav, header, footer, aside",
+  textSelector: "article p",
+});
 ```
 
 ---

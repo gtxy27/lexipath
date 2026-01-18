@@ -17,9 +17,10 @@ import { detectPlatform } from "../platform";
 import type { WordRenderMode } from "../enhanced-text";
 import type { WebWordCardManager } from "./web-word-card";
 import { injectFullParagraph, injectInlineWords } from "./dom-injector";
-import { getWebSiteAdapter } from "./site-adapters";
+import { resolveWebContentScope } from "./web-content-scope";
 import { ensureWebStylesInjected } from "./web-styles";
 import { createWebTooltipManager, type WebTooltipManager } from "./web-tooltip";
+import { isCoarsePointer } from "../../shared/ui/overlay-adaptation";
 
 type WebProcessingStatus = {
   keywordProviderConfigured: boolean;
@@ -161,7 +162,7 @@ export function createWebEnhancer(options: {
     const channelLimit = webProcessingStatus?.webEnhanceConcurrencyLimit ?? 15;
     let base = Math.min(20, Math.max(4, channelLimit));
 
-    if (window.matchMedia("(pointer: coarse)").matches) {
+    if (isCoarsePointer()) {
       return Math.min(base, 4);
     }
 
@@ -274,7 +275,7 @@ export function createWebEnhancer(options: {
     if (observer) return;
 
     observer = new MutationObserver((mutations) => {
-      const adapter = getWebSiteAdapter(currentUrl);
+      const scope = resolveWebContentScope(currentUrl);
       const newElements: Element[] = [];
 
       for (const mutation of mutations) {
@@ -283,14 +284,16 @@ export function createWebEnhancer(options: {
           if (!(node instanceof Element)) return;
           try {
             if (
-              node.matches(adapter.textSelector) &&
-              adapter.shouldQueueElement(node)
+              scope.root.contains(node) &&
+              node.matches(scope.textSelector) &&
+              scope.shouldQueueElement(node)
             ) {
               newElements.push(node);
             }
-            const descendants = node.querySelectorAll(adapter.textSelector);
+            const descendants = node.querySelectorAll(scope.textSelector);
             descendants.forEach((el) => {
-              if (adapter.shouldQueueElement(el)) newElements.push(el);
+              if (!scope.root.contains(el)) return;
+              if (scope.shouldQueueElement(el)) newElements.push(el);
             });
           } catch (error: unknown) {
             log.debug("MutationObserver selector check failed; ignoring node", {
@@ -352,13 +355,10 @@ export function createWebEnhancer(options: {
     if (detectPlatform(window.location.href) !== "unknown") return;
 
     try {
-      const adapter = getWebSiteAdapter(currentUrl);
-      const els = document.querySelectorAll(adapter.textSelector);
       let sample = "";
-      const maxEls = Math.min(25, els.length);
-      for (let i = 0; i < maxEls; i++) {
-        const el = els[i];
-        if (!el) continue;
+
+      const scope = resolveWebContentScope(currentUrl);
+      for (const el of scope.iterateTextElements({ maxElements: 25, maxNodes: 80_000 })) {
         const text = extractTextContent(el, MAX_TEXT_LENGTH);
         if (!text) continue;
         sample += ` ${text.slice(0, 220)}`;
@@ -396,8 +396,8 @@ export function createWebEnhancer(options: {
     if (isEnhancePausedNow()) return;
     if (!pageEligibleForLearning && manualForceEnhanceMode !== "full") return;
 
-    const adapter = getWebSiteAdapter(currentUrl);
-    if (!adapter.shouldProcessElement(element)) return;
+    const scope = resolveWebContentScope(currentUrl);
+    if (!scope.shouldProcessElement(element)) return;
 
     const text = extractTextContent(element, MAX_TEXT_LENGTH);
     if (text.length < MIN_TEXT_LENGTH) return;
@@ -651,35 +651,40 @@ export function createWebEnhancer(options: {
     manualForceEnhanceModeToken = manualForceEnhanceMode ? pageProcessingToken : 0;
     log.info("Starting page processing");
 
-    const adapter = getWebSiteAdapter(currentUrl);
-    const selectorResults = document.querySelectorAll(adapter.textSelector);
-    log.info(`Found ${selectorResults.length} candidate text elements`);
+    const scope = resolveWebContentScope(currentUrl);
+    const iterator = scope.iterateTextElements({ maxNodes: 400_000 });
+    log.info(`Scanning candidate text elements (profile=${scope.profileId})`);
 
     const scanToken = pageProcessingToken;
-    const total = selectorResults.length;
     const CHUNK_SIZE = 500;
-    let idx = 0;
+    let queuedTotal = 0;
 
     const scanChunk = () => {
       if (scanToken !== pageProcessingToken) return;
 
       const chunk: Element[] = [];
-      const end = Math.min(total, idx + CHUNK_SIZE);
-      for (; idx < end; idx++) {
-        const el = selectorResults[idx];
-        if (!el) continue;
-        if (!adapter.shouldQueueElement(el)) continue;
+      let done = false;
+      while (chunk.length < CHUNK_SIZE) {
+        const next = iterator.next();
+        if (next.done) {
+          done = true;
+          break;
+        }
+
+        const el = next.value;
+        if (!scope.shouldQueueElement(el)) continue;
         chunk.push(el);
       }
 
       if (chunk.length > 0) {
-        queueElements(chunk, { rectPrioritization: idx <= CHUNK_SIZE });
+        queueElements(chunk, { rectPrioritization: queuedTotal === 0 });
+        queuedTotal += chunk.length;
       }
 
-      if (idx < total) {
+      if (!done) {
         setTimeout(scanChunk, 0);
       } else {
-        log.info(`Queued ${total} candidate elements for processing`);
+        log.info(`Queued ${queuedTotal} candidate elements for processing`);
       }
     };
 
@@ -696,37 +701,40 @@ export function createWebEnhancer(options: {
       manualForceEnhanceModeToken = manualForceEnhanceMode ? pageProcessingToken : 0;
       log.info("Starting manual page processing");
 
-      const adapter = getWebSiteAdapter(currentUrl);
-      const selectorResults = document.querySelectorAll(adapter.textSelector);
-      log.info(
-        `Found ${selectorResults.length} candidate text elements to process (manual)`,
-      );
+      const scope = resolveWebContentScope(currentUrl);
+      const iterator = scope.iterateTextElements({ maxNodes: 400_000 });
+      log.info(`Scanning candidate text elements to process (manual, profile=${scope.profileId})`);
 
       const scanToken = pageProcessingToken;
-      const total = selectorResults.length;
       const CHUNK_SIZE = 500;
-      let idx = 0;
+      let queuedTotal = 0;
 
       const scanChunk = () => {
         if (scanToken !== pageProcessingToken) return;
 
         const chunk: Element[] = [];
-        const end = Math.min(total, idx + CHUNK_SIZE);
-        for (; idx < end; idx++) {
-          const el = selectorResults[idx];
-          if (!el) continue;
-          if (!adapter.shouldQueueElement(el)) continue;
+        let done = false;
+        while (chunk.length < CHUNK_SIZE) {
+          const next = iterator.next();
+          if (next.done) {
+            done = true;
+            break;
+          }
+
+          const el = next.value;
+          if (!scope.shouldQueueElement(el)) continue;
           chunk.push(el);
         }
 
         if (chunk.length > 0) {
-          queueElements(chunk, { rectPrioritization: idx <= CHUNK_SIZE });
+          queueElements(chunk, { rectPrioritization: queuedTotal === 0 });
+          queuedTotal += chunk.length;
         }
 
-        if (idx < total) {
+        if (!done) {
           setTimeout(scanChunk, 0);
         } else {
-          log.info(`Queued ${total} candidate elements for processing (manual)`);
+          log.info(`Queued ${queuedTotal} candidate elements for processing (manual)`);
         }
       };
 

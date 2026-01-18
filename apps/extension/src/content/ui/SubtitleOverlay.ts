@@ -1004,7 +1004,7 @@ export class SubtitleOverlay {
             width: 100% !important;
             max-width: 100% !important;
             border-radius: 20px 20px 0 0 !important;
-            padding: 24px 20px 40px 20px !important;
+            padding: 24px 20px calc(40px + env(safe-area-inset-bottom, 0px)) 20px !important;
             border-left: none !important;
             border-right: none !important;
             border-bottom: none !important;

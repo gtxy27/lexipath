@@ -4,6 +4,7 @@ import { WordCard, type WordCardData } from "./WordCard";
 import { sendMessage } from "../../shared/messages";
 import { cn } from "../lib/utils";
 import { t } from "../../shared/i18n";
+import { computeAnchoredOverlayPosition, isCoarsePointer } from "../../shared/ui/overlay-adaptation";
 
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -23,19 +24,17 @@ interface Position {
 
 const log = createLogger("ui:WordCardPopover");
 
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
+const useIsCoarsePointer = () => {
+  const [isCoarse, setIsCoarse] = useState(false);
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(
-        window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 768
-      );
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    const update = () => setIsCoarse(isCoarsePointer());
+    update();
+
+    const mql = window.matchMedia?.("(pointer: coarse)");
+    mql?.addEventListener?.("change", update);
+    return () => mql?.removeEventListener?.("change", update);
   }, []);
-  return isMobile;
+  return isCoarse;
 };
 
 function resolveTtsLang(options: {
@@ -151,31 +150,18 @@ export function WordCardPopover({
     if (!popoverRef.current) return;
 
     const popoverRect = popoverRef.current.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
 
     const MARGIN = 8;
-    const PREFERRED_OFFSET = 10;
+    const OFFSET = 10;
 
-    let top = anchorRect.bottom + PREFERRED_OFFSET;
-    let left = anchorRect.left + anchorRect.width / 2 - popoverRect.width / 2;
-
-    // Adjust horizontal position if it overflows
-    if (left < MARGIN) {
-      left = MARGIN;
-    } else if (left + popoverRect.width > viewportWidth - MARGIN) {
-      left = viewportWidth - popoverRect.width - MARGIN;
-    }
-
-    // Adjust vertical position if it overflows (show above instead)
-    if (top + popoverRect.height > viewportHeight - MARGIN) {
-      top = anchorRect.top - popoverRect.height - PREFERRED_OFFSET;
-    }
-
-    // Ensure it doesn't go above viewport
-    if (top < MARGIN) {
-      top = MARGIN;
-    }
+    const { top, left } = computeAnchoredOverlayPosition({
+      anchorRect,
+      overlaySize: { width: popoverRect.width, height: popoverRect.height },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      marginPx: MARGIN,
+      offsetPx: OFFSET,
+      prefer: "below",
+    });
 
     setPosition({ top, left });
 
@@ -234,7 +220,7 @@ export function WordCardPopover({
     };
   }, []);
 
-  const isMobile = useIsMobile();
+  const isMobile = useIsCoarsePointer();
 
   return (
     <AnimatePresence>
@@ -250,10 +236,14 @@ export function WordCardPopover({
             ? "bottom-0 left-0 right-0 w-full" 
             : "rounded-lg shadow-xl"
         )}
-        style={isMobile ? {} : {
-          top: `${position.top}px`,
-          left: `${position.left}px`,
-        }}
+        style={
+          isMobile
+            ? { bottom: 0, paddingBottom: "env(safe-area-inset-bottom, 0px)" }
+            : {
+                top: `${position.top}px`,
+                left: `${position.left}px`,
+              }
+        }
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >

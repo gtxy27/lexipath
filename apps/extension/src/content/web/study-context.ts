@@ -1,4 +1,4 @@
-import { getWebSiteAdapter } from "./site-adapters";
+import { resolveWebContentScope } from "./web-content-scope";
 
 export type StudyContext = {
   beforeText?: string;
@@ -74,16 +74,18 @@ function extractHeadlines(root: Element, options: { preloadScreens: number; maxI
   return headlines.length ? headlines.map((t, i) => `${i + 1}. ${t}`).join("\n") : "";
 }
 
-function extractBoundedExcerptFromAdapter(
-  adapter: { textSelector: string; shouldProcessElement: (el: Element) => boolean },
+function extractBoundedExcerptFromScope(
+  scope: {
+    iterateTextElements: (options?: { maxElements?: number; maxNodes?: number }) => IterableIterator<Element>;
+    shouldProcessElement: (el: Element) => boolean;
+  },
   maxChars: number,
 ): string {
-  const els = Array.from(document.querySelectorAll(adapter.textSelector));
   const parts: string[] = [];
   let total = 0;
 
-  for (const el of els) {
-    if (!adapter.shouldProcessElement(el)) continue;
+  for (const el of scope.iterateTextElements({ maxElements: 800, maxNodes: 120_000 })) {
+    if (!scope.shouldProcessElement(el)) continue;
     const text = normalizeText(el.textContent ?? "");
     if (!text) continue;
 
@@ -98,14 +100,16 @@ function extractBoundedExcerptFromAdapter(
   return parts.join("\n\n").trim();
 }
 
-function computeArticleLike(adapter: { textSelector: string; shouldProcessElement: (el: Element) => boolean }): boolean {
-  const els = Array.from(document.querySelectorAll(adapter.textSelector));
+function computeArticleLike(scope: {
+  iterateTextElements: (options?: { maxElements?: number; maxNodes?: number }) => IterableIterator<Element>;
+  shouldProcessElement: (el: Element) => boolean;
+}): boolean {
   let totalChars = 0;
   let paragraphCount = 0;
   let longParagraphs = 0;
 
-  for (const el of els) {
-    if (!adapter.shouldProcessElement(el)) continue;
+  for (const el of scope.iterateTextElements({ maxElements: 800, maxNodes: 120_000 })) {
+    if (!scope.shouldProcessElement(el)) continue;
     const text = normalizeText(el.textContent ?? "");
     if (!text) continue;
 
@@ -131,7 +135,7 @@ export function buildStudyContext(
   url: string,
   options?: { preloadScreens?: number; maxItems?: number; maxChars?: number },
 ): StudyContext {
-  const adapter = getWebSiteAdapter(url);
+  const scope = resolveWebContentScope(url);
 
   const preloadScreens = options?.preloadScreens ?? 2;
   const maxItems = options?.maxItems ?? 30;
@@ -139,18 +143,12 @@ export function buildStudyContext(
 
   const beforeText = getPageDescription();
 
-  // The study extractor is the "upper layer". Adapters remain rule providers.
-  // We can switch strategies based on adapter.id without embedding site logic in UI.
-  const root = document.querySelector("main") ?? document.body;
+  const root = scope.root;
 
   const selectedText = (() => {
-    if (adapter.id === "google-news") {
-      return extractHeadlines(root, { preloadScreens, maxItems });
-    }
-
-    const isArticle = computeArticleLike(adapter);
+    const isArticle = computeArticleLike(scope);
     if (isArticle) {
-      const excerpt = extractBoundedExcerptFromAdapter(adapter, maxChars);
+      const excerpt = extractBoundedExcerptFromScope(scope, maxChars);
       if (excerpt) return excerpt;
     }
 

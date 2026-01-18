@@ -4,6 +4,9 @@ export type { WebEnhancer } from "./web-enhancer";
 export { createWebWordCardManager } from "./web-word-card";
 export type { WebWordCardManager } from "./web-word-card";
 
-export { getWebSiteAdapter } from "./site-adapters";
-export type { WebSiteAdapter } from "./site-adapters";
+export { getWebSiteProfile } from "./site-profiles";
+export type { WebSiteProfile } from "./site-profiles";
+
+export { resolveWebContentScope } from "./web-content-scope";
+export type { WebContentScope } from "./web-content-scope";
 

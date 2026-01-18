@@ -4,6 +4,7 @@ import { createLogger, getErrorMessage } from '@lexipath/core/log';
 import { speak, stop } from '@lexipath/dictionary';
 
 import type { WordCardData, WordCardConfig, WordCardSectionKey } from './SubtitleOverlay';
+import { computeAnchoredOverlayPosition } from '../../shared/ui/overlay-adaptation';
 
 type SubtitlePlatform = 'youtube' | 'bilibili';
 
@@ -472,25 +473,19 @@ export class WordCardController {
   }
 
   private computeWordCardPosition(anchorRect: DOMRect): { top: number; left: number } {
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
     const MARGIN = 10;
-    const PREFERRED_OFFSET = 10;
+    const OFFSET = 10;
     const CARD_WIDTH = 320;
     const CARD_HEIGHT = 160;
 
-    let top = anchorRect.top - CARD_HEIGHT - PREFERRED_OFFSET;
-    let left = anchorRect.left + anchorRect.width / 2 - CARD_WIDTH / 2;
-
-    if (left < MARGIN) left = MARGIN;
-    if (left + CARD_WIDTH > viewportWidth - MARGIN) left = viewportWidth - CARD_WIDTH - MARGIN;
-
-    if (top < MARGIN) {
-      top = anchorRect.bottom + PREFERRED_OFFSET;
-      if (top + CARD_HEIGHT > viewportHeight - MARGIN) top = viewportHeight - CARD_HEIGHT - MARGIN;
-    }
-
-    return { top, left };
+    return computeAnchoredOverlayPosition({
+      anchorRect,
+      overlaySize: { width: CARD_WIDTH, height: CARD_HEIGHT },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      marginPx: MARGIN,
+      offsetPx: OFFSET,
+      prefer: 'above',
+    });
   }
 
   private getWordCardSectionsOrder(): WordCardSectionKey[] {

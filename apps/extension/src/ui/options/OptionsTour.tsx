@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { t } from "./optionsI18n";
+import { clampOverlayPositionToViewport } from "../../shared/ui/overlay-adaptation";
 
 export type TourStepId =
   | "summary"
@@ -43,15 +44,20 @@ function computeCardPosition(input: {
 }): { top: number; left: number } {
   const vw = Math.max(0, window.innerWidth);
   const vh = Math.max(0, window.innerHeight);
-
-  const clamp = (value: number, min: number, max: number) =>
-    Math.max(min, Math.min(max, value));
+  const marginPx = 16;
+  const overlaySize = { width: input.cardWidth, height: input.cardHeight };
+  const viewport = { width: vw, height: vh };
 
   if (!input.highlight) {
-    return {
-      top: clamp(vh - input.cardHeight - 24, 16, vh - input.cardHeight - 16),
-      left: clamp((vw - input.cardWidth) / 2, 16, vw - input.cardWidth - 16),
-    };
+    return clampOverlayPositionToViewport({
+      position: {
+        top: vh - input.cardHeight - 24,
+        left: (vw - input.cardWidth) / 2,
+      },
+      overlaySize,
+      viewport,
+      marginPx,
+    });
   }
 
   const h = input.highlight;
@@ -70,9 +76,12 @@ function computeCardPosition(input: {
       : vh - input.cardHeight - 24;
 
   const idealLeft = h.left + h.width / 2 - input.cardWidth / 2;
-  const left = clamp(idealLeft, 16, vw - input.cardWidth - 16);
-
-  return { top, left };
+  return clampOverlayPositionToViewport({
+    position: { top, left: idealLeft },
+    overlaySize,
+    viewport,
+    marginPx,
+  });
 }
 
 export function OptionsTour(props: {

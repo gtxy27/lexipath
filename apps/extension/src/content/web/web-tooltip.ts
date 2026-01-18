@@ -1,4 +1,5 @@
 import { isEnhancePausedNow } from "../../shared/tab-state";
+import { isCoarsePointer } from "../../shared/ui/overlay-adaptation";
 import type { WebWordCardManager } from "./web-word-card";
 
 export type WebTooltipManager = Readonly<{
@@ -68,7 +69,7 @@ export function createWebTooltipManager(options: {
 
   const showTooltipForWord = (wordEl: HTMLElement, clientX: number, clientY: number) => {
     if (isEnhancePausedNow()) return;
-    if (window.matchMedia("(pointer: coarse)").matches) return;
+    if (isCoarsePointer()) return;
     if (!tooltipEl || options.getWordCardManager().isVisible()) return;
 
     const tooltipText = wordEl.dataset.tooltip?.trim();
