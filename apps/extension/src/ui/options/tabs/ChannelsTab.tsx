@@ -108,6 +108,7 @@ export function ChannelsTab(props: {
         icon={Sparkles}
         actions={
           <Button
+            type="button"
             variant="outline"
             className="h-10 rounded-lg px-4 font-medium"
             onClick={() => {
@@ -198,6 +199,7 @@ export function ChannelsTab(props: {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           className="h-9 gap-2 rounded-lg px-3"
@@ -217,6 +219,7 @@ export function ChannelsTab(props: {
                         <div className="h-6 w-px bg-border mx-1" />
 
                         <Button
+                          type="button"
                           variant="ghost"
                           size="icon"
                           className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
@@ -239,6 +242,7 @@ export function ChannelsTab(props: {
                         </Button>
 
                         <Button
+                          type="button"
                           variant="ghost"
                           size="icon"
                           className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive"
@@ -355,12 +359,16 @@ export function ChannelsTab(props: {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div
+                          className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                          data-tour-id={channel.channelId === 1 ? "channels-api-config" : undefined}
+                        >
                           <div className="space-y-2.5">
                             <Label
                               htmlFor={`channel-${channel.channelId}-model`}
                               className="text-xs text-muted-foreground"
                             >
+
                               {t("optionsProviderModelLabel")}
                             </Label>
                             <Input
@@ -392,6 +400,7 @@ export function ChannelsTab(props: {
                               {t("optionsProviderApiKeyLabel")}
                             </Label>
                             <Input
+                              data-tour-id={channel.channelId === 1 ? "channels-api-key" : undefined}
                               id={`channel-${channel.channelId}-api-key`}
                               type="password"
                               value={channel.apiKey}

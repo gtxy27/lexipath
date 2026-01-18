@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { SettingsSchema, type Settings } from "@lexipath/core";
 import { createLogger } from "@lexipath/core/log";
 import { sendMessage } from "../../shared/messages";
@@ -24,7 +24,7 @@ import {
 } from "./optionsLogic";
 import { t } from "./optionsI18n";
 import type { FieldErrors, FormState } from "./optionsTypes";
-import { OptionsTour } from "./OptionsTour";
+import { OptionsTour, type TourStepId } from "./OptionsTour";
 
 const log = createLogger("ui:Options");
 
@@ -40,6 +40,9 @@ export function Options(): React.ReactElement {
   const [activeTab, setActiveTab] = useState("summary");
 
   const [tourOpen, setTourOpen] = useState(false);
+  const [tourHasTriggered, setTourHasTriggered] = useState(false);
+  const [tourStepId, setTourStepId] = useState<TourStepId | undefined>(undefined);
+  const [tourChannelsDirty, setTourChannelsDirty] = useState(false);
 
   useApplyTheme(form?.theme ?? settings?.theme);
 
@@ -96,14 +99,20 @@ export function Options(): React.ReactElement {
       // ignore
     }
 
+    if (tourHasTriggered) return;
+
     if (tourParam && hasCompleted && !hasSeen) {
+      setTourHasTriggered(true);
       setTourOpen(true);
+      setTourStepId("summary");
       clearTourQueryParam();
       return;
     }
 
     if (!tourParam && hasCompleted && !hasSeen) {
+      setTourHasTriggered(true);
       setTourOpen(true);
+      setTourStepId("summary");
       return;
     }
 
@@ -151,6 +160,13 @@ export function Options(): React.ReactElement {
       toast({
         title: t("optionsSaveSuccess"),
       });
+
+      if (tourOpen && tourStepId === "channels_api_key") {
+        // After successfully saving the API key, continue to Learning sub-sections.
+        setTourChannelsDirty(false);
+        setActiveTab("learning");
+        setTourStepId("learning_language");
+      }
     } finally {
       setSaving(false);
     }
@@ -196,13 +212,27 @@ export function Options(): React.ReactElement {
   ) =>
     setForm((prev: FormState | null) => {
       const base = prev ?? currentForm;
-      return typeof value === "function"
-        ? (value as (prevState: FormState) => FormState)(base)
-        : value;
+      const next =
+        typeof value === "function"
+          ? (value as (prevState: FormState) => FormState)(base)
+          : value;
+
+      // Keep for potential future flows; currently we show the hint immediately on step entry.
+      if (tourOpen && activeTab === "channels" && next.channels !== base.channels) {
+        setTourChannelsDirty(true);
+      }
+
+      return next;
     });
 
   const hasAiConfigured = currentForm.channels.some(channelIsConfigured);
-  const openChannelsTab = () => setActiveTab("channels");
+  const openChannelsTab = () => {
+    setActiveTab("channels");
+    // If the user is in the tutorial flow, clicking the "configure" CTA should advance to API key.
+    if (tourOpen && tourStepId === "general_ai_required") {
+      setTourStepId("channels_api_key");
+    }
+  };
 
   async function markOptionsTourSeen() {
     try {
@@ -224,6 +254,11 @@ export function Options(): React.ReactElement {
       <Toaster />
       <OptionsTour
         open={tourOpen}
+        {...(tourStepId ? { stepId: tourStepId } : {})}
+        onStepIdChange={(id) => {
+          setTourStepId(id);
+          setTourHasTriggered(true);
+        }}
         onOpenChange={(next) => {
           setTourOpen(next);
           if (!next) {
@@ -301,15 +336,23 @@ export function Options(): React.ReactElement {
                   {form.enabled ? t("on") : t("off")}
                 </span>
               </div>
-              <Button
-                size="sm"
-                className="h-9 px-4 text-xs font-medium rounded-lg"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
-                {t("optionsSaveButton")}
-              </Button>
+              <div className="relative">
+                 {tourOpen && tourStepId === "channels_api_key" ? (
+
+                  <div className="pointer-events-none absolute -top-1 left-0 -translate-y-full whitespace-nowrap text-[11px] rounded-full bg-amber-500/15 text-amber-600 px-2.5 py-1 border border-amber-500/25 animate-in fade-in duration-200">
+                    {t("optionsTourSaveInlineHint")}
+                  </div>
+                ) : null}
+                <Button
+                  size="sm"
+                  className="h-9 px-4 text-xs font-medium rounded-lg"
+                  onClick={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : null}
+                  {t("optionsSaveButton")}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

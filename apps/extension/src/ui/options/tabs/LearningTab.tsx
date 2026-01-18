@@ -28,83 +28,92 @@ export function LearningTab(props: {
 
   return (
     <div className="space-y-10">
-      <LanguageTab
-        form={form}
-        setForm={setForm}
-        aiEnabled={aiEnabled}
-        onOpenChannels={onOpenChannels}
-      />
+      <div data-tour-id="learning-language">
+        <LanguageTab
+          form={form}
+          setForm={setForm}
+          aiEnabled={aiEnabled}
+          onOpenChannels={onOpenChannels}
+        />
+      </div>
 
-      <OptionsSection title={t("optionsLlmContextTitle")} description={t("optionsLlmContextDesc")}>
-        <div className="space-y-5">
-          <OptionsRow
-            title={t("optionsLlmContextEnableTitle")}
-            description={t("optionsLlmContextEnableDesc")}
-          >
-            <Switch
-              data-testid="llm-context-enabled"
-              checked={contextEnabled}
-              onCheckedChange={(checked) =>
-                setForm({
-                  ...form,
-                  llmContextSentences: checked
-                    ? Math.max(1, form.llmContextSentences || 1)
-                    : 0,
-                })
-              }
-              className="data-[state=checked]:bg-primary"
-            />
-          </OptionsRow>
-
-          {contextEnabled ? (
+      <div data-tour-id="learning-context">
+        <OptionsSection
+          title={t("optionsLlmContextTitle")}
+          description={t("optionsLlmContextDesc")}
+        >
+          <div className="space-y-5">
             <OptionsRow
-              title={t("optionsLlmContextSizeTitle")}
-              description={t("optionsLlmContextSizeDesc")}
+              title={t("optionsLlmContextEnableTitle")}
+              description={t("optionsLlmContextEnableDesc")}
             >
-              <Select
-                value={String(form.llmContextSentences)}
-                onValueChange={(v) =>
+              <Switch
+                data-testid="llm-context-enabled"
+                checked={contextEnabled}
+                onCheckedChange={(checked) =>
                   setForm({
                     ...form,
-                    llmContextSentences: Number(v),
+                    llmContextSentences: checked
+                      ? Math.max(1, form.llmContextSentences || 1)
+                      : 0,
                   })
                 }
-              >
-                <SelectTrigger
-                  data-testid="llm-context-size"
-                  className="w-full sm:w-56 h-11 rounded-lg text-xs"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {contextOptions.map((n) => (
-                    <SelectItem key={String(n)} value={String(n)}>
-                      {t("optionsLlmContextSentencesLabel", String(n))}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                className="data-[state=checked]:bg-primary"
+              />
             </OptionsRow>
-          ) : null}
-        </div>
-      </OptionsSection>
 
-      <OptionsDisclosure
-        title={t("optionsLearningRoutingTitle")}
-        description={t("optionsLearningRoutingDesc")}
-        summaryRight={t("optionsAdvancedTitle")}
-      >
-        <div className="space-y-8">
-          <RoutingTab
-            embedded
-            form={form}
-            setForm={setForm}
-            errors={errors}
-            aiEnabled={aiEnabled}
-            onOpenChannels={onOpenChannels}
-          />
-        </div>
-      </OptionsDisclosure>
+            {contextEnabled ? (
+              <OptionsRow
+                title={t("optionsLlmContextSizeTitle")}
+                description={t("optionsLlmContextSizeDesc")}
+              >
+                <Select
+                  value={String(form.llmContextSentences)}
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      llmContextSentences: Number(v),
+                    })
+                  }
+                >
+                  <SelectTrigger
+                    data-testid="llm-context-size"
+                    className="w-full sm:w-56 h-11 rounded-lg text-xs"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contextOptions.map((n) => (
+                      <SelectItem key={String(n)} value={String(n)}>
+                        {t("optionsLlmContextSentencesLabel", String(n))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </OptionsRow>
+            ) : null}
+          </div>
+        </OptionsSection>
+      </div>
+
+      <div data-tour-id="learning-routing">
+        <OptionsDisclosure
+          title={t("optionsLearningRoutingTitle")}
+          description={t("optionsLearningRoutingDesc")}
+          summaryRight={t("optionsAdvancedTitle")}
+        >
+          <div className="space-y-8">
+            <RoutingTab
+              embedded
+              form={form}
+              setForm={setForm}
+              errors={errors}
+              aiEnabled={aiEnabled}
+              onOpenChannels={onOpenChannels}
+            />
+          </div>
+        </OptionsDisclosure>
+      </div>
     </div>
   );
 }

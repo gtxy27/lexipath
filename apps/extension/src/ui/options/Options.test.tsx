@@ -136,7 +136,7 @@ describe("Options", () => {
 
     render(<Options />);
 
-    expect(await screen.findByText("1/4")).toBeInTheDocument();
+    expect(await screen.findByText((_, el) => el?.textContent === "1/9")).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "optionsTourSkip" }));

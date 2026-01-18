@@ -2210,6 +2210,38 @@
     "message": "\u5168\u5c40\u5f00\u5173\uff0c\u9ad8\u7ea7\u8bbe\u7f6e\uff0c\u4ee5\u53ca\u7ef4\u62a4\u5de5\u5177\u3002",
     "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u901a\u7528 step \u63cf\u8ff0"
   },
+  "optionsTourStep_general_ai_required_desc": {
+    "message": "\u70b9\u51fb\u8bbe\u7f6e API \u5bc6\u94a5\uff0c\u542f\u7528 AI \u76f8\u5173\u529f\u80fd\u3002",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u901a\u7528\u9875\u7684\u914d\u7f6e\u63d0\u793a"
+  },
+  "optionsTourStep_channels_api_key_desc": {
+    "message": "\u5728\u8fd9\u91cc\u586b\u5199\u4f60\u7684 API \u5bc6\u94a5\u3002",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u5bc6\u94a5\u586b\u5199\u6b65\u9aa4"
+  },
+  "optionsTourStep_channels_save_desc": {
+    "message": "\u70b9\u51fb\u201c\u4fdd\u5b58\u201d\u8ba9\u4fee\u6539\u751f\u6548\u3002",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u4fdd\u5b58\u63d0\u9192\u6b65\u9aa4"
+  },
+  "optionsTourStep_learning_language_desc": {
+    "message": "\u8bbe\u7f6e\u76ee\u6807\u8bed\u8a00\u548c\u719f\u7ec3\u5ea6\u3002",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u5b66\u4e60\u8bed\u8a00\u6b65\u9aa4"
+  },
+  "optionsTourStep_learning_context_desc": {
+    "message": "\u8c03\u6574\u4e0a\u4e0b\u6587\u7a97\u53e3\u5927\u5c0f\u3002",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u4e0a\u4e0b\u6587\u7a97\u53e3\u6b65\u9aa4"
+  },
+  "optionsTourStep_learning_routing_desc": {
+    "message": "\u9009\u62e9\u54ea\u4e9b\u529f\u80fd\u4f7f\u7528 AI\uff0c\u5e76\u914d\u7f6e\u5bf9\u5e94\u7684\u8def\u7531\u3002",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u8def\u7531\u6b65\u9aa4"
+  },
+  "optionsTourSaveInlineHint": {
+    "message": "\u522b\u5fd8\u4e86\u4fdd\u5b58",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u4fdd\u5b58\u5c0f\u63d0\u793a"
+  },
+  "optionsTourClickToConfigure": {
+    "message": "\u70b9\u51fb\u6309\u94ae\u7ee7\u7eed",
+    "description": "\u8bbe\u7f6e\u5bfc\u89c8\uff1a\u63d0\u793a\u70b9\u51fb CTA"
+  },
 
   "summaryTitle": {
     "message": "\u4eca\u65e5\u603b\u7ed3",

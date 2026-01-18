@@ -2,9 +2,22 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { t } from "./optionsI18n";
 
+export type TourStepId =
+  | "summary"
+  | "learning_tab"
+  | "channels_tab"
+  | "general_tab"
+  | "general_ai_required"
+  | "channels_api_key"
+  | "learning_language"
+  | "learning_context"
+  | "learning_routing";
+
+type TourTab = "summary" | "learning" | "channels" | "general";
+
 type TourStep = {
-  id: "summary" | "learning" | "channels" | "general";
-  tab: "summary" | "learning" | "channels" | "general";
+  id: TourStepId;
+  tab: TourTab;
   anchorId: string;
   titleKey: string;
   descKey: string;
@@ -66,9 +79,11 @@ export function OptionsTour(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onMarkSeen: () => Promise<void>;
-  onNavigateTab: (tab: "summary" | "learning" | "channels" | "general") => void;
+  onNavigateTab: (tab: TourTab) => void;
+  stepId?: TourStepId;
+  onStepIdChange?: (stepId: TourStepId) => void;
 }): React.ReactElement | null {
-  const { open, onOpenChange, onMarkSeen, onNavigateTab } = props;
+  const { open, onOpenChange, onMarkSeen, onNavigateTab, stepId, onStepIdChange } = props;
 
   const steps: TourStep[] = useMemo(
     () => [
@@ -80,31 +95,70 @@ export function OptionsTour(props: {
         descKey: "optionsTourStep_summary_desc",
       },
       {
-        id: "learning",
+        id: "learning_tab",
         tab: "learning",
         anchorId: "options-tab-learning",
         titleKey: "optionsTab_learning",
         descKey: "optionsTourStep_learning_desc",
       },
       {
-        id: "channels",
+        id: "channels_tab",
         tab: "channels",
         anchorId: "options-tab-channels",
         titleKey: "optionsTab_channels",
         descKey: "optionsTourStep_channels_desc",
       },
       {
-        id: "general",
+        id: "general_tab",
         tab: "general",
         anchorId: "options-tab-general",
         titleKey: "optionsTab_general",
         descKey: "optionsTourStep_general_desc",
       },
+      {
+        id: "general_ai_required",
+        tab: "general",
+        anchorId: "general-ai-required-panel",
+        titleKey: "optionsTab_general",
+        descKey: "optionsTourStep_general_ai_required_desc",
+      },
+      {
+        id: "channels_api_key",
+        tab: "channels",
+        anchorId: "channels-api-config",
+        titleKey: "optionsTab_channels",
+        descKey: "optionsTourStep_channels_api_key_desc",
+      },
+      {
+        id: "learning_language",
+        tab: "learning",
+        anchorId: "learning-language",
+        titleKey: "optionsTab_learning",
+        descKey: "optionsTourStep_learning_language_desc",
+      },
+      {
+        id: "learning_context",
+        tab: "learning",
+        anchorId: "learning-context",
+        titleKey: "optionsTab_learning",
+        descKey: "optionsTourStep_learning_context_desc",
+      },
+      {
+        id: "learning_routing",
+        tab: "learning",
+        anchorId: "learning-routing",
+        titleKey: "optionsTab_learning",
+        descKey: "optionsTourStep_learning_routing_desc",
+      },
     ],
     [],
   );
 
-  const [stepIndex, setStepIndex] = useState<number>(0);
+  const currentStepId: TourStepId = stepId ?? steps[0]!.id;
+  const stepIndex = Math.max(
+    0,
+    steps.findIndex((s) => s.id === currentStepId),
+  );
   const [highlight, setHighlight] = useState<{
     top: number;
     left: number;
@@ -117,11 +171,6 @@ export function OptionsTour(props: {
 
   const step = steps[Math.max(0, Math.min(steps.length - 1, stepIndex))]!;
 
-  useEffect(() => {
-    if (!open) return;
-    // Reset to the first step whenever the tour is opened.
-    setStepIndex(0);
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -132,14 +181,22 @@ export function OptionsTour(props: {
     if (!open) return;
 
     let raf = 0;
+    let tries = 0;
 
     const update = () => {
       raf = 0;
       const el = findVisibleAnchor(step.anchorId);
       if (!el) {
+        tries += 1;
+        // When switching tabs, the anchor may not exist for a frame or two.
+        if (tries < 25) {
+          raf = requestAnimationFrame(update);
+          return;
+        }
         setHighlight(null);
         return;
       }
+      tries = 0;
 
       const rect = el.getBoundingClientRect();
 
@@ -187,8 +244,11 @@ export function OptionsTour(props: {
 
   const cardWidth = 360;
   const cardHeight = 170;
+
+  // For API key step, keep the card bottom-centered (unobtrusive), rather than anchored to the form.
+  const highlightForLayout = step.id === "channels_api_key" ? null : highlight;
   const pos = computeCardPosition({
-    highlight,
+    highlight: highlightForLayout,
     cardWidth,
     cardHeight,
     gap: 14,
@@ -202,32 +262,67 @@ export function OptionsTour(props: {
     onOpenChange(false);
   }
 
+  const overlayEnabled = step.id !== "channels_api_key";
+
+
+  const nextEnabled = step.id !== "channels_api_key" && step.id !== "general_ai_required";
+
+  // CTA hint: render without its own hooks to keep hook order stable.
+  const ctaEl = step.id === "general_ai_required" ? findVisibleAnchor("general-ai-required-cta") : null;
+  const ctaRect = ctaEl ? ctaEl.getBoundingClientRect() : null;
+  const ctaHintRect =
+    step.id === "general_ai_required" && ctaRect && ctaRect.width > 0 && ctaRect.height > 0
+      ? ctaRect
+      : null;
+
   return (
-    <div className="fixed inset-0 z-[60]">
-      {highlight ? (
+    <div className="fixed inset-0 z-[60] pointer-events-none">
+      {overlayEnabled ? (
+        highlight ? (
+          <div
+            className="fixed rounded-xl transition-all duration-300"
+            style={{
+              top: highlight.top,
+              left: highlight.left,
+              width: highlight.width,
+              height: highlight.height,
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.55)",
+              border: "1px solid rgba(255, 255, 255, 0.16)",
+              pointerEvents: "none",
+            }}
+          />
+        ) : (
+          <div className="fixed inset-0 bg-black/55" />
+        )
+      ) : null}
+
+      {step.id === "general_ai_required" && ctaHintRect ? (
         <div
-          className="fixed rounded-xl transition-all duration-300"
+          className="fixed pointer-events-none"
           style={{
-            top: highlight.top,
-            left: highlight.left,
-            width: highlight.width,
-            height: highlight.height,
-            boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.55)",
-            border: "1px solid rgba(255, 255, 255, 0.16)",
-            pointerEvents: "none",
+            top: ctaHintRect.top + ctaHintRect.height / 2,
+            left: ctaHintRect.left - 14,
+            transform: "translate(-100%, -50%)",
           }}
-        />
-      ) : (
-        <div className="fixed inset-0 bg-black/55" />
-      )}
+        >
+          <div className="flex items-center gap-2">
+            <div className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+            <div className="rounded-full bg-background/95 border border-border shadow px-2.5 py-1 text-[11px] text-foreground">
+              {t("optionsTourClickToConfigure")}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
 
       <div
-        className="fixed rounded-xl border border-border bg-background/95 backdrop-blur shadow-lg p-4 w-[360px] max-w-[calc(100vw-32px)] transition-all duration-300"
+        className="fixed rounded-xl border border-border bg-background/95 backdrop-blur shadow-lg p-4 w-[360px] max-w-[calc(100vw-32px)] transition-all duration-300 pointer-events-auto"
         style={{
           top: pos.top,
           left: pos.left,
         }}
       >
+
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs text-muted-foreground">
@@ -258,29 +353,39 @@ export function OptionsTour(props: {
                 type="button"
                 variant="outline"
                 className="h-9 px-3 rounded-lg"
-                onClick={() => setStepIndex((i: number) => Math.max(0, i - 1))}
+                onClick={() => {
+                  const next = Math.max(0, stepIndex - 1);
+                  const nextId = steps[next]?.id;
+                  if (nextId) onStepIdChange?.(nextId);
+                }}
               >
                 {t("optionsTourBack")}
               </Button>
             ) : null}
 
-            {isLast ? (
-              <Button
-                type="button"
-                className="h-9 px-4 rounded-lg"
-                onClick={handleSkipOrDone}
-              >
-                {t("optionsTourDone")}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                className="h-9 px-4 rounded-lg"
-                onClick={() => setStepIndex((i: number) => Math.min(steps.length - 1, i + 1))}
-              >
-                {t("optionsTourNext")}
-              </Button>
-            )}
+             {isLast ? (
+               <Button
+                 type="button"
+                 className="h-9 px-4 rounded-lg"
+                 onClick={handleSkipOrDone}
+               >
+                 {t("optionsTourDone")}
+               </Button>
+             ) : (
+               <Button
+                 type="button"
+                 className="h-9 px-4 rounded-lg"
+                 disabled={!nextEnabled}
+                 onClick={() => {
+                   const next = Math.min(steps.length - 1, stepIndex + 1);
+                   const nextId = steps[next]?.id;
+                   if (nextId) onStepIdChange?.(nextId);
+                 }}
+               >
+                 {t("optionsTourNext")}
+               </Button>
+             )}
+
           </div>
         </div>
       </div>
