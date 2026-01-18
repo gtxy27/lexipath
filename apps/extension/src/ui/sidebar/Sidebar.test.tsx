@@ -292,4 +292,69 @@ describe("Sidebar", () => {
     expect((await screen.findAllByText("Hello")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("WORLD")).length).toBeGreaterThan(0);
   });
+
+  it("refreshes web study context on sidebar open for web sessions", async () => {
+    // Ensure previous tests' storage mocks don't force the "hasRecentPendingMessage" path.
+    (browserMock.storage.local.get as any).mockImplementation(async () => ({}));
+
+    sendMessageMock.mockImplementation(async (type: string, payload: unknown): Promise<any> => {
+      if (type === "GET_SETTINGS") {
+        return { ok: true, value: { theme: "system" } };
+      }
+      if (type === "GET_CHAT_SESSIONS") {
+        return {
+          ok: true,
+          value: [
+            {
+              sessionId: "chat-web-1",
+              keyword: "",
+              conversationIndex: 0,
+              createdAt: 1,
+              lastAccessedAt: 10,
+              kind: "web",
+              label: "Old Page · old.example",
+              anchorKey: "anchor1",
+            },
+            {
+              sessionId: "chat-general-1",
+              keyword: "",
+              conversationIndex: 0,
+              createdAt: 2,
+              lastAccessedAt: 9,
+              kind: "general",
+              label: "General",
+              anchorKey: "",
+            },
+          ],
+        };
+      }
+      if (type === "GET_ACTIVE_WEB_STUDY_CONTEXT") {
+        return {
+          ok: true,
+          value: {
+            kind: "web",
+            source: "study",
+            title: "New Page",
+            domain: "new.example",
+            selectedText: "Hello from the current page",
+          },
+        };
+      }
+      if (type === "GET_CHAT_MESSAGES") {
+        return { ok: true, value: [] };
+      }
+      if (type === "CHAT") {
+        return { ok: true, value: { reply: "assistantReply", conversationId: "chat-web-1" } };
+      }
+      return { ok: true, value: null };
+    });
+
+    render(<Sidebar />);
+
+    await waitFor(() => {
+      expect(sendMessageMock).toHaveBeenCalledWith("GET_ACTIVE_WEB_STUDY_CONTEXT", undefined);
+    });
+
+    expect(await screen.findByText("New Page")).toBeInTheDocument();
+  });
 });

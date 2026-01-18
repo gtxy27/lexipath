@@ -153,6 +153,19 @@ const WebProcessingStatusSchema = z
   })
   .strict();
 
+const WebStudyContextInfoSchema = z
+  .object({
+    kind: z.literal('web'),
+    source: z.literal('study'),
+    title: z.string().optional(),
+    domain: z.string().optional(),
+    url: z.string().optional(),
+    selectedText: z.string().optional(),
+    beforeText: z.string().optional(),
+    afterText: z.string().optional(),
+  })
+  .strict();
+
 const messageDefinitions = {
   GET_SETTINGS: {
     payloadSchema: z.undefined(),
@@ -311,6 +324,10 @@ const messageDefinitions = {
       })
       .optional(),
     valueSchema: z.object({ ok: z.literal(true) }),
+  },
+  GET_ACTIVE_WEB_STUDY_CONTEXT: {
+    payloadSchema: z.undefined(),
+    valueSchema: z.union([z.null(), WebStudyContextInfoSchema]),
   },
   EXPORT_DATA: {
     payloadSchema: z.undefined(),

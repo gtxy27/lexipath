@@ -24,6 +24,7 @@ import { FloatingButtonController } from "./ui/floating-button-controller";
 import { FLOATING_HIDE_ONCE_KEY } from "./ui/floating-button-constants";
 import { createWebWordCardManager, type WebWordCardManager } from "./web";
 import { createWebEnhancer, type WebEnhancer } from "./web";
+import { buildStudyContext } from "./web/study-context";
 import {
   applyTabEnhancePausedFromStorage,
   applyWebShowOriginal,
@@ -393,6 +394,40 @@ async function init(): Promise<void> {
     }
   }
 
+  function getWebStudyContext():
+    | {
+        kind: "web";
+        source: "study";
+        title?: string;
+        domain?: string;
+        selectedText?: string;
+        beforeText?: string;
+      }
+    | null {
+    const title = normalizeSelectionText(document.title);
+    const domain = normalizeSelectionText(window.location.hostname);
+
+    try {
+      const url = window.location.href;
+      const context = buildStudyContext(url, { preloadScreens: 2 });
+      return {
+        kind: "web",
+        source: "study",
+        ...(title ? { title } : {}),
+        ...(domain ? { domain } : {}),
+        ...(context.beforeText ? { beforeText: context.beforeText } : {}),
+        ...(context.selectedText ? { selectedText: context.selectedText } : {}),
+      };
+    } catch {
+      return {
+        kind: "web",
+        source: "study",
+        ...(title ? { title } : {}),
+        ...(domain ? { domain } : {}),
+      };
+    }
+  }
+
   browser.runtime?.onMessage?.addListener?.((message: unknown) => {
     if (!message || typeof message !== "object") return;
     const type = (message as Record<string, unknown>).type;
@@ -414,6 +449,10 @@ async function init(): Promise<void> {
     }
     case "LEXIPATH_GET_WEB_SELECTION_CONTEXT": {
       const context = getWebSelectionContext();
+      return Promise.resolve(context ?? undefined);
+    }
+    case "LEXIPATH_GET_WEB_STUDY_CONTEXT": {
+      const context = getWebStudyContext();
       return Promise.resolve(context ?? undefined);
     }
     default:

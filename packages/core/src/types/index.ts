@@ -73,6 +73,7 @@ export const MessageTypeSchema = z.enum([
   'GET_CHAT_SESSIONS',
   'GET_CHAT_MESSAGES',
   'OPEN_SIDEBAR',
+  'GET_ACTIVE_WEB_STUDY_CONTEXT',
   'EXPORT_DATA',
   'IMPORT_DATA',
   'SEARCH_MESSAGES',

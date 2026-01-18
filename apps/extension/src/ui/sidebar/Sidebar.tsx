@@ -297,8 +297,31 @@ export function Sidebar(): React.ReactElement {
     [applySessionHistory, fetchChatMessages],
   );
 
+  const refreshWebStudyContextForSession = useCallback(
+    async (session: ChatSession) => {
+      if (session.kind !== "web") return;
+      const sessionId = session.sessionId;
+      if (!sessionId) return;
+
+      const response = await sendMessage("GET_ACTIVE_WEB_STUDY_CONTEXT", undefined);
+      if (!response.ok) return;
+
+      const raw = response.value;
+      if (!raw || typeof raw !== "object") return;
+      if ((raw as Record<string, unknown>).kind !== "web") return;
+
+      const context = raw as SidebarContextInfo;
+      setContextBySessionId((prev) => ({ ...prev, [sessionId]: context }));
+
+      setContextSelectionBySessionId((prev) =>
+        prev[sessionId] ? prev : { ...prev, [sessionId]: getDefaultSelectionForContext(context) },
+      );
+    },
+    [getDefaultSelectionForContext],
+  );
+
   const loadLatestSession = useCallback(
-    async (options?: { skipMessages?: boolean }) => {
+    async (options?: { skipMessages?: boolean; refreshWebContext?: boolean }) => {
       const startedWhileStreaming = uiStreamActiveRef.current;
       const response = await sendMessage("GET_CHAT_SESSIONS", {});
       if (response.ok) {
@@ -309,13 +332,22 @@ export function Sidebar(): React.ReactElement {
           const sorted = [...allSessions].sort((a, b) => b.lastAccessedAt - a.lastAccessedAt);
           const latest = sorted[0];
           if (latest) hydrateContextFromSession(latest);
+          if (
+            latest &&
+            latest.kind === "web" &&
+            (options?.refreshWebContext ?? true) &&
+            !startedWhileStreaming &&
+            !uiStreamActiveRef.current
+          ) {
+            await refreshWebStudyContextForSession(latest);
+          }
           if (latest && !options?.skipMessages && !startedWhileStreaming && !uiStreamActiveRef.current) {
             await loadMessages(latest.sessionId);
           }
         }
       }
     },
-    [hydrateContextFromSession, loadMessages],
+    [hydrateContextFromSession, loadMessages, refreshWebStudyContextForSession],
   );
 
   useEffect(() => {
@@ -344,7 +376,7 @@ export function Sidebar(): React.ReactElement {
         ({ hasRecentPendingMessage } = await readPending());
       }
 
-      await loadLatestSession({ skipMessages: hasRecentPendingMessage });
+      await loadLatestSession({ skipMessages: hasRecentPendingMessage, refreshWebContext: !hasRecentPendingMessage });
     }
     init();
   }, [loadLatestSession]);

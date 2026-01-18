@@ -1,6 +1,6 @@
 import browser from 'webextension-polyfill';
 
-import { createLogger } from '@lexipath/core/log';
+import { createLogger, getErrorMessage } from '@lexipath/core/log';
 
 import type { createMessageHandlerRegistry } from '../../shared/messages';
 import type { Translator } from '../lib/i18n';
@@ -17,6 +17,26 @@ async function openSidePanel(tabId?: number) {
 
 export function registerSidebarFeature(options: { registry: Registry; t: Translator }) {
   const { registry, t } = options;
+
+  registry.register('GET_ACTIVE_WEB_STUDY_CONTEXT', async () => {
+    try {
+      const tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+      const tabId = tabs?.[0]?.id;
+      if (typeof tabId !== 'number') return null;
+
+      const response = await browser.tabs.sendMessage(tabId, { type: 'LEXIPATH_GET_WEB_STUDY_CONTEXT' });
+      if (!response || typeof response !== 'object') return null;
+
+      const kind = (response as Record<string, unknown>).kind;
+      const source = (response as Record<string, unknown>).source;
+      if (kind !== 'web' || source !== 'study') return null;
+
+      return response;
+    } catch (error: unknown) {
+      log.warn('GET_ACTIVE_WEB_STUDY_CONTEXT failed; returning null', { message: getErrorMessage(error) });
+      return null;
+    }
+  });
 
   registry.register('OPEN_SIDEBAR', async (payload, sender) => {
     const tabId = sender?.tab?.id;
@@ -48,16 +68,43 @@ export function registerSidebarFeature(options: { registry: Registry; t: Transla
     });
 
     await pendingWritePromise;
-    return { ok: true };
+    return { ok: true } as const;
   });
 
+  const upsertExplainSelectionContextMenu = async () => {
+    const title = t('contextMenu_explainSelection', undefined, 'Explain selection');
+
+    try {
+      await browser.contextMenus.update('lexipath-explain-selection', { title });
+      return;
+    } catch {
+      // Fall through to create when the menu doesn't exist yet.
+    }
+
+    try {
+      await browser.contextMenus.create({
+        id: 'lexipath-explain-selection',
+        title,
+        contexts: ['selection'],
+      });
+    } catch (error: unknown) {
+      log.warn('Failed to create context menu item', { error });
+    }
+  };
+
+  // Keep context menu title in sync across installs/updates.
   browser.runtime.onInstalled.addListener(() => {
-    browser.contextMenus.create({
-      id: 'lexipath-explain-selection',
-      title: `${t('extensionName')}: ${t('contextMenu_explainSelection')}`,
-      contexts: ['selection'],
-    });
+    void upsertExplainSelectionContextMenu();
   });
+
+  if (browser.runtime.onStartup) {
+    browser.runtime.onStartup.addListener(() => {
+      void upsertExplainSelectionContextMenu();
+    });
+  }
+
+  // Best-effort: dev reloads/service worker restarts.
+  void upsertExplainSelectionContextMenu();
 
   browser.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === 'lexipath-explain-selection' && info.selectionText) {
