@@ -36,7 +36,11 @@
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.0.11",
     "jsdom": "^27.4.0",
-    "typescript": "^5.3.3",
+    "typescript": "^5.7.2",
     "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
