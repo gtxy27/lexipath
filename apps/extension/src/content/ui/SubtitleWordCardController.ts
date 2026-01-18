@@ -1,7 +1,9 @@
 import { getI18nMessage } from '../i18n';
 import { sendMessage } from '../../shared/messages';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
+import { makeWordbookEntryId, normalizeWordbookLanguage, normalizeWordbookTerm } from '@lexipath/core';
 import { speak, stop } from '@lexipath/dictionary';
+import { makeSubtitleAnchorKey, makeWebAnchorKey } from '../../shared/chat-anchor';
 
 import type { WordCardData, WordCardConfig, WordCardSectionKey } from './SubtitleOverlay';
 
@@ -18,7 +20,7 @@ type ContextInfo = {
   url?: string;
 };
 
-const log = createLogger('wordcard-controller');
+const log = createLogger('subtitle-wordcard-controller'); 
 
 export class WordCardController {
   private wordCardElement: HTMLDivElement;
@@ -40,6 +42,7 @@ export class WordCardController {
   private wordCardLastWord: string | null = null;
   private wordCardTempTtsLang: string | null = null;
   private wordCardSpeakToken = 0;
+  private wordCardWordbookToken = 0;
 
   private onWordClick: ((word: string, anchorRect: DOMRect) => void) | undefined;
   private onWordHover: ((word: string, anchorRect: DOMRect) => void) | undefined;
@@ -50,9 +53,9 @@ export class WordCardController {
   private getSubtitleAnchorId: () => string = () => '';
 
 
-  constructor(options: {
-    container: HTMLDivElement;
-    wordCardElement: HTMLDivElement;
+  constructor(options: { 
+    container: HTMLDivElement; 
+    wordCardElement: HTMLDivElement; 
     platform: SubtitlePlatform;
     wordCardConfig: WordCardConfig;
     onWordClick: ((word: string, anchorRect: DOMRect) => void) | undefined;
@@ -61,13 +64,14 @@ export class WordCardController {
     getVideoTimestampSec: () => number | null;
     getSubtitleContextLines: () => string[];
     getSubtitleAnchorId: () => string;
-  }) {
-    this.container = options.container;
-    this.wordCardElement = options.wordCardElement;
-    this.platform = options.platform;
-    this.wordCardConfig = options.wordCardConfig;
-    this.onWordClick = options.onWordClick;
-    this.onWordHover = options.onWordHover;
+  }) { 
+    this.container = options.container; 
+    this.wordCardElement = options.wordCardElement; 
+    this.wordCardElement.setAttribute('data-lx-wordcard', 'subtitle'); 
+    this.platform = options.platform; 
+    this.wordCardConfig = options.wordCardConfig; 
+    this.onWordClick = options.onWordClick; 
+    this.onWordHover = options.onWordHover; 
     this.getVideoTitle = options.getVideoTitle;
     this.getVideoTimestampSec = options.getVideoTimestampSec;
     this.getSubtitleContextLines = options.getSubtitleContextLines;
@@ -112,10 +116,20 @@ export class WordCardController {
     const header = document.createElement('div');
     header.className = 'lexipath-wordcard__header';
 
+    const titleRow = document.createElement('div');
+    titleRow.className = 'lexipath-wordcard__title-row';
+
     const title = document.createElement('div');
     title.className = 'lexipath-wordcard__title';
     title.textContent = data.word;
-    header.appendChild(title);
+    titleRow.appendChild(title);
+
+    const wordbookStateBadge = document.createElement('span');
+    wordbookStateBadge.className = 'lexipath-wordcard__wordbook-state';
+    wordbookStateBadge.style.display = 'none';
+    titleRow.appendChild(wordbookStateBadge);
+
+    header.appendChild(titleRow);
 
     const metaParts: string[] = [];
     if (data.phonetic) metaParts.push(data.phonetic);
@@ -269,7 +283,20 @@ export class WordCardController {
     });
 
     actionRow.appendChild(pronounceButton);
-    footer.appendChild(actionRow);
+
+    const wordbookButton = document.createElement('button'); 
+    wordbookButton.type = 'button'; 
+    wordbookButton.className = 'lexipath-wordcard__wordbook-button'; 
+    wordbookButton.disabled = true; 
+    wordbookButton.innerHTML = ` 
+      <svg class="lexipath-wordcard__wordbook-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> 
+        <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a.53.53 0 0 0 .398.29l5.166.75a.53.53 0 0 1 .294.904l-3.737 3.644a.53.53 0 0 0-.153.469l.882 5.143a.53.53 0 0 1-.77.56l-4.618-2.427a.53.53 0 0 0-.494 0l-4.618 2.427a.53.53 0 0 1-.77-.56l.882-5.143a.53.53 0 0 0-.153-.469L3.257 8.918a.53.53 0 0 1 .294-.904l5.166-.75a.53.53 0 0 0 .398-.29z"/> 
+      </svg> 
+    `; 
+    wordbookButton.setAttribute('aria-label', getI18nMessage('wordCard_save') || 'Save'); 
+    actionRow.appendChild(wordbookButton); 
+ 
+    footer.appendChild(actionRow); 
 
     const chatButton = document.createElement('button');
     chatButton.className = 'lexipath-wordcard__chat-button';
@@ -308,6 +335,169 @@ export class WordCardController {
 
     footer.appendChild(chatButton);
     this.wordCardElement.appendChild(footer);
+
+    const setWordbookUi = (state: 'active' | 'archived' | 'ignored' | null) => { 
+      const saved = Boolean(state); 
+      wordbookButton.setAttribute( 
+        'aria-label', 
+        saved ? getI18nMessage('wordCard_unsave') || 'Unsave' : getI18nMessage('wordCard_save') || 'Save', 
+      ); 
+      wordbookButton.classList.toggle('is-saved', saved); 
+ 
+      if (!saved) { 
+        wordbookStateBadge.style.display = 'none'; 
+        wordbookStateBadge.textContent = ''; 
+        wordbookStateBadge.removeAttribute('data-state'); 
+        return;
+      }
+
+      const labelKey =
+        state === 'archived'
+          ? 'wordCard_stateArchived'
+          : state === 'ignored'
+            ? 'wordCard_stateIgnored'
+            : 'wordCard_stateActive';
+      wordbookStateBadge.textContent = getI18nMessage(labelKey) || state;
+      wordbookStateBadge.setAttribute('data-state', state ?? '');
+      wordbookStateBadge.style.display = '';
+    };
+
+    const resolveWordbookIdentity = async (): Promise<{
+      id: string;
+      language: string;
+      term: string;
+      normalizedTerm: string;
+    } | null> => {
+      const term = String(data.word ?? '').trim();
+      const normalizedTerm = normalizeWordbookTerm(term);
+      if (!normalizedTerm) return null;
+
+      try {
+        const resp = await sendMessage('GET_SETTINGS', undefined);
+        const language = normalizeWordbookLanguage(resp.ok ? (resp.value as any)?.targetLanguage : undefined);
+        const id = makeWordbookEntryId(language as any, normalizedTerm);
+        return { id, language, term, normalizedTerm };
+      } catch {
+        const language = normalizeWordbookLanguage(undefined);
+        const id = makeWordbookEntryId(language as any, normalizedTerm);
+        return { id, language, term, normalizedTerm };
+      }
+    };
+
+    const resolveWordbookSource = async (): Promise<any | null> => {
+      const now = Date.now();
+      const snippet = (() => {
+        const candidate =
+          (typeof data.example === 'string' && data.example.trim() ? data.example.trim() : '') ||
+          this.getSubtitleContextLines().join(' ');
+        const trimmed = String(candidate ?? '').trim();
+        if (!trimmed) return undefined;
+        return trimmed.length > 240 ? `${trimmed.slice(0, 240)}…` : trimmed;
+      })();
+
+      const anchorId = this.getSubtitleAnchorId();
+      if (anchorId) {
+        const anchorKey = await makeSubtitleAnchorKey(anchorId);
+        if (anchorKey) {
+          const timestampSec = this.getVideoTimestampSec();
+          return {
+            kind: 'subtitle',
+            anchorKey,
+            capturedAt: now,
+            ...(snippet ? { snippet } : {}),
+            platform: this.platform,
+            ...(typeof timestampSec === 'number' ? { timestampSec: Math.floor(timestampSec) } : {}),
+          };
+        }
+      }
+
+      const anchorKey = await makeWebAnchorKey(window.location.href);
+      if (!anchorKey) return null;
+      return {
+        kind: 'web',
+        anchorKey,
+        capturedAt: now,
+        ...(snippet ? { snippet } : {}),
+        domain: window.location.hostname,
+        title: document.title,
+      };
+    };
+
+    const refreshWordbookState = async () => {
+      const token = ++this.wordCardWordbookToken;
+      wordbookButton.disabled = true;
+      try {
+        const identity = await resolveWordbookIdentity();
+        if (!identity) return;
+        const resp = await sendMessage('WORDBOOK_GET', { id: identity.id } as any);
+        if (token !== this.wordCardWordbookToken) return;
+        if (!resp.ok) {
+          setWordbookUi(null);
+          return;
+        }
+        const entry = resp.value as any;
+        setWordbookUi(entry?.state ?? null);
+      } catch {
+        if (token !== this.wordCardWordbookToken) return;
+        setWordbookUi(null);
+      } finally {
+        if (token === this.wordCardWordbookToken) {
+          wordbookButton.disabled = false;
+        }
+      }
+    };
+
+    wordbookButton.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const token = ++this.wordCardWordbookToken;
+      wordbookButton.disabled = true;
+
+      try {
+        const identity = await resolveWordbookIdentity();
+        if (!identity) return;
+
+        const existing = await sendMessage('WORDBOOK_GET', { id: identity.id } as any);
+        if (token !== this.wordCardWordbookToken) return;
+
+        if (existing.ok && existing.value) {
+          await sendMessage('WORDBOOK_DELETE', { id: identity.id } as any);
+          if (token !== this.wordCardWordbookToken) return;
+          setWordbookUi(null);
+          return;
+        }
+
+        const source = await resolveWordbookSource();
+        if (token !== this.wordCardWordbookToken) return;
+
+        const now = Date.now();
+        const entry = {
+          id: identity.id,
+          language: identity.language,
+          term: identity.term,
+          normalizedTerm: identity.normalizedTerm,
+          state: 'active',
+          tags: [],
+          note: '',
+          sources: source ? [source] : [],
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const upserted = await sendMessage('WORDBOOK_UPSERT', { entry } as any);
+        if (token !== this.wordCardWordbookToken) return;
+        if (upserted.ok) {
+          setWordbookUi((upserted.value as any)?.state ?? 'active');
+        } else {
+          setWordbookUi(null);
+        }
+      } finally {
+        if (token === this.wordCardWordbookToken) {
+          wordbookButton.disabled = false;
+        }
+      }
+    });
+
+    void refreshWordbookState();
 
     const loadingText = getI18nMessage('wordCard_loading', undefined, getI18nMessage('loading'));
     const shouldAutoPronounce = Boolean(options?.pinned) && Boolean(this.wordCardConfig.autoPronounce);

@@ -192,6 +192,8 @@ describe('SubtitleController', () => {
       siteMode: 'all',
       excludedSites: [],
       allowedSites: [],
+      wordbook: { saveSnippetOnCapture: true, maxSourcesPerEntry: 2 },
+      wordbookHideArchivedIgnoredInForgotten: true,
       toolExecutionEnabled: false,
     };
     controller = new SubtitleController(settings);

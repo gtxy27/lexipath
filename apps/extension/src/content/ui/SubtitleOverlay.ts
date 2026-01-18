@@ -8,7 +8,7 @@
 import { getI18nMessage } from '../i18n';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
 
-import { WordCardController } from './wordcard-controller';
+import { WordCardController } from './SubtitleWordCardController'; 
 
 const log = createLogger('subtitle-overlay');
 
@@ -1037,10 +1037,49 @@ export class SubtitleOverlay {
           margin-bottom: 10px;
         }
 
+        .lexipath-wordcard__title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
         .lexipath-wordcard__title {
           font-size: 18px;
           font-weight: 700;
           line-height: 1.2;
+        }
+
+        .lexipath-wordcard__wordbook-state {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          border: 1px solid ${isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.35)'};
+          background: ${isDark ? 'rgba(15, 23, 42, 0.55)' : 'rgba(241, 245, 249, 0.9)'};
+          color: ${textMuted};
+        }
+
+        .lexipath-wordcard__wordbook-state[data-state="active"] {
+          border-color: rgba(34, 197, 94, 0.35);
+          color: ${isDark ? 'rgba(134, 239, 172, 0.95)' : 'rgba(22, 163, 74, 0.95)'};
+          background: rgba(34, 197, 94, 0.10);
+        }
+
+        .lexipath-wordcard__wordbook-state[data-state="archived"] {
+          border-color: rgba(148, 163, 184, 0.35);
+          color: ${textMuted};
+          background: rgba(148, 163, 184, 0.08);
+        }
+
+        .lexipath-wordcard__wordbook-state[data-state="ignored"] {
+          border-color: rgba(244, 63, 94, 0.35);
+          color: ${isDark ? 'rgba(253, 164, 175, 0.95)' : 'rgba(225, 29, 72, 0.95)'};
+          background: rgba(244, 63, 94, 0.10);
         }
 
         .lexipath-wordcard__meta {
@@ -1129,6 +1168,44 @@ export class SubtitleOverlay {
 	          cursor: pointer;
 	          transition: all 0.2s ease;
 	          user-select: none;
+	        }
+
+	        .lexipath-wordcard__wordbook-button { 
+	          display: inline-flex; 
+	          align-items: center; 
+	          justify-content: center; 
+	          width: 32px; 
+	          height: 32px; 
+	          padding: 0; 
+	          border-radius: 10px; 
+	          border: 1px solid rgba(99, 102, 241, 0.35); 
+	          background: rgba(99, 102, 241, 0.08); 
+	          color: ${isDark ? '#a5b4fc' : '#4f46e5'}; 
+	          cursor: pointer; 
+	          transition: all 0.2s ease; 
+	          user-select: none; 
+	        } 
+ 
+	        .lexipath-wordcard__wordbook-button svg { 
+	          width: 16px; 
+	          height: 16px; 
+	          fill: none; 
+	        } 
+ 
+	        .lexipath-wordcard__wordbook-button.is-saved svg { 
+	          fill: currentColor; 
+	        } 
+ 
+	        .lexipath-wordcard__wordbook-button:hover { 
+	          background: rgba(99, 102, 241, 0.14); 
+	          border-color: rgba(99, 102, 241, 0.55); 
+	          transform: translateY(-1px); 
+	        }
+
+	        .lexipath-wordcard__wordbook-button:disabled {
+	          opacity: 0.65;
+	          cursor: default;
+	          transform: none;
 	        }
 
 	        .lexipath-wordcard__pronounce-button:hover {
