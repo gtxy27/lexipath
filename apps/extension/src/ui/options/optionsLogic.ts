@@ -37,6 +37,10 @@ import type {
 
 const log = createLogger("ui:options:logic");
 
+const UrlSchema = z.string().url();
+const RecordOfStringSchema = z.record(z.string());
+const PartialStrictSettingsSchema = SettingsSchema.partial().strict();
+
 export const FOLLOW_TRANSLATE_BEHAVIOR_KEYS: readonly BehaviorKey[] = [
   "translate_keywords",
   "dictionary",
@@ -205,7 +209,7 @@ export function parseCustomHeaders(
     return { ok: false, errorKey: "optionsProviderCustomHeadersInvalidJson" };
   }
 
-  const result = z.record(z.string()).safeParse(parsed);
+  const result = RecordOfStringSchema.safeParse(parsed);
   if (!result.success) {
     return { ok: false, errorKey: "optionsProviderCustomHeadersInvalidFormat" };
   }
@@ -290,7 +294,7 @@ export function settingsToFormState(settings: Settings): FormState {
       const baseUrl = typeof cfg.baseUrl === "string" ? cfg.baseUrl : "";
       const apiKey = typeof cfg.apiKey === "string" ? cfg.apiKey : "";
       const customHeaders = cfg.customHeaders as unknown;
-      const customHeadersText = z.record(z.string()).safeParse(customHeaders).success
+      const customHeadersText = RecordOfStringSchema.safeParse(customHeaders).success
         ? JSON.stringify(customHeaders, null, 2)
         : "";
 
@@ -443,7 +447,7 @@ export function channelIsConfigured(channel: ChannelFormState): boolean {
   if (!model) return false;
   if (channel.typeId === 1) {
     const baseUrl = channel.baseUrl.trim();
-    return Boolean(baseUrl && z.string().url().safeParse(baseUrl).success);
+    return Boolean(baseUrl && UrlSchema.safeParse(baseUrl).success);
   }
   return Boolean(channel.apiKey.trim());
 }
@@ -510,10 +514,10 @@ export function buildChannel(
   const apiKey = channel.apiKey.trim();
 
   if (channel.typeId === 1) {
-    if (baseUrl && !z.string().url().safeParse(baseUrl).success)
+    if (baseUrl && !UrlSchema.safeParse(baseUrl).success)
       errors.baseUrl = "optionsProviderBaseUrlInvalid";
   } else {
-    if (baseUrl && !z.string().url().safeParse(baseUrl).success)
+    if (baseUrl && !UrlSchema.safeParse(baseUrl).success)
       errors.baseUrl = "optionsProviderBaseUrlInvalid";
     if (!apiKey) errors.apiKey = "optionsProviderApiKeyRequired";
   }
@@ -668,7 +672,7 @@ export function buildSettingsPatch(
     if (!webdavHasAnyInput) return undefined;
 
     const url = form.webdav.url.trim();
-    if (!z.string().url().safeParse(url).success) {
+    if (!UrlSchema.safeParse(url).success) {
       webdavErrors.url = "optionsWebDAVUrlInvalid";
       return undefined;
     }
@@ -758,7 +762,7 @@ export function buildSettingsPatch(
     toolExecutionEnabled: Boolean(form.toolExecutionEnabled),
   };
 
-  const parsed = SettingsSchema.partial().strict().safeParse(patch);
+  const parsed = PartialStrictSettingsSchema.safeParse(patch);
   if (!parsed.success) {
     return { ok: false, errors: {} };
   }
@@ -798,7 +802,7 @@ export async function requestIconHostPermissions(
     try {
       await sendMessage("REQUEST_HOST_PERMISSION", { origin });
     } catch (error: unknown) {
-      log.warn(
+      log.debug(
         "REQUEST_HOST_PERMISSION threw while requesting icon host permission; continuing",
         { origin, message: getErrorMessage(error) },
       );
@@ -817,7 +821,7 @@ export function buildTestPayload(
 
   if (channel.typeId === 1) {
     const baseUrl = channel.baseUrl.trim();
-    if (!z.string().url().safeParse(baseUrl).success) return null;
+    if (!UrlSchema.safeParse(baseUrl).success) return null;
     const parsed = ProviderConfigSchema.safeParse({
       baseUrl,
       model,
