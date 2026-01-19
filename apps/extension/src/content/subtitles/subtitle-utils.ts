@@ -1,4 +1,4 @@
-import type { Cue, SupportedLanguage } from '@lexipath/core';
+import { lowerForMatch, type Cue, type SupportedLanguage } from '@lexipath/core';
 
 export function normalizeSupportedLanguageCode(languageCode: string): SupportedLanguage | null {
   const normalized = languageCode.trim().toLowerCase();
@@ -23,11 +23,7 @@ export function normalizeSupportedLanguageCode(languageCode: string): SupportedL
 }
 
 export function normalizeTerm(term: string): string {
-  return term
-    .replace(/\u2019/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
+  return lowerForMatch(term).replace(/\s+/g, ' ').trim();
 }
 
 export function computeTextSignature(text: string): string {

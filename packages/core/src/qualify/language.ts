@@ -117,6 +117,11 @@ const STOPWORD_MAP: ReadonlyMap<string, number> = (() => {
   return map;
 })();
 
+const EN_BIGRAMS = new Set(['th', 'he', 'in', 'er', 'an', 're', 'on', 'at', 'en', 'nd']);
+const FR_BIGRAMS = new Set(['es', 'le', 'de', 'en', 'on', 'nt', 're', 'ou', 'qu', 'au']);
+const DE_BIGRAMS = new Set(['en', 'er', 'ch', 'de', 'ei', 'te', 'nd', 'ie', 'ge', 'be']);
+const LATIN_BIGRAM_RE = /^[a-z]{2}$/;
+
 function scoreLatinLanguage(text: string): Exclude<DetectedLanguage, 'unknown' | 'zh' | 'ja' | 'ko'> {
   const normalized = text.toLowerCase();
   const tokens = normalized
@@ -137,18 +142,13 @@ function scoreLatinLanguage(text: string): Exclude<DetectedLanguage, 'unknown' |
   }
 
   // Character bigram scoring for improved accuracy
-  // Common bigrams by language
-  const enBigrams = new Set(['th', 'he', 'in', 'er', 'an', 're', 'on', 'at', 'en', 'nd']);
-  const frBigrams = new Set(['es', 'le', 'de', 'en', 'on', 'nt', 're', 'ou', 'qu', 'au']);
-  const deBigrams = new Set(['en', 'er', 'ch', 'de', 'ei', 'te', 'nd', 'ie', 'ge', 'be']);
-
   for (let i = 0; i < normalized.length - 1; i++) {
     const bigram = normalized.slice(i, i + 2);
-    if (!/^[a-z]{2}$/.test(bigram)) continue;
-    
-    if (enBigrams.has(bigram)) scoreEn += 0.5;
-    if (frBigrams.has(bigram)) scoreFr += 0.5;
-    if (deBigrams.has(bigram)) scoreDe += 0.5;
+    if (!LATIN_BIGRAM_RE.test(bigram)) continue;
+
+    if (EN_BIGRAMS.has(bigram)) scoreEn += 0.5;
+    if (FR_BIGRAMS.has(bigram)) scoreFr += 0.5;
+    if (DE_BIGRAMS.has(bigram)) scoreDe += 0.5;
   }
 
   // Language-specific character patterns

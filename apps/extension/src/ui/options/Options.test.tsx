@@ -78,7 +78,7 @@ const { browserMock, sendMessageMock, defaultSettings } = vi.hoisted(() => {
         }),
       },
     },
-    sendMessageMock: vi.fn(async (type: string, _payload: unknown) => {
+    sendMessageMock: vi.fn(async (type: string, payload: unknown) => {
       if (type === "GET_SETTINGS") return { ok: true, value: settings };
       if (type === "SET_SETTINGS") return { ok: true, value: null };
       if (type === "TEST_PROVIDER_CONNECTION") return { ok: true, value: true };

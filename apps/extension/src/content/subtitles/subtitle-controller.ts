@@ -34,6 +34,14 @@ export type { Platform } from './subtitle-platform';
 const SLOW_LOG_THRESHOLD_MS = 800;
 const DEBUG_LOG_THROTTLE_MS = 1500;
 const log = createLogger('subtitle-controller');
+const INTERACTIVE_WORD_STOPWORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'can', 'could', 'did', 'do', 'does',
+  'doing', 'for', 'from', 'had', 'has', 'have', 'having', 'he', 'her', 'here', 'him', 'his', 'how', 'i', 'if',
+  'in', 'into', 'is', 'it', 'its', 'just', 'me', 'my', 'no', 'not', 'of', 'on', 'or', 'our', 'out', 'over',
+  'she', 'so', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', 'this', 'to', 'too',
+  'under', 'up', 'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'who', 'why', 'will', 'with',
+  'would', 'you', 'your',
+]);
 
 /**
  * Subtitle Controller
@@ -1179,15 +1187,6 @@ export class SubtitleController {
   }
 
   private computeInteractiveWords(texts: string[]): Set<string> {
-    const stopwords = new Set([
-      'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'being', 'but', 'by', 'can', 'could', 'did', 'do', 'does',
-      'doing', 'for', 'from', 'had', 'has', 'have', 'having', 'he', 'her', 'here', 'him', 'his', 'how', 'i', 'if',
-      'in', 'into', 'is', 'it', 'its', 'just', 'me', 'my', 'no', 'not', 'of', 'on', 'or', 'our', 'out', 'over',
-      'she', 'so', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', 'this', 'to', 'too',
-      'under', 'up', 'very', 'was', 'we', 'were', 'what', 'when', 'where', 'which', 'who', 'why', 'will', 'with',
-      'would', 'you', 'your',
-    ]);
-
     const minLength = (() => {
       switch (this.settings.proficiencyLevel) {
         case 'A1':
@@ -1232,7 +1231,7 @@ export class SubtitleController {
         const raw = match[0] ?? '';
         const normalized = raw.toLowerCase();
         if (normalized.length < minLength) continue;
-        if (stopwords.has(normalized)) continue;
+        if (INTERACTIVE_WORD_STOPWORDS.has(normalized)) continue;
         const score = raw.length;
         candidates.set(normalized, Math.max(candidates.get(normalized) ?? 0, score));
       }

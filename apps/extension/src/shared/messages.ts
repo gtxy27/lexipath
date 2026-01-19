@@ -555,11 +555,17 @@ function normalizeMessageInput(input: unknown): unknown {
   return { payload: undefined, ...(input as Record<string, unknown>) };
 }
 
+const responseSchemaCache = new Map<MessageType, z.ZodTypeAny>();
+
 function responseSchemaFor<TType extends MessageType>(type: TType) {
-  return z.union([
+  const cached = responseSchemaCache.get(type);
+  if (cached) return cached;
+  const schema = z.union([
     SuccessResponseSchema(messageDefinitions[type].valueSchema),
     ErrorResponseSchema,
   ]);
+  responseSchemaCache.set(type, schema);
+  return schema;
 }
 
 function parseResponse<TType extends MessageType>(
