@@ -51,10 +51,11 @@ export async function parseJmdict(options: { useWordlist: boolean; wordlistPath:
     return { wordCount: 0, skippedReason: `missing input: ${inputPath} (run dict:download)` };
   }
 
-  const wordlist = options.useWordlist ? await loadWordlist(options.wordlistPath) : new Set<string>();
-  if (options.useWordlist && wordlist.size === 0) {
+  const wordlist = options.useWordlist ? await loadWordlist(options.wordlistPath) : null;
+  if (options.useWordlist && (!wordlist || wordlist.words.length === 0)) {
     return { wordCount: 0, skippedReason: `empty/missing wordlist: ${options.wordlistPath}` };
   }
+
 
   if (!options.useWordlist) {
     return {
@@ -63,11 +64,16 @@ export async function parseJmdict(options: { useWordlist: boolean; wordlistPath:
     };
   }
 
+  // At this point, wordlist is required and has been validated as non-empty.
+  if (!wordlist) {
+    return { wordCount: 0, skippedReason: "missing wordlist (unexpected)" };
+  }
+
   await ensureDir(processedDir);
   const outPath = path.join(processedDir, "jmdict_ja.json");
   const { writer, close } = await createJsonArrayFileWriter(outPath);
 
-  process.stdout.write(`[dict] parse JMdict (wordlist=${wordlist.size})\n`);
+  process.stdout.write(`[dict] parse JMdict (wordlist=${wordlist.words.length})\n`);
 
   const input = createReadStream(inputPath).pipe(createGunzip());
   let inEntry = false;
@@ -99,7 +105,7 @@ export async function parseJmdict(options: { useWordlist: boolean; wordlistPath:
     const pos = parsed.pos.length ? parsed.pos : undefined;
 
     for (const word of parsed.headwords) {
-      if (!wordlist.has(word)) continue;
+      if (!wordlist.order.has(word)) continue;
       const entry: JmdictEntry = { word, ...(reading ? { reading } : {}), ...(pos ? { pos } : {}) };
       writer.write(entry);
       count += 1;

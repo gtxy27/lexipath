@@ -53,8 +53,9 @@ export async function parseKaikki(options: {
     };
   }
 
-  const wordlist = options.useWordlist ? await loadWordlist(options.wordlistPath) : new Set<string>();
-  if (options.useWordlist && wordlist.size === 0) {
+  const wordlist = options.useWordlist ? await loadWordlist(options.wordlistPath) : null;
+  if (options.useWordlist && (!wordlist || wordlist.words.length === 0)) {
+
     return {
       lang: options.lang,
       wordCount: 0,
@@ -69,7 +70,8 @@ export async function parseKaikki(options: {
   const mappingsPath = path.join(processedDir, `${options.lang}_zh.json`);
 
   process.stdout.write(
-    `[dict] parse Kaikki ${options.lang.toUpperCase()} (wordlist=${options.useWordlist ? wordlist.size : "OFF"})\n`,
+    `[dict] parse Kaikki ${options.lang.toUpperCase()} (wordlist=${options.useWordlist ? wordlist!.words.length : "OFF"})\n`,
+
   );
 
   const { writer: wordsWriter, close: closeWords } = await createJsonArrayFileWriter(wordsPath);
@@ -89,7 +91,8 @@ export async function parseKaikki(options: {
 
     const word = typeof record?.word === "string" ? record.word.trim() : "";
     if (!word) continue;
-    if (options.useWordlist && !wordlist.has(word)) continue;
+    if (options.useWordlist && !wordlist!.order.has(word)) continue;
+
 
     const translations = getTranslations(record)
       .map((t) => ({
@@ -102,7 +105,28 @@ export async function parseKaikki(options: {
 
     if (!seen.has(word)) {
       seen.add(word);
-      wordsWriter.write({ word, pos: getPos(record) });
+
+      let frequency: number | undefined;
+
+      if (wordlist) {
+        // KO: ordered TOPIK list (earlier = higher frequency).
+        // JA: JLPT buckets (N5 > N4 > ... > N1), ties broken lexically.
+        const idx = wordlist.order.get(word);
+        if (typeof idx === "number") {
+          const b = wordlist.bucket.get(word);
+          if (options.lang === "ko") {
+            // Higher numeric frequency = earlier in list.
+            frequency = Math.max(0, wordlist.words.length - idx);
+          } else if (options.lang === "ja") {
+            const bucketWeight: Record<string, number> = { N5: 5, N4: 4, N3: 3, N2: 2, N1: 1 };
+            const w = b ? (bucketWeight[b] ?? 0) : 0;
+            // Spread buckets far apart; within bucket use list order to keep deterministic.
+            frequency = w * 1_000_000 + Math.max(0, wordlist.words.length - idx);
+          }
+        }
+      }
+
+      wordsWriter.write({ word, pos: getPos(record), frequency });
     }
 
     for (const t of translations) {

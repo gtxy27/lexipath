@@ -1169,7 +1169,9 @@ export class SubtitleController {
         definition,
         ...(typeof data.phonetic === 'string' && data.phonetic.trim() ? { phonetic: data.phonetic.trim() } : {}),
         ...(typeof data.difficulty === 'string' && data.difficulty.trim() ? { difficulty: data.difficulty.trim() } : {}),
-        ...(typeof data.translation === 'string' && data.translation.trim() ? { translation: data.translation.trim() } : {}),
+        ...(Array.isArray(data.targets) && data.targets.length > 0
+          ? { targets: data.targets.filter((t): t is string => typeof t === 'string' && Boolean(t.trim())) }
+          : {}),
         ...(typeof data.example === 'string' && data.example.trim() ? { example: data.example.trim() } : {}),
         ...(typeof data.example_translation === 'string' && data.example_translation.trim()
           ? { exampleTranslation: data.example_translation.trim() }

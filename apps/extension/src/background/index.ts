@@ -9,6 +9,7 @@ import { createTranslator } from './lib/i18n';
 
 import { registerChatFeature } from './features/chat';
 import { setupLifecycleListeners } from './features/lifecycle';
+import { seedDictionaryFromPublicData } from './dictionary-seed';
 import { registerLearningFeature } from './features/learning';
 import { registerProviderFeature } from './features/providers';
 import { registerSettingsFeature } from './features/settings';
@@ -25,6 +26,11 @@ const t = createTranslator(log);
 const concurrency = createConcurrencyManager(log);
 
 setupLifecycleListeners(log);
+
+// Offline dictionary seed: best-effort, idempotent, never blocks startup.
+void seedDictionaryFromPublicData().catch((error: unknown) => {
+  log.warn('Dictionary seed failed; continuing', { error });
+});
 
 registerSettingsFeature({ registry });
 registerStorageFeature({ registry });

@@ -176,7 +176,9 @@ export function createWebWordCardManager(options: {
         definition: data.definition || getI18nMessage("wordCard_definitionUnavailable"),
         phonetic: data.phonetic,
         difficulty: data.difficulty,
-        translation: data.translation,
+        targets: Array.isArray(data.targets) && data.targets.length > 0
+          ? data.targets.filter((t: any) => typeof t === 'string' && Boolean(t.trim()))
+          : undefined,
         example: data.example,
         exampleTranslation: data.example_translation,
       };

@@ -34,7 +34,7 @@ export interface WordCardData {
   definition: string;
   phonetic?: string;
   difficulty?: string;
-  translation?: string;
+  targets?: string[];
   example?: string;
   exampleTranslation?: string;
 }

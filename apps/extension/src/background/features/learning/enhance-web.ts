@@ -154,19 +154,22 @@ export async function handleEnhanceWeb(options: {
             log,
           });
 
-          const dictEntries = await dictionaryService.batchLookup(keywords);
+           const dictEntries = await dictionaryService.batchLookup(keywords, sourceLang, sourceLang);
+
           const convert_word = filterConvertWordByHits(
             opts.text,
             keywords.map((original, idx) => {
               const converted = translations[idx] ?? original;
-              const entry = dictEntries[idx];
-              const difficulty = typeof entry?.difficulty === 'string' ? entry.difficulty.trim() : '';
+               const result = dictEntries[idx];
+               const entry = result?.source;
+               const difficulty = typeof entry?.difficulty === 'string' ? entry.difficulty.trim() : '';
+
               const normalizedDifficulty = difficulty.toUpperCase();
               const difficultyLevel = (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const).includes(normalizedDifficulty as any)
                 ? (normalizedDifficulty as CEFRLevel)
                 : undefined;
-              const partOfSpeech =
-                typeof entry?.definitions?.[0]?.partOfSpeech === 'string' ? entry.definitions[0].partOfSpeech : undefined;
+               const partOfSpeech = typeof entry?.pos === 'string' ? entry.pos : undefined;
+
 
               return {
                 original,
@@ -251,18 +254,21 @@ export async function handleEnhanceWeb(options: {
             }
 
             const originals = rawConvert.map((w) => w.original);
-            const dictEntries = await dictionaryService.batchLookup(originals);
+             const dictEntries = await dictionaryService.batchLookup(originals, sourceLang, sourceLang);
+
             const enriched = filterConvertWordByHits(
               opts.text,
               rawConvert.map((word, idx) => {
-                const entry = dictEntries[idx];
+                const result = dictEntries[idx];
+                const entry = result?.source;
                 const dictDifficulty = typeof entry?.difficulty === 'string' ? entry.difficulty.trim() : '';
+
                 const normalizedDifficulty = dictDifficulty.toUpperCase();
                 const difficultyLevel = (['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const).includes(normalizedDifficulty as any)
                   ? (normalizedDifficulty as CEFRLevel)
                   : undefined;
-                const partOfSpeech =
-                  typeof entry?.definitions?.[0]?.partOfSpeech === 'string' ? entry.definitions[0].partOfSpeech : undefined;
+                const partOfSpeech = typeof entry?.pos === 'string' ? entry.pos : undefined;
+
 
                 const difficulty =
                   typeof word.difficulty === 'string' && word.difficulty.trim() ? word.difficulty.trim() : dictDifficulty;

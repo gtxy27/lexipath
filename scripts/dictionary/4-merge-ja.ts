@@ -7,6 +7,7 @@ type WordsJaEntry = {
   word: string;
   pos?: string;
   reading?: string;
+  frequency?: number;
 };
 
 type JmdictEntry = {

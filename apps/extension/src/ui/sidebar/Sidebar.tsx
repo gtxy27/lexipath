@@ -108,7 +108,7 @@ export function Sidebar(): React.ReactElement {
       word: string;
       phonetic?: string;
       definition: string;
-      translation?: string;
+      targets?: string[];
       difficulty?: string;
     };
   };
@@ -164,34 +164,37 @@ export function Sidebar(): React.ReactElement {
           return;
         }
 
-        const value = response.value as any;
-        const rawDefinition = typeof value?.definition === "string" ? value.definition : "";
-        const rawTranslation = typeof value?.translation === "string" ? value.translation : "";
-        const definition =
-          rawDefinition.trim()
-            ? rawDefinition
-            : rawTranslation.trim()
-              ? rawTranslation
-              : t("wordCard_definitionUnavailable");
-        const word = typeof value?.word === "string" && value.word.trim() ? value.word : term;
+        const value = response.value as unknown;
+        if (!value || typeof value !== 'object') {
+          throw new Error('EXPLAIN_WORD returned non-object value');
+        }
+        const v = value as Record<string, unknown>;
+
+        const rawDefinition = typeof v.definition === 'string' ? v.definition : '';
+        const targets = Array.isArray(v.targets)
+          ? v.targets.filter((t): t is string => typeof t === 'string' && Boolean(t.trim()))
+          : [];
+        const definition = rawDefinition.trim()
+          ? rawDefinition.trim()
+          : targets.length > 0
+            ? targets[0]!
+            : t('wordCard_definitionUnavailable');
+        const word = typeof v.word === 'string' && v.word.trim() ? v.word : term;
 
         setWordbookExplainById((prev) => ({
           ...prev,
           [entry.id]: {
-            status: "loaded",
+            status: 'loaded',
             data: {
               word,
-              ...(typeof value?.phonetic === "string" && value.phonetic.trim()
-                ? { phonetic: value.phonetic }
-                : {}),
+              ...(typeof v.phonetic === 'string' && v.phonetic.trim() ? { phonetic: v.phonetic } : {}),
               definition,
-              ...(rawTranslation.trim() ? { translation: rawTranslation } : {}),
-              ...(typeof value?.difficulty === "string" && value.difficulty.trim()
-                ? { difficulty: value.difficulty }
-                : {}),
+              ...(targets.length > 0 ? { targets } : {}),
+              ...(typeof v.difficulty === 'string' && v.difficulty.trim() ? { difficulty: v.difficulty } : {}),
             },
           },
         }));
+
       } catch {
         setWordbookExplainById((prev) => ({
           ...prev,
@@ -2274,12 +2277,12 @@ export function Sidebar(): React.ReactElement {
                                             ) : null}
                                           </div>
                                         ) : null}
-                                        {wordbookExplainById[entry.id]?.data?.translation &&
-                                        wordbookExplainById[entry.id]?.data?.translation?.trim() &&
-                                        wordbookExplainById[entry.id]?.data?.translation?.trim() !==
+                                        {wordbookExplainById[entry.id]?.data?.targets &&
+                                        wordbookExplainById[entry.id]?.data?.targets?.length &&
+                                        wordbookExplainById[entry.id]?.data?.targets?.[0] !==
                                           wordbookExplainById[entry.id]?.data?.definition?.trim() ? (
                                           <div className="mb-2 text-xs text-muted-foreground whitespace-pre-wrap">
-                                            {wordbookExplainById[entry.id]?.data?.translation}
+                                            {wordbookExplainById[entry.id]?.data?.targets?.[0]}
                                           </div>
                                         ) : null}
                                         <div className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -2683,12 +2686,12 @@ export function Sidebar(): React.ReactElement {
                                             ) : null}
                                           </div>
                                         ) : null}
-                                        {wordbookExplainById[entry.id]?.data?.translation &&
-                                        wordbookExplainById[entry.id]?.data?.translation?.trim() &&
-                                        wordbookExplainById[entry.id]?.data?.translation?.trim() !==
+                                        {wordbookExplainById[entry.id]?.data?.targets &&
+                                        wordbookExplainById[entry.id]?.data?.targets?.length &&
+                                        wordbookExplainById[entry.id]?.data?.targets?.[0] !==
                                           wordbookExplainById[entry.id]?.data?.definition?.trim() ? (
                                           <div className="mb-2 text-xs text-muted-foreground whitespace-pre-wrap">
-                                            {wordbookExplainById[entry.id]?.data?.translation}
+                                            {wordbookExplainById[entry.id]?.data?.targets?.[0]}
                                           </div>
                                         ) : null}
                                         <div className="text-sm leading-relaxed whitespace-pre-wrap">

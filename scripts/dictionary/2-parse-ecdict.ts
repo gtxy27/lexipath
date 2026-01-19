@@ -24,17 +24,55 @@ function parseDifficulty(row: EcdictRow): string | undefined {
   return undefined;
 }
 
+function stripPosPrefix(s: string): string {
+  // Remove POS prefixes like "n.", "vt.", "pron." at the start of a line/token.
+  // Also handle bracketed cases like "[n. xxx".
+  return s.replace(/^\s*\[?\s*[a-z]{1,6}\.(?=\s)/i, '').trim();
+}
+
+function cleanZhToken(raw: string): string {
+  const s = raw
+    .replace(/\s+/g, ' ')
+    .replace(/^\s*[0-9]+\s*[.)]\s*/g, '')
+    .trim();
+
+  // Some ECDICT entries include English morphology notes like "(ginger 的过去分词) n. 姜".
+  // For offline targets, keep only the trailing Chinese token part.
+  const afterParens = s.includes(')') ? s.split(')').slice(-1)[0]!.trim() : s;
+
+  // Remove any POS prefix even if it's not at the very start of the original string.
+  return stripPosPrefix(afterParens);
+}
+
 function splitZhTranslations(raw: string): string[] {
-  const cleaned = raw.replace(/[\uFF1B;]/g, ";").replace(/\s+/g, " ").trim();
-  if (!cleaned) return [];
-  return cleaned
-    .split(";")
+  // The ECDICT translation field often mixes multiple POS blocks separated by newlines.
+  // We want plain target tokens only, not multi-line "n./v." annotated blocks.
+  const normalized = raw
+    .replace(/[\uFF1B;]/g, ';')
+    // ECDICT sometimes encodes newlines as literal "\\n" sequences inside the CSV field.
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n');
+
+  const lines = normalized
+    .split(/\r?\n/g)
     .map((s) => s.trim())
     .filter(Boolean)
-    .flatMap((s) => s.split(/[，,]/g).map((x) => x.trim()))
-    .filter(Boolean)
-    .map((s) => s.replace(/^["“”]+|["“”]+$/g, "").trim())
-    .filter(Boolean);
+    .map(stripPosPrefix);
+
+  const tokens: string[] = [];
+  for (const line of lines) {
+    if (!line) continue;
+
+    for (const part of line.split(';')) {
+      for (const piece of part.split(/[，,]/g)) {
+        const cleaned = cleanZhToken(piece.replace(/^["“”]+|["“”]+$/g, ''));
+        if (cleaned) tokens.push(cleaned);
+      }
+    }
+  }
+
+  return tokens;
 }
 
 function pickFrequency(frqRaw: string | undefined): number | undefined {

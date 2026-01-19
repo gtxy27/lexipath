@@ -30,7 +30,8 @@ export class TranslateDictionaryProvider {
     return {
       word,
       definition,
-      translation: definition,
+      targets: [definition],
+      meta: { origin: 'online', provider: 'translate' },
     };
   }
 }
