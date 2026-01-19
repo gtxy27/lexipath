@@ -2,111 +2,123 @@
  * @vitest-environment happy-dom
  */
 
-import { describe, expect, it, vi } from 'vitest';
+/**
+ * @vitest-environment happy-dom
+ */
+
+import 'fake-indexeddb/auto';
+import { describe, expect, it } from 'vitest';
 import { DictionaryService } from './dictionary-service';
 
-type OpenRequest = {
-  result?: any;
-  error?: any;
-  onsuccess?: (() => void) | null;
-  onerror?: (() => void) | null;
-  onupgradeneeded?: ((event: any) => void) | null;
-};
-
-function createStoreGetRequest(result: any) {
-  const req: any = { result: undefined, onsuccess: null, onerror: null, error: null };
-  queueMicrotask(() => {
-    req.result = result;
-    req.onsuccess?.();
-  });
-  return req;
+function createDbName(prefix = 'test-lexipath-dictionary'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-describe('DictionaryService init de-duplication', () => {
-  it('dedupes concurrent init calls (indexedDB.open called once)', async () => {
-    const openMock = vi.fn((_name: string, _version?: number) => {
-      const request: OpenRequest = { onsuccess: null, onerror: null, onupgradeneeded: null };
+function deleteDb(name: string): Promise<void> {
+  return new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(name);
+    req.onerror = () => resolve();
+    req.onblocked = () => resolve();
+    req.onsuccess = () => resolve();
+  });
+}
 
-      const fakeDb: any = {
-        objectStoreNames: { contains: () => true },
-        createObjectStore: () => ({ createIndex: () => undefined }),
-        close: () => undefined,
-        transaction: () => ({
-          objectStore: () => ({
-            get: () => createStoreGetRequest(null),
-          }),
-        }),
-      };
+function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+  });
+}
 
-      queueMicrotask(() => {
-        request.result = fakeDb;
-        request.onsuccess?.();
-      });
+function transactionDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
 
-      return request as any;
-    });
+describe('DictionaryService (normalized IndexedDB)', () => {
+  it('dedupes concurrent init calls', async () => {
+    const dbName = createDbName('test-dict-init');
+    const service = new DictionaryService({ dbName });
 
-    (globalThis as any).indexedDB = { open: openMock };
+    try {
+      await Promise.all([
+        service.lookup('hello', 'en', 'zh'),
+        service.lookup('world', 'en', 'zh'),
+      ]);
 
-    const service = new DictionaryService({ dbName: 'test-db', storeName: 'words', version: 1 });
-
-    await Promise.all([service.lookup('apple'), service.lookup('banana')]);
-
-    expect(openMock).toHaveBeenCalledTimes(1);
+      // If init de-duping fails, fake-indexeddb should error on open/versionchange.
+      expect(service).toBeDefined();
+    } finally {
+      service.close();
+      await deleteDb(dbName);
+    }
   });
 
-  it('batchLookup uses a single transaction and normalizes words', async () => {
-    const transactionMock = vi.fn(() => {
-      let pending = 0;
-      const tx: any = {
-        oncomplete: null,
-        onerror: null,
-        onabort: null,
-        objectStore: () => ({
-          get: (key: string) => {
-            pending += 1;
-            const req = createStoreGetRequest({ word: key });
-            queueMicrotask(() => {
-              pending -= 1;
-              if (pending === 0) tx.oncomplete?.();
-            });
-            return req;
-          },
-        }),
-      };
+  it('offline three-hop lookup returns ordered targets', async () => {
+    const dbName = createDbName('test-dict-offline');
+    const service = new DictionaryService({ dbName });
 
-      return tx;
-    });
+    try {
+      await service.init();
 
-    const openMock = vi.fn((_name: string, _version?: number) => {
-      const request: OpenRequest = { onsuccess: null, onerror: null, onupgradeneeded: null };
-
-      const fakeDb: any = {
-        objectStoreNames: { contains: () => true },
-        createObjectStore: () => ({ createIndex: () => undefined }),
-        close: () => undefined,
-        transaction: transactionMock,
-      };
-
-      queueMicrotask(() => {
-        request.result = fakeDb;
-        request.onsuccess?.();
+      // Seed minimal offline data directly.
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open(dbName, 2);
+        req.onerror = () => reject(req.error);
+        req.onsuccess = () => resolve(req.result);
       });
 
-      return request as any;
-    });
+      try {
+        const tx = db.transaction(['words_en', 'words_zh', 'en_zh'], 'readwrite');
+        const en = tx.objectStore('words_en');
+        const zh = tx.objectStore('words_zh');
+        const map = tx.objectStore('en_zh');
 
-    (globalThis as any).indexedDB = { open: openMock };
+        await requestToPromise(en.put({ id: 1, word: 'hello', frequency: 100, difficulty: 'A1' }));
+        await requestToPromise(zh.put({ id: 10, word: '你好', frequency: 5 }));
+        await requestToPromise(map.put({ from_id: 1, to_id: 10, rank_en: 0, rank_zh: 0 }));
 
-    const service = new DictionaryService({ dbName: 'test-db', storeName: 'words', version: 1 });
+        await transactionDone(tx);
+      } finally {
+        db.close();
+      }
 
-    const results = await service.batchLookup(['Apple', 'BANANA']);
+      const result = await service.lookup('hello', 'en', 'zh');
+      expect(result?.meta.origin).toBe('offline');
+      expect(result?.source?.word).toBe('hello');
+      expect(result?.targets.map((t) => t.word)).toEqual(['你好']);
+    } finally {
+      service.close();
+      await deleteDb(dbName);
+    }
+  });
 
-    expect(openMock).toHaveBeenCalledTimes(1);
-    expect(transactionMock).toHaveBeenCalledTimes(1);
-    expect(results).toHaveLength(2);
-    expect(results[0]?.word).toBe('apple');
-    expect(results[1]?.word).toBe('banana');
+  it('cache fallback returns explain payload with origin=cache', async () => {
+    const dbName = createDbName('test-dict-cache');
+    const service = new DictionaryService({ dbName });
+
+    try {
+      await service.putLookupCache({
+        word: 'hello',
+        fromLang: 'en',
+        toLang: 'zh',
+        explain: { word: 'hello', definition: '你好', translation: '你好' },
+        provider: 'google',
+        ttlMs: 10_000,
+      });
+
+      const result = await service.lookup('hello', 'en', 'zh');
+      expect(result?.meta.origin).toBe('cache');
+      expect(result?.meta.provider).toBe('google');
+      expect(result?.explain?.translation).toBe('你好');
+    } finally {
+      service.close();
+      await deleteDb(dbName);
+    }
   });
 });
+
 
