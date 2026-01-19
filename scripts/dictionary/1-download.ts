@@ -1,5 +1,7 @@
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { ensureDir, fileSizeBytes } from "./fs";
 import { withConcurrencyLimit } from "./concurrency";
 import { parseArgs, getNumberArg, getBooleanArg } from "./args";
@@ -21,8 +23,12 @@ async function downloadFile(target: DownloadTarget): Promise<void> {
   if (!response.ok) {
     throw new Error(`[dict] download failed ${target.name}: ${response.status} ${response.statusText}`);
   }
+  if (!response.body) {
+    throw new Error(`[dict] download failed ${target.name}: empty response body`);
+  }
 
-  await Bun.write(target.outFile, response);
+  // Stream to file so the process doesn't exit before large downloads flush.
+  await pipeline(Readable.fromWeb(response.body as any), createWriteStream(target.outFile));
 
   const size = await fileSizeBytes(target.outFile);
   process.stdout.write(`[dict] downloaded ${target.name} (${size} bytes)\n`);

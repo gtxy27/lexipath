@@ -8,6 +8,7 @@ import { parseKaikki } from "./2-parse-kaikki";
 import { parseJmdict } from "./2-parse-jmdict";
 import { writeWordsZh } from "./3-merge-zh";
 import { mergeJmdictIntoWordsJa } from "./4-merge-ja";
+import { normalizeProcessedArtifacts } from "./5-normalize";
 import { compressProcessed } from "./6-compress";
 import { writeManifest } from "./manifest";
 
@@ -102,6 +103,11 @@ async function main(): Promise<void> {
   const zhCount = await writeWordsZh({ zhCounts });
   counts.words_zh = zhCount;
   process.stdout.write(`[dict] wrote ${zhCount} words_zh\n`);
+
+  // Normalize processed artifacts into the IndexedDB-aligned schema:
+  // - words_{lang}: {id, word, ...}
+  // - {pair}: {from_id, to_id, rank_*}
+  await normalizeProcessedArtifacts({ includeJa: !!ja && !ja.skippedReason, includeKo: !!ko && !ko.skippedReason });
 
   const compressed = await compressProcessed({ copyToPublic: true });
   const manifestPath = await writeManifest({ outDir: finalDir, files: compressed.files, counts });
