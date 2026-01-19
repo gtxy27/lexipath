@@ -4,7 +4,7 @@ import { speak, stop } from "@lexipath/dictionary";
 import { Card, CardContent, CardFooter, CardHeader } from "./ui/card"; 
 import { Button } from "./ui/button"; 
 import { Badge } from "./ui/badge"; 
-import { Volume2, Star, Check, X, Sparkles } from "lucide-react"; 
+import { Volume2, Star, Check, X, Sparkles, ChevronDown } from "lucide-react"; 
 import { cn } from "../lib/utils"; 
 import { motion, AnimatePresence } from "framer-motion"; 
 import { t } from "../../shared/i18n"; 
@@ -16,6 +16,7 @@ export interface WordCardData {
   phonetic?: string;
   definition: string;
   difficulty?: string;
+  targets?: string[];
   isFavorited?: boolean;
   isLearned?: boolean;
 }
@@ -47,6 +48,7 @@ export function WordCard({
   const [isFavorited, setIsFavorited] = useState(data.isFavorited ?? false);
   const [isLearned, setIsLearned] = useState(data.isLearned ?? false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isTargetsExpanded, setIsTargetsExpanded] = useState(false);
 
   const handleSpeak = useCallback(async () => {
     if (isPlayingAudio) {
@@ -191,6 +193,56 @@ export function WordCard({
                {data.definition}
              </p>
           </div>
+
+          {data.targets && data.targets.length > 0 && (
+            <div className="mt-4">
+               <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1 mb-2">
+                 {t("wordCard_sectionTranslation") || "Translations"}
+               </h4>
+               
+               <div className="flex flex-col gap-2">
+                  <div className="p-3 rounded-lg bg-muted/10 border border-border/50">
+                    <p className="text-sm font-semibold text-foreground">{data.targets[0]}</p>
+                  </div>
+
+                  {data.targets.length > 1 && (
+                    <div className="flex flex-col">
+                       <AnimatePresence>
+                         {isTargetsExpanded && (
+                           <motion.div
+                             initial={{ height: 0, opacity: 0 }}
+                             animate={{ height: "auto", opacity: 1 }}
+                             exit={{ height: 0, opacity: 0 }}
+                             className="overflow-hidden"
+                             data-testid="word-card-translations-expanded"
+                           >
+                             <div className="flex flex-col gap-2 pt-1 pb-2">
+                               {data.targets.slice(1).map((target, i) => (
+                                 <div key={i} className="p-2.5 rounded-md bg-muted/5 border border-transparent hover:bg-muted/10 hover:border-border/30 transition-colors">
+                                   <p className="text-[13px] text-muted-foreground">{target}</p>
+                                 </div>
+                               ))}
+                             </div>
+                           </motion.div>
+                         )}
+                       </AnimatePresence>
+                       
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => setIsTargetsExpanded(!isTargetsExpanded)}
+                         className="h-7 self-start px-2 text-muted-foreground hover:text-foreground text-[11px] flex items-center gap-1.5 hover:bg-muted/20 -ml-1 mt-1"
+                         aria-expanded={isTargetsExpanded}
+                         data-testid="word-card-translations-toggle"
+                       >
+                         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", isTargetsExpanded && "rotate-180")} />
+                         {isTargetsExpanded ? (t("wordCard_showLess") || "Show less") : (t("wordCard_showMore") || "Show more")}
+                       </Button>
+                    </div>
+                  )}
+               </div>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between p-4 px-6 bg-muted/10 border-t border-border">

@@ -14,7 +14,12 @@ describe('TranslateDictionaryProvider', () => {
     });
 
     expect(translate).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ word: 'hello', definition: '你好', translation: '你好' });
+    expect(result).toEqual({
+      word: 'hello',
+      definition: '你好',
+      targets: ['你好'],
+      meta: { origin: 'online', provider: 'translate' },
+    });
   });
 });
 

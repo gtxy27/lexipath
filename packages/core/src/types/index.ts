@@ -758,15 +758,28 @@ export const ExplainWordPayloadSchema = z
   .strict();
 export type ExplainWordPayload = z.infer<typeof ExplainWordPayloadSchema>;
 
+export const ExplainWordMetaSchema = z
+  .object({
+    origin: z.enum(['offline', 'cache', 'online']),
+    provider: z.string().min(1).optional(),
+  })
+  .strict();
+export type ExplainWordMeta = z.infer<typeof ExplainWordMetaSchema>;
+
 export const ExplainWordOutputSchema = z
   .object({
     word: z.string().min(1),
     definition: z.string().min(1),
     phonetic: z.string().min(1).optional(),
     difficulty: z.string().min(1).optional(),
-    translation: z.string().min(1).optional(),
     example: z.string().min(1).optional(),
     example_translation: z.string().min(1).optional(),
+
+    // Optional one-to-many candidates (ordered; index 0 is the default).
+    targets: z.array(z.string().min(1)).optional(),
+
+    // Optional metadata so UIs can display where the content came from.
+    meta: ExplainWordMetaSchema.optional(),
   })
   .strict();
 export type ExplainWordOutput = z.infer<typeof ExplainWordOutputSchema>;

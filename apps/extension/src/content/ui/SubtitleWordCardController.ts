@@ -158,7 +158,7 @@ export class WordCardController {
     if (defText) defText.textContent = data.definition;
     sectionsByKey.definition = definition;
 
-    if (data.translation) {
+    if (data.targets && data.targets.length > 0) {
       const translation = document.createElement('div');
       translation.className = 'lexipath-wordcard__section lexipath-wordcard__translation';
       translation.innerHTML = `
@@ -166,7 +166,57 @@ export class WordCardController {
         <div class="lexipath-wordcard__section-text"></div>
       `;
       const trText = translation.querySelector('.lexipath-wordcard__section-text');
-      if (trText) trText.textContent = data.translation;
+      if (trText) trText.textContent = data.targets[0] || null;
+
+      if (data.targets.length > 1) {
+        const moreContainer = document.createElement('div');
+        moreContainer.className = 'lexipath-wordcard__more-container';
+        moreContainer.style.marginTop = '4px';
+
+        const hiddenTargets = document.createElement('div');
+        hiddenTargets.className = 'lexipath-wordcard__hidden-targets';
+        hiddenTargets.style.display = 'none';
+        hiddenTargets.style.flexDirection = 'column';
+        hiddenTargets.style.gap = '2px';
+        hiddenTargets.style.marginTop = '2px';
+        hiddenTargets.setAttribute('data-testid', 'word-card-translations-expanded');
+
+        for (let i = 1; i < data.targets.length; i++) {
+          const t = document.createElement('div');
+          t.textContent = data.targets[i] ?? null;
+
+          t.style.opacity = '0.8';
+          hiddenTargets.appendChild(t);
+        }
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'lexipath-wordcard__more-button';
+        toggleBtn.textContent = getI18nMessage('wordCard_showMore') || 'Show more';
+        toggleBtn.style.background = 'none';
+        toggleBtn.style.border = 'none';
+        toggleBtn.style.padding = '0';
+        toggleBtn.style.fontSize = '11px';
+        toggleBtn.style.color = 'inherit';
+        toggleBtn.style.opacity = '0.6';
+        toggleBtn.style.cursor = 'pointer';
+        toggleBtn.style.marginTop = '2px';
+        toggleBtn.style.display = 'flex';
+        toggleBtn.style.alignItems = 'center';
+        toggleBtn.style.gap = '4px';
+
+        toggleBtn.onclick = (e) => {
+          e.stopPropagation();
+          const isHidden = hiddenTargets.style.display === 'none';
+          hiddenTargets.style.display = isHidden ? 'flex' : 'none';
+          toggleBtn.textContent = isHidden
+            ? (getI18nMessage('wordCard_showLess') || 'Show less')
+            : (getI18nMessage('wordCard_showMore') || 'Show more');
+        };
+
+        moreContainer.appendChild(hiddenTargets);
+        moreContainer.appendChild(toggleBtn);
+        translation.appendChild(moreContainer);
+      }
       sectionsByKey.translation = translation;
     }
 

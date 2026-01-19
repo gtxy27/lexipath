@@ -147,12 +147,19 @@ export function WordCardPopover({
             phonetic?: string;
             definition: string;
             difficulty?: string;
+            targets?: string[];
           };
+
+          const targets = data.targets && data.targets.length > 0 
+            ? data.targets 
+            : undefined;
+
           setCardData({
             word: data.word || word,
             ...(data.phonetic ? { phonetic: data.phonetic } : {}),
             definition: data.definition || t("wordCard_definitionUnavailable"),
             ...(data.difficulty ? { difficulty: data.difficulty } : {}),
+            ...(targets ? { targets } : {}),
           });
         } else {
           log.error("Failed to fetch word data", response.error);
