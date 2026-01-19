@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync } from 'fs';
+import { copyFileSync, mkdirSync } from 'fs';
 
 function shouldIgnoreRollupWarning(warning: any): boolean {
   return (
@@ -48,11 +48,14 @@ export default defineConfig(({ mode }) => {
     plugins: [
       {
         name: 'copy-manifest-content',
-        closeBundle() {
-          const src = resolve(__dirname, `public/manifest.${browser}.json`);
-          const dest = resolve(__dirname, `${outDir}/manifest.json`);
-          copyFileSync(src, dest);
-        },
+         closeBundle() {
+           const src = resolve(__dirname, `public/manifest.${browser}.json`);
+           const destDir = resolve(__dirname, outDir);
+           const dest = resolve(destDir, 'manifest.json');
+           mkdirSync(destDir, { recursive: true });
+           copyFileSync(src, dest);
+         },
+
       },
     ],
   };

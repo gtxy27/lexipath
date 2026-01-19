@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { copyFileSync } from 'fs';
+import { copyFileSync, mkdirSync } from 'fs';
 
 function copyManifestPlugin(params: { isFirefox: boolean; browser: 'firefox' | 'chrome' }) {
   return {
@@ -9,7 +9,9 @@ function copyManifestPlugin(params: { isFirefox: boolean; browser: 'firefox' | '
     closeBundle() {
       const outDir = params.isFirefox ? 'dist/firefox' : 'dist/chrome';
       const src = resolve(__dirname, `public/manifest.${params.browser}.json`);
-      const dest = resolve(__dirname, `${outDir}/manifest.json`);
+      const destDir = resolve(__dirname, outDir);
+      const dest = resolve(destDir, 'manifest.json');
+      mkdirSync(destDir, { recursive: true });
       copyFileSync(src, dest);
     },
   };
