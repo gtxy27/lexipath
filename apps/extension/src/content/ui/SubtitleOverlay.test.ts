@@ -240,6 +240,67 @@ describe('SubtitleOverlay', () => {
       expect(subtitleElement?.querySelector('.lexipath-subtitle-word')).toBeNull();
       expect(subtitleElement?.textContent).toContain('the hero');
     });
+
+    it('prefers longer overlapping terms deterministically', () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      const lines: SubtitleLine[] = [{ text: 'hello', isEnhanced: true }];
+      overlay.display({ mode: 'enhanced', lines, interactiveWords: new Set(['hell', 'hello']) });
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
+
+      const highlighted = subtitleElement?.querySelectorAll('.lexipath-subtitle-word') ?? [];
+      expect(highlighted).toHaveLength(1);
+      expect(highlighted[0]?.textContent).toBe('hello');
+    });
+
+    it('matches curly apostrophes and preserves offsets', () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      const lines: SubtitleLine[] = [{ text: 'We don’t know.', isEnhanced: true }];
+      overlay.display({ mode: 'enhanced', lines, interactiveWords: new Set([`don't`]) });
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
+
+      const highlighted = subtitleElement?.querySelectorAll('.lexipath-subtitle-word') ?? [];
+      expect(Array.from(highlighted).some((node) => node.textContent === 'don’t')).toBe(true);
+    });
+
+    it('matches en-dash and preserves offsets', () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      const lines: SubtitleLine[] = [{ text: 'A well–known fact.', isEnhanced: true }];
+      overlay.display({ mode: 'enhanced', lines, interactiveWords: new Set(['well-known']) });
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
+
+      const highlighted = subtitleElement?.querySelectorAll('.lexipath-subtitle-word') ?? [];
+      expect(Array.from(highlighted).some((node) => node.textContent === 'well–known')).toBe(true);
+    });
+
+    it('does not match inside ASCII word characters (underscore boundary)', () => {
+      const overlay = new SubtitleOverlay('youtube');
+      overlay.mount();
+
+      const lines: SubtitleLine[] = [{ text: 'foo_bar', isEnhanced: true }];
+      overlay.display({ mode: 'enhanced', lines, interactiveWords: new Set(['foo']) });
+
+      const container = videoContainer.querySelector('#lexipath-subtitle-overlay') as HTMLDivElement;
+      const shadow = container?.shadowRoot;
+      const subtitleElement = shadow?.querySelector('.lexipath-subtitle');
+
+      expect(subtitleElement?.querySelector('.lexipath-subtitle-word')).toBeNull();
+      expect(subtitleElement?.textContent).toContain('foo_bar');
+    });
   });
 
   describe('clear', () => {

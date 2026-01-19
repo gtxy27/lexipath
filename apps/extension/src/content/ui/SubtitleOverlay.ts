@@ -6,9 +6,10 @@
  */
 
 import { getI18nMessage } from '../i18n';
+import { buildHighlightOffsets, lowerForMatch } from '@lexipath/core';
 import { createLogger, getErrorMessage } from '@lexipath/core/log';
 
-import { WordCardController } from './SubtitleWordCardController'; 
+import { WordCardController } from './SubtitleWordCardController';
 
 const log = createLogger('subtitle-overlay');
 
@@ -123,7 +124,7 @@ export class SubtitleOverlay {
    */
   mount(): boolean {
     if (this.container) {
-      log.warn('Already mounted');
+      log.debug('Already mounted');
       return true;
     }
 
@@ -368,7 +369,7 @@ export class SubtitleOverlay {
    */
   display(options: SubtitleDisplayOptions): void {
     if (!this.subtitleElement || !this.subtitleLinesElement) {
-      log.warn('Not mounted');
+      log.debug('Not mounted');
       return;
     }
 
@@ -651,40 +652,40 @@ export class SubtitleOverlay {
       return;
     }
 
-    const matches = this.findNonOverlappingTermMatches(text, terms);
-    if (matches.length === 0) {
+    const offsets = buildHighlightOffsets(text, terms);
+    if (offsets.length === 0) {
       container.appendChild(document.createTextNode(text));
       return;
     }
 
     let lastIndex = 0;
-    for (const match of matches) {
-      if (match.start > lastIndex) {
-        container.appendChild(document.createTextNode(text.slice(lastIndex, match.start)));
+    for (const offset of offsets) {
+      if (offset.start > lastIndex) {
+        container.appendChild(document.createTextNode(text.slice(lastIndex, offset.start)));
       }
 
       const span = document.createElement('span');
       span.className = 'lexipath-subtitle-word';
 
-      const wordText = text.slice(match.start, match.end);
+      const wordText = text.slice(offset.start, offset.end);
       const wordEl = document.createElement('span');
       wordEl.className = 'lexipath-subtitle-word__text';
       wordEl.textContent = wordText;
       span.appendChild(wordEl);
 
-      const translationRaw = showKeywordTranslations ? keywordTranslations?.[match.term] : undefined;
+      const translationRaw = showKeywordTranslations ? keywordTranslations?.[offset.term] : undefined;
       const translation = typeof translationRaw === 'string' ? translationRaw.trim() : '';
-      if (translation && translation.toLowerCase() !== match.term.toLowerCase()) {
+      if (translation && translation.toLowerCase() !== offset.term.toLowerCase()) {
         const sup = document.createElement('sup');
         sup.className = 'lexipath-subtitle-word__translation';
         sup.textContent = translation;
         span.appendChild(sup);
       }
 
-      span.dataset.lexipathWord = match.term;
+      span.dataset.lexipathWord = offset.term;
       container.appendChild(span);
 
-      lastIndex = match.end;
+      lastIndex = offset.end;
     }
 
     if (lastIndex < text.length) {
@@ -724,95 +725,7 @@ export class SubtitleOverlay {
   }
 
   private normalizeTerm(term: string): string {
-    const normalized = term
-      .replace(/\u2019/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-    return normalized;
-  }
-
-  private isAsciiWordChar(char: string | undefined): boolean {
-    if (!char) return false;
-    const code = char.charCodeAt(0);
-    const isDigit = code >= 48 && code <= 57;
-    const isUpper = code >= 65 && code <= 90;
-    const isLower = code >= 97 && code <= 122;
-    return isDigit || isUpper || isLower;
-  }
-
-  private matchRespectsBoundary(
-    normalizedText: string,
-    start: number,
-    end: number,
-    term: string
-  ): boolean {
-    const first = term[0];
-    const last = term[term.length - 1];
-
-    if (this.isAsciiWordChar(first)) {
-      const left = normalizedText[start - 1];
-      if (this.isAsciiWordChar(left)) return false;
-    }
-
-    if (this.isAsciiWordChar(last)) {
-      const right = normalizedText[end];
-      if (this.isAsciiWordChar(right)) return false;
-    }
-
-    return true;
-  }
-
-  private findNonOverlappingTermMatches(
-    text: string,
-    normalizedTerms: string[]
-  ): Array<{ start: number; end: number; term: string }> {
-    const normalizedText = text.replace(/\u2019/g, "'").toLowerCase();
-
-    // Keep selected ranges sorted by start so overlap checks are O(log n).
-    const selected: Array<{ start: number; end: number; term: string }> = [];
-
-    const tryInsertNonOverlapping = (candidate: { start: number; end: number; term: string }) => {
-      let lo = 0;
-      let hi = selected.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        const midStart = selected[mid]?.start ?? 0;
-        if (midStart < candidate.start) lo = mid + 1;
-        else hi = mid;
-      }
-
-      const prev = lo > 0 ? selected[lo - 1] : undefined;
-      if (prev && candidate.start < prev.end) return false;
-
-      const next = lo < selected.length ? selected[lo] : undefined;
-      if (next && candidate.end > next.start) return false;
-
-      selected.splice(lo, 0, candidate);
-      return true;
-    };
-
-    const terms = Array.from(new Set(normalizedTerms)).sort((a, b) => b.length - a.length || a.localeCompare(b));
-
-    for (const term of terms) {
-      if (!term) continue;
-      const termLen = term.length;
-      if (termLen === 0) continue;
-
-      let fromIndex = 0;
-      for (;;) {
-        const start = normalizedText.indexOf(term, fromIndex);
-        if (start === -1) break;
-        const end = start + termLen;
-        fromIndex = Math.max(end, start + 1);
-
-        if (!this.matchRespectsBoundary(normalizedText, start, end, term)) continue;
-
-        tryInsertNonOverlapping({ start, end, term });
-      }
-    }
-
-    return selected;
+    return lowerForMatch(term).replace(/\s+/g, ' ').trim();
   }
 
 
