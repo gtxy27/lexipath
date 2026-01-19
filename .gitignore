@@ -49,8 +49,9 @@ data/wordlists/*.txt
 !data/wordlists/jlpt-n5-n3.txt
 !data/wordlists/topik-1-2.txt
 
-# Generated seed file (created by local dictionary scripts)
-apps/extension/src/background/dictionary-seed.ts
+# Dictionary seed pipeline
+# (tracked; used to import built artifacts into IndexedDB)
+
 
 # Temporary files
 *.tmp
